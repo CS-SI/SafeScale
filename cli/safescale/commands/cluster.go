@@ -743,9 +743,8 @@ var clusterShrinkCommand = &cli.Command{
 		}
 
 		req := protocol.ClusterResizeRequest{
-			Name:   clusterName,
-			Action: protocol.ClusterResizeAction_CRA_SHRINK,
-			Count:  int32(count),
+			Name:  clusterName,
+			Count: int32(count),
 		}
 		_, err = client.New().Cluster.Shrink(req, temporal.GetLongOperationTimeout())
 		if err != nil {

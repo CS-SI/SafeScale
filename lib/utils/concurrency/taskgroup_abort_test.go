@@ -13,25 +13,25 @@ import (
 )
 
 // this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' and checks if abortion is requested between operations
-func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, err error) {
+func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
 	var iRes int
 
-	defer func(err *error) {
+	defer func(err *fail.Error) {
 		if st, _ := t.GetStatus(); st == ABORTED {
 			if iRes > 1 {
-				*err = fmt.Errorf("failure: the action must check the status from time to time")
+				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
-	}(&err)
+	}(&xerr)
 
 	if st, _ := t.GetStatus(); st == ABORTED {
 		fmt.Println("Exiting before real execution")
 		return iRes, nil
 	}
 
-	_, err = heavyDutyTask(10*time.Millisecond, true)
-	if err != nil {
-		return nil, err
+	_, xerr = heavyDutyTask(10*time.Millisecond, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	iRes++
 
@@ -40,9 +40,9 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 		return iRes, nil
 	}
 
-	_, err = heavyDutyTask(10*time.Millisecond, true)
-	if err != nil {
-		return nil, err
+	_, xerr = heavyDutyTask(10*time.Millisecond, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	iRes++
 
@@ -51,9 +51,9 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 		return iRes, nil
 	}
 
-	_, err = heavyDutyTask(10*time.Millisecond, true)
-	if err != nil {
-		return nil, err
+	_, xerr = heavyDutyTask(10*time.Millisecond, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	iRes++
 
@@ -62,53 +62,53 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 		return iRes, nil
 	}
 
-	return result, err
+	return result, xerr
 }
 
 // this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' but doesn't care checking for abortion
-func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, err error) {
+func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
 	var iRes int
 
-	defer func(err *error) {
+	defer func(err *fail.Error) {
 		if st, _ := t.GetStatus(); st == ABORTED {
 			if iRes > 1 {
-				*err = fmt.Errorf("failure: the action must check the status from time to time")
+				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
-	}(&err)
+	}(&xerr)
 
-	_, err = heavyDutyTask(10*time.Millisecond, true)
-	if err != nil {
-		return nil, err
+	_, xerr = heavyDutyTask(10*time.Millisecond, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	iRes++
 
-	_, err = heavyDutyTask(10*time.Millisecond, true)
-	if err != nil {
-		return nil, err
+	_, xerr = heavyDutyTask(10*time.Millisecond, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	iRes++
 
-	_, err = heavyDutyTask(10*time.Millisecond, true)
-	if err != nil {
-		return nil, err
+	_, xerr = heavyDutyTask(10*time.Millisecond, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	iRes++
 
-	return result, err
+	return result, xerr
 }
 
 // this function never returns, it just leaks
-func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, err error) {
+func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
 	var iRes int
 
-	defer func(err *error) {
+	defer func(err *fail.Error) {
 		if st, _ := t.GetStatus(); st == ABORTED {
 			if iRes > 1 {
-				*err = fmt.Errorf("failure: the action must check the status from time to time")
+				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
-	}(&err)
+	}(&xerr)
 
 	keep := true
 	for keep {
@@ -116,38 +116,38 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 		_, _ = heavyDutyTask(10*time.Millisecond, true)
 	}
 
-	return result, err
+	return result, xerr
 }
 
-func heavyDutyTask(duration time.Duration, wantedResult bool) (bool, error) {
+func heavyDutyTask(duration time.Duration, wantedResult bool) (bool, fail.Error) {
 	time.Sleep(duration * 2)
 
 	return wantedResult, nil
 }
 
 func TestGoodTaskActionCitizen(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
 	fmt.Println("Begin")
 
 	numChild := 10
 	for ind := 0; ind < numChild; ind++ {
-		_, err := overlord.Start(goodTaskActionCitizen, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		_, xerr := overlord.Start(goodTaskActionCitizen, nil)
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
 
 	begin := time.Now()
 	time.Sleep(12 * time.Millisecond)
-	err = overlord.Abort()
-	if err != nil {
+	xerr = overlord.Abort()
+	if xerr != nil {
 		t.Fail()
 	}
 
@@ -155,12 +155,12 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 
 	time.Sleep(12 * time.Millisecond)
 
-	_, err = overlord.WaitGroup()
-	if err != nil {
-		if eab, ok := err.(fail.Aborted); ok {
+	_, xerr = overlord.WaitGroup()
+	if xerr != nil {
+		if eab, ok := xerr.(fail.ErrAborted); ok {
 			cause := eab.Cause()
 			if causes, ok := cause.(fail.ErrorList); ok {
-				errList := causes.ToErrors()
+				errList := causes.ToErrorSlice()
 				errFound := false
 				for _, err := range errList {
 					if strings.Contains(err.Error(), "must check the status") {
@@ -191,28 +191,28 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 // }
 
 func TestBadTaskActionCitizen(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
 	fmt.Println("Begin")
 
 	numChild := 10
 	for ind := 0; ind < numChild; ind++ {
-		_, err := overlord.Start(badTaskActionCitizen, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		_, xerr := overlord.Start(badTaskActionCitizen, nil)
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
 
 	begin := time.Now()
 	time.Sleep(10 * time.Millisecond)
-	err = overlord.Abort()
-	if err != nil {
+	xerr = overlord.Abort()
+	if xerr != nil {
 		t.Fail()
 	}
 
@@ -220,12 +220,12 @@ func TestBadTaskActionCitizen(t *testing.T) {
 
 	time.Sleep(60 * time.Millisecond)
 
-	_, err = overlord.WaitGroup()
-	if err != nil {
-		if eab, ok := err.(fail.Aborted); ok {
+	_, xerr = overlord.WaitGroup()
+	if xerr != nil {
+		if eab, ok := xerr.(fail.ErrAborted); ok {
 			cause := eab.Cause()
 			if causes, ok := cause.(fail.ErrorList); ok {
-				errList := causes.ToErrors()
+				errList := causes.ToErrorSlice()
 				errFound := false
 				for _, err := range errList {
 					if strings.Contains(err.Error(), "must check the status") {
@@ -256,34 +256,34 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	overlord, err := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
 	fmt.Println("Begin")
 
 	numChild := 4 // No need to push it
 	for ind := 0; ind < numChild; ind++ {
-		_, err := overlord.Start(horribleTaskActionCitizen, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		_, xerr := overlord.Start(horribleTaskActionCitizen, nil)
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
 
 	time.Sleep(10 * time.Millisecond)
-	err = overlord.Abort()
-	if err != nil {
+	xerr = overlord.Abort()
+	if xerr != nil {
 		t.Fail()
 	}
 
 	time.Sleep(60 * time.Millisecond)
 
-	_, err = overlord.WaitGroup()
-	if err == nil { // It should fail because it's an aborted task...
+	_, xerr = overlord.WaitGroup()
+	if xerr == nil { // It should fail because it's an aborted task...
 		t.Fail()
 	}
 

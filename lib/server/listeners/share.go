@@ -46,20 +46,17 @@ type ShareListener struct{}
 
 // Create calls share service creation
 func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot create share").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create share")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -74,31 +71,37 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	sharePath := in.GetPath()
 	shareType := in.GetType()
 
-	job, err := PrepareJob(ctx, "", "share create")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "share create")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	// LEGACY: NFSExportOptions of protocol has been deprecated and replaced by OptionsAsString
 	if in.OptionsAsString == "" && in.Options != nil {
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(*in.Options)
 	}
 	svc := job.SafeGetService()
-	host, err := hostfactory.Load(task, svc, hostRef)
-	share, err := sharefactory.New(svc)
+	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+	rs, xerr := sharefactory.New(svc)
+	if xerr != nil {
+		return nil, xerr
+	}
 	if err != nil {
 		return nil, err
 	}
-	err = share.Create(
+	xerr = rs.Create(
 		task,
 		shareName,
-		host, sharePath,
+		rh, sharePath,
 		in.OptionsAsString,
 		// in.GetSecurityModes(),
 		// in.GetOptions().GetReadOnly(),
@@ -109,33 +112,30 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		// in.GetOptions().GetCrossMount(),
 		// in.GetOptions().GetSubtreeCheck(),
 	)
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
-	psml, err := share.ToProtocol(task)
-	if err != nil {
-		return nil, err
+	psml, xerr := rs.ToProtocol(task)
+	if xerr != nil {
+		return nil, xerr
 	}
 	return psml.Share, nil
 }
 
 // Delete call share service deletion
 func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot delete share").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete share")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -155,32 +155,28 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	share, err := sharefactory.Load(job.SafeGetTask(), job.SafeGetService(), shareName)
-	if err != nil {
-		return empty, err
+	rs, xerr := sharefactory.Load(job.SafeGetTask(), job.SafeGetService(), shareName)
+	if xerr != nil {
+		return empty, xerr
 	}
-	err = share.Delete(job.SafeGetTask())
-	if err != nil {
-		return empty, err
+	if xerr = rs.Delete(job.SafeGetTask()); xerr != nil {
+		return empty, xerr
 	}
 	return empty, nil
 }
 
 // ErrorList return the list of all available shares
 func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.ShareList, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot list shares").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list shares")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -190,20 +186,20 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "share list")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "share list")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
-	shares, err := handler.List()
-	if err != nil {
-		return nil, err
+	shares, xerr := handler.List()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	var pbshares []*protocol.ShareDefinition
@@ -218,20 +214,17 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 
 // Mount mounts share on a local directory of the given host
 func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot mount share").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot mount share")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -241,9 +234,9 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "share mount")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "share mount")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -253,33 +246,30 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	shareType := in.GetType()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
-	mount, err := handler.Mount(shareRef, hostRef, hostPath, in.GetWithCache())
-	if err != nil {
-		return nil, err
+	mount, xerr := handler.Mount(shareRef, hostRef, hostPath, in.GetWithCache())
+	if xerr != nil {
+		return nil, xerr
 	}
 	return converters.ShareMountFromPropertyToProtocol(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
 
 // Unmount unmounts share from the given host
 func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot unmount share").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot unmount share")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -289,9 +279,9 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "share unmount")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "share unmount")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -301,32 +291,28 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 	shareType := in.GetType()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
-	err = handler.Unmount(shareRef, hostRef)
-	if err != nil {
-		return empty, err
+	if xerr = handler.Unmount(shareRef, hostRef); xerr != nil {
+		return empty, xerr
 	}
 	return empty, nil
 }
 
 // Inspect shows the detail of a share and all connected clients
 func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot inspect share").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect share")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -336,31 +322,27 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		}
 	}
 
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	shareRef := srvutils.GetReference(in)
-	tracer := concurrency.NewTracer(task, true, "('%s')", shareRef).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-
-	job, err := PrepareJob(ctx, "", "share inspect")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "share inspect")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
+	shareRef := srvutils.GetReference(in)
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s')", shareRef).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	handler := handlers.NewShareHandler(job)
-	share, err := handler.Inspect(shareRef)
-	if err != nil {
-		return nil, err
+	rh, xerr := handler.Inspect(shareRef)
+	if xerr != nil {
+		return nil, xerr
 	}
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if share == nil {
+	if rh == nil {
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	return share.ToProtocol(task)
+	return rh.ToProtocol(task)
 }

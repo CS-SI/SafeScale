@@ -128,7 +128,7 @@ type stepTargets map[string]string
 
 // parse converts the content of specification file loaded inside struct to
 // standardized values (0, 1 or *)
-func (st stepTargets) parse() (string, string, string, string, error) {
+func (st stepTargets) parse() (string, string, string, string, fail.Error) {
 	var (
 		hostT, masterT, nodeT, gwT string
 		ok                         bool
@@ -153,7 +153,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "1":
 			hostT = "1"
 		default:
-			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", hostT, targetHosts)
+			return "", "", "", "", fail.SyntaxError("invalid value '%s' for target '%s'", hostT, targetHosts)
 		}
 	}
 
@@ -180,7 +180,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			masterT = "*"
 		default:
-			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", masterT, targetMasters)
+			return "", "", "", "", fail.SyntaxError("invalid value '%s' for target '%s'", masterT, targetMasters)
 		}
 	}
 
@@ -205,7 +205,7 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			nodeT = "*"
 		default:
-			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", nodeT, targetNodes)
+			return "", "", "", "", fail.SyntaxError("invalid value '%s' for target '%s'", nodeT, targetNodes)
 		}
 	}
 
@@ -232,12 +232,12 @@ func (st stepTargets) parse() (string, string, string, string, error) {
 		case "*":
 			gwT = "*"
 		default:
-			return "", "", "", "", fail.SyntaxReport("invalid value '%s' for target '%s'", gwT, targetGateways)
+			return "", "", "", "", fail.SyntaxError("invalid value '%s' for target '%s'", gwT, targetGateways)
 		}
 	}
 
 	if hostT == "0" && masterT == "0" && nodeT == "0" && gwT == "0" {
-		return "", "", "", "", fail.SyntaxReport("no targets identified")
+		return "", "", "", "", fail.SyntaxError("no targets identified")
 	}
 	return hostT, masterT, nodeT, gwT, nil
 }
@@ -266,12 +266,12 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, err error) {
+func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
 	outcomes = unitResults{}
 
 	tracer := concurrency.NewTracer(is.Worker.feature.task, true, "").Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	nHosts := uint(len(hosts))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),
@@ -286,22 +286,20 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			cloneV["HostIP"], err = h.GetPrivateIP(is.Worker.feature.task)
-			if err != nil {
-				return nil, err
+			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
+				return nil, xerr
 			}
 			cloneV["Hostname"] = h.SafeGetName()
-			cloneV, err = realizeVariables(cloneV)
-			if err != nil {
-				return nil, err
+			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
+				return nil, xerr
 			}
 			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
 			if err != nil {
 				return nil, err
 			}
-			outcome, err := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
-			if err != nil {
-				return nil, err
+			outcome, xerr := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
+			if xerr != nil {
+				return nil, xerr
 			}
 			outcomes.AddSingle(h.SafeGetName(), outcome.(resources.UnitResult))
 
@@ -328,33 +326,31 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			cloneV["HostIP"], err = h.GetPrivateIP(is.Worker.feature.task)
-			if err != nil {
-				return nil, err
+			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
+				return nil, xerr
 			}
 			cloneV["Hostname"] = h.SafeGetName()
-			cloneV, err = realizeVariables(cloneV)
-			if err != nil {
-				return nil, err
+			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
+				return nil, xerr
 			}
 			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
 			if err != nil {
 				return nil, err
 			}
 
-			subtask, err = subtask.Start(is.taskRunOnHost, data.Map{
+			subtask, xerr = subtask.Start(is.taskRunOnHost, data.Map{
 				"host":      h,
 				"variables": cloneV,
 			})
-			if err != nil {
-				return nil, err
+			if xerr != nil {
+				return nil, xerr
 			}
 
 			subtasks[h.SafeGetName()] = subtask
 		}
 		for k, s := range subtasks {
-			outcome, err := s.Wait()
-			if err != nil {
+			outcome, xerr := s.Wait()
+			if xerr != nil {
 				logrus.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
 					is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
 				continue
@@ -384,45 +380,45 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	var (
 		p  = data.Map{}
 		ok bool
 	)
 	if params != nil {
 		if p, ok = params.(data.Map); !ok {
-			return nil, fail.InvalidParameterReport("params", "must be a 'data.Map'")
+			return nil, fail.InvalidParameterError("params", "must be a 'data.Map'")
 		}
 	}
 
 	// Get parameters
-	host, ok := p["host"].(resources.Host)
+	rh, ok := p["rh"].(resources.Host)
 	if !ok {
-		return nil, fail.InvalidParameterReport("params['host']", "must be a 'resources.Host'")
+		return nil, fail.InvalidParameterError("params['rh']", "must be a 'resources.Host'")
 	}
 	variables, ok := p["variables"].(data.Map)
 	if !ok {
-		return nil, fail.InvalidParameterReport("params['variables'", "must be a 'data.Map'")
+		return nil, fail.InvalidParameterError("params['variables'", "must be a 'data.Map'")
 	}
 
 	// Updates variables in step script
-	command, err := replaceVariablesInString(is.Script, variables)
-	if err != nil {
-		return stepResult{err: fail.Wrap(err, "failed to finalize installer script for step '%s'", is.Name)}, nil
+	command, xerr := replaceVariablesInString(is.Script, variables)
+	if xerr != nil {
+		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, nil
 	}
 
-	// If options file is defined, upload it to the remote host
+	// If options file is defined, upload it to the remote rh
 	if is.OptionsFileContent != "" {
-		// err := UploadStringToRemoteFile(is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
+		// err := UploadStringToRemoteFile(is.OptionsFileContent, rh, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
 		rfcItem := remotefile.Item{
 			Remote:       utils.TempFolder + "/options.json",
 			RemoteOwner:  "cladm:safescale",
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
-		err = rfcItem.UploadString(task, is.OptionsFileContent, host)
+		xerr = rfcItem.UploadString(task, is.OptionsFileContent, rh)
 		_ = os.Remove(rfcItem.Local)
-		if err != nil {
-			return stepResult{err: err}, nil
+		if xerr != nil {
+			return stepResult{err: xerr}, nil
 		}
 	}
 
@@ -436,14 +432,14 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.SafeGetName(), strings.ToLower(is.Action.String()), is.Name)
-	// err = UploadStringToRemoteFile(command, host, filename, "", "")
+	// err = UploadStringToRemoteFile(command, rh, filename, "", "")
 	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
-	err = rfcItem.UploadString(task, command, host)
+	xerr = rfcItem.UploadString(task, command, rh)
 	_ = os.Remove(rfcItem.Local)
-	if err != nil {
-		return stepResult{err: err}, nil
+	if xerr != nil {
+		return stepResult{err: xerr}, nil
 	}
 
 	if !hidesOutput {
@@ -452,17 +448,14 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
 	}
 
-	// Executes the script on the remote host
-	retcode, outrun, _, err := host.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
-	if err != nil {
-		return stepResult{err: err, output: outrun}, nil
+	// Executes the script on the remote rh
+	_, outrun, _, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	if xerr != nil {
+		_ = xerr.Annotate("sdtdout", outrun)
+		return stepResult{err: xerr, output: outrun}, nil
 	}
-	err = nil
-	ok = retcode == 0
-	if !ok {
-		err = fail.ReturnedValuesFromShellToError(retcode, outrun, "", err, "failure")
-	}
-	return stepResult{success: ok, completed: true, err: err, output: outrun}, nil
+	xerr = nil
+	return stepResult{success: ok, completed: true, err: nil, output: outrun}, nil
 }
 
 // func clitools.ReturnValuesFromShellToError(retcode int, stdout string, stderr string, err error, msg string) error {
@@ -490,33 +483,33 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 // 		if err != nil {
 // 			return fail.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
 // 		}
-// 		return fail.NewReport("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
+// 		return fail.NewError("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
 // 	}
 
 // 	if err != nil {
 // 		return fail.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
 // 	}
 // 	if retcode != 0 {
-// 		return fail.NewReport("%s: failed with error code %s", msg, richErrc)
+// 		return fail.NewError("%s: failed with error code %s", msg, richErrc)
 // 	}
 
 // 	return nil
 // }
 
 // realizeVariables replaces in every variable any template
-func realizeVariables(variables data.Map) (data.Map, error) {
+func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 	cloneV := variables.Clone()
 
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok {
 			varTemplate, err := template.New("realize_var").Parse(variable)
 			if err != nil {
-				return nil, fail.SyntaxReport("error parsing variable '%s': %s", k, err.Error())
+				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, err.Error())
 			}
 			buffer := bytes.NewBufferString("")
 			err = varTemplate.Execute(buffer, variables)
 			if err != nil {
-				return nil, err
+				return nil, fail.ToError(err)
 			}
 			cloneV[k] = buffer.String()
 		}
@@ -525,10 +518,10 @@ func realizeVariables(variables data.Map) (data.Map, error) {
 	return cloneV, nil
 }
 
-func replaceVariablesInString(text string, v data.Map) (string, error) {
+func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
 	tmpl, err := template.New("text").Parse(text)
 	if err != nil {
-		return "", fail.SyntaxReport("failed to parse: %s", err.Error())
+		return "", fail.SyntaxError("failed to parse: %s", err.Error())
 	}
 	dataBuffer := bytes.NewBufferString("")
 	err = tmpl.Execute(dataBuffer, v)

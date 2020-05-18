@@ -45,20 +45,17 @@ type NetworkListener struct{}
 
 // Create a new network
 func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefinition) (_ *protocol.Network, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot create network").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create network")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -70,19 +67,19 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 
 	networkName := in.GetName()
 	if networkName == "" {
-		return nil, fail.InvalidRequestReport("network name cannot be empty string")
+		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, err := PrepareJob(ctx, "", fmt.Sprintf("network create '%s'", networkName))
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("network create '%s'", networkName))
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var (
 		sizing    *abstract.HostSizingRequirements
@@ -91,9 +88,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	)
 	if in.Gateway != nil {
 		if in.Gateway.SizingAsString != "" {
-			sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
-			if err != nil {
-				return nil, err
+			sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
+			if xerr != nil {
+				return nil, xerr
 			}
 		} else if in.Gateway.Sizing != nil {
 			sizing = converters.HostSizingRequirementsFromProtocolToAbstract(*in.Gateway.Sizing)
@@ -105,7 +102,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	sizing.Image = in.Gateway.GetImageId()
 
 	handler := handlers.NewNetworkHandler(job)
-	network, err := handler.Create(
+	network, xerr := handler.Create(
 		networkName,
 		in.GetCidr(),
 		ipversion.IPv4,
@@ -115,8 +112,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		in.FailOver,
 		in.KeepOnFailure,
 	)
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	tracer.Trace("Network '%s' successfuly created.", networkName)
@@ -125,20 +122,17 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 
 // ErrorList existing networks
 func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequest) (_ *protocol.NetworkList, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot list networks").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list networks")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -156,7 +150,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	networks, err := handler.List(in.GetAll())
@@ -175,20 +169,17 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot inspect network").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect network")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -200,44 +191,41 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id given as reference")
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "network inspect")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "network inspect")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	network, err := networkfactory.Load(task, job.SafeGetService(), ref)
-	if err != nil {
-		return nil, err
+	network, xerr := networkfactory.Load(task, job.SafeGetService(), ref)
+	if xerr != nil {
+		return nil, xerr
 	}
 	return network.ToProtocol(task)
 }
 
 // Delete a network
 func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot delete network").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete network")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -249,28 +237,28 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, fail.InvalidRequestReport("cannot delete network: neither name nor id given as reference")
+		return empty, fail.InvalidRequestError("cannot delete network: neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "delete network")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "delete network")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
-	_, err = job.SafeGetTask().Run(
-		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	_, xerr = job.SafeGetTask().Run(
+		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 			return nil, handler.Delete(ref)
 		},
 		nil,
 	)
-	if err != nil {
-		return empty, err
+	if xerr != nil {
+		return empty, xerr
 	}
 
 	tracer.Trace("Network '%s' successfully deleted.", ref)

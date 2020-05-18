@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -58,29 +59,29 @@ func nullNetwork() *network {
 }
 
 // NewNetwork creates an instance of Network
-func NewNetwork(svc iaas.Service) (resources.Network, error) {
+func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {
-		return nullNetwork(), fail.InvalidParameterReport("svc", "cannot be nil")
+		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	core, err := NewCore(svc, "network", networksFolderName, &abstract.Network{})
-	if err != nil {
-		return nullNetwork(), err
+	core, xerr := NewCore(svc, "network", networksFolderName, &abstract.Network{})
+	if xerr != nil {
+		return nullNetwork(), xerr
 	}
 
 	return &network{core: core}, nil
 }
 
 // LoadNetwork loads the metadata of a network
-func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Report) {
+func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
 	if task == nil {
-		return nullNetwork(), fail.InvalidParameterReport("task", "cannot be nil")
+		return nullNetwork(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nullNetwork(), fail.InvalidParameterReport("svc", "cannot be nil")
+		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nullNetwork(), fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	objn, err := NewNetwork(svc)
@@ -94,10 +95,10 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		10*time.Second, // FIXME: parameterize
 	)
 	if err != nil {
-		// If retry timed out, log it and return error NotFound
+		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := err.(retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of network '%s'", ref)
-			err = fail.NotFoundReport("network '%s' not found: %s", ref, fail.Cause(err).Error())
+			err = fail.NotFoundError("network '%s' not found: %s", ref, fail.Cause(err).Error())
 		}
 		return nullNetwork(), err
 	}
@@ -110,12 +111,12 @@ func (objn *network) IsNull() bool {
 }
 
 // Create creates a network
-func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (err error) {
+func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	if objn.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(
@@ -124,67 +125,65 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
 	// Check if network already exists and is managed by SafeScale
 	svc := objn.SafeGetService()
-	_, err = LoadNetwork(task, svc, req.Name)
-	if err == nil {
-		return fail.DuplicateReport("network '%s' already exists", req.Name)
+	if _, xerr = LoadNetwork(task, svc, req.Name); xerr == nil {
+		return fail.DuplicateError("network '%s' already exists", req.Name)
 	}
 
 	// Verify if the network already exist and in this case is not managed by SafeScale
-	_, err = svc.GetNetworkByName(req.Name)
-	if err != nil {
-		switch err.(type) {
-		case fail.NotFound:
-		case fail.InvalidRequest, fail.Timeout:
-			return err
+	if _, xerr = svc.GetNetworkByName(req.Name); xerr != nil {
+		switch xerr.(type) {
+		case fail.ErrNotFound:
+		case fail.ErrInvalidRequest, fail.ErrTimeout:
+			return xerr
 		default:
-			return err
+			return xerr
 		}
 	} else {
-		return fail.DuplicateReport("network '%s' already exists (not managed by SafeScale)", req.Name)
+		return fail.DuplicateError("network '%s' already exists (not managed by SafeScale)", req.Name)
 	}
 
 	// Verify the CIDR is not routable
 	if req.CIDR != "" {
-		routable, err := utils.IsCIDRRoutable(req.CIDR)
-		if err != nil {
-			return fail.Wrap(err, "failed to determine if CIDR is not routable")
+		routable, xerr := utils.IsCIDRRoutable(req.CIDR)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
 		}
 		if routable {
-			return fail.InvalidRequestReport("cannot create such a network, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
+			return fail.InvalidRequestError("cannot create such a network, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
 		}
 	}
 
 	// Create the network
 	logrus.Debugf("Creating network '%s' ...", req.Name)
-	an, err := svc.CreateNetwork(req)
-	if err != nil {
-		switch err.(type) {
-		case fail.NotFound, fail.InvalidRequest, fail.Timeout:
-			return err
+	an, xerr := svc.CreateNetwork(req)
+	if xerr != nil {
+		switch xerr.(type) {
+		case fail.ErrNotFound, fail.ErrInvalidRequest, fail.ErrTimeout:
+			return xerr
 		default:
-			return err
+			return xerr
 		}
 	}
 
 	// Starting from here, delete network if exiting with error
 	defer func() {
-		if err != nil && an != nil && !req.KeepOnFailure {
+		if xerr != nil && an != nil && !req.KeepOnFailure {
 			derr := svc.DeleteNetwork(an.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case fail.NotFound:
+				case fail.ErrNotFound:
 					logrus.Errorf("failed to delete network, resource not found: %+v", derr)
-				case fail.Timeout:
+				case fail.ErrTimeout:
 					logrus.Errorf("failed to delete network, timeout: %+v", derr)
 				default:
 					logrus.Errorf("failed to delete network, other reason: %+v", derr)
 				}
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -202,24 +201,23 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Creates VIP for gateways if asked for
 	if failover {
-		an.VIP, err = svc.CreateVIP(an.ID, fmt.Sprintf("for gateways of network %s", an.Name))
-		if err != nil {
-			switch err.(type) {
-			case fail.NotFound, fail.Timeout:
-				return err
+		if an.VIP, xerr = svc.CreateVIP(an.ID, fmt.Sprintf("for gateways of network %s", an.Name)); xerr != nil {
+			switch xerr.(type) {
+			case fail.ErrNotFound, fail.ErrTimeout:
+				return xerr
 			default:
-				return err
+				return xerr
 			}
 		}
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
-			if err != nil && !req.KeepOnFailure {
+			if xerr != nil && !req.KeepOnFailure {
 				if an != nil {
 					derr := svc.DeleteVIP(an.VIP)
 					if derr != nil {
 						logrus.Errorf("failed to delete VIP: %+v", derr)
-						err = fail.AddConsequence(err, derr)
+						_ = xerr.AddConsequence(derr)
 					}
 				}
 			}
@@ -228,38 +226,37 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 	// Write network object metadata
 	// logrus.Debugf("Saving network metadata '%s' ...", network.Name)
-	err = objn.Carry(task, an)
-	if err != nil {
-		return err
+	if xerr = objn.Carry(task, an); xerr != nil {
+		return xerr
 	}
 
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
-		if err != nil && !req.KeepOnFailure {
+		if xerr != nil && !req.KeepOnFailure {
 			derr := objn.core.Delete(task)
 			if derr != nil {
 				logrus.Errorf("failed to delete network metadata: %+v", derr)
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
 
-	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		an.NetworkState = networkstate.GATEWAY_CREATION
 		return nil
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	var template *abstract.HostTemplate
-	tpls, err := svc.SelectTemplatesBySize(*gwSizing, false)
-	if err != nil {
-		return fail.Wrap(err, "failed to find appropriate template")
+	tpls, xerr := svc.SelectTemplatesBySize(*gwSizing, false)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to find appropriate template")
 	}
 	if len(tpls) > 0 {
 		template = tpls[0]
@@ -277,7 +274,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		msg += ")"
 		logrus.Infof(msg)
 	} else {
-		return fail.NotFoundReport("error creating network: no host template matching requirements for gateway")
+		return fail.NotFoundError("error creating network: no host template matching requirements for gateway")
 	}
 	if req.Image == "" {
 		// if gwSizing.Image != "" {
@@ -285,16 +282,16 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		// }
 	}
 	if req.Image == "" {
-		cfg, err := svc.GetConfigurationOptions()
-		if err != nil {
-			return err
+		cfg, xerr := svc.GetConfigurationOptions()
+		if xerr != nil {
+			return xerr
 		}
 		req.Image = cfg.GetString("DefaultImage")
 		gwSizing.Image = req.Image
 	}
-	img, err := svc.SearchImage(req.Image)
-	if err != nil {
-		return fail.Wrap(err, "unable to create network gateway")
+	img, xerr := svc.SearchImage(req.Image)
+	if xerr != nil {
+		return fail.Wrap(xerr, "unable to create network gateway")
 	}
 
 	networkName := objn.SafeGetName()
@@ -309,9 +306,9 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	keypairName := "kp_" + networkName
-	keypair, err := svc.CreateKeyPair(keypairName)
-	if err != nil {
-		return err
+	keypair, xerr := svc.CreateKeyPair(keypairName)
+	if xerr != nil {
+		return xerr
 	}
 
 	gwRequest := abstract.HostRequest{
@@ -326,7 +323,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		primaryGateway, secondaryGateway   resources.Host
 		primaryUserdata, secondaryUserdata *userdata.Content
 		primaryTask, secondaryTask         concurrency.Task
-		secondaryErr                       error
+		secondaryErr                       fail.Error
 		secondaryResult                    concurrency.TaskResult
 	)
 
@@ -368,29 +365,29 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	if primaryErr == nil {
 		result, ok := primaryResult.(data.Map)
 		if !ok {
-			return fail.InconsistentReport("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
+			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
 		}
 		primaryGateway = result["host"].(resources.Host)
 		primaryUserdata = result["userdata"].(*userdata.Content)
 
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
-			if err != nil && !req.KeepOnFailure {
+			if xerr != nil && !req.KeepOnFailure {
 				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.SafeGetName())
 				derr := objn.deleteGateway(task, primaryGateway)
 				if derr != nil {
 					switch derr.(type) {
-					case fail.Timeout:
+					case fail.ErrTimeout:
 						logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 					default:
 					}
-					err = fail.AddConsequence(err, derr)
+					_ = xerr.AddConsequence(derr)
 				} else {
 					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", primaryGateway.SafeGetName())
 				}
 				if failover {
 					failErr := objn.unbindHostFromVIP(task, an.VIP, primaryGateway)
-					err = fail.AddConsequence(err, failErr)
+					_ = xerr.AddConsequence(failErr)
 				}
 			}
 		}()
@@ -400,7 +397,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		if secondaryErr == nil {
 			result, ok := secondaryResult.(data.Map)
 			if !ok {
-				return fail.InconsistentReport("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
+				return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
 			}
 
 			secondaryGateway = result["host"].(resources.Host)
@@ -408,18 +405,20 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
-				if err != nil && !req.KeepOnFailure {
+				if xerr != nil && !req.KeepOnFailure {
 					derr := objn.deleteGateway(task, secondaryGateway)
 					if derr != nil {
 						switch derr.(type) {
-						case fail.Timeout:
+						case fail.ErrTimeout:
 							logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
 						default:
 						}
-						err = fail.AddConsequence(err, derr)
+						_ = xerr.AddConsequence(derr)
 					}
 					failErr := objn.unbindHostFromVIP(task, an.VIP, secondaryGateway)
-					err = fail.AddConsequence(err, failErr)
+					if failErr != nil {
+						_ = xerr.AddConsequence(failErr)
+					}
 				}
 			}()
 		}
@@ -432,10 +431,10 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	}
 
 	// Update metadata of network object
-	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		// an.GatewayID = primaryGateway.SafeGetID()
@@ -462,64 +461,60 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 		return nil
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// As hosts are gateways, the configuration stopped on phase 'netsec', the remaining phases 'hwga', 'sysfix' and 'final' have to be run
-	primaryTask, err = concurrency.NewTask()
-	if err != nil {
-		return err
+	if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
+		return xerr
 	}
-	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		an.NetworkState = networkstate.GATEWAY_CONFIGURATION
 		return nil
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
-	primaryTask, err = primaryTask.Start(objn.taskFinalizeGatewayConfiguration, data.Map{
+	primaryTask, xerr = primaryTask.Start(objn.taskFinalizeGatewayConfiguration, data.Map{
 		"host":     primaryGateway,
 		"userdata": primaryUserdata,
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 	if failover && secondaryTask != nil {
-		secondaryTask, err = concurrency.NewTask()
-		if err != nil {
-			return err
+		if secondaryTask, xerr = concurrency.NewTask(); xerr != nil {
+			return xerr
 		}
-		secondaryTask, err = secondaryTask.Start(objn.taskFinalizeGatewayConfiguration, data.Map{
+		secondaryTask, xerr = secondaryTask.Start(objn.taskFinalizeGatewayConfiguration, data.Map{
 			"host":     secondaryGateway,
 			"userdata": secondaryUserdata,
 		})
-		if err != nil {
-			return err
+		if xerr != nil {
+			return xerr
 		}
 	}
-	_, primaryErr = primaryTask.Wait()
-	if primaryErr != nil {
+	if _, primaryErr = primaryTask.Wait(); primaryErr != nil {
 		return primaryErr
 	}
 	if failover && secondaryTask != nil {
-		_, secondaryErr = secondaryTask.Wait()
-		if secondaryErr != nil {
+		if _, secondaryErr = secondaryTask.Wait(); secondaryErr != nil {
 			return secondaryErr
 		}
 	}
 
 	// Updates network state in metadata
 	// logrus.Debugf("Updating network metadata '%s' ...", network.Name)
-	return objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	return objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		an.NetworkState = networkstate.READY
 		return nil
@@ -528,96 +523,99 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
 // deleteGateway eases a gateway deletion
 // Note: doesn't use gw.Delete() because by rule a Delete on a gateway is not permitted
-func (objn *network) deleteGateway(task concurrency.Task, gw resources.Host) (err error) {
+func (objn *network) deleteGateway(task concurrency.Task, gw resources.Host) (xerr fail.Error) {
 	name := gw.SafeGetName()
-	err = objn.SafeGetService().DeleteHost(gw.SafeGetID())
-	if err != nil {
-		switch err.(type) {
-		case fail.NotFound: // host resource not found, considered as a success.
+	fail.OnExitLogError(fmt.Sprintf("failed to delete gateway '%s'", name), &xerr)
+
+	var errors []error
+	if xerr = objn.SafeGetService().DeleteHost(gw.SafeGetID()); xerr != nil {
+		switch xerr.(type) {
+		case fail.ErrNotFound: // host resource not found, considered as a success.
 			break
-		case fail.Timeout:
-			logrus.Errorf("Failed to delete host '%s', timeout: %v", name, err)
+		case fail.ErrTimeout:
+			errors = append(errors, fail.Wrap(xerr, "failed to delete host '%s', timeout", name))
 		default:
-			logrus.Errorf("Failed to delete host '%s': %v", name, err)
+			errors = append(errors, fail.Wrap(xerr, "failed to delete host '%s'", name))
 		}
 	}
-	err = gw.(*host).core.Delete(task)
-	if err != nil {
-		switch err.(type) {
-		case fail.NotFound: // host metadata not found, considered as a success.
-			return nil
-		case fail.Timeout:
-			logrus.Errorf("Failed to delete gateway '%s' metadata, timeout: %v", name, err)
+	if xerr = gw.(*host).core.Delete(task); xerr != nil {
+		switch xerr.(type) {
+		case fail.ErrNotFound: // host metadata not found, considered as a success.
+			break
+		case fail.ErrTimeout:
+			errors = append(errors, fail.Wrap(xerr, "timeout trying to delete gateway metadata", name))
 		default:
-			logrus.Errorf("Failed to delete gateway '%s' metadata: %v", name, err)
+			errors = append(errors, fail.Wrap(xerr, "failed to delete gateway '%s' metadata", name))
 		}
 	}
-	return err
+	if len(errors) > 0 {
+		return fail.NewErrorList(errors)
+	}
+	return nil
 }
 
-func (objn *network) unbindHostFromVIP(task concurrency.Task, vip *abstract.VirtualIP, host resources.Host) error {
+func (objn *network) unbindHostFromVIP(task concurrency.Task, vip *abstract.VirtualIP, host resources.Host) fail.Error {
 	name := host.SafeGetName()
-	err := objn.SafeGetService().UnbindHostFromVIP(vip, host.SafeGetID())
-	if err != nil {
-		switch err.(type) {
-		case fail.NotFound, fail.Timeout:
-			logrus.Debugf("Cleaning up on failure, failed to remove '%s' gateway bind from VIP: %v", name, err)
+	if xerr := objn.SafeGetService().UnbindHostFromVIP(vip, host.SafeGetID()); xerr != nil {
+		switch xerr.(type) {
+		case fail.ErrNotFound, fail.ErrTimeout:
+			logrus.Debugf("Cleaning up on failure, failed to remove '%s' gateway bind from VIP: %v", name, xerr)
 		default:
-			logrus.Debugf("Cleaning up on failure, failed to remove '%s' gateway bind from VIP: %v", name, err)
+			logrus.Debugf("Cleaning up on failure, failed to remove '%s' gateway bind from VIP: %v", name, xerr)
 		}
-		return err
+		return xerr
 	}
 	logrus.Infof("Cleaning up on failure, host '%s' bind removed from VIP", name)
 	return nil
 }
 
 // Browse walks through all the metadata objects in network
-func (objn *network) Browse(task concurrency.Task, callback func(*abstract.Network) error) error {
+func (objn *network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error {
 	if objn.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "can't be nil")
+		return fail.InvalidParameterError("task", "can't be nil")
 	}
 	if callback == nil {
-		return fail.InvalidParameterReport("callback", "can't be nil")
+		return fail.InvalidParameterError("callback", "can't be nil")
 	}
 
-	return objn.core.BrowseFolder(task, func(buf []byte) error {
+	return objn.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		an := abstract.NewNetwork()
-		err := an.Deserialize(buf)
-		if err != nil {
-			return err
+		xerr := an.Deserialize(buf)
+		if xerr != nil {
+			return xerr
 		}
 		return callback(an)
 	})
 }
 
 // AttachHost links host ID to the network
-func (objn *network) AttachHost(task concurrency.Task, host resources.Host) (err error) {
+func (objn *network) AttachHost(task concurrency.Task, host resources.Host) (xerr fail.Error) {
 	if objn.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if host == nil {
-		return fail.InvalidParameterReport("host", "cannot be nil")
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "("+host.SafeGetName()+")").Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+	defer fail.OnPanic(&xerr)
 
 	hostID := host.SafeGetID()
 	hostName := host.SafeGetName()
 
-	return objn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
+	return objn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			networkHostsV1.ByID[hostID] = hostName
 			networkHostsV1.ByName[hostName] = hostID
@@ -627,27 +625,27 @@ func (objn *network) AttachHost(task concurrency.Task, host resources.Host) (err
 }
 
 // DetachHost unlinks host ID from network
-func (objn *network) DetachHost(task concurrency.Task, hostID string) (err error) {
+func (objn *network) DetachHost(task concurrency.Task, hostID string) (xerr fail.Error) {
 	if objn.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterReport("hostID", "cannot be empty string")
+		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "('"+hostID+"')").Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
-	return objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
+	return objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			hostName, found := networkHostsV1.ByID[hostID]
 			if found {
@@ -660,53 +658,49 @@ func (objn *network) DetachHost(task concurrency.Task, hostID string) (err error
 }
 
 // ListHosts returns the list of Host attached to the network (excluding gateway)
-func (objn *network) ListHosts(task concurrency.Task) (_ []resources.Host, err error) {
+func (objn *network) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail.Error) {
 	if objn.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, true, "").Entering()
-	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	defer concurrency.NewTracer(task, debug.ShouldTrace("resources.network")).Entering().OnExitTrace()
+	defer fail.OnExitLogError("error listing hosts", &xerr)
+	defer fail.OnPanic(&xerr)
 
 	var list []resources.Host
-	err = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
+	xerr = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			svc := objn.SafeGetService()
 			for id := range networkHostsV1.ByID {
-				host, err := LoadHost(task, svc, id)
-				if err != nil {
-					return err
+				host, innerErr := LoadHost(task, svc, id)
+				if innerErr != nil {
+					return innerErr
 				}
 				list = append(list, host)
 			}
 			return nil
 		})
 	})
-	if err != nil {
-		logrus.Errorf("Report listing hosts: %+v", err)
-	}
-	return list, nil
+	return list, xerr
 }
 
 // GetGateway returns the gateway related to network
-func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resources.Host, err error) {
+func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resources.Host, xerr fail.Error) {
 	if objn.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	defer fail.OnPanic(&err)
+	defer fail.OnPanic(&xerr)
 
 	primaryStr := "primary"
 	if !primary {
@@ -714,14 +708,14 @@ func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resource
 	}
 	tracer := concurrency.NewTracer(nil, true, "(%s)", primaryStr).Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
 	var gatewayID string
-	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if primary {
 			gatewayID = an.GatewayID
@@ -730,11 +724,11 @@ func (objn *network) GetGateway(task concurrency.Task, primary bool) (_ resource
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 	if gatewayID == "" {
-		return nil, fail.NotFoundReport("no %s gateway ID found in network properties", primaryStr)
+		return nil, fail.NotFoundError("no %s gateway ID found in network properties", primaryStr)
 	}
 	return LoadHost(task, objn.SafeGetService(), gatewayID)
 }
@@ -746,37 +740,37 @@ func (objn *network) SafeGetGateway(task concurrency.Task, primary bool) resourc
 }
 
 // Delete deletes network referenced by ref
-func (objn *network) Delete(task concurrency.Task) (err error) {
+func (objn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	if objn.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+	defer fail.OnPanic(&xerr)
 
 	objn.SafeLock(task)
 	defer objn.SafeUnlock(task)
 
 	// var gwID string
-	err = objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+	xerr = objn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		svc := objn.SafeGetService()
 
 		// Check if hosts are still attached to network according to metadata
 		var errorMsg string
-		innerErr := props.Inspect(task, networkproperty.HostsV1, func(clonable data.Clonable) error {
+		innerErr := props.Inspect(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			hostsLen := uint(len(networkHostsV1.ByName))
 			if hostsLen > 0 {
@@ -790,7 +784,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				}
 				errorMsg = fmt.Sprintf("cannot delete network '%s': %d host%s %s still attached to it: %s",
 					an.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(list, ", "))
-				return fail.NotAvailableReport(errorMsg)
+				return fail.NotAvailableError(errorMsg)
 			}
 			return nil
 		})
@@ -801,7 +795,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 		// Leave a chance to abort
 		taskStatus, _ := task.GetStatus()
 		if taskStatus == concurrency.ABORTED {
-			return fail.AbortedReport(nil)
+			return fail.AbortedError(nil)
 		}
 
 		// 1st delete primary gateway
@@ -809,7 +803,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 			stop := false
 			rh, innerErr := LoadHost(task, svc, an.GatewayID)
 			if innerErr != nil {
-				if _, ok := innerErr.(fail.NotFound); !ok {
+				if _, ok := innerErr.(fail.ErrNotFound); !ok {
 					return innerErr
 				}
 				stop = true
@@ -818,7 +812,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				if rh != nil {
 					logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
 					innerErr = objn.deleteGateway(task, rh)
-					if _, ok := innerErr.(fail.NotFound); ok { // allow no gateway, but log it
+					if _, ok := innerErr.(fail.ErrNotFound); ok { // allow no gateway, but log it
 						logrus.Errorf("Failed to delete primary gateway: %s", innerErr.Error())
 					} else if innerErr != nil {
 						return innerErr
@@ -834,7 +828,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 			stop := false
 			rh, innerErr := LoadHost(task, svc, an.SecondaryGatewayID)
 			if innerErr != nil {
-				if _, ok := innerErr.(fail.NotFound); !ok {
+				if _, ok := innerErr.(fail.ErrNotFound); !ok {
 					return innerErr
 				}
 				stop = true
@@ -844,7 +838,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 					logrus.Debugf("Deleting gateway '%s'...", rh.SafeGetName())
 					innerErr = objn.deleteGateway(task, rh)
 					if innerErr != nil { // allow no gateway, but log it
-						if _, ok := innerErr.(fail.NotFound); ok { // nolint
+						if _, ok := innerErr.(fail.ErrNotFound); ok { // nolint
 							logrus.Errorf("failed to delete secondary gateway: %s", innerErr.Error())
 						} else {
 							return innerErr
@@ -870,11 +864,11 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 		innerErr = svc.DeleteNetwork(an.ID)
 		if innerErr != nil {
 			switch innerErr.(type) {
-			case fail.NotFound:
+			case fail.ErrNotFound:
 				// If network doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
 				logrus.Warnf("network not found on provider side, cleaning up metadata.")
-				return err
-			case fail.Timeout:
+				return innerErr
+			case fail.ErrTimeout:
 				logrus.Error("cannot delete network due to a timeout")
 				waitMore = true
 			default:
@@ -888,7 +882,7 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 					if recNet != nil {
 						return fmt.Errorf("still there")
 					}
-					if _, ok := recErr.(fail.NotFound); ok {
+					if _, ok := recErr.(fail.ErrNotFound); ok {
 						return nil
 					}
 					return fail.Wrap(recErr, "another kind of error")
@@ -896,13 +890,13 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 				temporal.GetContextTimeout(),
 			)
 			if errWaitMore != nil {
-				innerErr = fail.AddConsequence(err, errWaitMore)
+				_ = innerErr.AddConsequence(errWaitMore)
 			}
 		}
 		return innerErr
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// Delete metadata
@@ -910,19 +904,19 @@ func (objn *network) Delete(task concurrency.Task) (err error) {
 }
 
 // GetDefaultRouteIP returns the IP of the LAN default route
-func (objn *network) GetDefaultRouteIP(task concurrency.Task) (ip string, err error) {
+func (objn *network) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.Error) {
 	if objn.IsNull() {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return "", fail.InvalidParameterReport("task", "cannot be nil")
+		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	ip = ""
-	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if an.VIP != nil && an.VIP.PrivateIP != "" {
 			ip = an.VIP.PrivateIP
@@ -936,7 +930,7 @@ func (objn *network) GetDefaultRouteIP(task concurrency.Task) (ip string, err er
 		}
 		return nil
 	})
-	return ip, err
+	return ip, xerr
 }
 
 // SafeGetDefaultRouteIP ...
@@ -949,19 +943,19 @@ func (objn *network) SafeGetDefaultRouteIP(task concurrency.Task) string {
 }
 
 // GetEndpointIP returns the IP of the internet IP to reach the network
-func (objn *network) GetEndpointIP(task concurrency.Task) (ip string, err error) {
+func (objn *network) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Error) {
 	if objn.IsNull() {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return "", fail.InvalidParameterReport("task", "cannot be nil")
+		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	ip = ""
-	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if an.VIP != nil && an.VIP.PublicIP != "" {
 			ip = an.VIP.PublicIP
@@ -975,7 +969,7 @@ func (objn *network) GetEndpointIP(task concurrency.Task) (ip string, err error)
 		}
 		return nil
 	})
-	return ip, err
+	return ip, xerr
 }
 
 // SafeGetEndpointIP ...
@@ -990,68 +984,68 @@ func (objn *network) SafeGetEndpointIP(task concurrency.Task) string {
 // HasVirtualIP tells if the network uses a VIP a default route
 func (objn *network) HasVirtualIP(task concurrency.Task) bool {
 	if objn.IsNull() {
-		logrus.Errorf(fail.InvalidInstanceReport().Error())
+		logrus.Errorf(fail.InvalidInstanceError().Error())
 		return false
 	}
 
 	var found bool
-	err := objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr := objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		found = an.VIP != nil
 		return nil
 	})
-	return err == nil && found
+	return xerr == nil && found
 }
 
 // GetVirtualIP returns an abstract.VirtualIP used by gateway HA
-func (objn *network) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, err error) {
+func (objn *network) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, xerr fail.Error) {
 	if objn == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	err = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+	xerr = objn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		vip = an.VIP
 		return nil
 	})
-	if err != nil {
-		return nil, fail.Wrap(err, "cannot get network virtual IP")
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "cannot get network virtual IP")
 
 	}
 	if vip == nil {
-		return nil, fail.NotFoundReport("failed to find Virtual IP binded to gateways for network '%s'", objn.SafeGetName())
+		return nil, fail.NotFoundError("failed to find Virtual IP binded to gateways for network '%s'", objn.SafeGetName())
 	}
 	return vip, nil
 }
 
 // GetCIDR returns the CIDR of the network
-func (objn *network) GetCIDR(task concurrency.Task) (cidr string, err error) {
+func (objn *network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
 	if objn == nil {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return "", fail.InvalidParameterReport("task", "cannot be nil")
+		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	cidr = ""
-	err = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		cidr = an.CIDR
 		return nil
 	})
-	return cidr, err
+	return cidr, xerr
 }
 
 // SafeGetCIDR returns the CIDR of the network
@@ -1062,20 +1056,20 @@ func (objn *network) SafeGetCIDR(task concurrency.Task) string {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (objn *network) ToProtocol(task concurrency.Task) (_ *protocol.Network, err error) {
+func (objn *network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr fail.Error) {
 	if objn == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").Entering()
 	defer tracer.OnExitTrace()
 
 	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "failed to convert resources.Network to *protocol.Network")
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to convert resources.Network to *protocol.Network")
 		}
 	}()
 
@@ -1086,17 +1080,17 @@ func (objn *network) ToProtocol(task concurrency.Task) (_ *protocol.Network, err
 	)
 
 	// Get primary gateway ID
-	gw, err = objn.GetGateway(task, true)
-	if err != nil {
-		return nil, err
+	gw, xerr = objn.GetGateway(task, true)
+	if xerr != nil {
+		return nil, xerr
 	}
 	primaryGatewayID := gw.SafeGetID()
 
 	// Get secondary gateway id if such a gateway exists
-	gw, err = objn.GetGateway(task, false)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
-			return nil, err
+	gw, xerr = objn.GetGateway(task, false)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return nil, xerr
 		}
 	} else {
 		secondaryGatewayID = gw.SafeGetID()
@@ -1112,10 +1106,10 @@ func (objn *network) ToProtocol(task concurrency.Task) (_ *protocol.Network, err
 		// State:              objn.SafeGetState(),
 	}
 
-	vip, err = objn.GetVirtualIP(task)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
-			return nil, err
+	vip, xerr = objn.GetVirtualIP(task)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return nil, xerr
 		}
 	}
 	if vip != nil {

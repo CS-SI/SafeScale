@@ -43,27 +43,22 @@ type SSHListener struct{}
 
 // Run executes an ssh command an an host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot run by ssh").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot run by ssh")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	hostRef := in.GetHost().GetName()
@@ -71,30 +66,31 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		hostRef = in.GetHost().GetId()
 	}
 	if hostRef == "" {
-		return nil, fail.InvalidParameterReport("in.Host", "host reference is missing")
+		return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
 	}
 
 	command := in.GetCommand()
 
-	job, err := PrepareJob(ctx, "", "ssh run")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "ssh run")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	task := job.SafeGetTask()
+	tracer := concurrency.NewTracer(task, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
-	if err != nil {
-		return nil, err
+	rh, xerr := hostfactory.Load(task, job.SafeGetService(), hostRef)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	retcode, stdout, stderr, err := host.Run(job.SafeGetTask(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return nil, err
+	retcode, stdout, stderr, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return &protocol.SshResponse{
@@ -106,40 +102,36 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot copy by ssh").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "ssh copy")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "ssh copy")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
+	task := job.SafeGetTask()
 
 	source := in.Source
 	dest := in.Destination
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var (
 		pull                bool
@@ -163,31 +155,31 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	parts = strings.Split(dest, ":")
 	if len(parts) > 1 {
 		if pull {
-			return nil, fail.InvalidRequestReport("file copy from one remote host to another one is not supported")
+			return nil, fail.InvalidRequestError("file copy from one remote host to another one is not supported")
 		}
 		hostRef = parts[0]
 		hostPath = strings.Join(parts[1:], ":")
 	} else {
 		if !pull {
-			return nil, fail.InvalidRequestReport("failed to find a remote host in the request")
+			return nil, fail.InvalidRequestError("failed to find a remote host in the request")
 		}
 		localPath = dest
 	}
 
-	host, err := hostfactory.Load(job.SafeGetTask(), job.SafeGetService(), hostRef)
-	if err != nil {
-		return nil, err
+	rh, xerr := hostfactory.Load(task, job.SafeGetService(), hostRef)
+	if xerr != nil {
+		return nil, xerr
 	}
 	if pull {
-		retcode, stdout, stderr, err = host.Pull(job.SafeGetTask(), hostPath, localPath, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = rh.Pull(task, hostPath, localPath, temporal.GetLongOperationTimeout())
 	} else {
-		retcode, stdout, stderr, err = host.Push(job.SafeGetTask(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = rh.Push(task, localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
 	}
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 	if retcode != 0 {
-		return nil, fail.NewReport(fmt.Sprintf("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr))
+		return nil, fail.NewError("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
 	}
 
 	return &protocol.SshResponse{

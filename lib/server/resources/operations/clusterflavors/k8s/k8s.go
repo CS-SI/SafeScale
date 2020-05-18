@@ -56,10 +56,10 @@ var (
 	}
 )
 
-func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, error) {
-	complexity, err := c.GetComplexity(task)
-	if err != nil {
-		return 0, 0, 0, nil
+func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
+	complexity, xerr := c.GetComplexity(task)
+	if xerr != nil {
+		return 0, 0, 0, xerr
 	}
 	var masterCount uint
 	var privateNodeCount uint
@@ -105,23 +105,23 @@ func defaultImage(task concurrency.Task, _ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 
-func configureCluster(task concurrency.Task, c resources.Cluster) error {
+func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
 	clusterName := c.SafeGetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
 	// feat, err := featurefactory.New(task, c.Service(), "kubernetes")
 	// if err != nil {
-	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Report()
+	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error()
 	// }
 	// results, err := feat.Add(c, data.Map{}, resources.FeatureSettings{})
-	results, err := c.AddFeature(task, "kubernetes", data.Map{}, resources.FeatureSettings{})
-	if err != nil {
-		return fail.Wrap(err, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
+	results, xerr := c.AddFeature(task, "kubernetes", data.Map{}, resources.FeatureSettings{})
+	if xerr != nil {
+		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
 	if !results.Successful() {
-		err = fail.NewReport(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'kubernetes' to cluster '%s'", clusterName)
-		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, err.Error())
-		return err
+		xerr = fail.NewError(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'kubernetes' to cluster '%s'", clusterName)
+		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, xerr.Error())
+		return xerr
 	}
 	logrus.Infof("[cluster %s] feature 'kubernetes' addition successful.", clusterName)
 	return nil
@@ -141,13 +141,13 @@ func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeT
 	return script, data
 }
 
-func getTemplateBox() (*rice.Box, error) {
+func getTemplateBox() (*rice.Box, fail.Error) {
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../k8s/scripts")
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 		templateBox.Store(b)
 		anon = templateBox.Load()
@@ -155,23 +155,23 @@ func getTemplateBox() (*rice.Box, error) {
 	return anon.(*rice.Box), nil
 }
 
-func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, fail.Error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
-		box, err := getTemplateBox()
-		if err != nil {
-			return "", err
+		box, xerr := getTemplateBox()
+		if xerr != nil {
+			return "", xerr
 		}
 
 		// We will need information from cluster network
-		netCfg, err := c.GetNetworkConfig(task)
-		if err != nil {
-			return "", err
+		netCfg, xerr := c.GetNetworkConfig(task)
+		if xerr != nil {
+			return "", xerr
 		}
-		identity, err := c.GetIdentity(task)
-		if err != nil {
-			return "", err
+		identity, xerr := c.GetIdentity(task)
+		if xerr != nil {
+			return "", xerr
 		}
 
 		// get file contents as string

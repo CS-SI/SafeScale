@@ -49,7 +49,7 @@ type location struct {
 }
 
 // NewLocation creates an Object Storage Location based on config
-func NewLocation(conf Config) (Location, error) {
+func NewLocation(conf Config) (Location, fail.Error) {
 	location := &location{
 		config: conf,
 	}
@@ -65,7 +65,7 @@ func NewLocation(conf Config) (Location, error) {
 // }
 
 // Connect connects to an Object Storage Location
-func (l *location) connect() error {
+func (l *location) connect() fail.Error {
 	// FIXME GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
 	var config stow.ConfigMap
 
@@ -94,13 +94,13 @@ func (l *location) connect() error {
 	err := stow.Validate(kind, config)
 	if err != nil {
 		logrus.Debugf("invalid config: %v", err)
-		return err
+		return fail.ToError(err)
 	}
 	l.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
 		logrus.Debugf("failed dialing location: %v", err)
 	}
-	return err
+	return fail.ToError(err)
 }
 
 // SafeGetObjectStorageProtocol returns the type of ObjectStorage
@@ -109,9 +109,9 @@ func (l location) SafeGetObjectStorageProtocol() string {
 }
 
 // ListBuckets ...
-func (l *location) ListBuckets(prefix string) ([]string, error) {
+func (l *location) ListBuckets(prefix string) ([]string, fail.Error) {
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s')", prefix).Entering().OnExitTrace()
@@ -129,18 +129,18 @@ func (l *location) ListBuckets(prefix string) ([]string, error) {
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	return list, nil
 }
 
 // FindBucket returns true if a bucket with the name exists in location
-func (l *location) FindBucket(bucketName string) (bool, error) {
+func (l *location) FindBucket(bucketName string) (bool, fail.Error) {
 	if l == nil {
-		return false, fail.InvalidInstanceReport()
+		return false, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return false, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return false, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "(%s)", bucketName).Entering().OnExitTrace()
@@ -162,16 +162,16 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 	if found {
 		return true, nil
 	}
-	return false, err
+	return false, fail.ToError(err)
 }
 
 // GetBucket ...
-func (l *location) InspectBucket(bucketName string) (Bucket, error) {
+func (l *location) InspectBucket(bucketName string) (Bucket, fail.Error) {
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "(%s)", bucketName).Entering().OnExitTrace()
@@ -180,21 +180,22 @@ func (l *location) InspectBucket(bucketName string) (Bucket, error) {
 	if err != nil {
 		return nil, err
 	}
-	b.container, err = l.stowLocation.Container(bucketName)
-	if err != nil {
+	var cerr error
+	b.container, cerr = l.stowLocation.Container(bucketName)
+	if cerr != nil {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	return b, nil
 }
 
 // CreateBucket ...
-func (l *location) CreateBucket(bucketName string) (Bucket, error) {
+func (l *location) CreateBucket(bucketName string) (Bucket, fail.Error) {
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s')", bucketName).Entering().OnExitTrace()
@@ -211,33 +212,33 @@ func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 }
 
 // DeleteBucket removes a bucket from Object Storage
-func (l *location) DeleteBucket(bucketName string) error {
+func (l *location) DeleteBucket(bucketName string) fail.Error {
 	if l == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s')", bucketName).Entering().OnExitTrace()
 
 	err := l.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	return nil
 }
 
 // InspectObject ...
-func (l *location) InspectObject(bucketName string, objectName string) (Object, error) {
+func (l *location) InspectObject(bucketName string, objectName string) (Object, fail.Error) {
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, fail.InvalidParameterReport("objectName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
@@ -250,15 +251,15 @@ func (l *location) InspectObject(bucketName string, objectName string) (Object, 
 }
 
 // DeleteObject ...
-func (l *location) DeleteObject(bucketName, objectName string) error {
+func (l *location) DeleteObject(bucketName, objectName string) fail.Error {
 	if l == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return fail.InvalidParameterReport("objectName", "cannot be empty string")
+		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
@@ -271,12 +272,12 @@ func (l *location) DeleteObject(bucketName, objectName string) error {
 }
 
 // ListObjects lists the objects in a Bucket
-func (l *location) ListObjects(bucketName string, path, prefix string) ([]string, error) {
+func (l *location) ListObjects(bucketName string, path, prefix string) ([]string, fail.Error) {
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
@@ -289,12 +290,12 @@ func (l *location) ListObjects(bucketName string, path, prefix string) ([]string
 }
 
 // Browse walks through the objects in a Bucket and apply callback to each object
-func (l *location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) error) error {
+func (l *location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) fail.Error {
 	if l == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
@@ -307,12 +308,12 @@ func (l *location) BrowseBucket(bucketName string, path, prefix string, callback
 }
 
 // ClearBucket ...
-func (l *location) ClearBucket(bucketName string, path, prefix string) error {
+func (l *location) ClearBucket(bucketName string, path, prefix string) fail.Error {
 	if l == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
@@ -325,15 +326,15 @@ func (l *location) ClearBucket(bucketName string, path, prefix string) error {
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) error {
+func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) fail.Error {
 	if l == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return fail.InvalidParameterReport("objectName", "cannot be empty string")
+		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
@@ -358,19 +359,19 @@ func (l *location) WriteObject(
 	bucketName string, objectName string,
 	source io.Reader, size int64,
 	metadata ObjectMetadata,
-) (Object, error) {
+) (Object, fail.Error) {
 
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, fail.InvalidParameterReport("objectName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 	if source == nil {
-		return nil, fail.InvalidParameterReport("source", "cannot be nil")
+		return nil, fail.InvalidParameterError("source", "cannot be nil")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().OnExitTrace()
@@ -389,16 +390,16 @@ func (l *location) WriteMultiPartObject(
 	source io.Reader, sourceSize int64,
 	chunkSize int,
 	metadata ObjectMetadata,
-) (Object, error) {
+) (Object, fail.Error) {
 
 	if l == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterReport("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, fail.InvalidParameterReport("objectName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering().OnExitTrace()

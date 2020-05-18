@@ -39,12 +39,16 @@ func (c *bucket) List(timeout time.Duration) (*protocol.BucketList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	r, err := service.List(ctx, &googleprotobuf.Empty{})
 	if err != nil {
 		return nil, err
 	}
-
-	return service.List(ctx, &googleprotobuf.Empty{})
+	return r, nil
 }
 
 // Create ...
@@ -53,12 +57,12 @@ func (c *bucket) Create(name string, timeout time.Duration) error {
 	defer c.session.Disconnect()
 
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Create(ctx, &protocol.Bucket{Name: name})
+	_, err := service.Create(ctx, &protocol.Bucket{Name: name})
 	return err
 }
 
@@ -67,9 +71,9 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
 	var (
@@ -118,12 +122,12 @@ func (c *bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dur
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Mount(ctx, &protocol.BucketMountingPoint{
+	_, err := service.Mount(ctx, &protocol.BucketMountingPoint{
 		Bucket: bucketName,
 		Host:   &protocol.Reference{Name: hostName},
 		Path:   mountPoint,
@@ -136,12 +140,12 @@ func (c *bucket) Unmount(bucketName, hostName string, timeout time.Duration) err
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Unmount(ctx, &protocol.BucketMountingPoint{
+	_, err := service.Unmount(ctx, &protocol.BucketMountingPoint{
 		Bucket: bucketName,
 		Host:   &protocol.Reference{Name: hostName},
 	})

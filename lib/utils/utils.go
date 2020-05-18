@@ -88,7 +88,7 @@ func UserConfirmed(msg string) bool {
 }
 
 // ExtractRetCode extracts info from the error
-func ExtractRetCode(err error) (string, int, error) {
+func ExtractRetCode(err error) (string, int, fail.Error) {
 	retCode := -1
 	msg := "__ NO MESSAGE __"
 	if ee, ok := err.(*exec.ExitError); ok {
@@ -96,11 +96,11 @@ func ExtractRetCode(err error) (string, int, error) {
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
 			retCode = status.ExitStatus()
 		} else {
-			return msg, retCode, fail.NewReport("ExitError.Sys is not a 'syscall.WaitStatus'")
+			return msg, retCode, fail.NewError("ExitError.Sys is not a 'syscall.WaitStatus'")
 		}
 		// Retrieve error Message
 		msg = ee.Error()
 		return msg, retCode, nil
 	}
-	return msg, retCode, fail.NewReport("error is not an 'ExitError'")
+	return msg, retCode, fail.NewError("error is not an 'ExitError'")
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package fail
+package debug
 
 import (
 	"fmt"
@@ -24,8 +24,8 @@ import (
 	"strings"
 )
 
-// decorateWithCallTrace adds call trace to the message "prefix what: why"
-func decorateWithCallTrace(prefix, what, why string) string {
+// DecorateWithCallTrace adds call trace to the message "prefix what: why"
+func DecorateWithCallTrace(prefix, what, why string) string {
 	const missingPrefixMessage = "uncategorized error occurred:"
 
 	msg := prefix
@@ -39,7 +39,7 @@ func decorateWithCallTrace(prefix, what, why string) string {
 
 	if pc, file, line, ok := runtime.Caller(2); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
-			filename := strings.Replace(file, getPartToRemove(), "", 1)
+			filename := strings.Replace(file, SourceFilePartToRemove(), "", 1)
 			if what == "" {
 				msg += fmt.Sprintf(" %s", filepath.Base(f.Name()))
 			} else {
@@ -59,9 +59,9 @@ func decorateWithCallTrace(prefix, what, why string) string {
 	return msg
 }
 
-// getPartToRemove returns the part of the file path to remove before display.
-func getPartToRemove() string {
-	if anon := removePart.Load(); anon != nil {
+// SourceFilePartToRemove returns the part of the file path to remove before display.
+func SourceFilePartToRemove() string {
+	if anon := sourceFileRemovePart.Load(); anon != nil {
 		return anon.(string)
 	}
 	return "github.com/CS-SI/SafeScale/"

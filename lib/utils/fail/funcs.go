@@ -27,7 +27,7 @@ import (
 // AddConsequence adds an error 'err' to the list of consequences
 func AddConsequence(err error, cons error) error {
 	if err != nil {
-		conseq, ok := err.(Report)
+		conseq, ok := err.(Error)
 		if ok {
 			if cons != nil {
 				nerr := conseq.AddConsequence(cons)
@@ -45,7 +45,7 @@ func AddConsequence(err error, cons error) error {
 // Consequences returns the list of consequences
 func Consequences(err error) []error {
 	if err != nil {
-		conseq, ok := err.(Report)
+		conseq, ok := err.(Error)
 		if ok {
 			return conseq.Consequences()
 		}
@@ -54,44 +54,22 @@ func Consequences(err error) []error {
 	return []error{}
 }
 
-// WithField ...
-func WithField(err error, key string, content interface{}) Report {
+// Annotate ...
+func Annotate(err error, key string, content interface{}) Error {
 	if err != nil {
-		enrich, ok := err.(Report)
+		enrich, ok := err.(Error)
 		if !ok {
-			enrich = NewReport(err.Error())
+			enrich = NewError(err.Error())
 		}
 		if key != "" {
-			return enrich.WithField(key, content)
+			_ = enrich.Annotate(key, content)
 		}
 		return enrich
 	}
 	return nil
 }
 
-// // DecorateError changes the error to something more comprehensible when
-// // timeout occurred
-// func DecorateError(err error, action string, timeout time.Duration) error {
-// 	if IsGRPCTimeout(err) {
-// 		if timeout > 0 {
-// 			return fmt.Errorf("%s took too long (> %v) to respond", action, timeout)
-// 		}
-// 		return fmt.Errorf("%s took too long to respond", action)
-// 	}
-// 	msg := err.Report()
-// 	if strings.Contains(msg, "desc = ") {
-// 		pos := strings.Index(msg, "desc = ") + 7
-// 		msg = msg[pos:]
-
-// 		if strings.Index(msg, " :") == 0 {
-// 			msg = msg[2:]
-// 		}
-// 		return fmt.Errorf(msg)
-// 	}
-// 	return err
-// }
-
-// IsGRPCTimeout tells if the err is a timeout kind
+// IsGRPCTimeout tells if the err is a ImplTimeout kind
 func IsGRPCTimeout(err error) bool {
 	return grpcstatus.Code(err) == codes.DeadlineExceeded
 }
@@ -106,70 +84,77 @@ func IsGRPCError(err error) bool {
 }
 
 // FromGRPCStatus translates GRPC status to error
-func FromGRPCStatus(err error) Report {
-	if _, ok := err.(Report); ok {
-		return err.(Report)
+func FromGRPCStatus(err error) Error {
+	if _, ok := err.(Error); ok {
+		return err.(Error)
 	}
 
 	message := grpcstatus.Convert(err).Message()
 	code := grpcstatus.Code(err)
-	common := &reportCore{message: message, grpcCode: code}
+	common := &errorCore{message: message, grpcCode: code}
 	switch code {
 	case codes.DeadlineExceeded:
-		return &timeout{reportCore: common}
+		return &ImplTimeout{errorCore: common, dur: 0}
 	case codes.Aborted:
-		return &aborted{reportCore: common}
+		return &ImplAborted{common}
 	case codes.FailedPrecondition:
-		return &invalidParameter{reportCore: common}
+		return &ImplInvalidParameter{common}
 	case codes.AlreadyExists:
-		return &duplicate{reportCore: common}
+		return &ImplDuplicate{common}
 	case codes.InvalidArgument:
-		return &invalidRequest{reportCore: common}
+		return &ImplInvalidRequest{common}
 	case codes.NotFound:
-		return &notFound{reportCore: common}
+		return &ImplNotFound{common}
 	case codes.PermissionDenied:
-		return &forbidden{reportCore: common}
+		return &ImplForbidden{common}
 	case codes.ResourceExhausted:
-		return &overload{reportCore: common}
+		return &ImplOverload{common}
 	case codes.OutOfRange:
-		return &overflow{reportCore: common}
+		return &ImplOverflow{errorCore: common, limit: 0}
 	case codes.Unimplemented:
-		return &notImplemented{reportCore: common}
+		return &ImplNotImplemented{common}
 	case codes.Internal:
-		return &runtimePanic{reportCore: common}
+		return &ImplRuntimePanic{common}
 	case codes.DataLoss:
-		return &inconsistent{reportCore: common}
+		return &ImplInconsistent{common}
 	case codes.Unauthenticated:
-		return &notAuthenticated{reportCore: common}
+		return &ImplNotAuthenticated{common}
 	}
 	return common
 }
 
 // ToGRPCStatus translates an error to a GRPC status
 func ToGRPCStatus(err error) error {
-	if casted, ok := err.(Report); ok {
+	if casted, ok := err.(Error); ok {
 		return casted.ToGRPCStatus()
 	}
 	return grpcstatus.Errorf(codes.Unknown, err.Error())
 }
 
 // Wrap creates a new error with a message 'message' and a causer error 'causer'
-func Wrap(cause error, msg ...interface{}) Report {
-	newErr := &reportCore{message: strprocess.FormatStrings(msg...), causer: cause, consequences: []error{}}
-	if casted, ok := cause.(Report); ok {
-		newErr.grpcCode = casted.GRPCCode()
-	} else {
-		newErr.grpcCode = codes.Unknown
+func Wrap(cause error, msg ...interface{}) Error {
+	// If the cause is already an Error, make sure we don't lose its real type during the operation
+	if coreErr, ok := cause.(*errorCore); ok {
+		coreErr.message = strprocess.FormatStrings(msg...) + ": " + coreErr.message
+		return cause.(Error)
+	}
+
+	// classical error, create a new Error
+	newErr := &errorCore{
+		message:      strprocess.FormatStrings(msg...),
+		causer:       cause,
+		consequences: []error{},
+		grpcCode:     codes.Unknown,
 	}
 	return newErr
 }
 
-// Cause returns the causer of an error if it implements the causer interface
+// Cause returns the root cause of an error, or nil if there no root cause
 func Cause(err error) (resp error) {
 	resp = err
 
 	for err != nil {
-		cause, ok := err.(Report)
+		cause, ok := err.(Error)
 		if !ok {
 			break
 		}
@@ -182,13 +167,13 @@ func Cause(err error) (resp error) {
 	return resp
 }
 
-// ErrorToReport converts an error to a fail.Report
-func ErrorToReport(err error) Report {
+// ToError converts an error to a fail.Error
+func ToError(err error) Error {
 	if err != nil {
-		if casted, ok := err.(Report); ok {
+		if casted, ok := err.(Error); ok {
 			return casted
 		}
-		return NewReport(err.Error())
+		return NewError(err.Error())
 	}
 	return nil
 }

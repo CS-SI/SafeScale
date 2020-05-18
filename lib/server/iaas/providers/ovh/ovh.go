@@ -89,7 +89,7 @@ func New() providerapi.Provider {
 }
 
 // Build build a new instance of Ovh using configuration parameters
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, fail.Error) {
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})
@@ -141,13 +141,13 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	providerName := "openstack"
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, applicationKey, projectName)
-	if err != nil {
-		return nil, err
+	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, applicationKey, projectName)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
@@ -167,15 +167,15 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	serviceVersions := map[string]string{"volume": "v1"}
 
-	stack, err := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
-	if err != nil {
-		return nil, err
+	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	validRegions, err := stack.ListRegions()
-	if err != nil {
+	validRegions, xerr := stack.ListRegions()
+	if xerr != nil {
 		if len(validRegions) != 0 {
-			return nil, err
+			return nil, xerr
 		}
 	}
 	if len(validRegions) != 0 {
@@ -186,14 +186,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fail.InvalidRequestReport("invalid region '%s'", region)
+			return nil, fail.InvalidRequestError("invalid region '%s'", region)
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones()
-	if err != nil {
+	validAvailabilityZones, xerr := stack.ListAvailabilityZones()
+	if xerr != nil {
 		if len(validAvailabilityZones) != 0 {
-			return nil, err
+			return nil, xerr
 		}
 	}
 
@@ -209,7 +209,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestReport("invalid availability zone '%s', valid zones are %v", zone, validZones)
+			return nil, fail.InvalidRequestError("invalid availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 
@@ -217,15 +217,15 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		Stack:            stack,
 		tenantParameters: params,
 	}
-	err = stack.InitDefaultSecurityGroup()
-	if err != nil {
-		return nil, err
+	xerr = stack.InitDefaultSecurityGroup()
+	if xerr != nil {
+		return nil, xerr
 	}
 	return newP, nil
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -243,7 +243,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -258,7 +258,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -274,15 +274,15 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates()
-	if err != nil {
-		return nil, err
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	allTemplates, xerr := p.Stack.ListTemplates()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if !all {
@@ -294,16 +294,16 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	// check flavor disponibilities through OVH-API
 	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
-		logrus.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
+		logrus.Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")
 	region := authOpts.GetString("Region")
 
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
-	flavors, err := p.requestOVHAPI(restURL, "GET")
-	if err != nil {
-		logrus.Warnf("Unable to request OVH API, flavors availability won't be checked: %v", err)
+	flavors, xerr := p.requestOVHAPI(restURL, "GET")
+	if xerr != nil {
+		logrus.Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
 		return allTemplates, nil
 	}
 
@@ -320,7 +320,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)
 		} else {
-			logrus.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
+			logrus.Debugf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
 		}
 	}
 	allTemplates = listAvailableTemplates
@@ -337,7 +337,7 @@ func isFlexTemplate(t abstract.HostTemplate) bool {
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {
@@ -362,30 +362,30 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 }
 
 // BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
+func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterReport("vip", "cannot be nil")
+		return fail.InvalidParameterError("vip", "cannot be nil")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterReport("host", "cannot be empty string")
+		return fail.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	return nil
 }
 
 // UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
+func (p *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterReport("vip", "cannot be nil")
+		return fail.InvalidParameterError("vip", "cannot be nil")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterReport("host", "cannot be empty string")
+		return fail.InvalidParameterError("host", "cannot be empty string")
 	}
 
 	return nil

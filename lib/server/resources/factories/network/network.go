@@ -26,24 +26,24 @@ import (
 )
 
 // New creates an instance of resources.Network
-func New(svc iaas.Service) (resources.Network, error) {
+func New(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	return operations.NewNetwork(svc)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Report) {
+func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	return operations.LoadNetwork(task, svc, ref)

@@ -36,9 +36,9 @@ import (
 )
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
@@ -60,17 +60,17 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	} else if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok {
 			if gerr.Code != 404 {
-				return nil, err
+				return nil, fail.ToError(err)
 			}
 		} else {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 	}
 
 	if recreateSafescaleNetwork {
 		opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectID, &ne).Context(context.Background()).Do()
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 
 		oco := OpContext{
@@ -80,15 +80,15 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 			DesiredState: "DONE",
 		}
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+		xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 		if err != nil {
-			return nil, err
+			return nil, xerr
 		}
 	}
 
 	necreated, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	net := abstract.NewNetwork()
@@ -115,7 +115,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 	opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	oco := OpContext{
@@ -127,12 +127,12 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, theRegion, req.Name).Do()
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	// FIXME: Add properties and GatewayID
@@ -151,10 +151,10 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	} else if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok {
 			if gerr.Code != 404 {
-				return nil, err
+				return nil, fail.ToError(err)
 			}
 		} else {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 	}
 
@@ -175,7 +175,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 		opp, err = compuService.Firewalls.Insert(s.GcpConfig.ProjectID, &fiw).Do()
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 		oco = OpContext{
 			Operation:    opp,
@@ -184,9 +184,9 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 			DesiredState: "DONE",
 		}
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-		if err != nil {
-			return nil, err
+		xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
+		if xerr != nil {
+			return nil, xerr
 		}
 	}
 
@@ -199,10 +199,10 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	} else if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok {
 			if gerr.Code != 404 {
-				return nil, err
+				return nil, fail.ToError(err)
 			}
 		} else {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 	}
 
@@ -217,7 +217,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 		}
 		opp, err := compuService.Routes.Insert(s.GcpConfig.ProjectID, route).Do()
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 		oco = OpContext{
 			Operation:    opp,
@@ -226,11 +226,10 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 			DesiredState: "DONE",
 		}
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-		if err != nil {
-			return nil, err
+		xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+		if xerr != nil {
+			return nil, xerr
 		}
-
 	}
 
 	_ = subnet.OK()
@@ -239,14 +238,14 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
-	nets, err := s.ListNetworks()
-	if err != nil {
-		return nil, err
+	nets, xerr := s.ListNetworks()
+	if xerr != nil {
+		return nil, xerr
 	}
 	for _, net := range nets {
 		if net.ID == ref {
@@ -258,14 +257,14 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
-	nets, err := s.ListNetworks()
-	if err != nil {
-		return nil, err
+	nets, xerr := s.ListNetworks()
+	if xerr != nil {
+		return nil, xerr
 	}
 	for _, net := range nets {
 		if net.Name == ref {
@@ -277,9 +276,9 @@ func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var networks []*abstract.Network
@@ -328,24 +327,20 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s *Stack) DeleteNetwork(ref string) (err error) {
+func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
 	if s == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
-	theNetwork, err := s.GetNetwork(ref)
-	if err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok {
-			if gerr.Code != 404 {
-				return err
-			}
-		} else {
-			return err
+	theNetwork, xerr := s.GetNetwork(ref)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return xerr
 		}
 	}
 
 	if theNetwork == nil {
-		return fail.NewReport("delete network failed: unexpected nil network when looking for '%s'", ref)
+		return fail.NewError("delete network failed: unexpected nil network when looking for '%s'", ref)
 	}
 
 	if !theNetwork.OK() {
@@ -355,12 +350,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	compuService := s.ComputeService
 	subnetwork, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, theNetwork.Name).Do()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 
 	opp, err := compuService.Subnetworks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, subnetwork.Name).Do()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 
 	oco := OpContext{
@@ -370,14 +365,14 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		DesiredState: "DONE",
 	}
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-	if err != nil {
-		switch err.(type) {
-		case fail.Timeout:
-			logrus.Warnf("Timeout waiting for subnetwork deletion")
-			return err
+	xerr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+	if xerr != nil {
+		switch xerr.(type) {
+		case fail.ErrTimeout:
+			logrus.Warnf("ErrTimeout waiting for subnetwork deletion")
+			return xerr
 		default:
-			return err
+			return xerr
 		}
 	}
 
@@ -386,7 +381,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if err != nil {
 		logrus.Warn(err)
-		return err
+		return fail.ToError(err)
 	}
 
 	if fws != nil {
@@ -402,10 +397,10 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 			if operr != nil {
 				logrus.Warn(operr)
-				return operr
+				return fail.ToError(operr)
 			}
 		} else {
-			return operr
+			return fail.ToError(operr)
 		}
 	}
 
@@ -413,7 +408,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
 	if err != nil {
 		logrus.Warn(err)
-		return err
+		return fail.ToError(err)
 	}
 
 	if nws != nil {
@@ -429,10 +424,10 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 			if operr != nil {
 				logrus.Warn(operr)
-				return operr
+				return fail.ToError(operr)
 			}
 		} else {
-			return operr
+			return fail.ToError(operr)
 		}
 	}
 
@@ -442,10 +437,10 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 // // CreateGateway creates a public Gateway for a private network
 // func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
 // 	if s == nil {
-// 		return nil, nil, fail.InvalidInstanceReport()
+// 		return nil, nil, fail.InvalidInstanceError()
 // 	}
 // 	if req.Network == nil {
-// 		return nil, nil, fail.InvalidParameterReport("req.Network", "cannot be nil")
+// 		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
 // 	}
 //
 // 	defer fail.OnPanic(&err)
@@ -467,7 +462,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 // 	host, userData, err := s.CreateHost(hostReq)
 // 	if err != nil {
 // 		switch err.(type) {
-// 		case fail.InvalidRequest:
+// 		case fail.ErrInvalidRequest:
 // 			return nil, userData, err
 // 		default:
 // 			return nil, userData, fail.Wrap(err, "error creating gateway")
@@ -495,26 +490,26 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
-	return nil, fail.NotImplementedReport("CreateVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
-	return fail.NotImplementedReport("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
-	return fail.NotImplementedReport("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
-	return fail.NotImplementedReport("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
-	return fail.NotImplementedReport("DeleteVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
+	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

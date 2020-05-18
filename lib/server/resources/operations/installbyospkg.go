@@ -40,87 +40,84 @@ type genericPackager struct {
 }
 
 // Check checks if the feature is installed
-func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
+func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
 	if f == nil {
-		return nil, fail.InvalidParameterReport("f", "cannot be nil")
+		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
 	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
-	if err != nil {
-		return nil, err
+	worker, xerr := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		logrus.Println(err.Error())
-		return nil, err
+	if xerr = worker.CanProceed(s); xerr != nil {
+		logrus.Info(xerr.Error())
+		return nil, xerr
 	}
 	return worker.Proceed(v, s)
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
+func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
 	if f == nil {
-		return nil, fail.InvalidParameterReport("f", "cannot be nil")
+		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
 	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, g.method, installaction.Add, g.addCommand)
-	if err != nil {
-		logrus.Println(err.Error())
-		return nil, err
+	worker, xerr := newWorker(f, t, g.method, installaction.Add, g.addCommand)
+	if xerr != nil {
+		logrus.Println(xerr.Error())
+		return nil, xerr
 	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		logrus.Println(err.Error())
-		return nil, err
+	if xerr = worker.CanProceed(s); xerr != nil {
+		logrus.Info(xerr.Error())
+		return nil, xerr
 	}
 
 	return worker.Proceed(v, s)
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
+func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
 	if f == nil {
-		return nil, fail.InvalidParameterReport("f", "cannot be nil")
+		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
 	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)
-	if err != nil {
-		return nil, err
+	worker, xerr := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		logrus.Println(err.Error())
-		return nil, err
+	if xerr = worker.CanProceed(s); xerr != nil {
+		logrus.Info(xerr.Error())
+		return nil, xerr
 	}
 	return worker.Proceed(v, s)
 }

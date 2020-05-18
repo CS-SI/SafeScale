@@ -14,12 +14,22 @@
  * limitations under the License.
  */
 
-package data
+package debug
 
-//go:generate mockgen -destination=../mocks/mock_identifyable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Identifyable
+import (
+	"runtime"
+	"strings"
+	"sync/atomic"
+)
 
-// Identifyable proposes methods to identify a struct
-type Identifyable interface {
-	SafeGetName() string // Returns the name
-	SafeGetID() string   // Returns the ID
+var sourceFileRemovePart atomic.Value
+
+func init() {
+	var rootPath string
+	if pc, _, _, ok := runtime.Caller(0); ok {
+		if f := runtime.FuncForPC(pc); f != nil {
+			rootPath = strings.Split(f.Name(), "lib/utils/")[0]
+		}
+	}
+	sourceFileRemovePart.Store(rootPath)
 }

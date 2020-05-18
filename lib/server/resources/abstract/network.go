@@ -128,24 +128,25 @@ func (n *Network) OK() bool {
 }
 
 // Serialize serializes Host instance into bytes (output json code)
-func (n *Network) Serialize() ([]byte, error) {
+func (n *Network) Serialize() ([]byte, fail.Error) {
 	if n == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
-	return json.Marshal(n)
+	r, err := json.Marshal(n)
+	return r, fail.ToError(err)
 }
 
 // Deserialize reads json code and reinstantiates an Host
-func (n *Network) Deserialize(buf []byte) (err error) {
+func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
 	if n == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
-	defer fail.OnPanic(&err) // json.Unmarshal may panic
-	return json.Unmarshal(buf, n)
+	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	return fail.ToError(json.Unmarshal(buf, n))
 }
 
 // SafeGetName ...
-// satisfies interface data.Identifyable
+// satisfies interface data.Identifiable
 func (n *Network) SafeGetName() string {
 	if n == nil {
 		return ""
@@ -154,7 +155,7 @@ func (n *Network) SafeGetName() string {
 }
 
 // SafeGetID ...
-// satisfies interface data.Identifyable
+// satisfies interface data.Identifiable
 func (n *Network) SafeGetID() string {
 	if n == nil {
 		return ""
@@ -177,14 +178,12 @@ func NewVirtualIP() *VirtualIP {
 }
 
 // Clone ...
-//
 // satisfies interface data.Clonable
 func (vip *VirtualIP) Clone() data.Clonable {
 	return NewVirtualIP().Replace(vip)
 }
 
 // Replace ...
-//
 // satisfies interface data.Clonable interface
 func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
 	src := p.(*VirtualIP)

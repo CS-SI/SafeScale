@@ -49,20 +49,17 @@ type VolumeListener struct{}
 
 // ErrorList the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot list volumes").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list volume")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -77,25 +74,25 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		return nil, err
 	}
 	defer job.Close()
+	task := job.SafeGetTask()
 
 	all := in.GetAll()
-	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	volumes, err := handler.List(in.GetAll())
-	if err != nil {
-		return nil, err
+	volumes, xerr := handler.List(in.GetAll())
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.VolumeInspectResponse
 	for _, v := range volumes {
-		pbVolume, err := v.ToProtocol(task)
-		if err != nil {
-			return nil, err
+		pbVolume, xerr := v.ToProtocol(task)
+		if xerr != nil {
+			return nil, xerr
 		}
 		pbvolumes = append(pbvolumes, pbVolume)
 	}
@@ -105,86 +102,75 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 
 // Create a new volume
 func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRequest) (_ *protocol.VolumeInspectResponse, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot create volume").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create volume")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "volume create")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "volume create")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
+	task := job.SafeGetTask()
 
 	name := in.GetName()
 	speed := in.GetSpeed()
 	size := in.GetSize()
-	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	handler := handlers.NewVolumeHandler(job)
-	vol, err := handler.Create(name, int(size), volumespeed.Enum(speed))
-	if err != nil {
-		return nil, err
+	rv, xerr := handler.Create(name, int(size), volumespeed.Enum(speed))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return vol.ToProtocol(task)
+	return rv.ToProtocol(task)
 }
 
 // Attach a volume to an host and create a mount point
 func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot attach volume").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot attach volume")
 
 	empty := &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
-		return empty, fail.InvalidRequestReport("neither name nor id given as reference for volume")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, fail.InvalidRequestReport("neither name nor id given as reference for host")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
 	mountPath := in.GetMountPath()
 	// FIXME: change Format to Filesystem in protobuf
@@ -198,20 +184,19 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		doNotFormatStr = "FORMAT"
 	}
 
-	job, err := PrepareJob(ctx, "", "volume attach")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "volume attach")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	err = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat)
-	if err != nil {
-		return empty, err
+	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat); xerr != nil {
+		return empty, xerr
 	}
 
 	return empty, nil
@@ -219,53 +204,47 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 
 // Detach a volume from an host. It umount associated mountpoint
 func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot detach volume").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot detach volume")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
-		return empty, fail.InvalidRequestReport("neither name nor id given as reference for volume")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, fail.InvalidRequestReport("neither name nor id given as reference for host")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
 
-	job, err := PrepareJob(ctx, "", "volume detach")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "volume detach")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	err = handler.Detach(volumeRef, hostRef)
-	if err != nil {
-		return empty, err
+	if xerr = handler.Detach(volumeRef, hostRef); xerr != nil {
+		return empty, xerr
 	}
 
 	tracer.Trace("Volume '%s' successfully detached from '%s'.", volumeRef, hostRef)
@@ -274,49 +253,41 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 
 // Delete a volume
 func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot delete volume").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete volume")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
-	}
-
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, fail.InvalidRequestReport("neither name nor id given as reference")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "volume delete")
-	if err != nil {
-		return nil, err
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+	}
+
+	job, xerr := PrepareJob(ctx, "", "volume delete")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return empty, err
+	if xerr = handler.Delete(ref); xerr != nil {
+		return empty, xerr
 	}
 
 	tracer.Trace("Volume '%s' successfully deleted.", ref)
@@ -325,50 +296,43 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 
 // Inspect a volume
 func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.VolumeInspectResponse, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot inspect volume").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect volume")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
-	}
-
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id given as reference")
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "volume inspect")
-	if err != nil {
-		return nil, err
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+	}
+
+	job, xerr := PrepareJob(ctx, "", "volume inspect")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
-
 	task := job.SafeGetTask()
+
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	volume, err := handler.Inspect(ref)
-	if err != nil {
-		return nil, err
+	rv, xerr := handler.Inspect(ref)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	return volume.ToProtocol(task)
+	return rv.ToProtocol(task)
 }

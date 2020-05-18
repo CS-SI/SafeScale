@@ -56,29 +56,30 @@ type ShareIdentity struct {
 
 // SafeGetID returns the ID of the share
 //
-// satisfies interface data.Identifyable
+// satisfies interface data.Identifiable
 func (si *ShareIdentity) SafeGetID() string {
 	return si.ShareID
 }
 
 // SafeGetName returns the name of the share
 //
-// satisfies interface data.Identifyable
+// satisfies interface data.Identifiable
 func (si *ShareIdentity) SafeGetName() string {
 	return si.ShareName
 }
 
 // Serialize ...
 // satisfies interface data.Serializable
-func (si *ShareIdentity) Serialize() ([]byte, error) {
-	return json.Marshal(si)
+func (si *ShareIdentity) Serialize() ([]byte, fail.Error) {
+	r, err := json.Marshal(si)
+	return r, fail.ToError(err)
 }
 
 // Deserialize ...
 // satisfies interface data.Serializable
-func (si *ShareIdentity) Deserialize(buf []byte) (err error) {
-	defer fail.OnPanic(&err) // json.Unmarshal may panic
-	return json.Unmarshal(buf, si)
+func (si *ShareIdentity) Deserialize(buf []byte) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	return fail.ToError(json.Unmarshal(buf, si))
 }
 
 // Clone ...
@@ -106,54 +107,54 @@ func nullShare() *share {
 }
 
 // NewShare creates an instance of Share
-func NewShare(svc iaas.Service) (resources.Share, error) {
+func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {
-		return nullShare(), fail.InvalidParameterReport("svc", "cannot be nil")
+		return nullShare(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	core, err := NewCore(svc, "share", sharesFolderName, &ShareIdentity{})
-	if err != nil {
-		return nullShare(), err
+	c, xerr := NewCore(svc, "share", sharesFolderName, &ShareIdentity{})
+	if xerr != nil {
+		return nullShare(), xerr
 	}
-	return &share{core: core}, nil
+	return &share{core: c}, nil
 }
 
 // LoadShare returns the name of the host owing the share 'ref', read from Object Storage
 // logic: try to read until success.
-//        If error is fail.NotFound return this error
+//        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
-//        If retry times out, return fail.Timeout
-func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, error) {
+//        If retry times out, return fail.ErrTimeout
+func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, fail.Error) {
 	if task == nil {
-		return nullShare(), fail.InvalidParameterReport("task", "cannot be nil")
+		return nullShare(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nullShare(), fail.InvalidParameterReport("svc", "cannot be nil")
+		return nullShare(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nullShare(), fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nullShare(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	share, err := NewShare(svc)
-	if err != nil {
-		return share, err
+	rs, xerr := NewShare(svc)
+	if xerr != nil {
+		return rs, xerr
 	}
 
-	err = retry.WhileUnsuccessfulDelay1Second(
+	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			return share.Read(task, ref)
+			return rs.Read(task, ref)
 		},
 		10*time.Second,
 	)
-	if err != nil {
-		// If retry timed out, log it and return error NotFound
-		if _, ok := err.(retry.ErrTimeout); ok {
-			logrus.Debugf("timeout reading metadata of share '%s'", ref)
-			err = fail.NotFoundReport("failed to load metadata of share '%s': timeout", ref)
+	if xerr != nil {
+		// If retry timed out, log it and return error ErrNotFound
+		if _, ok := xerr.(retry.ErrTimeout); ok {
+			logrus.Debugf("timeout reading metadata of rs '%s'", ref)
+			xerr = fail.NotFoundError("failed to load metadata of rs '%s': timeout", ref)
 		}
-		return nullShare(), err
+		return nullShare(), xerr
 	}
-	return share, nil
+	return rs, nil
 }
 
 func (objs *share) IsNull() bool {
@@ -161,21 +162,20 @@ func (objs *share) IsNull() bool {
 }
 
 // Browse walks through shares folder and executes a callback for each entry
-func (objs *share) Browse(task concurrency.Task, callback func(string, string) error) error {
+func (objs *share) Browse(task concurrency.Task, callback func(string, string) fail.Error) fail.Error {
 	if objs.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
-		return fail.InvalidParameterReport("callback", "cannot be nil")
+		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
-	return objs.core.BrowseFolder(task, func(buf []byte) error {
+	return objs.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		si := &ShareIdentity{}
-		err := si.Deserialize(buf)
-		if err != nil {
-			return err
+		if xerr := si.Deserialize(buf); xerr != nil {
+			return xerr
 		}
 		return callback(si.HostName, si.ShareID)
 	})
@@ -226,7 +226,7 @@ func (objs *share) Browse(task concurrency.Task, callback func(string, string) e
 // 		return nil, err
 // 	}
 // 	if client == nil {
-// 		return nil, fail.NotFoundReport("no client found for nas '%s' on host '%s'", *m.name, hostName)
+// 		return nil, fail.NotFoundError("no client found for nas '%s' on host '%s'", *m.name, hostName)
 // 	}
 // 	return client, nil
 // }
@@ -249,118 +249,115 @@ func (objs *share) Create(
 	server resources.Host, path string,
 	options string,
 	/*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
-) (err error) {
+) (xerr fail.Error) {
 
 	if objs.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if shareName == "" {
-		return fail.InvalidParameterReport("shareName", "cannot be empty string")
+		return fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
 	if server == nil {
-		return fail.InvalidParameterReport("server", "cannot be nil")
+		return fail.InvalidParameterError("server", "cannot be nil")
 	}
 
 	// Check if a share already exists with the same name
-	_, err = server.GetShare(task, shareName)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
-			return err
+	if _, xerr = server.GetShare(task, shareName); xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return xerr
 		}
 	}
 
 	// Sanitize path
-	sharePath, err := sanitize(path)
-	if err != nil {
-		return err
+	sharePath, xerr := sanitize(path)
+	if xerr != nil {
+		return xerr
 	}
 
 	// -- make some validations --
-	err = server.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+	xerr = server.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if the path to share isn't a remote mount or contains a remote mount
-		return props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			serverMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
-				return fail.InvalidRequestReport(fmt.Sprintf("path to export '%s' is a mounted share", sharePath))
+				return fail.InvalidRequestError(fmt.Sprintf("path to export '%s' is a mounted share", sharePath))
 			}
 			for k := range serverMountsV1.RemoteMountsByPath {
 				if strings.Index(sharePath, k) == 0 {
-					return fail.InvalidRequestReport("export path '%s' contains a share mounted in '%s'", sharePath, k)
+					return fail.InvalidRequestError("export path '%s' contains a share mounted in '%s'", sharePath, k)
 				}
 			}
 			return nil
 		})
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// Installs NFS Server software if needed
-	sshConfig, err := server.GetSSHConfig(task)
-	if err != nil {
-		return err
+	sshConfig, xerr := server.GetSSHConfig(task)
+	if xerr != nil {
+		return xerr
 	}
-	nfsServer, err := nfs.NewServer(sshConfig)
-	if err != nil {
-		return err
+	nfsServer, xerr := nfs.NewServer(sshConfig)
+	if xerr != nil {
+		return xerr
 	}
 
 	// Nothing will be changed in object, but we don't want more than 1 goroutine to install NFS if needed (yes, this will cost a useless metadata update)
-	err = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+	xerr = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if len(serverSharesV1.ByID) == 0 {
 				// Host doesn't have shares yet, so install NFS
-				err = nfsServer.Install(task)
-				if err != nil {
-					return err
+				if xerr = nfsServer.Install(task); xerr != nil {
+					return xerr
 				}
 			}
 			return nil
 		})
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
-	err = nfsServer.AddShare(task, sharePath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
-	if err != nil {
-		return err
+	if xerr = nfsServer.AddShare(task, sharePath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/); xerr != nil {
+		return xerr
 	}
 
 	// Starting from here, remove share from host if exiting with error
 	defer func() {
-		if err != nil {
+		if xerr != nil {
 			derr := nfsServer.RemoveShare(task, sharePath)
 			if derr != nil {
 				logrus.Errorf("After failure, cleanup failed to remove share '%s' on host", sharePath)
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
 
 	// Updates Host Property propertiesv1.HostShares
 	var hostShare *propertiesv1.HostShare
-	err = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+	xerr = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			hostShare := propertiesv1.NewHostShare()
 			hostShare.Name = shareName
 			shareID, err := uuid.NewV4()
 			if err != nil {
-				return fail.Wrap(err, "Report creating UUID for share")
+				return fail.Wrap(err, "Error creating UUID for share")
 			}
 			hostShare.ID = shareID.String()
 			hostShare.Path = sharePath
@@ -372,18 +369,18 @@ func (objs *share) Create(
 			return nil
 		})
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// Starting from here, delete share reference in server if exiting with error
 	defer func() {
-		if err != nil {
-			derr := server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+		if xerr != nil {
+			derr := server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
-						return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					delete(serverSharesV1.ByID, hostShare.ID)
 					delete(serverSharesV1.ByName, hostShare.Name)
@@ -392,7 +389,7 @@ func (objs *share) Create(
 			})
 			if derr != nil {
 				logrus.Errorf("After failure, cleanup failed to update metadata of host '%s'", server.SafeGetName())
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -404,168 +401,156 @@ func (objs *share) Create(
 		ShareID:   hostShare.ID,
 		ShareName: hostShare.Name,
 	}
-	err = objs.Carry(task, &si)
-	return err
+	return objs.Carry(task, &si)
 }
 
 // GetServer returns the *Host acting as share server, with error handling
-func (objs *share) GetServer(task concurrency.Task) (resources.Host, error) {
+func (objs *share) GetServer(task concurrency.Task) (resources.Host, fail.Error) {
 	if objs.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var hostID, hostName string
-	err := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
-			return fail.InconsistentReport("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		hostID = share.HostID
 		hostName = share.HostName
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 	svc := objs.SafeGetService()
-	server, err := LoadHost(task, svc, hostID)
-	if err != nil {
-		server, err = LoadHost(task, svc, hostName)
+	server, xerr := LoadHost(task, svc, hostID)
+	if xerr != nil {
+		server, xerr = LoadHost(task, svc, hostName)
 	}
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 	return server, nil
 }
 
 // SafeGetServer returns the *Host acting as share server, with no error handling
-func (objs *share) SafeGetServer(task concurrency.Task) (host resources.Host) {
-	host, _ = objs.GetServer(task)
-	return host
+func (objs *share) SafeGetServer(task concurrency.Task) (rh resources.Host) {
+	rh, _ = objs.GetServer(task)
+	return rh
 }
 
 // Mount mounts a share on a local directory of an host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
-func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache bool) (*propertiesv1.HostRemoteMount, error) {
+func (objs *share) Mount(task concurrency.Task, target resources.Host, path string, withCache bool) (*propertiesv1.HostRemoteMount, fail.Error) {
 	if objs.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if hostName == "" {
-		return nil, fail.InvalidParameterReport("hostName", "cannot be empty string")
+	if target == nil {
+		return nil, fail.InvalidParameterError("target", "cannot be nil")
 	}
 	if path == "" {
-		return nil, fail.InvalidParameterReport("path", "cannot be empty string")
+		return nil, fail.InvalidParameterError("path", "cannot be empty string")
 	}
+
 	var (
-		serverName, serverID            string
+		// serverName, serverID            string
 		serverPrivateIP, serverAccessIP string
 		export                          string
-		objtarget                       resources.Host
 		targetName, targetID            string
 		hostShare                       *propertiesv1.HostShare
 		shareName                       string
 	)
 
 	// Retrieve info about the share
-	err := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
-			return fail.InconsistentReport("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		shareName = si.ShareName
 		return nil
 	})
 
-	objserver, err := objs.GetServer(task)
-	if err != nil {
-		return nil, err
+	objserver, xerr := objs.GetServer(task)
+	if xerr != nil {
+		return nil, xerr
 	}
-	serverID = objserver.SafeGetID()
-	serverName = objserver.SafeGetName()
-	ip, err := objserver.GetPrivateIP(task)
-	if err != nil {
-		return nil, err
+	// serverID = objserver.SafeGetID()
+	// serverName = objserver.SafeGetName()
+	ip, xerr := objserver.GetPrivateIP(task)
+	if xerr != nil {
+		return nil, xerr
 	}
 	serverPrivateIP = ip
-	ip, err = objserver.GetAccessIP(task)
-	if err != nil {
-		return nil, err
+	if ip, xerr = objserver.GetAccessIP(task); xerr != nil {
+		return nil, xerr
 	}
 	serverAccessIP = ip
 
-	err = objserver.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+	xerr = objserver.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			hostShare = sharesV1.ByID[sharesV1.ByName[shareName]].Clone().(*propertiesv1.HostShare)
 			return nil
 		})
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Sanitize path
-	mountPath, err := sanitize(path)
-	if err != nil {
-		return nil, fail.Wrap(err, "invalid mount path '%s'", path)
-	}
-
-	svc := objs.SafeGetService()
-	if serverName == hostName || serverID == hostName {
-		objtarget = objserver
-	} else {
-		objtarget, err = LoadHost(task, svc, hostName)
-		if err != nil {
-			return nil, err
-		}
+	mountPath, xerr := sanitize(path)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "invalid mount path '%s'", path)
 	}
 
 	// Lock for read, won't change data other than properties, which are protected by their own way
-	targetID = objtarget.SafeGetID()
-	targetName = objtarget.SafeGetName()
-	err = objtarget.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
+	targetID = target.SafeGetID()
+	targetName = target.SafeGetName()
+	xerr = target.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Check if share is already mounted
 		// Check if there is already volume mounted in the path (or in subpath)
-		innerErr := props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
+		innerXErr := props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if s, ok := targetMountsV1.RemoteMountsByShareID[hostShare.ID]; ok {
-				return fail.DuplicateReport(fmt.Sprintf("already mounted in '%s:%s'", targetName, targetMountsV1.RemoteMountsByPath[s].Path))
+				return fail.DuplicateError(fmt.Sprintf("already mounted in '%s:%s'", targetName, targetMountsV1.RemoteMountsByPath[s].Path))
 			}
 			for _, i := range targetMountsV1.LocalMountsByPath {
 				if i.Path == path {
 					// cannot mount a share in place of a volume (by convention, nothing technically preventing it)
-					return fail.InvalidRequestReport(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, path))
+					return fail.InvalidRequestError(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, path))
 				}
 			}
 			for _, i := range targetMountsV1.RemoteMountsByPath {
 				if strings.Index(path, i.Path) == 0 {
 					// cannot mount a share inside another share (at least by convention, if not technically)
-					return fail.InvalidRequestReport("there is already a share mounted in '%s:%s'", targetName, i.Path)
+					return fail.InvalidRequestError("there is already a share mounted in '%s:%s'", targetName, i.Path)
 				}
 			}
 
 			return nil
 		})
-		if innerErr != nil {
-			return innerErr
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if hostNetworkV1.DefaultGatewayPrivateIP == serverPrivateIP {
 				export = serverPrivateIP + ":" + hostShare.Path
@@ -575,40 +560,40 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 			return nil
 		})
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	targetSSHConfig, err := objtarget.GetSSHConfig(task)
-	if err != nil {
-		return nil, err
+	targetSSHConfig, xerr := target.GetSSHConfig(task)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// -- Mount the share on host --
 	// Lock for read, won't change data other than properties, which are protected by their own way
-	err = objserver.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+	xerr = objserver.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			_, found := serverSharesV1.ByID[serverSharesV1.ByName[shareName]]
 			if !found {
-				return fail.NotFoundReport(fmt.Sprintf("failed to find metadata about share '%s'", shareName))
+				return fail.NotFoundError(fmt.Sprintf("failed to find metadata about share '%s'", shareName))
 			}
 			shareID := serverSharesV1.ByName[shareName]
 
-			nfsClient, err := nfs.NewNFSClient(targetSSHConfig)
-			if err != nil {
-				return err
+			nfsClient, xerr := nfs.NewNFSClient(targetSSHConfig)
+			if xerr != nil {
+				return xerr
 			}
-			err = nfsClient.Install(task)
-			if err != nil {
-				return err
+			xerr = nfsClient.Install(task)
+			if xerr != nil {
+				return xerr
 			}
-			err = nfsClient.Mount(task, export, mountPath, withCache)
-			if err != nil {
-				return err
+			xerr = nfsClient.Mount(task, export, mountPath, withCache)
+			if xerr != nil {
+				return xerr
 			}
 
 			serverSharesV1.ByID[shareID].ClientsByName[targetName] = targetID
@@ -616,18 +601,18 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 			return nil
 		})
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Starting from here, remove share mount from server share when exiting with error
 	defer func() {
-		if err != nil {
-			derr := objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+		if xerr != nil {
+			derr := objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
-						return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByName, targetName)
 					delete(serverSharesV1.ByID[serverSharesV1.ByName[shareName]].ClientsByID, targetID)
@@ -643,18 +628,18 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 				}
 			}
 			if derr != nil {
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 				logrus.Error(derr)
 			}
 		}
 	}()
 
 	var mount *propertiesv1.HostRemoteMount
-	err = objtarget.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
+	xerr = target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// Make sure the HostMounts is correctly init if there are no mount yet
@@ -672,18 +657,18 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 			return nil
 		})
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Starting from here, removes share mount from target if exiting with error
 	defer func() {
-		if err != nil {
-			derr := objtarget.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
+		if xerr != nil {
+			derr := target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 					targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 					if !ok {
-						return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
 					delete(targetMountsV1.RemoteMountsByPath, mount.Path)
@@ -692,8 +677,8 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 				})
 			})
 			if derr != nil {
-				err = fail.AddConsequence(err, derr)
-				logrus.Warnf("Failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
+				_ = xerr.AddConsequence(derr)
+				logrus.Warnf("Failed to remove mounted share '%s' from host '%s' metadata", shareName, targetName)
 			}
 		}
 	}()
@@ -702,90 +687,78 @@ func (objs *share) Mount(task concurrency.Task, hostName, path string, withCache
 }
 
 // Unmount unmounts a share from local directory of an host
-func (objs *share) Unmount(task concurrency.Task, targetName string) error {
+func (objs *share) Unmount(task concurrency.Task, target resources.Host) fail.Error {
 	if objs.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if targetName == "" {
-		return fail.InvalidParameterReport("targetName", "cannot be empty string")
+	if target == nil {
+		return fail.InvalidParameterError("target", "cannot be nil")
 	}
 
 	var (
-		shareName, shareID   string
-		serverID, serverName string
-		serverAccessIP       string
-		targetID             string
-		objtarget            resources.Host
-		hostShare            *propertiesv1.HostShare
+		shareName, shareID string
+		/*serverID,*/ serverName string
+		serverAccessIP           string
+		hostShare                *propertiesv1.HostShare
 	)
 
 	// -- get data from share --
-	err := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
-			return fail.InconsistentReport("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		shareName = si.ShareName
 		return nil
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
-	objserver, err := objs.GetServer(task)
-	if err != nil {
-		return err
+	objserver, xerr := objs.GetServer(task)
+	if xerr != nil {
+		return xerr
 	}
-	err = objserver.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
+	xerr = objserver.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		serverName = objserver.SafeGetName()
-		serverID = objserver.SafeGetID()
+		// serverID = objserver.SafeGetID()
 		serverAccessIP = objserver.SafeGetAccessIP(task)
 
-		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1 := clonable.(*propertiesv1.HostShares)
 			var found bool
 			shareID, found = serverSharesV1.ByName[shareName]
 			if !found {
-				return fail.NotFoundReport("failed to find data about share '%s' on host '%s'", shareName, serverName)
+				return fail.NotFoundError("failed to find data about share '%s' on host '%s'", shareName, serverName)
 			}
 			hostShare = serverSharesV1.ByID[shareID]
 			// remotePath := h.AccessIP() + ":" + hostShare.Path
 			return nil
 		})
 	})
-	if err != nil {
-		return err
-	}
-
-	svc := objs.SafeGetService()
-	if serverName == targetName || serverID == targetName {
-		objtarget = objserver
-	} else {
-		objtarget, err = LoadHost(task, svc, targetName)
-		if err != nil {
-			return err
-		}
+	if xerr != nil {
+		return xerr
 	}
 
 	var mountPath string
-	err = objtarget.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		targetName = objtarget.SafeGetName()
-		targetID = objtarget.SafeGetID()
-		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) error {
+	targetName := target.SafeGetName()
+	targetID := target.SafeGetID()
+	xerr = target.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
 			if !found {
-				return fail.NotFoundReport("not mounted on host '%s'", targetName)
+				return fail.NotFoundError("not mounted on host '%s'", targetName)
 			}
 
 			// Unmount share from client
-			sshConfig, inErr := objtarget.GetSSHConfig(task)
+			sshConfig, inErr := target.GetSSHConfig(task)
 			if inErr != nil {
 				return inErr
 			}
@@ -805,13 +778,13 @@ func (objs *share) Unmount(task concurrency.Task, targetName string) error {
 			return nil
 		})
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// Remove host from client lists of the share
-	return objserver.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+	return objserver.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1 := clonable.(*propertiesv1.HostShares)
 			delete(serverSharesV1.ByID[shareID].ClientsByName, targetName)
 			delete(serverSharesV1.ByID[shareID].ClientsByID, targetID)
@@ -821,12 +794,12 @@ func (objs *share) Unmount(task concurrency.Task, targetName string) error {
 }
 
 // Delete deletes a share from server
-func (objs *share) Delete(task concurrency.Task) error {
+func (objs *share) Delete(task concurrency.Task) fail.Error {
 	if objs.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var (
@@ -835,31 +808,31 @@ func (objs *share) Delete(task concurrency.Task) error {
 	)
 
 	// -- Retrieve info about the share --
-	err := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
-			return fail.InconsistentReport("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		shareID = si.ShareID
 		shareName = si.ShareName
 		return nil
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
-	objserver, err := objs.GetServer(task)
-	if err != nil {
-		return err
+	objserver, xerr := objs.GetServer(task)
+	if xerr != nil {
+		return xerr
 	}
-	err = objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) error {
+	xerr = objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if _, ok := serverSharesV1.ByID[shareName]; !ok {
-				return fail.NotFoundReport("failed to find data about share '%s' in host '%s'", shareName, objserver.SafeGetName())
+				return fail.NotFoundError("failed to find data about share '%s' in host '%s'", shareName, objserver.SafeGetName())
 			}
 
 			hostShare = serverSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
@@ -870,20 +843,19 @@ func (objs *share) Delete(task concurrency.Task) error {
 				for k := range hostShare.ClientsByName {
 					list = append(list, "'"+k+"'")
 				}
-				return fail.InvalidRequestReport("still used by: %s", strings.Join(list, ","))
+				return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
 			}
 
-			sshConfig, err := objserver.GetSSHConfig(task)
-			if err != nil {
-				return err
+			sshConfig, xerr := objserver.GetSSHConfig(task)
+			if xerr != nil {
+				return xerr
 			}
-			nfsServer, err := nfs.NewServer(sshConfig)
-			if err != nil {
-				return err
+			nfsServer, xerr := nfs.NewServer(sshConfig)
+			if xerr != nil {
+				return xerr
 			}
-			err = nfsServer.RemoveShare(task, hostShare.Path)
-			if err != nil {
-				return err
+			if xerr = nfsServer.RemoveShare(task, hostShare.Path); xerr != nil {
+				return xerr
 			}
 
 			delete(serverSharesV1.ByID, shareID)
@@ -891,36 +863,36 @@ func (objs *share) Delete(task concurrency.Task) error {
 			return nil
 		})
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// Remove share metadata
 	return objs.core.Delete(task)
 }
 
-func sanitize(in string) (string, error) {
+func sanitize(in string) (string, fail.Error) {
 	sanitized := path.Clean(in)
 	if !path.IsAbs(sanitized) {
-		return "", fail.InvalidParameterReport("in", "must be a string containing an absolute path")
+		return "", fail.InvalidParameterError("in", "must be a string containing an absolute path")
 	}
 	return sanitized, nil
 }
 
-func (objs *share) ToProtocol(task concurrency.Task) (*protocol.ShareMountList, error) {
+func (objs *share) ToProtocol(task concurrency.Task) (*protocol.ShareMountList, fail.Error) {
 	if objs.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	shareID := objs.SafeGetID()
 	shareName := objs.SafeGetName()
 	server := objs.SafeGetServer(task)
-	share, err := server.GetShare(task, shareID)
-	if err != nil {
-		return nil, err
+	share, xerr := server.GetShare(task, shareID)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	psml := &protocol.ShareMountList{
@@ -935,24 +907,24 @@ func (objs *share) ToProtocol(task concurrency.Task) (*protocol.ShareMountList, 
 		},
 	}
 	for k := range share.ClientsByName {
-		h, err := LoadHost(task, objs.SafeGetService(), k)
-		if err != nil {
-			log.Errorf(err.Error())
+		h, xerr := LoadHost(task, objs.SafeGetService(), k)
+		if xerr != nil {
+			log.Errorf(xerr.Error())
 			continue
 		}
-		mounts, err := h.GetMounts(task)
-		if err != nil {
-			log.Errorf(err.Error())
+		mounts, xerr := h.GetMounts(task)
+		if xerr != nil {
+			log.Errorf(xerr.Error())
 			continue
 		}
 		path, ok := mounts.RemoteMountsByShareID[shareID]
 		if !ok {
-			logrus.Error(fail.InconsistentReport("failed to find the path on host '%s' where share '%s' is mounted", h.SafeGetName(), shareName).Error())
+			logrus.Error(fail.InconsistentError("failed to find the path on host '%s' where share '%s' is mounted", h.SafeGetName(), shareName).Error())
 			continue
 		}
 		mount, ok := mounts.RemoteMountsByPath[path]
 		if !ok {
-			logrus.Error(fail.InconsistentReport("failed to find a mount associated to share path '%s' for host '%s'", path, h.SafeGetName()).Error())
+			logrus.Error(fail.InconsistentError("failed to find a mount associated to share path '%s' for host '%s'", path, h.SafeGetName()).Error())
 			continue
 		}
 		psmd := &protocol.ShareMountDefinition{

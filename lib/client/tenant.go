@@ -23,6 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // tenant is the part of safescale client handling tenants
@@ -35,12 +36,13 @@ type tenant struct {
 func (t *tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
+	service := protocol.NewTenantServiceClient(t.session.connection)
 	return service.List(ctx, &googleprotobuf.Empty{})
 
 }
@@ -49,12 +51,13 @@ func (t *tenant) List(timeout time.Duration) (*protocol.TenantList, error) {
 func (t *tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
+	service := protocol.NewTenantServiceClient(t.session.connection)
 	return service.Get(ctx, &googleprotobuf.Empty{})
 }
 
@@ -62,26 +65,28 @@ func (t *tenant) Get(timeout time.Duration) (*protocol.TenantName, error) {
 func (t *tenant) Set(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Set(ctx, &protocol.TenantName{Name: name})
-	return err
+	service := protocol.NewTenantServiceClient(t.session.connection)
+	_, err := service.Set(ctx, &protocol.TenantName{Name: name})
+	return fail.ToError(err)
 }
 
 // Cleanup ...
 func (t *tenant) Cleanup(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Cleanup(ctx, &protocol.TenantCleanupRequest{Name: name, Force: false})
+	service := protocol.NewTenantServiceClient(t.session.connection)
+	_, err := service.Cleanup(ctx, &protocol.TenantCleanupRequest{Name: name, Force: false})
 	return err
 }

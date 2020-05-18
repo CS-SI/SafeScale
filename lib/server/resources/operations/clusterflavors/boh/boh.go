@@ -67,14 +67,14 @@ var (
 	}
 )
 
-func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, error) {
+func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
 	var (
 		privateNodeCount uint
 		masterNodeCount  uint
 	)
-	complexity, err := c.GetComplexity(task)
-	if err != nil {
-		return 0, 0, 0, err
+	complexity, xerr := c.GetComplexity(task)
+	if xerr != nil {
+		return 0, 0, 0, xerr
 	}
 	switch complexity {
 	case clustercomplexity.Small:
@@ -117,7 +117,7 @@ func defaultImage(task concurrency.Task, _ resources.Cluster) string {
 }
 
 // getTemplateBox
-func getTemplateBox() (*rice.Box, error) {
+func getTemplateBox() (*rice.Box, fail.Error) {
 	var b *rice.Box
 	var err error
 	anon := templateBox.Load()
@@ -125,7 +125,7 @@ func getTemplateBox() (*rice.Box, error) {
 		// Note: path MUST be literal for rice to work
 		b, err = rice.FindBox("../boh/scripts")
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 		templateBox.Store(b)
 		anon = templateBox.Load()
@@ -135,19 +135,19 @@ func getTemplateBox() (*rice.Box, error) {
 
 // getGlobalSystemRequirements returns the string corresponding to the script boh_install_requirements.sh
 // which installs common features (docker in particular)
-func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, error) {
+func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, fail.Error) {
 	anon := globalSystemRequirementsContent.Load()
 	if anon == nil {
 		// find the rice.Box
-		b, err := getTemplateBox()
-		if err != nil {
-			return "", err
+		b, xerr := getTemplateBox()
+		if xerr != nil {
+			return "", xerr
 		}
 
 		// We will need information about cluster network
-		netCfg, err := c.GetNetworkConfig(task)
-		if err != nil {
-			return "", err
+		netCfg, xerr := c.GetNetworkConfig(task)
+		if xerr != nil {
+			return "", xerr
 		}
 
 		// get file contents as string
@@ -162,9 +162,9 @@ func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (st
 			return "", fail.Wrap(err, "error parsing script template")
 		}
 		dataBuffer := bytes.NewBufferString("")
-		identity, err := c.GetIdentity(task)
-		if err != nil {
-			return "", err
+		identity, xerr := c.GetIdentity(task)
+		if xerr != nil {
+			return "", xerr
 		}
 		data := map[string]interface{}{
 			"CIDR":          netCfg.CIDR,

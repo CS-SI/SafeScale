@@ -19,6 +19,8 @@ package objectstorage
 import (
 	"io"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 const (
@@ -36,44 +38,44 @@ type Location interface {
 	SafeGetObjectStorageProtocol() string
 
 	// ListBuckets returns all bucket prefixed by a string given as a parameter
-	ListBuckets(string) ([]string, error)
+	ListBuckets(string) ([]string, fail.Error)
 	// FindBucket returns true of bucket exists in location
-	FindBucket(string) (bool, error)
+	FindBucket(string) (bool, fail.Error)
 	// InspectBucket returns info of the Bucket
-	InspectBucket(string) (Bucket, error)
+	InspectBucket(string) (Bucket, fail.Error)
 	// Create a bucket
-	CreateBucket(string) (Bucket, error)
+	CreateBucket(string) (Bucket, fail.Error)
 	// DeleteBucket removes a bucket (need to be cleared before)
-	DeleteBucket(string) error
+	DeleteBucket(string) fail.Error
 	// ClearBucket empties a Bucket
-	ClearBucket(string, string, string) error
+	ClearBucket(string, string, string) fail.Error
 
 	// ListObjects lists the objects in a Bucket
-	ListObjects(string, string, string) ([]string, error)
+	ListObjects(string, string, string) ([]string, fail.Error)
 	// InspectObject ...
-	InspectObject(string, string) (Object, error)
+	InspectObject(string, string) (Object, fail.Error)
 	// ReadObject ...
-	ReadObject(string, string, io.Writer, int64, int64) error
+	ReadObject(string, string, io.Writer, int64, int64) fail.Error
 	// WriteMultiChunkObject ...
-	WriteMultiPartObject(string, string, io.Reader, int64, int, ObjectMetadata) (Object, error)
+	WriteMultiPartObject(string, string, io.Reader, int64, int, ObjectMetadata) (Object, fail.Error)
 	// WriteObject ...
-	WriteObject(string, string, io.Reader, int64, ObjectMetadata) (Object, error)
+	WriteObject(string, string, io.Reader, int64, ObjectMetadata) (Object, fail.Error)
 	// // CopyObject copies an object
-	// CopyObject(string, string, string) error
+	// CopyObject(string, string, string) fail.Error
 	// DeleteObject delete an object from a container
-	DeleteObject(string, string) error
-	// FilterItemsByMetadata(ContainerName string, key string, pattern string) (map[string][]string, error)
+	DeleteObject(string, string) fail.Error
+	// FilterItemsByMetadata(ContainerName string, key string, pattern string) (map[string][]string, fail.Error)
 
 	// // ItemSize ?
-	// ItemSize(ContainerName string, item string) (int64, error)
+	// ItemSize(ContainerName string, item string) (int64, fail.Error)
 	// // ItemEtag returns the Etag of an item
-	// ItemEtag(ContainerName string, item string) (string, error)
+	// ItemEtag(ContainerName string, item string) (string, fail.Error)
 	// // ItemLastMod returns the dagte of last update
-	// ItemLastMod(ContainerName string, item string) (time.Time, error)
+	// ItemLastMod(ContainerName string, item string) (time.Time, fail.Error)
 	// // ItemID returns the ID of the item
 	// ItemID(ContainerName string, item string) (id string)
 	// // ItemMetadata returns the metadata of an Item
-	// ItemMetadata(ContainerName string, item string) (map[string]interface{}, error)
+	// ItemMetadata(ContainerName string, item string) (map[string]interface{}, fail.Error)
 }
 
 //go:generate mockgen -destination=../mocks/mock_bucket.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage Bucket
@@ -81,31 +83,31 @@ type Location interface {
 // Bucket interface
 type Bucket interface {
 	// List list object names in a Bucket
-	List(string, string) ([]string, error)
+	List(string, string) ([]string, fail.Error)
 	// BrowseObjects browses inside the Bucket and execute a callback on each Object found
-	Browse(string, string, func(Object) error) error
+	Browse(string, string, func(Object) fail.Error) fail.Error
 
 	// CreateObject creates a new object in the bucket
-	CreateObject(string) (Object, error)
+	CreateObject(string) (Object, fail.Error)
 	// InspectObject returns Object instance of an object in the Bucket
-	InspectObject(string) (Object, error)
+	InspectObject(string) (Object, fail.Error)
 	// DeleteObject delete an object from a container
-	DeleteObject(string) error
+	DeleteObject(string) fail.Error
 	// ReadObject reads the content of an object
-	ReadObject(string, io.Writer, int64, int64) (Object, error)
+	ReadObject(string, io.Writer, int64, int64) (Object, fail.Error)
 	// WriteObject writes into an object
-	WriteObject(string, io.Reader, int64, ObjectMetadata) (Object, error)
+	WriteObject(string, io.Reader, int64, ObjectMetadata) (Object, fail.Error)
 	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
-	WriteMultiPartObject(string, io.Reader, int64, int, ObjectMetadata) (Object, error)
+	WriteMultiPartObject(string, io.Reader, int64, int, ObjectMetadata) (Object, fail.Error)
 	// // CopyObject copies an object
-	// CopyObject(string, string) error
+	// CopyObject(string, string) fail.Error
 
 	// GetName returns the name of the bucket
-	GetName() (string, error)
+	GetName() (string, fail.Error)
 	// GetCount returns the number of objects in the Bucket
-	GetCount(string, string) (int64, error)
+	GetCount(string, string) (int64, fail.Error)
 	// GetSize returns the total size of all objects in the bucket
-	GetSize(string, string) (int64, string, error)
+	GetSize(string, string) (int64, string, fail.Error)
 	// SafeeGetName returns the name of the bucket
 	SafeGetName() string
 }
@@ -128,21 +130,21 @@ func (om ObjectMetadata) Clone() ObjectMetadata {
 type Object interface {
 	Stored() bool
 
-	Read(io.Writer, int64, int64) error
-	Write(io.Reader, int64) error
-	WriteMultiPart(io.Reader, int64, int) error
-	Reload() error
-	Delete() error
-	AddMetadata(ObjectMetadata) error
-	ForceAddMetadata(ObjectMetadata) error
-	ReplaceMetadata(ObjectMetadata) error
+	Read(io.Writer, int64, int64) fail.Error
+	Write(io.Reader, int64) fail.Error
+	WriteMultiPart(io.Reader, int64, int) fail.Error
+	Reload() fail.Error
+	Delete() fail.Error
+	AddMetadata(ObjectMetadata) fail.Error
+	ForceAddMetadata(ObjectMetadata) fail.Error
+	ReplaceMetadata(ObjectMetadata) fail.Error
 
-	GetID() (string, error)
-	GetName() (string, error)
-	GetLastUpdate() (time.Time, error)
-	GetSize() (int64, error)
-	GetETag() (string, error)
-	GetMetadata() (ObjectMetadata, error)
+	GetID() (string, fail.Error)
+	GetName() (string, fail.Error)
+	GetLastUpdate() (time.Time, fail.Error)
+	GetSize() (int64, fail.Error)
+	GetETag() (string, fail.Error)
+	GetMetadata() (ObjectMetadata, fail.Error)
 
 	SafeGetID() string
 	SafeGetName() string

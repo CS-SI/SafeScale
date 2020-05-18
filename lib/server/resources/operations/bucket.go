@@ -45,9 +45,9 @@ type bucket struct {
 }
 
 // NewBucket intanciantes bucket struct
-func NewBucket(svc iaas.Service) (resources.Bucket, error) {
+func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	b := &bucket{
 		svc: svc,
@@ -56,30 +56,29 @@ func NewBucket(svc iaas.Service) (resources.Bucket, error) {
 }
 
 // LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage Bucket
-func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, err error) {
+func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(nil, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	anon, err := NewBucket(svc)
-	if err != nil {
-		return nil, err
+	anon, xerr := NewBucket(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
 	b := anon.(*bucket)
 
-	_, err = svc.InspectBucket(name)
-	if err != nil {
-		if err.Error() == "not found" {
+	if _, xerr = svc.InspectBucket(name); xerr != nil {
+		if xerr.Error() == "not found" {
 			return nil, abstract.ResourceNotFoundError("bucket", name)
 		}
-		return nil, fail.NewReport(err, nil, "failed to read bucket information")
+		return nil, fail.NewError(xerr, nil, "failed to read bucket information")
 	}
 	b.Name = name
 	b.ID = name
@@ -123,33 +122,32 @@ func (b *bucket) SafeGetMountPoint() string {
 }
 
 // Create a bucket
-func (b *bucket) Create(task concurrency.Task, name string) (err error) {
+func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	if b == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return fail.InvalidParameterReport("name", "cannot be empty string")
+		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	bucket, err := b.svc.InspectBucket(name)
-	if err != nil {
-		if err.Error() != "not found" {
-			return err
+	bucket, xerr := b.svc.InspectBucket(name)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return xerr
 		}
 	}
 	if bucket != nil {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
-	_, err = b.svc.CreateBucket(name)
-	if err != nil {
-		return err
+	if _, xerr = b.svc.CreateBucket(name); xerr != nil {
+		return xerr
 	}
 	b.Name = name
 	b.ID = name
@@ -158,24 +156,24 @@ func (b *bucket) Create(task concurrency.Task, name string) (err error) {
 }
 
 // Delete a bucket
-func (b *bucket) Delete(task concurrency.Task) (err error) {
+func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	return b.svc.DeleteBucket(b.SafeGetName())
 }
 
 // Mount a bucket on an host on the given mount point
-func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error) {
+func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.Error) {
 	tracer := concurrency.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	// Get Host data
-	host, err := LoadHost(task, b.svc, hostName)
-	if err != nil {
-		return fail.Wrap(err, "failed to mount bucket '%s' on host '%s'", b.SafeGetName(), hostName)
+	rh, xerr := LoadHost(task, b.svc, hostName)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to mount bucket '%s' on rh '%s'", b.SafeGetName(), hostName)
 	}
 
 	// Create mount point
@@ -222,32 +220,31 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (err error)
 		Protocol:   objStorageProtocol,
 	}
 
-	rerr := b.exec(task, host, "mount_object_storage.sh", data)
-	return rerr
+	err := b.exec(task, rh, "mount_object_storage.sh", data)
+	return fail.ToError(err)
 }
 
 // Unmount a bucket
-func (b *bucket) Unmount(task concurrency.Task, hostName string) (err error) {
+func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Error) {
 	tracer := concurrency.NewTracer(task, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "failed to unmount bucket '%s' from host '%s'", b.SafeGetName(), hostName)
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from rh '%s'", b.SafeGetName(), hostName)
 		}
 	}()
 
 	// Check bucket existence
-	_, err = b.svc.InspectBucket(b.SafeGetName())
-	if err != nil {
-		return err
+	if _, xerr = b.svc.InspectBucket(b.SafeGetName()); xerr != nil {
+		return xerr
 	}
 
 	// Get Host ID
-	host, err := LoadHost(task, b.svc, hostName)
-	if err != nil {
-		return err
+	rh, xerr := LoadHost(task, b.svc, hostName)
+	if xerr != nil {
+		return xerr
 	}
 
 	data := struct {
@@ -256,41 +253,41 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (err error) {
 		Bucket: b.SafeGetName(),
 	}
 
-	rerr := b.exec(task, host, "umount_object_storage.sh", data)
-	return rerr
+	err := b.exec(task, rh, "umount_object_storage.sh", data)
+	return fail.ToError(err)
 }
 
 // Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
-func (b *bucket) exec(task concurrency.Task, host resources.Host, script string, data interface{}) error {
-	scriptCmd, err := getBoxContent(script, data)
-	if err != nil {
-		return err
+func (b *bucket) exec(task concurrency.Task, host resources.Host, script string, data interface{}) fail.Error {
+	scriptCmd, xerr := getBoxContent(script, data)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, _, _, err = host.Run(task, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	return err
+	_, _, _, xerr = host.Run(task, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	return xerr
 }
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
-func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer fail.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &err)
+func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Error) {
+	defer fail.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &xerr)
 
 	box, err := rice.FindBox("../operations/scripts")
 	if err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 	tpl, err := template.New("TemplateName").Parse(scriptContent)
 	if err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 
 	tplcmd = buffer.String()

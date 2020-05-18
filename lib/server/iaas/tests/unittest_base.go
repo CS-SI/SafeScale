@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
@@ -210,15 +211,15 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abstract.Network, public bool) (*abstract.HostFull, *userdata.Content, error) {
-	tpls, err := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abstract.Network, public bool) (*abstract.HostFull, *userdata.Content, fail.Error) {
+	tpls, xerr := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
 	}, false)
-	assert.Nil(t, err)
-	img, err := tester.Service.SearchImage("Ubuntu 18.04")
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
+	img, xerr := tester.Service.SearchImage("Ubuntu 18.04")
+	assert.Nil(t, xerr)
 	hostRequest := abstract.HostRequest{
 		ResourceName:   name,
 		Networks:       []*abstract.Network{network},
@@ -234,15 +235,15 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abst
 }
 
 // CreateGW creates a test GW
-func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) error {
-	tpls, err := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) fail.Error {
+	tpls, xerr := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
 	}, false)
-	assert.Nil(t, err)
-	img, err := tester.Service.SearchImage("Ubuntu 18.04")
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
+	img, xerr := tester.Service.SearchImage("Ubuntu 18.04")
+	assert.Nil(t, xerr)
 	gwRequest := abstract.HostRequest{
 		ImageID:      img.ID,
 		TemplateID:   tpls[0].ID,
@@ -250,9 +251,9 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) e
 		ResourceName: "gw-" + network.Name,
 		IsGateway:    true,
 	}
-	gw, _, err := tester.Service.CreateHost(gwRequest)
-	if err != nil {
-		return err
+	gw, _, xerr := tester.Service.CreateHost(gwRequest)
+	if xerr != nil {
+		return xerr
 	}
 	network.GatewayID = gw.Core.ID
 	return nil

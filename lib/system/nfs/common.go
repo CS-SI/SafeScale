@@ -20,9 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-	"syscall"
 	"text/template"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -43,12 +41,12 @@ import (
 var tmplBox *rice.Box
 
 // getTemplateProvider returns the instance of TemplateProvider
-func getTemplateBox() (*rice.Box, error) {
+func getTemplateBox() (*rice.Box, fail.Error) {
 	if tmplBox == nil {
 		var err error
 		tmplBox, err = rice.FindBox("../nfs/scripts")
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 	}
 	return tmplBox, nil
@@ -57,10 +55,14 @@ func getTemplateBox() (*rice.Box, error) {
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, error) {
-	bashLibrary, err := system.GetBashLibrary()
-	if err != nil {
-		return 255, "", "", err
+// func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
+func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (string, fail.Error) {
+	bashLibrary, xerr := system.GetBashLibrary()
+	if xerr != nil {
+		xerr = fail.ExecutionError(xerr)
+		xerr.Annotate("retcode", 255)
+		// return 255, "", "", fail.ToError(err)
+		return "", xerr
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 	data["Revision"] = system.REV
@@ -77,27 +79,39 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	}
 
 	data["BashHeader"] = scriptHeader
-
-	tmplBox, err := getTemplateBox()
-	if err != nil {
-		return 255, "", "", err
+	tmplBox, xerr := getTemplateBox()
+	if xerr != nil {
+		xerr = fail.ExecutionError(xerr)
+		xerr.Annotate("retcode", 255)
+		return "", xerr
 	}
 
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
-		return 255, "", "", err
+		// return 255, "", "", fail.ToError(err)
+		xerr = fail.ExecutionError(err)
+		_ = xerr.Annotate("retcode", 255)
+		// return 255, "", "", fail.ToError(err)
+		return "", xerr
 	}
 
 	// Prepare the template for execution
 	tmplPrepared, err := template.New(name).Parse(tmplContent)
 	if err != nil {
-		return 255, "", "", err
+		// return 255, "", "", fail.ToError(err)
+		xerr = fail.ExecutionError(err)
+		xerr.Annotate("retcode", 255)
+		// return 255, "", "", fail.ToError(err)
+		return "", xerr
 	}
 
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Execute(&buffer, data); err != nil {
-		return 255, "", "", fail.Wrap(err, "failed to execute template")
+		xerr = fail.ExecutionError(err, "failed to execute template")
+		xerr.Annotate("retcode", 255)
+		// return 255, "", "", fail.Wrap(err, "failed to execute template")
+		return "", xerr
 	}
 	content := buffer.String()
 
@@ -112,32 +126,42 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	}
 
 	// Copy script to remote host with retries if needed
-	f, err := system.CreateTempFileFromString(content, 0600)
-	if err != nil {
-		return 255, "", "", fail.Wrap(err, "failed to create temporary file")
+	f, xerr := system.CreateTempFileFromString(content, 0600)
+	if xerr != nil {
+		xerr.Annotate("retcode", 255)
+		// return 255, "", "", fail.Wrap(err, "failed to create temporary file")
+		return "", xerr
 	}
 	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, stdout, stderr, err := sshconfig.Copy(task, filename, f.Name(), true)
-			if err != nil {
-				return fail.Wrap(err, "ssh operation failed")
+			retcode, stdout, stderr, xerr := sshconfig.Copy(task, filename, f.Name(), true)
+			if xerr != nil {
+				return fail.Wrap(xerr, "ssh operation failed")
 			}
 			if retcode != 0 {
-				return fail.NewReport("script copy failed: %s, %s", stdout, stderr)
+				xerr = fail.ExecutionError(xerr, "script copy failed: %s, %s", stdout, stderr)
+				_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 			}
 			return nil
 		},
 		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
-		return 255, "", "", fail.Wrap(err, "failed to copy script to remote host")
+		if _, ok := retryErr.(fail.ErrExecution); ok {
+			xerr = retryErr
+		} else {
+			xerr = fail.ExecutionError(retryErr, "failed to copy script to remote host")
+			xerr.Annotate("retcode", 255)
+		}
+		// return 255, "", "", fail.Wrap(err, "failed to copy script to remote host")
+		return "", xerr
 	}
 
 	k, uperr := sshconfig.SudoCommand(task, "which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
-		if kerr == nil {
+		_, uptext, _, xerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
+		if xerr == nil {
 			connected := strings.Contains(uptext, "/scp")
 			if !connected {
 				logrus.Warn("SUDO problem ?")
@@ -145,15 +169,15 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		}
 	}
 
-	nerr := utils.LazyRemove(f.Name())
-	if nerr != nil {
-		logrus.Warnf("Report deleting file: %v", nerr)
+	xerr = utils.LazyRemove(f.Name())
+	if xerr != nil {
+		logrus.Warnf("Error deleting file: %v", xerr)
 	}
 
 	// Execute script on remote host with retries if needed
 	var (
-		cmd, stdout, stderr string
-		retcode             int
+		cmd, stdout string
+		// retcode     int
 	)
 
 	if !hidesOutput {
@@ -165,38 +189,38 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	retryErr = retry.Action(
 		func() error {
 			stdout = ""
-			stderr = ""
-			retcode = 0
+			// retcode = 0
 
 			sshCmd, err := sshconfig.SudoCommand(task, cmd)
 			if err != nil {
-				return err
+				return fail.ExecutionError(err)
 			}
 			cmdResult, err := sshCmd.Output()
 			stdout = string(cmdResult)
-			stderr = ""
-			retcode = 0
 			if err != nil {
-				if ee, ok := err.(*exec.ExitError); ok {
-					if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-						retcode = status.ExitStatus()
-					}
-					stderr = string(ee.Stderr)
-				}
+				return fail.ExecutionError(err)
 			}
-			return err
+			return nil
 		},
 		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(temporal.GetContextTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil, nil,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
-		case *retry.ErrTimeout:
-			logrus.Errorf("Timeout running remote script '%s'", name)
-			return 255, stdout, stderr, retryErr
+		switch cErr := retryErr.(type) {
+		case fail.ErrTimeout:
+			logrus.Errorf("ErrTimeout running remote script '%s'", name)
+			xerr := fail.ExecutionError(cErr)
+			xerr.Annotate("retcode", 255)
+			// return 255, stdout, stderr, retryErr
+			return stdout, xerr
+		case fail.ErrExecution:
+			return stdout, cErr
 		default:
-			return 255, stdout, stderr, retryErr
+			xerr = fail.ExecutionError(retryErr)
+			xerr.Annotate("retcode", 255).Annotate("stderr", "")
+			// return 255, stdout, stderr, retryErr
+			return stdout, xerr
 		}
 	}
 
@@ -212,5 +236,6 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		}
 	*/
 
-	return retcode, stdout, stderr, err
+	// return retcode, stdout, stderr, err
+	return stdout, nil
 }

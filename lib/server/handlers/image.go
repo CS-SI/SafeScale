@@ -30,9 +30,9 @@ import (
 
 // ImageHandler defines API to manipulate images
 type ImageHandler interface {
-	List(all bool) ([]abstract.Image, error)
-	Select(osfilter string) (*abstract.Image, error)
-	Filter(osfilter string) ([]abstract.Image, error)
+	List(all bool) ([]abstract.Image, fail.Error)
+	Select(osfilter string) (*abstract.Image, fail.Error)
+	Filter(osfilter string) ([]abstract.Image, fail.Error)
 }
 
 // FIXME ROBUSTNESS All functions MUST propagate context
@@ -48,27 +48,27 @@ func NewImageHandler(job server.Job) ImageHandler {
 }
 
 // ErrorList returns the image list
-func (handler *imageHandler) List(all bool) (images []abstract.Image, err error) {
+func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	return handler.job.SafeGetService().ListImages(all)
 }
 
 // Select selects the image that best fits osname
-func (handler *imageHandler) Select(osname string) (image *abstract.Image, err error) {
-	return nil, fail.NotImplementedReport("ImageHandler.Select() not yet implemented")
+func (handler *imageHandler) Select(osname string) (image *abstract.Image, xerr fail.Error) {
+	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
-func (handler *imageHandler) Filter(osname string) (image []abstract.Image, err error) {
-	return nil, fail.NotImplementedReport("ImageHandler.Filter() not yet implemented")
+func (handler *imageHandler) Filter(osname string) (image []abstract.Image, xerr fail.Error) {
+	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented")
 }

@@ -38,12 +38,12 @@ type folder struct {
 }
 
 // folderDecoderCallback is the prototype of the function that will decode data read from Metadata
-type folderDecoderCallback func([]byte) error
+type folderDecoderCallback func([]byte) fail.Error
 
 // newFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func newFolder(svc iaas.Service, path string) (*folder, error) {
+func newFolder(svc iaas.Service, path string) (*folder, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	f := &folder{
@@ -51,10 +51,10 @@ func newFolder(svc iaas.Service, path string) (*folder, error) {
 		service: svc,
 	}
 
-	cryptKey, err := svc.GetMetadataKey()
-	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
-			return nil, err
+	cryptKey, xerr := svc.GetMetadataKey()
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return nil, xerr
 		}
 	} else {
 		f.crypt = cryptKey != nil && len(cryptKey) > 0
@@ -95,11 +95,11 @@ func (f *folder) absolutePath(path ...string) string {
 }
 
 // Search tells if the object named 'name' is inside the ObjectStorage folder
-func (f *folder) Search(path string, name string) error {
+func (f *folder) Search(path string, name string) fail.Error {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, err := f.service.SafeGetMetadataBucket().List(absPath, objectstorage.NoPrefix)
-	if err != nil {
-		return err
+	list, xerr := f.service.SafeGetMetadataBucket().List(absPath, objectstorage.NoPrefix)
+	if xerr != nil {
+		return xerr
 	}
 	if absPath != "" {
 		absPath += "/"
@@ -110,14 +110,13 @@ func (f *folder) Search(path string, name string) error {
 			return nil
 		}
 	}
-	return fail.NotFoundReport("failed to find '%s'", fullPath)
+	return fail.NotFoundError("failed to find '%s'", fullPath)
 }
 
 // Delete removes metadata passed as parameter
-func (f *folder) Delete(path string, name string) error {
-	err := f.service.SafeGetMetadataBucket().DeleteObject(f.absolutePath(path, name))
-	if err != nil {
-		return fail.Wrap(err, "failed to remove metadata in Object Storage")
+func (f *folder) Delete(path string, name string) fail.Error {
+	if xerr := f.service.SafeGetMetadataBucket().DeleteObject(f.absolutePath(path, name)); xerr != nil {
+		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
 	}
 	return nil
 }
@@ -127,88 +126,87 @@ func (f *folder) Delete(path string, name string) error {
 // returns false, err if an error occured
 // returns true, nil if the object has been found
 // The callback function has to know how to decode it and where to store the result
-func (f *folder) Read(path string, name string, callback func([]byte) error) error {
-	err := f.Search(path, name)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); ok {
-			return err
+func (f *folder) Read(path string, name string, callback func([]byte) fail.Error) fail.Error {
+	xerr := f.Search(path, name)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); ok {
+			return xerr
 		}
-		return fail.Wrap(err, "failed to search in Metadata Storage")
+		return fail.Wrap(xerr, "failed to search in Metadata Storage")
 	}
 
 	var buffer bytes.Buffer
-	_, err = f.service.SafeGetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
-	if err != nil {
-		return fail.NotFoundReport("failed to read '%s/%s' in Metadata Storage: %v", path, name, err)
+	_, xerr = f.service.SafeGetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+	if xerr != nil {
+		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
 	}
 	data := buffer.Bytes()
 	if f.crypt {
+		var err error
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			return fail.NotFoundReport("failed to decrypt metadata '%s/%s': %v", path, name, err)
+			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
-	err = callback(data)
-	if err != nil {
-		return fail.NotFoundReport("failed to decode metadata '%s/%s': %v", path, name, err)
+	xerr = callback(data)
+	if xerr != nil {
+		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
 	}
 	return nil
 }
 
 // Write writes the content in Object Storage
-func (f *folder) Write(path string, name string, content []byte) error {
+func (f *folder) Write(path string, name string, content []byte) fail.Error {
 	if f == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return fail.InvalidParameterReport("name", "cannot be empty string")
+		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	var (
-		data []byte
-		err  error
-	)
-
+	var data []byte
 	if f.crypt {
+		var err error
 		data, err = crypt.Encrypt(content, f.cryptKey)
 		if err != nil {
-			return err
+			return fail.ToError(err)
 		}
 	} else {
 		data = content
 	}
 
 	source := bytes.NewBuffer(data)
-	_, err = f.service.SafeGetMetadataBucket().WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
-	return err
+	_, xerr := f.service.SafeGetMetadataBucket().WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
+	return xerr
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
-func (f *folder) Browse(path string, callback folderDecoderCallback) error {
-	list, err := f.service.SafeGetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
-	if err != nil {
-		logrus.Errorf("Report browsing metadata: listing objects: %+v", err)
-		return err
+func (f *folder) Browse(path string, callback folderDecoderCallback) fail.Error {
+	list, xerr := f.service.SafeGetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
+	if xerr != nil {
+		logrus.Errorf("Error browsing metadata: listing objects: %+v", xerr)
+		return xerr
 	}
 
 	for _, i := range list {
 		var buffer bytes.Buffer
-		_, err = f.service.SafeGetMetadataBucket().ReadObject(i, &buffer, 0, 0)
-		if err != nil {
-			logrus.Errorf("Report browsing metadata: reading from buffer: %+v", err)
-			return err
+		_, xerr = f.service.SafeGetMetadataBucket().ReadObject(i, &buffer, 0, 0)
+		if xerr != nil {
+			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", xerr)
+			return xerr
 		}
 		data := buffer.Bytes()
+		var err error
 		if f.crypt {
 			data, err = crypt.Decrypt(data, f.cryptKey)
 			if err != nil {
-				return err
+				return fail.ToError(err)
 			}
 		}
-		err = callback(data)
-		if err != nil {
-			logrus.Errorf("Report browsing metadata: running callback: %+v", err)
-			return err
+		xerr = callback(data)
+		if xerr != nil {
+			logrus.Errorf("Error browsing metadata: running callback: %+v", xerr)
+			return xerr
 		}
 	}
 	return nil

@@ -75,7 +75,7 @@ func New() providerapi.Provider {
 }
 
 // Build initializes a new FlexibleEngine instance from parameters
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, fail.Error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
@@ -121,13 +121,13 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	providerName := "huaweicloud"
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID)
-	if err != nil {
-		return nil, err
+	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
@@ -147,20 +147,18 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		// BlacklistImageRegexp:    blacklistImagePattern,
 	}
 
-	stack, err := huaweicloud.New(authOptions, cfgOptions)
-	if err != nil {
-		return nil, err
+	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = stack.InitDefaultSecurityGroup()
-	if err != nil {
-		return nil, err
+	xerr = stack.InitDefaultSecurityGroup()
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	validRegions, err := stack.ListRegions()
-	if err != nil {
-		if len(validRegions) != 0 {
-			return nil, err
-		}
+	validRegions, xerr := stack.ListRegions()
+	if xerr != nil {
+		return nil, xerr
 	}
 	if len(validRegions) != 0 {
 		regionIsValidInput := false
@@ -170,17 +168,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fail.InvalidRequestReport("invalid Region '%s'", region)
+			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones()
-	if err != nil {
-		if len(validAvailabilityZones) != 0 {
-			return nil, err
-		}
+	validAvailabilityZones, xerr := stack.ListAvailabilityZones()
+	if xerr != nil {
+		return nil, xerr
 	}
-
 	if len(validAvailabilityZones) != 0 {
 		var validZones []string
 		zoneIsValidInput := false
@@ -193,7 +188,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestReport("invalid Availability zone '%s', valid zones are %v", zone, validZones)
+			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 
@@ -212,20 +207,23 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
-	tpl, err := p.Stack.GetTemplate(id)
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+	tpl, xerr := p.Stack.GetTemplate(id)
+	if xerr != nil {
+		return nil, xerr
+	}
 	if tpl != nil {
 		addGPUCfg(tpl)
 	}
-	return tpl, err
+	return tpl, nil
 }
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates()
-	if err != nil {
-		return nil, err
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	allTemplates, xerr := p.Stack.ListTemplates()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	var tpls []abstract.HostTemplate
@@ -247,10 +245,10 @@ func isBMSImage(image abstract.Image) bool {
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
-	images, err := p.Stack.ListImages()
-	if err != nil {
-		return nil, err
+func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	images, xerr := p.Stack.ListImages()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if !all {
@@ -261,7 +259,7 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -276,7 +274,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()

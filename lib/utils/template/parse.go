@@ -23,12 +23,16 @@ import (
 )
 
 // Parse returns a text template with default funcs declared
-func Parse(title, content string, funcMap map[string]interface{}) (*txttmpl.Template, error) {
+func Parse(title, content string, funcMap map[string]interface{}) (*txttmpl.Template, fail.Error) {
 	if title == "" {
-		return nil, fail.InvalidParameterReport("title", "cannot be empty string")
+		return nil, fail.InvalidParameterError("title", "cannot be empty string")
 	}
 	if content == "" {
-		return nil, fail.InvalidParameterReport("content", "cannot be empty string")
+		return nil, fail.InvalidParameterError("content", "cannot be empty string")
 	}
-	return txttmpl.New(title).Funcs(MergeFuncs(funcMap, false)).Parse(content)
+	r, err := txttmpl.New(title).Funcs(MergeFuncs(funcMap, false)).Parse(content)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return r, nil
 }

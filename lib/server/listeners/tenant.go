@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -68,39 +69,35 @@ type TenantListener struct{}
 
 // ErrorList registered tenants
 func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot list tenants").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list tenants")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "template list")
+	if xerr != nil {
+		return nil, xerr
 	}
+	defer job.Close()
+	task := job.SafeGetTask()
 
-	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.tenant"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	tenants, err := iaas.GetTenantNames()
-	if err != nil {
-		return nil, err
+	tenants, xerr := iaas.GetTenantNames()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	var list []*protocol.Tenant
@@ -116,17 +113,14 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 
 // Get returns the name of the current tenant used
 func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot get tenant").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get tenant")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -136,68 +130,62 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		}
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "template list")
+	if xerr != nil {
+		return nil, xerr
 	}
+	defer job.Close()
 
-	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	getCurrentTenant()
 	if currentTenant == nil {
-		return nil, fail.NotFoundReport("no tenant set")
+		return nil, fail.NotFoundError("no tenant set")
 	}
 	return &protocol.TenantName{Name: currentTenant.name}, nil
 }
 
 // Set the the tenant to use for each command
 func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot set tenant").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot set tenant")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "template list")
+	if xerr != nil {
+		return nil, xerr
 	}
+	defer job.Close()
 
 	name := in.GetName()
-
-	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
 	}
 
-	service, err := iaas.UseService(in.GetName())
-	if err != nil {
-		return empty, err
+	service, xerr := iaas.UseService(in.GetName())
+	if xerr != nil {
+		return empty, xerr
 	}
 	currentTenant = &Tenant{name: in.GetName(), Service: service}
 	return empty, nil
@@ -205,21 +193,18 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 
 // Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
 func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot cleanup tenant").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot cleanup tenant")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -229,68 +214,61 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 		}
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "tenant cleanup")
+	if xerr != nil {
+		return nil, xerr
 	}
+	defer job.Close()
 
 	name := in.GetName()
-
-	tracer := concurrency.NewTracer(task, true, "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	if currentTenant != nil && currentTenant.name == in.GetName() {
 		return empty, nil
 	}
 
-	service, err := iaas.UseService(in.GetName())
-	if err != nil {
-		return empty, err
+	service, xerr := iaas.UseService(in.GetName())
+	if xerr != nil {
+		return empty, xerr
 	}
 
-	err = service.TenantCleanup(in.Force)
-	return empty, err
+	xerr = service.TenantCleanup(in.Force)
+	return empty, xerr
 }
 
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
 func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "failed to scan tenant").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot scan tenant")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	job, err := PrepareJob(ctx, "", "host start")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "tenant scan")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	getCurrentTenant()
 	if currentTenant == nil {
-		return nil, fail.NotFoundReport("no tenant set")
+		return nil, fail.NotFoundError("no tenant set")
 	}
 
 	name := currentTenant.name
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewScannerHandler(job)
-	if err != nil {
-		return empty, err
-	}
 
-	err = handler.Scan()
-	return empty, err
+	xerr = handler.Scan()
+	return empty, xerr
 }

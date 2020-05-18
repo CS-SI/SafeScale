@@ -39,24 +39,24 @@ type Item struct {
 }
 
 // Upload transfers the local file to the hostname
-func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
+func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Error) {
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if host == nil {
-		return fail.InvalidParameterReport("host", "cannot be nil")
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 	if rfc.Local == "" {
-		return fail.InvalidInstanceContentReport("rfc.Local", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
 	}
 	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentReport("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -70,13 +70,13 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
 					// File may exist on target, try to remote it
 					_, _, _, err = host.Run(task, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
 					if err == nil {
-						return fail.NewReport("file may exist on remote with inappropriate access rights, deleted it and retrying")
+						return fail.NewError("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
 					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
 					return retry.StopRetryError(err, "an unrecoverable network error has occurred")
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fail.NewReport("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.SafeGetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+					err = fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.SafeGetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
 					return err
 				}
 				return nil
@@ -88,9 +88,9 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
-		case *retry.ErrStopRetry:
+		case retry.ErrStopRetry:
 			return fail.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.SafeGetName())
-		case *retry.ErrTimeout:
+		case retry.ErrTimeout:
 			return fail.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.SafeGetName(), rfc.Remote)
 		}
 		return retryErr
@@ -112,36 +112,36 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (err error) {
 		return err
 	}
 	if retcode != 0 {
-		return fail.NewReport("failed to update owner and/or access rights of the remote file")
+		return fail.NewError("failed to update owner and/or access rights of the remote file")
 	}
 
 	return nil
 }
 
-// Upload transfers the local file to the hostname
-func (rfc Item) UploadString(task concurrency.Task, content string, host resources.Host) error {
+// UploadString transfers the local file to the hostname
+func (rfc Item) UploadString(task concurrency.Task, content string, host resources.Host) fail.Error {
 	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentReport("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	f, err := system.CreateTempFileFromString(content, 0600)
-	if err != nil {
-		return fail.NewReport("failed to create temporary file: %s", err.Error())
+	f, xerr := system.CreateTempFileFromString(content, 0600)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to create temporary file")
 	}
 	rfc.Local = f.Name()
 	return rfc.Upload(task, host)
 }
 
 // RemoveRemote deletes the remote file from host
-func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) error {
+func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) fail.Error {
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil || retcode != 0 {
-		return fail.NewReport("failed to remove file '%s:%s'", host.SafeGetName(), rfc.Remote)
+	retcode, _, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil || retcode != 0 {
+		return fail.NewError("failed to remove file '%s:%s'", host.SafeGetName(), rfc.Remote)
 	}
 	return nil
 }
@@ -163,11 +163,11 @@ func (rfh *RemoteFilesHandler) Count() uint {
 
 // Upload executes the copy of files
 // TODO: allow to upload to many hosts
-func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host) error {
+func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host) fail.Error {
 	for _, v := range rfh.items {
-		err := v.Upload(task, host)
-		if err != nil {
-			return err
+		xerr := v.Upload(task, host)
+		if xerr != nil {
+			return xerr
 		}
 	}
 	return nil
@@ -178,9 +178,9 @@ func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host
 // TODO: allow to cleanup on many hosts
 func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, host resources.Host) {
 	for _, v := range rfh.items {
-		err := v.RemoveRemote(task, host)
-		if err != nil {
-			logrus.Warnf(err.Error())
+		xerr := v.RemoveRemote(task, host)
+		if xerr != nil {
+			logrus.Warnf(xerr.Error())
 		}
 	}
 }

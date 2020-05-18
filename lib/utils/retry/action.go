@@ -32,7 +32,7 @@ import (
 type Try struct {
 	Start time.Time
 	Count uint
-	Err   fail.Report
+	Err   error
 }
 
 type action struct {
@@ -41,11 +41,11 @@ type action struct {
 	// Arbiter is called for every try to determine if next try is wanted
 	Arbiter Arbiter
 	// First is called before the loop of retries
-	First func() fail.Report
+	First func() error
 	// Run is called for every try
-	Run func() fail.Report
+	Run func() error
 	// Last is called after the loop of retries (being successful or not)
-	Last func() fail.Report
+	Last func() error
 	// Notify
 	Notify Notify
 }
@@ -54,22 +54,22 @@ type action struct {
 // If defined, 'first' is executed before trying (and may fail), and last is executed after the
 // tries (whatever the state of the tries is, and cannot fail)
 func Action(
-	run func() fail.Report,
+	run func() error,
 	arbiter Arbiter,
 	officer *Officer,
-	first func() fail.Report,
-	last func() fail.Report,
+	first func() error,
+	last func() error,
 	notify Notify,
-) fail.Report {
+) fail.Error {
 
 	if run == nil {
-		return fail.InvalidParameterReport("run", "cannot be nil!")
+		return fail.InvalidParameterError("run", "cannot be nil!")
 	}
 	if arbiter == nil {
-		return fail.InvalidParameterReport("arbiter", "cannot be nil!")
+		return fail.InvalidParameterError("arbiter", "cannot be nil!")
 	}
 	if officer == nil {
-		return fail.InvalidParameterReport("officer", "cannot be nil!")
+		return fail.InvalidParameterError("officer", "cannot be nil!")
 	}
 
 	return action{
@@ -84,7 +84,7 @@ func Action(
 }
 
 // WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'
-func WhileUnsuccessful(run func() fail.Report, delay time.Duration, timeout time.Duration) fail.Report {
+func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 	}
@@ -109,7 +109,7 @@ func WhileUnsuccessful(run func() fail.Report, delay time.Duration, timeout time
 }
 
 // WhileUnsuccessfulTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
-func WhileUnsuccessfulTimeout(run func() fail.Report, delay time.Duration, timeout time.Duration) fail.Report {
+func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 	}
@@ -135,31 +135,31 @@ func WhileUnsuccessfulTimeout(run func() fail.Report, delay time.Duration, timeo
 
 // WhileUnsuccessfulDelay1Second retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 1 second after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay1Second(run func() fail.Report, timeout time.Duration) fail.Report {
+func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) fail.Error {
 	return WhileUnsuccessful(run, time.Second, timeout)
 }
 
 // WhileUnsuccessfulDelay5Seconds retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 5 seconds after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay5Seconds(run func() fail.Report, timeout time.Duration) fail.Report {
+func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) fail.Error {
 	return WhileUnsuccessful(run, 5*time.Second, timeout)
 }
 
 // WhileUnsuccessfulDelay5SecondsTimeout ...
-func WhileUnsuccessfulDelay5SecondsTimeout(run func() fail.Report, timeout time.Duration) fail.Report {
+func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Duration) fail.Error {
 	return WhileUnsuccessfulTimeout(run, 5*time.Second, timeout)
 }
 
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 'delay' after each try, expiring after 'timeout'
-func WhileUnsuccessfulWithNotify(run func() fail.Report, delay time.Duration, timeout time.Duration, notify Notify) fail.Report {
+func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}
 
 	if notify == nil {
-		return fail.InvalidParameterReport("notify", "cannot be nil!")
+		return fail.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -183,14 +183,14 @@ func WhileUnsuccessfulWithNotify(run func() fail.Report, delay time.Duration, ti
 
 // WhileUnsuccessfulWhereRetcode255WithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
 // and this error has 255 as exit status code), waiting 'delay' after each try, expiring after 'timeout'
-func WhileUnsuccessfulWhereRetcode255WithNotify(run func() fail.Report, delay time.Duration, timeout time.Duration, notify Notify) fail.Report {
+func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}
 
 	if notify == nil {
-		return fail.InvalidParameterReport("notify", "cannot be nil!")
+		return fail.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -215,27 +215,27 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() fail.Report, delay ti
 // WhileUnsuccessfulDelay1SecondWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 1 second after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
-func WhileUnsuccessfulDelay1SecondWithNotify(run func() fail.Report, timeout time.Duration, notify Notify) fail.Report {
+func WhileUnsuccessfulDelay1SecondWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
 	return WhileUnsuccessfulWithNotify(run, time.Second, timeout, notify)
 }
 
 // WhileUnsuccessfulDelay5SecondsWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 5 seconds after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
-func WhileUnsuccessfulDelay5SecondsWithNotify(run func() fail.Report, timeout time.Duration, notify Notify) fail.Report {
+func WhileUnsuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
 	return WhileUnsuccessfulWithNotify(run, time.Second*5, timeout, notify)
 }
 
 // WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
 // and this error has 255 as exit status code), waiting 5 seconds after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
-func WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(run func() fail.Report, timeout time.Duration, notify Notify) fail.Report {
+func WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
 	return WhileUnsuccessfulWhereRetcode255WithNotify(run, time.Second*5, timeout, notify)
 }
 
 // WhileSuccessful retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting a duration of 'delay' after each try, expiring after a duration of 'timeout'.
-func WhileSuccessful(run func() fail.Report, delay time.Duration, timeout time.Duration) fail.Report {
+func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
@@ -262,27 +262,27 @@ func WhileSuccessful(run func() fail.Report, delay time.Duration, timeout time.D
 
 // WhileSuccessfulDelay1Second retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting 1 second after each try, expiring after a duration of 'timeout'.
-func WhileSuccessfulDelay1Second(run func() fail.Report, timeout time.Duration) fail.Report {
+func WhileSuccessfulDelay1Second(run func() error, timeout time.Duration) fail.Error {
 	return WhileSuccessful(run, time.Second, timeout)
 }
 
 // WhileSuccessfulDelay5Seconds retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting 5 seconds after each try, expiring after a duration of 'timeout'.
-func WhileSuccessfulDelay5Seconds(run func() fail.Report, timeout time.Duration) fail.Report {
+func WhileSuccessfulDelay5Seconds(run func() error, timeout time.Duration) fail.Error {
 	return WhileSuccessful(run, 5*time.Second, timeout)
 }
 
 // WhileSuccessfulWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting a duration of 'delay' after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
-func WhileSuccessfulWithNotify(run func() fail.Report, delay time.Duration, timeout time.Duration, notify Notify) fail.Report {
+func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 		delay = timeout / 2
 	}
 
 	if notify == nil {
-		return fail.InvalidParameterReport("notify", "cannot be nil!")
+		return fail.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -307,19 +307,19 @@ func WhileSuccessfulWithNotify(run func() fail.Report, delay time.Duration, time
 // WhileSuccessfulDelay1SecondWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting 1 second after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
-func WhileSuccessfulDelay1SecondWithNotify(run func() fail.Report, timeout time.Duration, notify Notify) fail.Report {
+func WhileSuccessfulDelay1SecondWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
 	return WhileSuccessfulWithNotify(run, time.Second, timeout, notify)
 }
 
 // WhileSuccessfulDelay5SecondsWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
 // waiting 5 seconds after each try, expiring after a duration of 'timeout'.
 // 'notify' is called after each try for feedback.
-func WhileSuccessfulDelay5SecondsWithNotify(run func() fail.Report, timeout time.Duration, notify Notify) fail.Report {
+func WhileSuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
 	return WhileSuccessfulWithNotify(run, 5*time.Second, timeout, notify)
 }
 
 // loop executes the tries
-func (a action) loop() fail.Report {
+func (a action) loop() fail.Error {
 	var (
 		arbiter = a.Arbiter
 		start   = time.Now()
@@ -331,7 +331,7 @@ func (a action) loop() fail.Report {
 	if a.First != nil {
 		err := a.First()
 		if err != nil {
-			return err
+			return fail.ToError(err)
 		}
 	}
 
@@ -361,7 +361,7 @@ func (a action) loop() fail.Report {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return fail.ErrorListReport([]error{errLast, retryErr})
+					return fail.NewErrorList([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -371,7 +371,7 @@ func (a action) loop() fail.Report {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return fail.ErrorListReport([]error{errLast, retryErr})
+					return fail.NewErrorList([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -385,7 +385,7 @@ func (a action) loop() fail.Report {
 }
 
 // loop executes the tries
-func (a action) loopWithTimeout(timeout time.Duration) fail.Report {
+func (a action) loopWithTimeout(timeout time.Duration) fail.Error {
 	var (
 		arbiter = a.Arbiter
 		start   = time.Now()
@@ -397,16 +397,16 @@ func (a action) loopWithTimeout(timeout time.Duration) fail.Report {
 	if a.First != nil {
 		err := a.First()
 		if err != nil {
-			return err
+			return fail.ToError(err)
 		}
 	}
 
 	desist := time.After(timeout)
 	for count := uint(1); ; count++ {
-		var err fail.Report
+		var err error
 
 		// Perform action
-		ch := make(chan fail.Report)
+		ch := make(chan error)
 		go func() {
 			ch <- a.Run()
 		}()
@@ -416,9 +416,9 @@ func (a action) loopWithTimeout(timeout time.Duration) fail.Report {
 			err = response
 		case <-time.After(timeout):
 			// call timed out
-			err = fail.TimeoutReport(nil, timeout, "operation timeout")
+			err = fail.TimeoutError(nil, timeout, "operation timeout")
 		case <-desist:
-			err = fail.TimeoutReport(nil, timeout, "desist timeout")
+			err = fail.TimeoutError(nil, timeout, "desist timeout")
 		}
 
 		// Collects the result of the try
@@ -441,7 +441,7 @@ func (a action) loopWithTimeout(timeout time.Duration) fail.Report {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return fail.ErrorListReport([]error{errLast, retryErr})
+					return fail.NewErrorList([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -451,7 +451,7 @@ func (a action) loopWithTimeout(timeout time.Duration) fail.Report {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return fail.ErrorListReport([]error{errLast, retryErr})
+					return fail.NewErrorList([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -468,7 +468,7 @@ func (a action) loopWithTimeout(timeout time.Duration) fail.Report {
 					err = response
 					_ = err
 				case <-desist:
-					err = fail.TimeoutReport(nil, timeout, "desist timeout")
+					err = fail.TimeoutError(nil, timeout, "desist timeout")
 					_ = err
 				}
 			}

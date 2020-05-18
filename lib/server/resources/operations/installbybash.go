@@ -29,95 +29,93 @@ import (
 // bashInstaller is an installer using script to add and remove a feature
 type bashInstaller struct{}
 
+// GetName ...
 func (i *bashInstaller) GetName() string {
 	return "script"
 }
 
 // Check checks if the feature is installed, using the check script in Specs
-func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
+func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
 	if f == nil {
-		return nil, fail.InvalidParameterReport("f", "cannot be nil")
+		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
 	yamlKey := "feature.install.bash.check"
 	if !f.SafeGetSpecs().IsSet(yamlKey) {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), yamlKey)
 	}
 
-	worker, err := newWorker(f, t, installmethod.Bash, installaction.Check, nil)
-	if err != nil {
-		return nil, err
+	w, xerr := newWorker(f, t, installmethod.Bash, installaction.Check, nil)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	err = worker.CanProceed(s)
-	if err != nil {
-		logrus.Error(err.Error())
-		return nil, err
+	if xerr = w.CanProceed(s); xerr != nil {
+		logrus.Error(xerr.Error())
+		return nil, xerr
 	}
-	return worker.Proceed(v, s)
+	return w.Proceed(v, s)
 }
 
 // Add installs the feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
+func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
 	if f == nil {
-		return nil, fail.InvalidParameterReport("f", "cannot be nil")
+		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
 	// Determining if install script is defined in specification file
 	if !f.SafeGetSpecs().IsSet("feature.install.bash.add") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.add' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
 	}
 
-	worker, err := newWorker(f, t, installmethod.Bash, installaction.Add, nil)
-	if err != nil {
-		return nil, err
+	w, xerr := newWorker(f, t, installmethod.Bash, installaction.Add, nil)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		logrus.Println(err.Error())
-		return nil, err
+	if xerr = w.CanProceed(s); xerr != nil {
+		logrus.Info(xerr.Error())
+		return nil, xerr
 	}
-	if !worker.ConcernsCluster() {
+	if !w.ConcernsCluster() {
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "safescale"
 		}
 	}
-	return worker.Proceed(v, s)
+	return w.Proceed(v, s)
 }
 
 // Remove uninstalls the feature
-func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, error) {
+func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
 	if f == nil {
-		return nil, fail.InvalidParameterReport("f", "cannot be nil")
+		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
 	if !f.SafeGetSpecs().IsSet("feature.install.bash.remove") {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key 'feature.install.bash.remove' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename())
 	}
 
-	worker, err := newWorker(f, t, installmethod.Bash, installaction.Remove, nil)
-	if err != nil {
-		return nil, err
+	w, xerr := newWorker(f, t, installmethod.Bash, installaction.Remove, nil)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		logrus.Println(err.Error())
-		return nil, err
+	if xerr = w.CanProceed(s); xerr != nil {
+		logrus.Info(xerr.Error())
+		return nil, xerr
 	}
 
 	// if t.GetTargetType() != featuretargettype.CLUSTER {
@@ -125,10 +123,10 @@ func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	// 		v["Username"] = "safescale"
 	// 	}
 	// }
-	return worker.Proceed(v, s)
+	return w.Proceed(v, s)
 }
 
-// NewBashInstaller creates a new instance of Installer using script
-func NewBashInstaller() Installer {
+// newBashInstaller creates a new instance of Installer using script
+func newBashInstaller() Installer {
 	return &bashInstaller{}
 }

@@ -72,7 +72,7 @@ func Parse(v string) (Enum, error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return e, fail.NotFoundReport("failed to find a Flavor matching with '%s'", v)
+		return e, fail.NotFoundError("failed to find a Flavor matching with '%s'", v)
 	}
 	return e, nil
 

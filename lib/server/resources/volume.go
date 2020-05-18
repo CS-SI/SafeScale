@@ -23,22 +23,23 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Volume links Object Storage folder and Volumes
 type Volume interface {
 	Metadata
-	data.Identifyable
+	data.Identifiable
 	data.NullValue
 
-	Attach(task concurrency.Task, host Host, path, format string, doNotFormat bool) error // attaches a volume to an host
-	Browse(task concurrency.Task, callback func(*abstract.Volume) error) error            // walks through all the metadata objects in network
-	Create(task concurrency.Task, req abstract.VolumeRequest) error                       // creates a volume
-	Detach(task concurrency.Task, host Host) error                                        // detaches the volume identified by ref, ref can be the name or the id
-	GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, error)        // returns the property containing where the volume is attached
-	GetSize(task concurrency.Task) (int, error)                                           // returns the size of volume in GB
-	GetSpeed(task concurrency.Task) (volumespeed.Enum, error)                             // returns the speed of the volume (more or less the type of hardware)
-	SafeGetSize(task concurrency.Task) int                                                // Same as GetSize() but without error handling (returned value is already correct but not necessarily significant)
-	SafeGetSpeed(task concurrency.Task) volumespeed.Enum                                  // Same as GetSpeed() but without error handling (returned value is already correct but not necessarily significant)
-	ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, error)            // converts volume to equivalent protocol message
+	Attach(task concurrency.Task, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
+	Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network
+	Create(task concurrency.Task, req abstract.VolumeRequest) fail.Error                       // creates a volume
+	Detach(task concurrency.Task, host Host) fail.Error                                        // detaches the volume identified by ref, ref can be the name or the id
+	GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error)        // returns the property containing where the volume is attached
+	GetSize(task concurrency.Task) (int, fail.Error)                                           // returns the size of volume in GB
+	GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error)                             // returns the speed of the volume (more or less the type of hardware)
+	SafeGetSize(task concurrency.Task) int                                                     // Same as GetSize() but without error handling (returned value is already correct but not necessarily significant)
+	SafeGetSpeed(task concurrency.Task) volumespeed.Enum                                       // Same as GetSpeed() but without error handling (returned value is already correct but not necessarily significant)
+	ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, fail.Error)            // converts volume to equivalent protocol message
 }

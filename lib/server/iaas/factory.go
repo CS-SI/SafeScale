@@ -52,13 +52,13 @@ func Register(name string, provider api.Provider) {
 }
 
 // GetTenantNames returns all known tenants names
-func GetTenantNames() (map[string]string, error) {
+func GetTenantNames() (map[string]string, fail.Error) {
 	err := loadConfig()
 	return allTenants, err
 }
 
 // GetTenants returns all known tenants
-func GetTenants() ([]interface{}, error) {
+func GetTenants() ([]interface{}, fail.Error) {
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -68,9 +68,9 @@ func GetTenants() ([]interface{}, error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName string) (newService Service, err fail.Report) {
-	defer fail.OnExitLogError("", &err)
-	defer fail.OnPanic(&err)
+func UseService(tenantName string) (newService Service, xerr fail.Error) {
+	defer fail.OnExitLogError("", &xerr)
+	defer fail.OnPanic(&xerr)
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
@@ -78,11 +78,11 @@ func UseService(tenantName string) (newService Service, err fail.Report) {
 	}
 
 	var (
-		tenantInCfg bool
-		found       bool
-		name        string
-		svc         Service
-		svcProvider = "__not_found__"
+		tenantInCfg    bool
+		found          bool
+		name, provider string
+		svc            Service
+		svcProvider    = "__not_found__"
 	)
 
 	for _, t := range tenants {
@@ -97,7 +97,7 @@ func UseService(tenantName string) (newService Service, err fail.Report) {
 		}
 
 		tenantInCfg = true
-		provider, found := tenant["provider"].(string)
+		provider, found = tenant["provider"].(string)
 		if !found {
 			provider, found = tenant["client"].(string)
 			if !found {
@@ -194,11 +194,11 @@ func UseService(tenantName string) (newService Service, err fail.Report) {
 			}
 			anon, found := serviceCfg.Get("MetadataBucketName")
 			if !found {
-				return nullService(), fail.SyntaxReport("missing configuration option 'MetadataBucketName'")
+				return nullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
 			}
 			bucketName, ok := anon.(string)
 			if !ok {
-				return nullService(), fail.InvalidRequestReport("invalid bucket name, it's not a string")
+				return nullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
 			}
 			found, err = metadataLocation.FindBucket(bucketName)
 			if err != nil {
@@ -218,12 +218,12 @@ func UseService(tenantName string) (newService Service, err fail.Report) {
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
 				ek, err := crypt.NewEncryptionKey([]byte(metadataConfig["CryptKey"].(string)))
 				if err != nil {
-					return nullService(), err
+					return nullService(), fail.ToError(err)
 				}
 				metadataCryptKey = ek
 			}
 		} else {
-			return nullService(), fail.SyntaxReport("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
 
 		// Service is ready
@@ -237,23 +237,23 @@ func UseService(tenantName string) (newService Service, err fail.Report) {
 	}
 
 	if !tenantInCfg {
-		return nullService(), fail.NotFoundReport("tenant '%s' not found in configuration", tenantName)
+		return nullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
 	}
-	return nullService(), fail.NotFoundReport("provider builder for '%s'", svcProvider)
+	return nullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 
 // validatRegexps validates regexp values from tenants file
-func validateRegexps(svc *service, tenant map[string]interface{}) error {
+func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
 	compute, ok := tenant["compute"].(map[string]interface{})
 	if !ok {
-		return fail.InvalidParameterReport("tenant['compute']", "is not a map")
+		return fail.InvalidParameterError("tenant['compute']", "is not a map")
 	}
 
 	if reStr, ok := compute["WhitelistTemplateRegexp"].(string); ok {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fail.SyntaxReport("invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error())
+			return fail.SyntaxError("invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error())
 		}
 		svc.whitelistTemplateRE = re
 	}
@@ -261,7 +261,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fail.SyntaxReport("invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error())
+			return fail.SyntaxError("invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error())
 		}
 		svc.blacklistTemplateRE = re
 	}
@@ -269,7 +269,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fail.SyntaxReport("invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error())
+			return fail.SyntaxError("invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error())
 		}
 		svc.whitelistImageRE = re
 	}
@@ -277,7 +277,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fail.SyntaxReport("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
+			return fail.SyntaxError("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
 		}
 		svc.blacklistImageRE = re
 	}
@@ -285,7 +285,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
+func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -296,7 +296,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
-		return config, fail.SyntaxReport("missing setting 'Type' in 'objectstorage' section")
+		return config, fail.SyntaxError("missing setting 'Type' in 'objectstorage' section")
 	}
 
 	if config.Domain, ok = ostorage["Domain"].(string); !ok {
@@ -371,7 +371,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
 			if _, ok = identity[key].(string); !ok {
-				return config, fail.SyntaxReport("problem parsing %s", key)
+				return config, fail.SyntaxError("problem parsing %s", key)
 			}
 		}
 
@@ -390,9 +390,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			ClientCert:   identity["client_x509_cert_url"].(string),
 		}
 
-		d1, err := json.MarshalIndent(googleCfg, "", "  ")
-		if err != nil {
-			return config, err
+		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
+		if jserr != nil {
+			return config, fail.ToError(jserr)
 		}
 
 		config.Credentials = string(d1)
@@ -400,21 +400,21 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	return config, nil
 }
 
-func validateOVHObjectStorageRegionNaming(context, region, authURL string) error {
+func validateOVHObjectStorageRegionNaming(context, region, authURL string) fail.Error {
 	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
 	// Object Storage regions don't contain anymore an index like compute regions
 	if strings.Contains(authURL, "ovh.") {
 		rLen := len(region)
 		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
 			region = region[:rLen-1]
-			return fail.InvalidRequestReport(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
+			return fail.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
 		}
 	}
 	return nil
 }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
+func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -427,7 +427,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
-			return config, fail.SyntaxReport("missing setting 'Type' in 'metadata' section")
+			return config, fail.SyntaxError("missing setting 'Type' in 'metadata' section")
 		}
 	}
 
@@ -542,7 +542,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
 			if _, ok = identity[key].(string); !ok {
-				return config, fail.SyntaxReport("problem parsing %s", key)
+				return config, fail.SyntaxError("problem parsing %s", key)
 			}
 		}
 
@@ -561,9 +561,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 			ClientCert:   identity["client_x509_cert_url"].(string),
 		}
 
-		d1, err := json.MarshalIndent(googleCfg, "", "  ")
-		if err != nil {
-			return config, err
+		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
+		if jserr != nil {
+			return config, fail.ToError(jserr)
 		}
 
 		config.Credentials = string(d1)
@@ -572,7 +572,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	return config, nil
 }
 
-func loadConfig() error {
+func loadConfig() fail.Error {
 	tenantsCfg, v, err := getTenantsFromCfg()
 	if err != nil {
 		return err
@@ -583,16 +583,16 @@ func loadConfig() error {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
 			} else {
-				return fail.SyntaxReport("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
+				return fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
 			}
 		} else {
-			return fail.SyntaxReport("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
+			return fail.SyntaxError("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
 		}
 	}
 	return nil
 }
 
-func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Report) {
+func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Error) {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
@@ -603,7 +603,7 @@ func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Report) {
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
 		logrus.Errorf(msg)
-		return nil, v, fail.SyntaxReport(msg)
+		return nil, v, fail.SyntaxError(msg)
 	}
 	settings := v.AllSettings()
 	tenantsCfg, _ := settings["tenants"].([]interface{})

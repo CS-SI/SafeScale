@@ -28,9 +28,9 @@ type Server struct {
 }
 
 // NewServer instantiates a new nfs.Server struct
-func NewServer(sshconfig *system.SSHConfig) (srv *Server, err error) {
+func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
-		return nil, fail.InvalidParameterReport("sshconfig", "cannot be nil")
+		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
 	server := Server{
@@ -45,16 +45,22 @@ func (s *Server) GetHost() string {
 }
 
 // Install installs and configure NFS service on the remote host
-func (s *Server) Install(task concurrency.Task) error {
-	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to install nfs server")
+func (s *Server) Install(task concurrency.Task) fail.Error {
+	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install nfs server")
+	stdout, xerr := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return fail.Wrap(xerr, "error executing script to install nfs server")
+	}
+	return nil
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(task concurrency.Task, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) error {
-	share, err := NewShare(s, path, options)
-	if err != nil {
-		return fail.Wrap(err, "failed to create the share")
+func (s *Server) AddShare(task concurrency.Task, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error {
+	share, xerr := NewShare(s, path, options)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to create the share")
 	}
 
 	// acl := ExportACL{
@@ -95,32 +101,49 @@ func (s *Server) AddShare(task concurrency.Task, path string, options string /*s
 }
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
-func (s *Server) RemoveShare(task concurrency.Task, path string) error {
+func (s *Server) RemoveShare(task concurrency.Task, path string) fail.Error {
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to unexport a shared directory")
+	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
+	stdout, xerr := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
+	}
+	return nil
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint, format string, doNotFormat bool) (string, error) {
+func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint, format string, doNotFormat bool) (string, fail.Error) {
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
 		"FileSystem":  format,
 		"DoNotFormat": doNotFormat,
 	}
-	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
-	err = fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to mount block device")
-	return stdout, err
+	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
+	// err = fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to mount block device")
+	stdout, xerr := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return "", fail.Wrap(xerr, "error executing script to mount block device")
+	}
+	return stdout, nil
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
-func (s *Server) UnmountBlockDevice(task concurrency.Task, volumeUUID string) error {
+func (s *Server) UnmountBlockDevice(task concurrency.Task, volumeUUID string) fail.Error {
 	data := map[string]interface{}{
 		"UUID": volumeUUID,
 	}
-	retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to umount block device")
+	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
+	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to umount block device")
+	stdout, xerr := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return fail.Wrap(xerr, "error executing script to unmount block device")
+	}
+	return nil
 }

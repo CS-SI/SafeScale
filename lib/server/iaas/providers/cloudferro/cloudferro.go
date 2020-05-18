@@ -52,7 +52,7 @@ func New() providerapi.Provider {
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
 	identity, _ := params["identity"].(map[string]interface{})
@@ -99,13 +99,13 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 
 	providerName := "openstack"
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
-	if err != nil {
-		return nil, err
+	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
@@ -124,20 +124,18 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		ProviderName:     providerName,
 	}
 
-	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
-	if err != nil {
-		return nil, err
+	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = stack.InitDefaultSecurityGroup()
-	if err != nil {
-		return nil, err
+	xerr = stack.InitDefaultSecurityGroup()
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	validRegions, err := stack.ListRegions()
-	if err != nil {
-		if len(validRegions) != 0 {
-			return nil, err
-		}
+	validRegions, xerr := stack.ListRegions()
+	if xerr != nil {
+		return nil, xerr
 	}
 	if len(validRegions) != 0 {
 		regionIsValidInput := false
@@ -147,17 +145,14 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, fail.InvalidRequestReport("invalid Region '%s'", region)
+			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
 		}
 	}
 
-	validAvailabilityZones, err := stack.ListAvailabilityZones()
-	if err != nil {
-		if len(validAvailabilityZones) != 0 {
-			return nil, err
-		}
+	validAvailabilityZones, xerr := stack.ListAvailabilityZones()
+	if xerr != nil {
+		return nil, xerr
 	}
-
 	if len(validAvailabilityZones) != 0 {
 		var validZones []string
 		zoneIsValidInput := false
@@ -170,7 +165,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestReport("invalid Availability zone '%s', valid zones are %v", zone, validZones)
+			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
 		}
 	}
 
@@ -182,7 +177,7 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 }
 
 // GetAuthOpts returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -195,7 +190,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -211,20 +206,20 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
-	allTemplates, err := p.Stack.ListTemplates()
-	if err != nil {
-		return nil, err
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	allTemplates, xerr := p.Stack.ListTemplates()
+	if xerr != nil {
+		return nil, xerr
 	}
 	return allTemplates, nil
 }
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
-	allImages, err := p.Stack.ListImages()
-	if err != nil {
-		return nil, err
+func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	allImages, xerr := p.Stack.ListImages()
+	if xerr != nil {
+		return nil, xerr
 	}
 	return allImages, nil
 }

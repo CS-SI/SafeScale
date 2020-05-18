@@ -107,9 +107,9 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 //-------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []abstract.Image, err error) {
+func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
@@ -134,7 +134,7 @@ func (s *Stack) ListImages() (images []abstract.Image, err error) {
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return nil, fail.InvalidParameterReport("result['images']]", "is not an array")
+		return nil, fail.InvalidParameterError("result['images']]", "is not an array")
 	}
 	images = []abstract.Image{}
 	for _, imageJSON := range imagesJSON {
@@ -149,12 +149,12 @@ func (s *Stack) ListImages() (images []abstract.Image, err error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
+func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterReport("id", "cannot be empty string")
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
@@ -179,7 +179,7 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return nil, fail.InvalidParameterReport("result['images']]", "is not an array")
+		return nil, fail.InvalidParameterError("result['images']]", "is not an array")
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, ok := imageJSON.(map[string]interface{})["imageID"]; ok && imageID == id {
@@ -196,15 +196,15 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 		}
 	}
 
-	return nil, fail.NotFoundReport("image with id=%s not found", id)
+	return nil, fail.NotFoundError("image with id=%s not found", id)
 }
 
 //-------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, err error) {
+func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
@@ -229,7 +229,7 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, err error) {
 
 	templatesJSON, ok := result["templates"].([]interface{})
 	if !ok {
-		return nil, fail.InvalidParameterReport("result['templates']]", "is not an array")
+		return nil, fail.InvalidParameterError("result['templates']]", "is not an array")
 	}
 	templates = []abstract.HostTemplate{}
 	for _, templateJSON := range templatesJSON {
@@ -249,9 +249,9 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, err error) {
 }
 
 //GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err error) {
+func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	jsonFile, err := os.Open(s.LibvirtConfig.TemplatesJSONPath)
@@ -276,7 +276,7 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 
 	templatesJSON, ok := result["templates"].([]interface{})
 	if !ok {
-		return nil, fail.InvalidParameterReport("result['templates']", "is not an array")
+		return nil, fail.InvalidParameterError("result['templates']", "is not an array")
 	}
 	for _, templateJSON := range templatesJSON {
 		if templateID, _ := templateJSON.(map[string]interface{})["templateID"]; templateID == id {
@@ -292,15 +292,15 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 		}
 	}
 
-	return nil, fail.NotFoundReport("template with id '%s' not found", id)
+	return nil, fail.NotFoundError("template with id '%s' not found", id)
 }
 
 //-------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
@@ -331,22 +331,22 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
-	return nil, fail.NotImplementedReport("GetKeyPair() not implemented yet") // FIXME Technical debt
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+	return nil, fail.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
-	return nil, fail.NotImplementedReport("ListKeyPairs() not implemented yet") // FIXME Technical debt
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(id string) error {
-	return fail.NotImplementedReport("DeleteKeyPair() not implemented yet") // FIXME Technical debt
+func (s *Stack) DeleteKeyPair(id string) fail.Error {
+	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 //-------------HOST MANAGEMENT------------------------------------------------------------------------------------------
-func downloadImage(path string, downloadInfo map[string]interface{}) error {
+func downloadImage(path string, downloadInfo map[string]interface{}) fail.Error {
 	switch downloadInfo["method"].(string) {
 	case "GoogleDrive":
 		command := fmt.Sprintf(`file_name="%s"
@@ -362,13 +362,13 @@ func downloadImage(path string, downloadInfo map[string]interface{}) error {
 			return fail.Wrap(err, "command failed: '%s'\n", command)
 		}
 	default:
-		return fail.NotImplementedReport(fmt.Sprintf("download method %s not implemented", downloadInfo["method"].(string)))
+		return fail.NotImplementedError(fmt.Sprintf("download method %s not implemented", downloadInfo["method"].(string)))
 	}
 	return nil
 }
 
 // getImagePathFromID retrieve the storage path of an image from this image ID
-func getImagePathFromID(s *Stack, id string) (path string, err error) {
+func getImagePathFromID(s *Stack, id string) (path string, xerr fail.Error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return "", fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
@@ -391,30 +391,30 @@ func getImagePathFromID(s *Stack, id string) (path string, err error) {
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return "", fail.InvalidParameterReport("result['images']", "must be an array")
+		return "", fail.InvalidParameterError("result['images']", "must be an array")
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
 			path, ok := imageJSON.(map[string]interface{})["imagePath"].(string)
 			if !ok {
-				return "", fail.InvalidParameterReport("imagePath", "must be an non-empty string")
+				return "", fail.InvalidParameterError("imagePath", "must be an non-empty string")
 			}
 			// check parent directory first
 			parentDir := filepath.Dir(path)
 			if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 				if err != nil {
-					return "", fail.NewReport("failed to download image: directory '%s' doesn't exist", parentDir)
+					return "", fail.NewError("failed to download image: directory '%s' doesn't exist", parentDir)
 				}
 			}
 			// download if image file isn't there
 			if _, err := os.Stat(path); os.IsNotExist(err) {
 				downloadPath, ok := imageJSON.(map[string]interface{})["download"]
 				if !ok {
-					return "", fail.SyntaxReport("invalid json")
+					return "", fail.SyntaxError("invalid json")
 				}
 				mapDownload, ok := downloadPath.(map[string]interface{})
 				if !ok {
-					return "", fail.SyntaxReport("invalid json")
+					return "", fail.SyntaxError("invalid json")
 				}
 				err := downloadImage(path, mapDownload)
 				if err != nil {
@@ -427,11 +427,11 @@ func getImagePathFromID(s *Stack, id string) (path string, err error) {
 		}
 	}
 
-	return "", fail.NotFoundReport("image with id '%s' not found", id)
+	return "", fail.NotFoundError("image with id '%s' not found", id)
 }
 
 // getDiskFromID retrieve the disk with root partition of an image from this image ID
-func getDiskFromID(s *Stack, id string) (disk string, err error) {
+func getDiskFromID(s *Stack, id string) (disk string, xerr fail.Error) {
 	jsonFile, err := os.Open(s.LibvirtConfig.ImagesJSONPath)
 	if err != nil {
 		return "", fail.Wrap(err, "failed to open '%s'", s.LibvirtConfig.ImagesJSONPath)
@@ -454,7 +454,7 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 
 	imagesJSON, ok := result["images"].([]interface{})
 	if !ok {
-		return "", fail.InvalidParameterReport("result['images']]", "is not an array")
+		return "", fail.InvalidParameterError("result['images']]", "is not an array")
 	}
 	for _, imageJSON := range imagesJSON {
 		if imageID, _ := imageJSON.(map[string]interface{})["imageID"]; imageID == id {
@@ -462,10 +462,10 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 		}
 	}
 
-	return "", fail.NotFoundReport("image with id '%s' not found", id)
+	return "", fail.NotFoundError("image with id '%s' not found", id)
 }
 
-func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) ([]*libvirtxml.StorageVolume, error) {
+func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) ([]*libvirtxml.StorageVolume, fail.Error) {
 	var volumeDescriptions []*libvirtxml.StorageVolume
 	var domainVolumePaths []string
 
@@ -531,7 +531,7 @@ func stateConvert(stateLibvirt libvirt.DomainState) hoststate.Enum {
 	}
 }
 
-func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostDescription, error) {
+func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostDescription, fail.Error) {
 	hostDescription := propertiesv1.NewHostDescription()
 
 	//var Created time.Time
@@ -543,7 +543,7 @@ func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.
 
 	return hostDescription, nil
 }
-func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostSizing, error) {
+func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostSizing, fail.Error) {
 	hostSizing := propertiesv1.NewHostSizing()
 
 	info, err := domain.GetInfo()
@@ -571,7 +571,7 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 
 	return hostSizing, nil
 }
-func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.HostNetwork, error) {
+func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.HostNetwork, fail.Error) {
 	hostNetwork := propertiesv1.NewHostNetwork()
 
 	domainXML, err := domain.GetXMLDesc(0)
@@ -604,7 +604,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 								if dhcpLease.Mac == iface.MAC.Address {
 									net, err := s.GetNetwork(iface.Source.Network.Network)
 									if err != nil {
-										return fail.NotFoundReport("unknown Network %s", iface.Source.Network.Network)
+										return fail.NotFoundError("unknown Network %s", iface.Source.Network.Network)
 									}
 									if len(strings.Split(dhcpLease.IPaddr, ".")) == 4 {
 										if name == "default" {
@@ -621,7 +621,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 											hostNetwork.IPv6Addresses[net.ID] = dhcpLease.IPaddr
 										}
 									} else {
-										return fail.NewReport("unknown adressType")
+										return fail.NewError("unknown adressType")
 									}
 									hostNetwork.NetworksByID[net.ID] = net.Name
 									hostNetwork.NetworksByName[net.Name] = net.ID
@@ -630,7 +630,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 							}
 						}
 					}
-					return fail.NotFoundReport("no local IP matching inteface '%s' found", iface.Alias)
+					return fail.NotFoundError("no local IP matching inteface '%s' found", iface.Alias)
 				},
 				temporal.GetHostTimeout(),
 			)
@@ -643,7 +643,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 }
 
 // getHostFromDomain build a abstract.Host struct representing a Domain
-func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, err error) {
+func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, xerr fail.Error) {
 	defer fail.OnPanic(&err)
 
 	id, err := domain.GetUUIDString()
@@ -710,7 +710,7 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, err
 }
 
 // getHostAndDomainFromRef retrieve the host and the domain associated to an ref (id or name)
-func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.Host, *libvirt.Domain, error) {
+func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.Host, *libvirt.Domain, fail.Error) {
 	domain, err := s.LibvirtService.LookupDomainByUUIDString(ref)
 	if err != nil {
 		domain, err = s.LibvirtService.LookupDomainByName(ref)
@@ -734,12 +734,12 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.Host, *libvirt.Do
 	return host, domain, nil
 }
 
-func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err error) {
+func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (xerr fail.Error) {
 	if host == nil {
-		return fail.InvalidParameterReport("host", "cannot be nil")
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 	if newHost == nil {
-		return fail.InvalidParameterReport("newHost", "cannot be nil")
+		return fail.InvalidParameterError("newHost", "cannot be nil")
 	}
 
 	defer fail.OnPanic(&err)
@@ -751,10 +751,10 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 	host.LastState = newHost.LastState
 
 	// FIXME: this code should have been moved to operations, check this
-	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) error {
-		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
+	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			newHostNetworkV1 := propertiesv1.NewHostNetwork()
-			readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+			readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) fail.Error {
 				newHostNetworkV1 = clonable.(*propertiesv1.HostNetwork)
 				return nil
 			})
@@ -772,9 +772,9 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 			return innerErr
 		}
 
-		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) error {
+		return props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
 			newHostSizingV1 := propertiesv1.NewHostSizing()
-			readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+			readLockErr := newHost.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) fail.Error {
 				newHostSizingV1 = clonable.(*propertiesv1.HostSizing)
 				return nil
 			})
@@ -790,7 +790,7 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (err
 	})
 }
 
-func verifyVirtResizeCanAccessKernel() (err error) {
+func verifyVirtResizeCanAccessKernel() (xerr fail.Error) {
 	command := "echo /boot/vmlinuz-`uname -r`"
 	cmd := exec.Command("bash", "-c", command)
 
@@ -798,7 +798,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 	cmd.Stdout = cmdOutput
 	err = cmd.Run()
 	if err != nil {
-		return fail.NewReport("command failed: '%s'\n%s", command, err.Error())
+		return fail.NewError("command failed: '%s'\n%s", command, err.Error())
 	}
 
 	target := strings.TrimSpace(cmdOutput.String())
@@ -812,9 +812,9 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, _ *abstract.HostTemplate, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, _ *abstract.HostTemplate, userData *userdata.Content, xerr fail.Error) {
 	if s == nil {
-		return nil, nil, nil, fail.InvalidInstanceReport()
+		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
 	defer fail.OnPanic(&err)
@@ -832,26 +832,26 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	//----Check Inputs----
 	if resourceName == "" {
-		return nil, nil, nil, fail.InvalidParameterReport("request.ResourceName", "cannit be empty string")
+		return nil, nil, nil, fail.InvalidParameterError("request.ResourceName", "cannit be empty string")
 	}
 	if hostName == "" {
 		hostName = resourceName
 	}
 	if networks == nil || len(networks) == 0 {
-		return nil, nil, userData, fail.InvalidParameterReport("request.Networks", "cannot be nil or an empty slice")
+		return nil, nil, userData, fail.InvalidParameterError("request.Networks", "cannot be nil or an empty slice")
 	}
 	if defaultGateway == nil && !publicIP {
-		return nil, nil, userData, fail.InvalidRequestReport("the host '%s' must have a gateway or be public", resourceName)
+		return nil, nil, userData, fail.InvalidRequestError("the host '%s' must have a gateway or be public", resourceName)
 	}
 	if templateID == "" {
-		return nil, nil, userData, fail.InvalidParameterReport("request.templateID", "cannot be empty string")
+		return nil, nil, userData, fail.InvalidParameterError("request.templateID", "cannot be empty string")
 	}
 	if imageID == "" {
-		return nil, nil, userData, fail.InvalidParameterReport("request.ImageID", "cannot be empty string")
+		return nil, nil, userData, fail.InvalidParameterError("request.ImageID", "cannot be empty string")
 	}
 	host, _, err = s.getHostAndDomainFromRef(resourceName)
 	if err == nil && host != nil {
-		return nil, nil, userData, fail.DuplicateReport("the host '%s' already exists", resourceName)
+		return nil, nil, userData, fail.DuplicateError("the host '%s' already exists", resourceName)
 	}
 
 	//----Initialize----
@@ -904,7 +904,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			networkDefault, err := s.GetNetwork("default")
 			if err != nil {
 				switch err.(type) {
-				case fail.NotFound:
+				case fail.ErrNotFound:
 					networkDefault, err = s.CreateNetwork(
 						abstract.NetworkRequest{
 							Name:      "default",
@@ -927,7 +927,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		cmd.Stdout = cmdOutput
 		err = cmd.Run()
 		if err != nil {
-			return nil, nil, nil, fail.NewReport("command failed: '%s'\n%s", command, err.Error())
+			return nil, nil, nil, fail.NewError("command failed: '%s'\n%s", command, err.Error())
 		}
 		ip := strings.Trim(fmt.Sprint(cmdOutput), "\n ")
 
@@ -971,7 +971,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// without sudo rights /boot/vmlinuz/`uname -r` have to be readable by the user to execute virt-resize / virt-sysprep
 	err = verifyVirtResizeCanAccessKernel()
 	if err != nil {
-		return nil, nil, userData, fail.NewReport("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
+		return nil, nil, userData, fail.NewError("libvirt cannot access /boot/vmlinuz/`uname -r`, this file must be readable in order to be used by libvirt")
 	}
 
 	var commands []string
@@ -1000,7 +1000,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		err = cmd.Run()
 		if err != nil {
 			logrus.Errorf("Commands failed: [%s] with error [%s], stdOutput [%s] and stdError [%s]", command, err.Error(), cmdOutput.String(), cmdError.String())
-			return nil, nil, userData, fail.NewReport("command failed: '%s'\n%s", command, err.Error())
+			return nil, nil, userData, fail.NewError("command failed: '%s'\n%s", command, err.Error())
 		}
 	}
 
@@ -1060,9 +1060,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, xerr fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahc, hostRef, err := stacks.ValidateHostParam(hostParam)
@@ -1089,9 +1089,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, err
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstract.HostCore, error) {
+func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(name)
@@ -1102,9 +1102,9 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(id string) error {
+func (s *Stack) DeleteHost(id string) fail.Error {
 	if s == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1157,15 +1157,15 @@ func (s *Stack) DeleteHost(id string) error {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.HostFull, error) {
-	return nil, fail.NotImplementedReport("ResizeHost() not implemented yet") // FIXME: Technical debt
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.HostFull, fail.Error) {
+	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*abstract.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 	var hosts []*abstract.Host
 	if s == nil {
-		return hosts, fail.InvalidInstanceReport()
+		return hosts, fail.InvalidInstanceError()
 	}
 
 	domains, err := s.LibvirtService.ListAllDomains(16383)
@@ -1185,9 +1185,9 @@ func (s *Stack) ListHosts() ([]*abstract.Host, error) {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(id string) error {
+func (s *Stack) StopHost(id string) fail.Error {
 	if s == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1204,9 +1204,9 @@ func (s *Stack) StopHost(id string) error {
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(id string) error {
+func (s *Stack) StartHost(id string) fail.Error {
 	if s == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1223,9 +1223,9 @@ func (s *Stack) StartHost(id string) error {
 }
 
 // RebootHost reboot the host identified by id
-func (s *Stack) RebootHost(id string) error {
+func (s *Stack) RebootHost(id string) fail.Error {
 	if s == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1242,9 +1242,9 @@ func (s *Stack) RebootHost(id string) error {
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
 	if s == nil {
-		return hoststate.ERROR, fail.InvalidInstanceReport()
+		return hoststate.ERROR, fail.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(hostParam)
@@ -1257,16 +1257,16 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 //-------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	return map[string]bool{"local": true}, nil
 }
 
-func (s *Stack) ListRegions() ([]string, error) {
+func (s *Stack) ListRegions() ([]string, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	return []string{"local"}, nil

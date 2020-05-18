@@ -56,7 +56,7 @@ type object struct {
 }
 
 // NewObject ...
-func newObject(bucket *bucket, objectName string) (*object, error) {
+func newObject(bucket *bucket, objectName string) (*object, fail.Error) {
 	o := &object{
 		bucket: bucket,
 		Name:   objectName,
@@ -84,38 +84,38 @@ func (o *object) Stored() bool {
 }
 
 // Reload reloads the data of the Object from the Object Storage
-func (o *object) Reload() error {
+func (o *object) Reload() fail.Error {
 	if o == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
 
 	item, err := o.bucket.container.Item(o.Name)
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	return o.reloadFromItem(item)
 }
 
 // reloadFromItem reloads object instance with stow.Item
-func (o *object) reloadFromItem(item stow.Item) error {
+func (o *object) reloadFromItem(item stow.Item) fail.Error {
 	o.item = item
 	newMetadata, err := item.Metadata()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	o.Metadata = newMetadata
 	return nil
 }
 
 // Read reads the content of the object from Object Storage and writes it in 'target'
-func (o *object) Read(target io.Writer, from, to int64) error {
+func (o *object) Read(target io.Writer, from, to int64) fail.Error {
 	if target == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if from > to {
-		return fail.InvalidParameterReport("from", "cannot be greater than 'to'")
+		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().OnExitTrace()
@@ -134,7 +134,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return fail.Wrap(err, "failed to get bucket size")
 	}
 	if size < 0 {
-		return fail.NewReport("unknown size of object")
+		return fail.NewError("unknown size of object")
 	}
 
 	length = size
@@ -145,21 +145,21 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		length = to - from
 	}
 
-	source, err := o.item.Open()
-	if err != nil {
-		return err
+	source, serr := o.item.Open()
+	if serr != nil {
+		return fail.ToError(err)
 	}
 	defer func() {
 		clerr := source.Close()
 		if clerr != nil {
-			logrus.Error("Report closing item")
+			logrus.Error("Error closing item")
 		}
 	}()
 
 	if seekTo == 0 && length >= size {
 		_, err := io.CopyN(target, source, size)
 		if err != nil {
-			return err
+			return fail.ToError(err)
 		}
 	} else {
 		buf := make([]byte, seekTo)
@@ -176,38 +176,38 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		readerbis := bytes.NewReader(bufbis)
 		_, err := io.CopyBuffer(target, readerbis, bufbis)
 		if err != nil {
-			return err
+			return fail.ToError(err)
 		}
 	}
 	return nil
 }
 
 // Write the source to the object in Object Storage
-func (o *object) Write(source io.Reader, sourceSize int64) error {
+func (o *object) Write(source io.Reader, sourceSize int64) fail.Error {
 	if o == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if source == nil {
-		return fail.InvalidParameterReport("source", "cannot be nil")
+		return fail.InvalidParameterError("source", "cannot be nil")
 	}
 	if o.bucket == nil {
-		return fail.InvalidParameterReport("o.bucket", "cannot be nil")
+		return fail.InvalidParameterError("o.bucket", "cannot be nil")
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().OnExitTrace()
 
 	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.SafeGetMetadata())
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	return o.reloadFromItem(item)
 }
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) error {
+func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
 	if o == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if source == nil { // If source is nil, do nothing and don't trigger an error
 		return nil
@@ -238,19 +238,13 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 }
 
 // writeChunk writes a chunk of data for object
-func writeChunk(
-	container stow.Container, objectName string,
-	source io.Reader, nBytesToRead int,
-	metadata ObjectMetadata,
-	chunkIndex int,
-) error {
-
+func writeChunk(container stow.Container, objectName string, source io.Reader, nBytesToRead int, metadata ObjectMetadata, chunkIndex int) fail.Error {
 	buf := make([]byte, nBytesToRead)
 	nBytesRead, err := source.Read(buf)
 	if err == io.EOF {
 		msg := fmt.Sprintf("failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 		logrus.Errorf(msg)
-		return fail.NewReport(msg)
+		return fail.NewError(msg)
 	}
 	r := bytes.NewReader(buf)
 	objectNamePart := objectName + strconv.Itoa(chunkIndex)
@@ -260,29 +254,29 @@ func writeChunk(
 		return fail.Wrap(err, "failed to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 	}
 	logrus.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
-	return err
+	return fail.ToError(err)
 }
 
 // Delete deletes the object from Object Storage
-func (o *object) Delete() error {
+func (o *object) Delete() fail.Error {
 	if o.item == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
 
 	err := o.bucket.container.RemoveItem(o.Name)
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	o.item = nil
 	return nil
 }
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
-func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
+func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) fail.Error {
 	if o == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
@@ -294,9 +288,9 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
 }
 
 // AddMetadata adds missing entries in object metadata
-func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
+func (o *object) AddMetadata(newMetadata ObjectMetadata) fail.Error {
 	if o == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
@@ -311,9 +305,9 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
 }
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
-func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
+func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) fail.Error {
 	if o == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "").Entering().OnExitTrace()
 
@@ -322,16 +316,16 @@ func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
 }
 
 // GetLastUpdate returns the date of last update
-func (o *object) GetLastUpdate() (time.Time, error) {
+func (o *object) GetLastUpdate() (time.Time, fail.Error) {
 	if o == nil {
-		return time.Time{}, fail.InvalidInstanceReport()
+		return time.Time{}, fail.InvalidInstanceError()
 	}
 	if o.item == nil {
-		return time.Time{}, fail.InvalidInstanceContentReport("o.item", "cannot be nil")
+		return time.Time{}, fail.InvalidInstanceContentError("o.item", "cannot be nil")
 	}
 	t, err := o.item.LastMod()
 	if err != nil {
-		return time.Time{}, fail.NewReport(err, nil, "")
+		return time.Time{}, fail.NewError(err, nil, "")
 	}
 	return t, nil
 }
@@ -344,9 +338,9 @@ func (o *object) SafeGetLastUpdate() time.Time {
 }
 
 // GetMetadata returns the metadata of the object in Object Storage
-func (o *object) GetMetadata() (ObjectMetadata, error) {
+func (o *object) GetMetadata() (ObjectMetadata, fail.Error) {
 	if o == nil {
-		return ObjectMetadata{}, fail.InvalidInstanceReport()
+		return ObjectMetadata{}, fail.InvalidInstanceError()
 	}
 	return o.Metadata.Clone(), nil
 }
@@ -359,16 +353,16 @@ func (o *object) SafeGetMetadata() ObjectMetadata {
 }
 
 // GetSize returns the size of the content of the object
-func (o *object) GetSize() (int64, error) {
+func (o *object) GetSize() (int64, fail.Error) {
 	if o == nil {
-		return -1, fail.InvalidInstanceReport()
+		return -1, fail.InvalidInstanceError()
 	}
 	if o.item == nil {
-		return -1, fail.InvalidInstanceContentReport("o.item", "cannot be nil")
+		return -1, fail.InvalidInstanceContentError("o.item", "cannot be nil")
 	}
 	size, err := o.item.Size()
 	if err != nil {
-		return -1, err
+		return -1, fail.ToError(err)
 	}
 	return size, nil
 }
@@ -380,16 +374,16 @@ func (o *object) SafeGetSize() int64 {
 }
 
 // GetETag returns the value of the ETag (+/- md5sum of the content...)
-func (o *object) GetETag() (string, error) {
+func (o *object) GetETag() (string, fail.Error) {
 	if o == nil {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	if o.item == nil {
-		return "", fail.InvalidInstanceContentReport("o.item", "cannot be nil")
+		return "", fail.InvalidInstanceContentError("o.item", "cannot be nil")
 	}
 	etag, err := o.item.ETag()
 	if err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 	return etag, nil
 }
@@ -402,12 +396,12 @@ func (o *object) SafeGetETag() string {
 }
 
 // GetID ...
-func (o *object) GetID() (string, error) {
+func (o *object) GetID() (string, fail.Error) {
 	if o == nil {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	if o.item == nil {
-		return "", fail.InvalidInstanceContentReport("o.item", "cannot be nil")
+		return "", fail.InvalidInstanceContentError("o.item", "cannot be nil")
 	}
 	return o.item.ID(), nil
 }
@@ -420,9 +414,9 @@ func (o *object) SafeGetID() string {
 }
 
 // GetName returns the name of the object
-func (o *object) GetName() (string, error) {
+func (o *object) GetName() (string, fail.Error) {
 	if o == nil {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	return o.Name, nil
 }

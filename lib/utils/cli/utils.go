@@ -16,27 +16,20 @@
 
 package cli
 
-import (
-	"os/exec"
-	"syscall"
-
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-)
-
-// ExtractRetCode extracts info from the error
-func ExtractRetCode(err error) (string, int, error) {
-	retCode := -1
-	msg := "__ NO MESSAGE __"
-	if ee, ok := err.(*exec.ExitError); ok {
-		// Try to get retCode
-		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-			retCode = status.ExitStatus()
-		} else {
-			return msg, retCode, fail.InvalidParameterReport("err", "must be a *exec.ExitError and err.Sys() must be a 'syscall.WaitStatus'")
-		}
-		// Retrieve error message
-		msg = ee.Error()
-		return msg, retCode, nil
-	}
-	return msg, retCode, fail.InvalidParameterReport("err", "is not an 'ExitError'")
-}
+// // ExtractRetCode extracts info from the error
+// func ExtractRetCode(xerr fail.Error) (string, int, fail.Error) {
+// 	retCode := -1
+// 	msg := "__ NO MESSAGE __"
+// 	if ee, ok := err.(*exec.ExitError); ok {
+// 		// Try to get retCode
+// 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+// 			retCode = status.ExitStatus()
+// 		} else {
+// 			return msg, retCode, fail.InvalidParameterReport("err", "must be a *exec.ExitError and err.Sys() must be a 'syscall.WaitStatus'")
+// 		}
+// 		// Retrieve error message
+// 		msg = ee.Error()
+// 		return msg, retCode, nil
+// 	}
+// 	return msg, retCode, fail.InvalidParameterReport("err", "is not an 'ExitError'")
+// }
