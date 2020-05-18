@@ -324,6 +324,11 @@ var clusterCreateCommand = &cli.Command{
 			Value:   "192.168.0.0/16",
 			Usage:   "Defines the CIDR of the network to use with cluster",
 		},
+		&cli.StringFlag{
+			Name:  "domain",
+			Value: "cluster.local",
+			Usage: "domain name of the hosts in the cluster (default: cluster.local)",
+		},
 		&cli.StringSliceFlag{
 			Name:  "disable",
 			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
@@ -671,7 +676,6 @@ var clusterExpandCommand = &cli.Command{
 
 		req := protocol.ClusterResizeRequest{
 			Name:       clusterName,
-			Action:     protocol.ClusterResizeAction_CRA_EXPAND,
 			Count:      int32(count),
 			NodeSizing: nodesDef,
 			ImageId:    los,
@@ -974,16 +978,16 @@ func executeCommand(task concurrency.Task, command string, files *client.RemoteF
 		if !Debug {
 			defer files.Cleanup(task, master.SafeGetID())
 		}
-		err = files.Upload(task, master.SafeGetID())
-		if err != nil {
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error())
+		xerr := files.Upload(task, master.SafeGetID())
+		if xerr != nil {
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, xerr.Error())
 		}
 	}
 
 	sshClient := client.New().SSH
-	retcode, stdout, stderr, err := sshClient.Run(task, master.SafeGetID(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.SafeGetID(), clusterName, err.Error())
+	retcode, stdout, stderr, xerr := sshClient.Run(task, master.SafeGetID(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.SafeGetID(), clusterName, xerr.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
@@ -1016,14 +1020,14 @@ var clusterListFeaturesCommand = &cli.Command{
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
-		task, err := concurrency.RootTask()
-		if err != nil {
-			return clitools.FailureResponse(err)
+		task, xerr := concurrency.RootTask()
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
 		}
 		features, err := clusterInstance.ListInstalledFeatures(task)
 		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			xerr := fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 		return clitools.SuccessResponse(features)
 	},

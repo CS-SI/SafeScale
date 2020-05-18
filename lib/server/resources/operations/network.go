@@ -337,13 +337,13 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 	if req.Domain != "" {
 		primaryRequest.HostName += "." + req.Domain
 	}
-	primaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
+	primaryTask, xerr = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 		"request": primaryRequest,
 		"sizing":  *gwSizing,
 		"primary": true,
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	// Starts secondary gateway creation if asked for
@@ -354,13 +354,13 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 		if req.Domain != "" {
 			secondaryRequest.HostName += "." + req.Domain
 		}
-		secondaryTask, err = task.StartInSubtask(objn.taskCreateGateway, data.Map{
+		secondaryTask, xerr = task.StartInSubtask(objn.taskCreateGateway, data.Map{
 			"request": secondaryRequest,
 			"sizing":  *gwSizing,
 			"primary": false,
 		})
-		if err != nil {
-			return err
+		if xerr != nil {
+			return xerr
 		}
 	}
 

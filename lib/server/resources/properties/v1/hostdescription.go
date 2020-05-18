@@ -30,10 +30,11 @@ import (
 //       Create a new version instead with needed supplemental fields
 type HostDescription struct {
 	Created time.Time `json:"created,omitempty"`  // tells when the host has been created
-	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of a host
-	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified
-	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host
-	Tenant  string    `json:"tenant"`             // contains the tenant name used to create the host
+	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of the host
+	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified (by SafeScale)
+	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host (not set for now)
+	Tenant  string    `json:"tenant,omitempty"`   // contains the tenant name used to create the host
+	Domain  string    `json:"domain,omitempty"`   // Contains the domain used to define the FQDN of the host at creation (taken from first network attached to the host)
 }
 
 // NewHostDescription ...

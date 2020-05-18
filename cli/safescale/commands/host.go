@@ -211,6 +211,11 @@ var hostCreate = &cli.Command{
 			Name:  "public",
 			Usage: "Create with public IP",
 		},
+		&cli.StringFlag{
+			Name:  "domain",
+			Value: "",
+			Usage: "domain name of the host (default: empty)",
+		},
 		&cli.BoolFlag{
 			Name:    "force",
 			Aliases: []string{"f"},
