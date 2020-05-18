@@ -1,59 +1,54 @@
 # Building SafeScale for MacOS
 
-## Install brew
+## Install Homebrew
+An important dependency before Homebrew can work is the Command Line Tools for Xcode. These include compilers that will allow you to build things from source.
+Then, to install brew:
+```bash
+$ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 ```
+
+## Install go (must provide go version 1.12 minimum)
+```bash
+$ brew update
+$ brew install golang
+```
+
+
+## Install protoc-gen-go (must provide protoc-gen-go 1.3 minimum)
+```bash
+$ brew install protoc-gen-go
 ```
 
 ## Prepare environment
-```
-$ brew install 
-```
-
-## Install GO 1.10
-```
-wget https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.10.3.linux-amd64.tar.gz
-rm ./go1.10.3.linux-amd64.tar.gz
-```
-
-## Install Protoc 3.6.1
-```
-brew install protoc
-```
-
-## Prepare environment vars
 ```bash
-echo -e "\nexport GOPATH=~/go" >> ~/.bashrc
-echo -e "\nexport PATH=/usr/local/go/bin:/go/bin:\$PATH:~/go/bin" >> ~/.bashrc
-source ~/.bashrc
+$ mkdir -p ~/go-workspace # replace go-workspace with the path you want
+$ export GOPATH=~/go-workspace # don't forget to change your path correctly!
+$ export GOROOT=/usr/local/opt/go/libexec
+$ export PATH=$PATH:$GOPATH/bin
+$ export PATH=$PATH:$GOROOT/bin
 ```
-
-```zsh
-echo -e "\nexport GOPATH=~/go" >> ~/.zshrc
-echo -e "\nexport PATH=/usr/local/go/bin:/go/bin:\$PATH:~/go/bin" >> ~/.zshrc
-source ~/.zshrc
-```
-
+You may want to put these commands in ~~.bashrc or ~/.zshrc to keep them after logout/restart.
+ 
 ## Build
-```
+```bash 
 # Prepare directory
-mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
+$ mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
 
 # Clone SafeScale
-cd ${GOPATH:-$HOME}/src/github.com/CS-SI
-git clone https://github.com/CS-SI/SafeScale
+$ cd ${GOPATH:-$HOME}/src/github.com/CS-SI
+$ git clone https://github.com/CS-SI/SafeScale
 
-cd SafeScale
-git checkout -b develop -t origin/develop
+$ cd SafeScale
+$ git checkout -b develop -t origin/develop
 
 # Show help
-make
+$ make
 
 # Build SafeScale
-make all
+$ make all
 
 # Copy the binaries to $HOME/go/bin
-make install
+$ make install
 ```
 
 ## Cross-Compilation
