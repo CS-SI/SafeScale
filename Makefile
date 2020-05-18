@@ -94,7 +94,7 @@ getdevdeps: begin
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) || true); \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-  		$(GO) version | grep 1.10 > /dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $($(GO) env GOPATH)/bin v1.26.0 || true); \
+  		$(GO) version | grep 1.10 > /dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.26.0 || true); \
 	fi
 
 ensure:
@@ -168,7 +168,7 @@ devdeps:
 	@($(GO) get -u $(DEVDEPSLIST))
 	@$(GO) version | grep 1.10 > /dev/null || $(GO) get -u $(NEWDEVDEPSLIST)
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $($(GO) env GOPATH)/bin v1.26.0 || true); \
+		$(GO) version | grep 1.10 > /dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.26.0 || true); \
 	fi
 
 depclean: begin
