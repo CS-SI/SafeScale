@@ -234,7 +234,7 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 
 	single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(30) * time.Millisecond)
-		return "Ahhhh", fmt.Errorf("chaos")
+		return "Ahhhh", fail.NewError("chaos")
 	}, nil)
 	require.Nil(t, err)
 

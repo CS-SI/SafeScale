@@ -107,7 +107,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 			rint := tools.RandomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
 			if rint > 55 {
-				return "", fmt.Errorf("suck it")
+				return "", fail.NewError("suck it")
 			}
 
 			return "waiting game", nil

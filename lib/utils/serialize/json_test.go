@@ -2,16 +2,18 @@ package serialize
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 // Lorem ipsum dolor sit amet, consectetur adipiscing elit. In et nulla eros. Ut pharetra, arcu at bibendum ullamcorper, leo magna condimentum leo, at rhoncus dui turpis vel ante. Curabitur ac leo vel massa pretium maximus. In sed gravida felis. Etiam lacinia, sem at sollicitudin tempus, tortor dolor porta leo, ut suscipit ex mi eget eros. Praesent id ultricies metus. Morbi condimentum placerat elementum. Morbi et sem ligula.
@@ -70,7 +72,7 @@ func TestLockForReadDoesNotChange(t *testing.T) {
 
 	assert.NotNil(t, clusters)
 
-	err := clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+	err := clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
@@ -90,7 +92,7 @@ func TestLockForWriteDoesChange(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	err := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
@@ -114,12 +116,12 @@ func TestLockForReadDoesLock(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 
 	// Here ve have clusters with "Ipsum", good
 
@@ -132,7 +134,7 @@ func TestLockForReadDoesLock(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(1500 * time.Millisecond)
-		oerr := clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("second there")
 			defer fmt.Println("end second there")
 			thing := clonable.(*LikeFeatures)
@@ -144,7 +146,7 @@ func TestLockForReadDoesLock(t *testing.T) {
 	}()
 
 	// That should have the lock first, the sleep in inside the lock
-	err = clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+	_ = clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 		fmt.Println("first there")
 		defer fmt.Println("end first there")
 		time.Sleep(3 * time.Second)
@@ -183,12 +185,12 @@ func TestWriteDeterministicLocks(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 
 	// Here ve have clusters with "Ipsum", good
 
@@ -201,7 +203,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(150 * time.Millisecond)
-		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("Writer")
 			defer fmt.Println("End Writer")
 			thing := clonable.(*LikeFeatures)
@@ -217,7 +219,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(20 * time.Millisecond)
-		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("Writer 2")
 			defer fmt.Println("End Writer 2")
 			thing := clonable.(*LikeFeatures)
@@ -230,7 +232,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 
 	// That should have the lock first, the sleep in inside the lock
 	time.Sleep(80 * time.Millisecond)
-	err = clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+	_ = clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 		fmt.Println("Reader")
 		defer fmt.Println("End Reader")
 		thing := clonable.(*LikeFeatures)
@@ -268,12 +270,12 @@ func TestEternalReaderLocks(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 
 	// Here ve have clusters with "Ipsum", good
 
@@ -286,7 +288,7 @@ func TestEternalReaderLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(200 * time.Millisecond)
-		oerr := clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("Slow Reader")
 			defer fmt.Println("End slow Reader")
 			time.Sleep(500 * time.Millisecond)
@@ -301,7 +303,7 @@ func TestEternalReaderLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(500 * time.Millisecond)
-		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("Writer 2")
 			defer fmt.Println("End Writer 2")
 			thing := clonable.(*LikeFeatures)
@@ -313,7 +315,7 @@ func TestEternalReaderLocks(t *testing.T) {
 
 	// That should have the lock first, the sleep in inside the lock
 	time.Sleep(800 * time.Millisecond)
-	err = clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+	_ = clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 		fmt.Println("Reader")
 		defer fmt.Println("End Reader")
 		thing := clonable.(*LikeFeatures)
@@ -351,12 +353,12 @@ func TestLockAndWriteLocks(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 
 	// Here ve have clusters with "Ipsum", good
 
@@ -369,7 +371,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(150 * time.Millisecond)
-		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("Writer")
 			defer fmt.Println("End Writer")
 			thing := clonable.(*LikeFeatures)
@@ -385,7 +387,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(20 * time.Millisecond)
-		oerr := clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 			fmt.Println("Reader 2")
 			defer fmt.Println("End Reader 2")
 			thing := clonable.(*LikeFeatures)
@@ -398,7 +400,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 
 	// That should have the lock first, the sleep in inside the lock
 	time.Sleep(300 * time.Millisecond)
-	err = clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+	_ = clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 		fmt.Println("Reader")
 		defer fmt.Println("End Reader")
 		thing := clonable.(*LikeFeatures)
@@ -432,12 +434,12 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 
 	// Here ve have clusters with "Ipsum", good
 	// one at a time ??
@@ -447,31 +449,31 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err = clusters.Alter(task, "first", func(clonable data.Clonable) error {
+		oerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 			thing := clonable.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(50 * time.Millisecond)
-			return clusters.Inspect(task, "second", func(clonable data.Clonable) error {
+			return clusters.Inspect(task, "second", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks here")
 				return nil
 			})
 		})
-		assert.Nil(t, err)
+		assert.Nil(t, oerr)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		time.Sleep(10 * time.Millisecond)
-		oerr := clusters.Alter(task, "second", func(clonable data.Clonable) error {
+		oerr := clusters.Alter(task, "second", func(clonable data.Clonable) fail.Error {
 			thing := clonable.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(50 * time.Millisecond)
-			return clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+			return clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks")
@@ -512,12 +514,12 @@ func TestNestedLocks(t *testing.T) {
 
 	task, _ := concurrency.NewUnbreakableTask()
 
-	err := clusters.Alter(task, "first", func(clonable data.Clonable) error {
+	xerr := clusters.Alter(task, "first", func(clonable data.Clonable) fail.Error {
 		thing := clonable.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 
 	// Here ve have clusters with "Ipsum", good
 	// one at a time ??
@@ -527,12 +529,12 @@ func TestNestedLocks(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err = clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+		xerr = clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 			thing := clonable.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(500 * time.Millisecond)
-			return clusters.Inspect(task, "second", func(clonable data.Clonable) error {
+			return clusters.Inspect(task, "second", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks here")
@@ -545,12 +547,12 @@ func TestNestedLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		time.Sleep(100 * time.Millisecond)
-		oerr := clusters.Inspect(task, "second", func(clonable data.Clonable) error {
+		oerr := clusters.Inspect(task, "second", func(clonable data.Clonable) fail.Error {
 			thing := clonable.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(500 * time.Millisecond)
-			return clusters.Inspect(task, "first", func(clonable data.Clonable) error {
+			return clusters.Inspect(task, "first", func(clonable data.Clonable) fail.Error {
 				other := clonable.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks")
@@ -565,5 +567,5 @@ func TestNestedLocks(t *testing.T) {
 		t.Fail()
 	}
 
-	assert.Nil(t, err)
+	assert.Nil(t, xerr)
 }
