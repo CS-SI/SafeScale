@@ -4,7 +4,7 @@ This file list the guidelines to use when you want to contribute to SafeScale co
 
 ## error messages
 
-In general, follow the GOLANG coding guidelines, in particular :
+In general, follow the GOLANG coding guidelines, in particular:
 
 - Don't use capitalized error messages
 - Don't use punctuation at the end of the error messages
