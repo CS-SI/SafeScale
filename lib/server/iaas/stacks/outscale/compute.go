@@ -491,7 +491,7 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 	return hostState(vm.State), nil
 }
 
-// WaitForHostState wait for host to be in the specifed state
+// WaitForHostState wait for host to be in the specified state
 func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
@@ -499,7 +499,7 @@ func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		hostState, err := s.hostState(hostID)
 		if err != nil {
-			return scerr.AbortedError("", err)
+			return scerr.Errorf("", err)
 		}
 		if state != hostState {
 			return scerr.Errorf("wrong state", nil)

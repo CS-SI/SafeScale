@@ -21,7 +21,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	log "github.com/sirupsen/logrus"
 
@@ -303,7 +302,6 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	subnet, err := s.getSubnet(id)
 	if err != nil {
-		spew.Dump(err) // FIXME Remove spew.Dump
 		if !strings.Contains(err.Error(), id) {
 			return nil, scerr.Errorf(fmt.Sprintf("failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err)), err)
 		}

@@ -22,7 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	"github.com/davecgh/go-spew/spew"
 	log "github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -295,12 +294,6 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	})
 	va, err := r.Extract()
 	if err != nil {
-		spew.Dump(r.Err)
-		// switch r.Err.(type) {
-		// 	case
-		// }
-		// message := extractMessageFromBadRequest(r.Err)
-		// if message != ""
 		return "", scerr.Wrap(err, fmt.Sprintf("error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
 	}
 
