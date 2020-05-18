@@ -37,10 +37,9 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
-GOLANGCI := github.com/golangci/golangci-lint/cmd/golangci-lint
 
 DEVDEPSLIST := $(RICE) $(PROTOBUF) $(DEP) $(COVER) $(XUNIT) $(COVERTOOL) $(GOVENDOR)
-NEWDEVDEPSLIST := $(STRINGER) $(GOLANGCI) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCHECK)
+NEWDEVDEPSLIST := $(STRINGER) $(MOCKGEN) $(LINTER) $(CONVEY) $(ERRCHECK)
 
 BUILD_TAGS = ""
 export BUILD_TAGS
@@ -95,7 +94,7 @@ getdevdeps: begin
 		$(GO) version | grep 1.10 > /dev/null || (printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) || true); \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
-		$(GO) version | grep 1.10 > /dev/null || ($(GO) get -u  $(GOLANGCI) || true); \
+  		$(GO) version | grep 1.10 > /dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $($(GO) env GOPATH)/bin v1.26.0 || true); \
 	fi
 
 ensure:
@@ -168,6 +167,9 @@ devdeps:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Getting dev dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) get -u $(DEVDEPSLIST))
 	@$(GO) version | grep 1.10 > /dev/null || $(GO) get -u $(NEWDEVDEPSLIST)
+	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+		$(GO) version | grep 1.10 > /dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $($(GO) env GOPATH)/bin v1.26.0 || true); \
+	fi
 
 depclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

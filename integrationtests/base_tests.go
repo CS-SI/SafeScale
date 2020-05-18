@@ -3,6 +3,7 @@ package integrationtests
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,12 @@ func keyFromProvider(provider providers.Enum) string {
 		return "TEST_CLOUDFERRO"
 	case providers.FLEXIBLEENGINE:
 		return "TEST_FLEXIBLE"
+	case providers.AWS:
+		return "TEST_AWS"
+	case providers.GCP:
+		return "TEST_GCP"
+	case providers.OUTSCALE:
+		return "TEST_OUTSCALE"
 	}
 	return ""
 }
@@ -37,6 +44,12 @@ func nameFromProvider(provider providers.Enum) string {
 		return "cloudferro"
 	case providers.FLEXIBLEENGINE:
 		return "flexibleengine"
+	case providers.AWS:
+		return "aws"
+	case providers.GCP:
+		return "gcp"
+	case providers.OUTSCALE:
+		return "outscale"
 	}
 	return ""
 }
@@ -80,7 +93,11 @@ func Setup(t *testing.T, provider providers.Enum) {
 	}
 	require.Nil(t, err)
 	require.True(t, len(getStr) > 0)
-	// require.True(t, strings.Contains(getStr, fmt.Sprintf("\"Provider\":\"%s\"", name)))
+
+	providerName := os.Getenv(keyFromProvider(provider))
+	require.NotEmpty(t, providerName)
+
+	require.True(t, strings.Contains(getStr, providerName))
 }
 
 func Basic(t *testing.T, provider providers.Enum) {

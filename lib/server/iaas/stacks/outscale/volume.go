@@ -13,16 +13,8 @@ import (
 	"github.com/outscale-dev/osc-sdk-go/osc"
 )
 
-func (s *Stack) deleteVolumeOnError(err error, v *osc.Volume) error {
-	err2 := s.DeleteVolume(v.VolumeId)
-	if err2 != nil {
-		return scerr.Wrap(err, err2.Error())
-	}
-	return err
-}
-
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volume, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -56,15 +48,29 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 
 	ov := res.Volume
+
+	defer func() {
+		if err != nil {
+			if !scerr.ImplementsCauser(err) {
+				err = scerr.Wrap(err, "")
+			}
+
+			derr := s.DeleteVolume(ov.VolumeId)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	err = s.setResourceTags(res.Volume.VolumeId, map[string]string{
 		"name": request.Name,
 	})
 	if err != nil {
-		return nil, s.deleteVolumeOnError(err, &ov)
+		return nil, err
 	}
 	err = s.WaitForVolumeState(ov.VolumeId, volumestate.AVAILABLE)
 	if err != nil {
-		return nil, s.deleteVolumeOnError(err, &ov)
+		return nil, err
 	}
 	volume := resources.NewVolume()
 	volume.ID = ov.VolumeId
@@ -112,13 +118,16 @@ func volumeState(state string) volumestate.Enum {
 
 // WaitForVolumeState wait for volume to be in the specified state
 func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		vol, err := s.GetVolume(volumeID)
 		if err != nil {
 			return scerr.AbortedError("", err)
 		}
 		if vol.State != state {
-			return fmt.Errorf("wrong state")
+			return scerr.Errorf("wrong state", nil)
 		}
 		return nil
 	}, temporal.GetHostTimeout())
@@ -256,21 +265,24 @@ func freeDevice(usedDevices []string, device string) bool {
 	return true
 }
 
-func (s *Stack) getFirstFreeDeviceName(serverID string) string {
+func (s *Stack) getFirstFreeDeviceName(serverID string) (string, error) {
 	var usedDeviceNames []string
 	atts, _ := s.ListVolumeAttachments(serverID)
 	if atts == nil {
-		return s.deviceNames[0]
+		if len(s.deviceNames) > 0 {
+			return s.deviceNames[0], nil
+		}
+		return "", scerr.InconsistentError("device names is empty")
 	}
 	for _, att := range atts {
 		usedDeviceNames = append(usedDeviceNames, att.Device)
 	}
 	for _, deviceName := range s.deviceNames {
 		if freeDevice(usedDeviceNames, deviceName) {
-			return deviceName
+			return deviceName, nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 // CreateVolumeAttachment attaches a volume to an host
@@ -285,12 +297,17 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		return "", scerr.InvalidParameterError("VolumeID", "cannot be empty string")
 	}
 
+	firstDeviceName, err := s.getFirstFreeDeviceName(request.HostID)
+	if err != nil {
+		return "", err
+	}
+
 	linkVolumeRequest := osc.LinkVolumeRequest{
-		DeviceName: s.getFirstFreeDeviceName(request.HostID),
+		DeviceName: firstDeviceName,
 		VmId:       request.HostID,
 		VolumeId:   request.VolumeID,
 	}
-	_, _, err := s.client.VolumeApi.LinkVolume(s.auth, &osc.LinkVolumeOpts{
+	_, _, err = s.client.VolumeApi.LinkVolume(s.auth, &osc.LinkVolumeOpts{
 		LinkVolumeRequest: optional.NewInterface(linkVolumeRequest),
 	})
 	if err != nil {

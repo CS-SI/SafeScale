@@ -73,5 +73,6 @@ func RunOnlyInIntegrationTest(key string) error {
 	if tenantOverride := os.Getenv(key); tenantOverride == "" {
 		return fmt.Errorf("this only runs as an integration test")
 	}
+
 	return nil
 }

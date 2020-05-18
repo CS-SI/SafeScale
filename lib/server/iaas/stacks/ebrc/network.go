@@ -260,12 +260,12 @@ func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
 	return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("No public IPs found"), nil)
 }
 
-func ipv4MaskString(m []byte) string {
+func ipv4MaskString(m []byte) (string, error) {
 	if len(m) != 4 {
-		panic("ipv4Mask: len must be 4 bytes")
+		return "", fmt.Errorf("ipv4Mask: len must be 4 bytes")
 	}
 
-	return fmt.Sprintf("%d.%d.%d.%d", m[0], m[1], m[2], m[3])
+	return fmt.Sprintf("%d.%d.%d.%d", m[0], m[1], m[2], m[3]), nil
 }
 
 func toIPRange(cidr string) (types.IPRanges, error) {
@@ -408,6 +408,10 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 	logrus.Debug("ebrc.Client.CreateNetwork() called")
 	defer logrus.Debug("ebrc.Client.CreateNetwork() done")
 
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network"))
@@ -455,7 +459,10 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 		return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), nil)
 	}
 
-	stringMask := ipv4MaskString(networkDesc.Mask)
+	stringMask, err := ipv4MaskString(networkDesc.Mask)
+	if err != nil {
+		return nil, scerr.Wrap(err, "Invalid ipv4 mask")
+	}
 
 	gwIP, _ := getGateway(req.CIDR)
 
@@ -602,6 +609,10 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 	logrus.Debug("ebrc.Client.GetNetwork() called")
 	defer logrus.Debug("ebrc.Client.GetNetwork() done")
 
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network"))
@@ -640,6 +651,10 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
 	logrus.Debug("ebrc.Client.GetNetworkByName() called")
 	defer logrus.Debug("ebrc.Client.GetNetworkByName() done")
 
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, err
@@ -666,6 +681,10 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
 func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
 	logrus.Debug("ebrc.Client.ListNetworks() called")
 	defer logrus.Debug("ebrc.Client.ListNetworks() done")
+
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
@@ -698,6 +717,10 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 	logrus.Debug("ebrc.Client.DeleteNetwork() called")
 	defer logrus.Debug("ebrc.Client.DeleteNetwork() done")
 
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network"))
@@ -725,8 +748,12 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources
 	logrus.Debug("ebrc.Client.CreateGateway() called")
 	defer logrus.Debug("ebrc.Client.CreateGateway() done")
 
+	if s == nil {
+		return nil, nil, scerr.InvalidInstanceError()
+	}
+
 	if req.Network == nil {
-		panic("req.Network is nil!")
+		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
 	gwname := req.Name
 	if gwname == "" {
@@ -766,5 +793,9 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (s *StackEbrc) DeleteGateway(ref string) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
+
 	return s.DeleteHost(ref)
 }

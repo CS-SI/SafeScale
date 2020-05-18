@@ -42,6 +42,10 @@ import (
 )
 
 func normalizeImageName(name string) string {
+	if len(name) == 0 {
+		return name
+	}
+
 	n := strings.Replace(name, "-", " ", 1)
 	n = strings.Replace(n, "-", " (", 1)
 	n = strings.Replace(n, ".", ",", 1)
@@ -49,6 +53,10 @@ func normalizeImageName(name string) string {
 	n = strings.Replace(n, ",", ".", 1)
 	n = strings.ReplaceAll(n, "-0", ")")
 	tok := strings.Split(n, " (")
+
+	if len(tok) == 0 {
+		return name
+	}
 
 	return tok[0]
 }
@@ -104,6 +112,11 @@ func parseSizing(s string) (cpus, ram, perf int, err error) {
 	tokens := strings.FieldsFunc(s, func(r rune) bool {
 		return r == 'c' || r == 'r' || r == 'p' || r == 'g'
 	})
+
+	if len(tokens) < 2 {
+		return 0, 0, 0, scerr.InconsistentError("error parsing sizing string")
+	}
+
 	cpus, err = strconv.Atoi(tokens[0])
 	if err != nil {
 		return
@@ -293,6 +306,9 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (*resources.Image, error) {
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
 		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
 			DryRun: false,
@@ -477,13 +493,16 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 
 // WaitForHostState wait for host to be in the specifed state
 func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		hostState, err := s.hostState(hostID)
 		if err != nil {
 			return scerr.AbortedError("", err)
 		}
 		if state != hostState {
-			return fmt.Errorf("wrong state")
+			return scerr.Errorf("wrong state", nil)
 		}
 		if state == hoststate.ERROR {
 			return scerr.AbortedError("host in error state", err)
@@ -581,7 +600,7 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 	return createErr
 }
 
-func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
+func (s *Stack) addVolume(request *resources.HostRequest, vmID string) (err error) {
 	if request.DiskSize == 0 {
 		return nil
 	}
@@ -593,32 +612,30 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) error {
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			if !scerr.ImplementsCauser(err) {
+				err = scerr.Wrap(err, "")
+			}
+			derr := s.DeleteVolume(v.ID)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	err = s.setResourceTags(v.ID, map[string]string{
 		"DeleteWithVM": "true",
 	})
 	if err != nil {
-		err2 := s.DeleteVolume(v.ID)
-		msg := func() string {
-			if err2 == nil {
-				return ""
-			}
-			return err2.Error()
-		}
-		return scerr.Wrap(err, msg())
+		return err
 	}
 	_, err = s.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
 		HostID:   vmID,
 		VolumeID: v.ID,
 	})
 	if err != nil {
-		err2 := s.DeleteVolume(v.ID)
-		msg := func() string {
-			if err2 == nil {
-				return ""
-			}
-			return err2.Error()
-		}
-		return scerr.Wrap(err, msg())
+		return err
 	}
 	return nil
 }
@@ -793,14 +810,6 @@ func (s *Stack) initHostProperties(request *resources.HostRequest, host *resourc
 	})
 }
 
-func (s *Stack) deleteHostOnError(err error, vm *osc.Vm) error {
-	err2 := s.DeleteHost(vm.VmId)
-	if err2 != nil {
-		return scerr.Wrap(err, err2.Error())
-	}
-	return err
-}
-
 func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, error) {
 	ip, err := s.addPublicIP(primaryNIC)
 	if err != nil {
@@ -817,7 +826,7 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 }
 
 // CreateHost creates an host that fulfils the request
-func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -887,24 +896,40 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 		return nil, userData, err
 	}
 
+	if len(resVM.Vms) == 0 {
+		return nil, userData, scerr.InconsistentError("virtual machine list empty")
+	}
+
 	vm := resVM.Vms[0]
+	defer func() {
+		if err != nil {
+			if !scerr.ImplementsCauser(err) {
+				err = scerr.Wrap(err, "")
+			}
+			derr := s.DeleteHost(vm.VmId)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	err = s.WaitForHostState(vm.VmId, hoststate.STARTED)
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 	// Retrieve default Nic use to create public ip
 	nics, err := s.getNICS(vm.VmId)
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 	if len(nics) == 0 {
-		return nil, userData, s.deleteHostOnError(scerr.InconsistentError("No network interface associated to vm"), &vm)
+		return nil, userData, scerr.InconsistentError("No network interface associated to vm")
 	}
 	defaultNic := nics[0]
 
 	nics, err = s.addNICS(&request, vm.VmId)
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 	if request.PublicIP {
 		ip, err := s.addPublicIPs(&defaultNic, nics)
@@ -913,29 +938,29 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 			vm.PublicIp = userData.PublicIP
 		}
 		if err != nil {
-			return nil, userData, s.deleteHostOnError(err, &vm)
+			return nil, userData, err
 		}
 	}
 
 	err = s.addVolume(&request, vm.VmId)
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 
 	err = s.addGPUs(&request, vm.VmId)
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 	err = s.setResourceTags(vm.VmId, map[string]string{
 		"name": request.ResourceName,
 	})
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 
 	err = s.WaitForHostState(vm.VmId, hoststate.STARTED)
 	if err != nil {
-		return nil, userData, s.deleteHostOnError(err, &vm)
+		return nil, userData, err
 	}
 
 	host.ID = vm.VmId
@@ -949,6 +974,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (*resources.Host, *use
 }
 
 func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
+	if s == nil {
+		return "", scerr.InvalidInstanceError()
+	}
 	if len(request.Networks) == 0 {
 		return "", nil
 	}
@@ -964,6 +992,9 @@ func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
 }
 
 func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 	readVmsRequest := osc.ReadVmsRequest{
 		Filters: osc.FiltersVm{
 			VmIds: []string{vmID},
@@ -982,6 +1013,9 @@ func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
 }
 
 func (s *Stack) deleteHost(id string) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 	request := osc.DeleteVmsRequest{
 		VmIds: []string{id},
 	}
