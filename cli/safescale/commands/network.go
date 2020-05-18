@@ -274,7 +274,7 @@ var networkVIPCreateCommand = &cli.Command{
 		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Report()))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of network VIP not yet implemented"))
@@ -297,7 +297,7 @@ var networkVIPInspectCommand = &cli.Command{
 		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network VIP", false).Report()))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of network VIP not yet implemented"))
@@ -320,7 +320,7 @@ var networkVIPDeleteCommand = &cli.Command{
 		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network VIP", false).Report()))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of network VIP not yet implemented"))
@@ -342,7 +342,7 @@ var networkVIPBindCommand = &cli.Command{
 		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Report()))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to network VIP not yet implemented"))
@@ -364,7 +364,7 @@ var networkVIPUnbindCommand = &cli.Command{
 		// network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Report()))
+		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
 		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from network VIP not yet implemented"))

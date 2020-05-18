@@ -245,6 +245,14 @@ configure_dns() {
     fi
 }
 
+# adds entry in /etc/hosts corresponding to FQDN hostname with private IP
+update_fqdn() {
+    IF=${PR_IFs[0]}
+    [ -z ${IF} ] && return
+    IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+    ping -n -c1 -w5 {{ .HostName }} 2>/dev/null || echo "$IP {{ .HostName }}" >>/etc/hosts
+}
+
 configure_network() {
     case $LINUX_KIND in
         debian|ubuntu)
@@ -276,6 +284,8 @@ configure_network() {
     {{- if .IsGateway }}
     configure_as_gateway || fail 194
     {{- end }}
+
+    update_fqdn
 
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
@@ -396,20 +406,20 @@ EOF
     done
 
     if [ "{{.ProviderName}}" == "aws" ]; then
-      echo "It actually IS AWS"
-      AWS=1
+        echo "It actually IS AWS"
+        AWS=1
     else
-      echo "It is NOT AWS"
-      AWS=0
+        echo "It is NOT AWS"
+        AWS=0
     fi
 
     if [[ $AWS -eq 1 ]]; then
-      if [[ $ISGW -eq 0 ]]; then
-        rm -f /etc/netplan/*
-        # Recreate netplan configuration with last netplan version and more settings
-        for IF in $NICS; do
-            if [ "$IF" = "$PU_IF" ]; then
-                cat <<-EOF >/etc/netplan/10-$IF-public.yaml
+        if [[ $ISGW -eq 0 ]]; then
+            rm -f /etc/netplan/*
+            # Recreate netplan configuration with last netplan version and more settings
+            for IF in $NICS; do
+                if [ "$IF" = "$PU_IF" ]; then
+                    cat <<-EOF >/etc/netplan/10-$IF-public.yaml
 network:
   version: 2
   renderer: networkd
@@ -423,8 +433,8 @@ network:
           use-dns: true
           use-routes: true
 EOF
-            else
-                cat <<-EOF >/etc/netplan/11-$IF-private.yaml
+                else
+                    cat <<-EOF >/etc/netplan/11-$IF-private.yaml
 network:
   version: 2
   renderer: networkd
@@ -447,9 +457,9 @@ network:
         use-routes: true
 {{- end}}
 EOF
-            fi
-        done
-      fi
+                fi
+            done
+        fi
     fi
 
     if [[ $AWS -eq 1 ]]; then
@@ -534,8 +544,8 @@ configure_network_redhat() {
 
     # Configure all network interfaces in dhcp
     for IF in $NICS; do
-        if [ $IF != "lo" ]; then
-            cat >/etc/sysconfig/network-scripts/ifcfg-$IF <<-EOF
+        if [[ ${IF} != "lo" ]]; then
+            cat >/etc/sysconfig/network-scripts/ifcfg-${IF} <<-EOF
 DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
@@ -544,15 +554,15 @@ EOF
             {{- if .DNSServers }}
             i=1
             {{- range .DNSServers }}
-            echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
             i=$((i+1))
             {{- end }}
             {{- else }}
             EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
-            if [ -z $EXISTING_DNS ]; then
-                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            if [[ -z ${EXISTING_DNS} ]]; then
+                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
             else
-                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
             fi
             {{- end }}
         fi
@@ -610,10 +620,10 @@ check_for_network() {
 configure_as_gateway() {
     echo "Configuring host as gateway..."
 
-    if [ ! -z $PR_IFs ]; then
+    if [[ ! -z ${PR_IFs} ]]; then
         # Enable forwarding
         for i in /etc/sysctl.d/* /etc/sysctl.conf; do
-            grep -v "net.ipv4.ip_forward=" $i >${i}.new
+            grep -v "net.ipv4.ip_forward=" ${i} >${i}.new
             mv -f ${i}.new ${i}
         done
         cat >/etc/sysctl.d/21-gateway.conf <<-EOF
@@ -626,7 +636,7 @@ EOF
         esac
     fi
 
-    if [ ! -z $PU_IF ]; then
+    if [[ ! -z ${PU_IF} ]]; then
         # Dedicated public interface available...
 
         # Allows ping
@@ -656,9 +666,9 @@ configure_dns_legacy() {
     if [[ -e /etc/dhcp/dhclient.conf ]]; then
         dnsservers=
         for i in {{range .DNSServers}} {{end}}; do
-            [ ! -z $dnsservers ] && dnsservers="$dnsservers, "
+            [[ ! -z ${dnsservers} ]] && dnsservers="$dnsservers, "
         done
-        [ ! -z $dnsservers ] && echo "prepend domain-name-servers $dnsservers;" >>/etc/dhcp/dhclient.conf
+        [[ ! -z ${dnsservers} ]] && echo "prepend domain-name-servers $dnsservers;" >>/etc/dhcp/dhclient.conf
     else
         echo "dhclient.conf not modified";
     fi
@@ -681,7 +691,7 @@ EOF
 
     op=-1
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-    [ $op -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
+    [ ${op} -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
 
     echo done
 }

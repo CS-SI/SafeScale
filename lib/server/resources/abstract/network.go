@@ -59,43 +59,45 @@ type NetworkRequest struct {
 	KeepOnFailure bool
 }
 
-// Network represents a virtual network
-type Network struct {
-	ID                 string         `json:"id,omitempty"`                   // ID for the network (from provider)
-	Name               string         `json:"name,omitempty"`                 // Name of the network
-	CIDR               string         `json:"mask,omitempty"`                 // network in CIDR notation
-	GatewayID          string         `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
-	SecondaryGatewayID string         `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
-	VIP                *VirtualIP     `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
-	IPVersion          ipversion.Enum `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
-	// properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
-	NetworkState networkstate.Enum `json:"status,omitempty"`
+// FIXME: comment!
+type SubNetwork struct {
+	CIDR string `json:"subnetmask,omitempty"` // FIXME: comment!
+	ID   string `json:"subnetid,omitempty"`   // FIXME: comment!
 }
 
-// NewNetwork ...
-func NewNetwork() *Network {
-	// //FIXME: remove props from abstract
-	// props, err := serialize.NewJSONProperties("resources.network")
-	// if err != nil {
-	// 	panic(err)
-	// }
+// Network represents a virtual network
+type Network struct {
+	ID                 string            `json:"id,omitempty"`                   // ID for the network (from provider)
+	Name               string            `json:"name,omitempty"`                 // Name of the network
+	CIDR               string            `json:"mask,omitempty"`                 // network in CIDR notation
+	Domain             string            `json:"domain,omitempty"`               // contains the domain used to define host FQDN
+	GatewayID          string            `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
+	SecondaryGatewayID string            `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
+	VIP                *VirtualIP        `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
+	IPVersion          ipversion.Enum    `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
+	NetworkState       networkstate.Enum `json:"status,omitempty"`
 
+	Subnetworks []SubNetwork `json:"subnetworks,omitempty"` // FIXME: comment!
+
+	Subnet bool   // FIXME: comment!
+	Parent string // FIXME: comment!
+}
+
+// NewNetwork initializes a new instance of Network
+func NewNetwork() *Network {
 	return &Network{
-		// properties:   props,
 		NetworkState: networkstate.UNKNOWNSTATE,
 	}
 }
 
 // Clone ...
-//
 // satisfies interface data.Clonable
 func (n *Network) Clone() data.Clonable {
 	return NewNetwork().Replace(n)
 }
 
 // Replace ...
-//
-// satisfies interface data.Clonable interface
+// satisfies interface data.Clonable
 func (n *Network) Replace(p data.Clonable) data.Clonable {
 	*n = *p.(*Network)
 	return n

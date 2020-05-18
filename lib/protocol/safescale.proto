@@ -118,6 +118,7 @@ message NetworkDefinition{
     GatewayDefinition gateway = 4;
     bool fail_over = 5;
     bool keep_on_failure = 6;
+    string domain = 7;
 }
 
 message GatewayDefinition{
@@ -542,6 +543,7 @@ message ClusterCreateRequest {
     string gateway_sizing = 9;
     string master_sizing = 10;
     string node_sizing = 11;
+    string domain = 12;
 }
 
 message ClusterResizeRequest {
