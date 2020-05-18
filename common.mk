@@ -1,4 +1,4 @@
-VERSION=20.04.0-alpha
+VERSION=20.05.0-alpha
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -53,7 +53,7 @@ GOFMT?=gofmt
 CP?=cp
 RM?=rm
 BROWSER?=firefox
-
+BUILDTOOL?=mod
 
 ifeq ($(OS),Windows_NT)
 HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
@@ -103,7 +103,6 @@ else
 GOMODPATH?=$(GOPATH)
 endif
 endif
-
 
 ifeq ($(strip $(GOPATH)),)
 GOMODPATH?=$(HOME)/go
