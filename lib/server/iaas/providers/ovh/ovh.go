@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -84,12 +83,12 @@ type provider struct {
 }
 
 // New creates a new instance of ovh provider
-func New() providerapi.Provider {
+func New() providers.Provider {
 	return &provider{}
 }
 
 // Build build a new instance of Ovh using configuration parameters
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})

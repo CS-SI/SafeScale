@@ -20,7 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -36,12 +35,12 @@ type provider struct {
 }
 
 // New creates a new instance of gcp provider
-func New() apiprovider.Provider {
+func New() providers.Provider {
 	return &provider{}
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
@@ -146,8 +145,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, f
 	}
 
 	// evalid := apiprovider.NewValidatedProvider(p, providerName)
-	etrace := apiprovider.NewErrorTraceProvider(newP, providerName)
-	prov := apiprovider.NewLoggedProvider(etrace, providerName)
+	etrace := providers.NewErrorTraceProvider(newP, providerName)
+	prov := providers.NewLoggedProvider(etrace, providerName)
 	return prov, nil
 }
 

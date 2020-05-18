@@ -32,7 +32,7 @@ import (
 	"github.com/xrash/smetrics"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	providers "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	providers2 "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
@@ -64,7 +64,7 @@ type Service interface {
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
 	// --- from interface iaas.Providers ---
-	providers.Provider
+	providers2.Provider
 
 	// --- from interface ObjectStorage ---
 	objectstorage.Location
@@ -77,7 +77,7 @@ type Service interface {
 
 // Service ...
 type service struct {
-	providers.Provider
+	providers2.Provider
 	objectstorage.Location
 	metadataBucket objectstorage.Bucket
 	metadataKey    *crypt.Key
@@ -170,7 +170,7 @@ func (svc *service) GetMetadataKey() (*crypt.Key, fail.Error) {
 }
 
 // ChangeProvider allows to change provider interface of service object (mainly for test purposes)
-func (svc *service) ChangeProvider(provider providers.Provider) fail.Error {
+func (svc *service) ChangeProvider(provider providers2.Provider) fail.Error {
 	if svc.IsNull() {
 		return fail.InvalidInstanceError()
 	}

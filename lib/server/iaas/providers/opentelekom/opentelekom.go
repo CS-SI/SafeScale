@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -46,12 +45,12 @@ type provider struct {
 }
 
 // New creates a new instance of opentelekom provider
-func New() providerapi.Provider {
+func New() providers.Provider {
 	return &provider{}
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
