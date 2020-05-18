@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package api
+package providers
 
 import (
 	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -59,13 +58,13 @@ func (w LoggedProvider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.E
 }
 
 // GetAuthenticationOptions ...
-func (w LoggedProvider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (w LoggedProvider) GetAuthenticationOptions() (Config, fail.Error) {
 	defer w.prepare(w.trace("GetAuthenticationOptions"))
 	return w.InnerProvider.GetAuthenticationOptions()
 }
 
 // GetConfigurationOptions ...
-func (w LoggedProvider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (w LoggedProvider) GetConfigurationOptions() (Config, fail.Error) {
 	defer w.prepare(w.trace("GetConfigurationOptions"))
 	return w.InnerProvider.GetConfigurationOptions()
 }
@@ -329,7 +328,7 @@ func (w LoggedProvider) DeleteVolumeAttachment(serverID, id string) fail.Error {
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (w LoggedProvider) GetCapabilities() providers.Capabilities {
+func (w LoggedProvider) GetCapabilities() Capabilities {
 	defer w.prepare(w.trace("GetCapabilities"))
 	return w.InnerProvider.GetCapabilities()
 }

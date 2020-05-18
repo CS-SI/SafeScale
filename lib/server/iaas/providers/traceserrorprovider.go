@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package api
+package providers
 
 import (
 	"fmt"
@@ -22,7 +22,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -75,7 +74,7 @@ func (w ErrorTraceProvider) ListTemplates(all bool) (templates []abstract.HostTe
 }
 
 // GetAuthenticationOptions ...
-func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, err fail.Error) {
+func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg Config, err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -86,7 +85,7 @@ func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, er
 }
 
 // GetConfigurationOptions ...
-func (w ErrorTraceProvider) GetConfigurationOptions() (cfg providers.Config, err fail.Error) {
+func (w ErrorTraceProvider) GetConfigurationOptions() (cfg Config, err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -493,6 +492,6 @@ func (w ErrorTraceProvider) DeleteVolumeAttachment(serverID, id string) (err fai
 }
 
 // GetCapabilities ...
-func (w ErrorTraceProvider) GetCapabilities() providers.Capabilities {
+func (w ErrorTraceProvider) GetCapabilities() Capabilities {
 	return w.InnerProvider.GetCapabilities()
 }

@@ -28,7 +28,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -41,7 +40,7 @@ var (
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
 // This function shoud be called by the init function of each provider to be registered in SafeScale
-func Register(name string, provider api.Provider) {
+func Register(name string, provider providers.Provider) {
 	// if already registered, leave
 	if _, ok := allProviders[name]; ok {
 		return

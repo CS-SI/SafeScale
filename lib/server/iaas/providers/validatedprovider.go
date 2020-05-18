@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package api
+package providers
 
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 // ValidatedProvider ...
@@ -55,7 +55,7 @@ func (w ValidatedProvider) DeleteVIP(vip *abstract.VirtualIP) error {
 	return w.InnerProvider.DeleteVIP(vip)
 }
 
-func (w ValidatedProvider) GetCapabilities() providers.Capabilities {
+func (w ValidatedProvider) GetCapabilities() Capabilities {
 	return w.InnerProvider.GetCapabilities()
 }
 
@@ -93,11 +93,11 @@ func (w ValidatedProvider) ListTemplates(all bool) (res []abstract.HostTemplate,
 	return res, err
 }
 
-func (w ValidatedProvider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (w ValidatedProvider) GetAuthenticationOptions() (Config, fail.Error) {
 	return w.InnerProvider.GetAuthenticationOptions()
 }
 
-func (w ValidatedProvider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (w ValidatedProvider) GetConfigurationOptions() (Config, fail.Error) {
 	return w.InnerProvider.GetConfigurationOptions()
 }
 

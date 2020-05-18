@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -49,7 +48,7 @@ func (provider *provider) WaitHostReady(hostParam interface{}, timeout time.Dura
 	return gReport
 }
 
-func (provider *provider) Build(params map[string]interface{}) (providerapi.Provider, fail.Error) {
+func (provider *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	provider.tenantParameters = map[string]interface{}{}
 	return nil, gReport
 }

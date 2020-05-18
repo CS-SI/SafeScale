@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package api
+package providers
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -40,16 +39,16 @@ type Provider interface {
 	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
-	GetAuthenticationOptions() (providers.Config, fail.Error)
+	GetAuthenticationOptions() (Config, fail.Error)
 
 	// GetConfigurationfgOpts returns configuration options as a Config
-	GetConfigurationOptions() (providers.Config, fail.Error)
+	GetConfigurationOptions() (Config, fail.Error)
 
 	// GetName returns the provider name
 	GetName() string
 
 	// GetCapabilities returns the capabilities of the provider
-	GetCapabilities() providers.Capabilities
+	GetCapabilities() Capabilities
 
 	// GetTenantParameters returns the tenant parameters as read
 	GetTenantParameters() map[string]interface{}
