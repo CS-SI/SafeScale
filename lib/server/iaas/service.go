@@ -213,7 +213,6 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 			time.Sleep(1 * time.Second)
 		}
 	}
-	return nil
 }
 
 // WaitVolumeState waits an host achieve state

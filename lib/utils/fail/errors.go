@@ -301,6 +301,11 @@ func TimeoutError(cause error, dur time.Duration, msg ...interface{}) Error {
 	}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplTimeout) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplTimeout) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -332,6 +337,11 @@ func NotFoundError(msg ...interface{}) Error {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.NotFound
 	return &ImplNotFound{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplNotFound) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -367,6 +377,11 @@ func NotAvailableError(msg ...interface{}) Error {
 	return &ImplNotAvailable{r}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplNotAvailable) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplNotAvailable) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -398,6 +413,11 @@ func DuplicateError(msg ...interface{}) Error {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.AlreadyExists
 	return &ImplDuplicate{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplDuplicate) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -434,6 +454,11 @@ func InvalidRequestError(msg ...interface{}) Error {
 	return &ImplInvalidRequest{r}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplInvalidRequest) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplInvalidRequest) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -466,6 +491,11 @@ func SyntaxError(msg ...interface{}) Error {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Internal
 	return &ImplSyntax{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplSyntax) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -501,6 +531,11 @@ func NotAuthenticatedError(msg ...interface{}) Error {
 	return &ImplNotAuthenticated{r}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplNotAuthenticated) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplNotAuthenticated) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -532,6 +567,11 @@ func ForbiddenError(msg ...interface{}) Error {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.PermissionDenied
 	return &ImplForbidden{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplForbidden) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -571,6 +611,11 @@ func AbortedError(err error, msg ...interface{}) Error {
 	r := newError(err, nil, message)
 	r.grpcCode = codes.Aborted
 	return &ImplAborted{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplAborted) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -618,6 +663,11 @@ func OverflowError(err error, limit uint, msg ...interface{}) Error {
 	}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplOverflow) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplOverflow) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -651,6 +701,11 @@ func OverloadError(msg ...interface{}) Error {
 	return &ImplOverload{r}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplOverload) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplOverload) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -682,6 +737,11 @@ func NotImplementedError(msg ...interface{}) Error {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("not implemented yet:", strprocess.FormatStrings(msg...), ""))
 	r.grpcCode = codes.Unimplemented
 	return &ImplNotImplemented{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplNotImplemented) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // NotImplementedErrorWithReason creates a ErrNotImplemented report
@@ -724,6 +784,11 @@ func RuntimePanicError(msg ...interface{}) Error {
 	return &ImplRuntimePanic{r}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplRuntimePanic) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplRuntimePanic) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -745,8 +810,8 @@ func (e *ImplRuntimePanic) Annotate(key string, value data.Annotation) data.Anno
 }
 
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
-type ErrInvalidInstance = *errInvalidInstance
-type errInvalidInstance struct {
+type ErrInvalidInstance = *ImplInvalidInstance
+type ImplInvalidInstance struct {
 	*errorCore
 }
 
@@ -754,11 +819,16 @@ type errInvalidInstance struct {
 func InvalidInstanceError() Error {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("invalid instance:", "", "calling method from a nil pointer"))
 	r.grpcCode = codes.FailedPrecondition
-	return &errInvalidInstance{r}
+	return &ImplInvalidInstance{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplInvalidInstance) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *errInvalidInstance) AddConsequence(err error) Error {
+func (e *ImplInvalidInstance) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidInstance.AddConsequence() from null instance")
 		return e
@@ -768,7 +838,7 @@ func (e *errInvalidInstance) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *errInvalidInstance) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ImplInvalidInstance) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidInstance.Annotate() from null instance")
 		return e
@@ -788,6 +858,11 @@ func InvalidParameterError(what, why string) Error {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("invalid parameter:", what, why))
 	r.grpcCode = codes.FailedPrecondition
 	return &ImplInvalidParameter{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplInvalidParameter) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -823,6 +898,11 @@ func InvalidInstanceContentError(what, why string) Error {
 	return &ImplInvalidInstanceContent{r}
 }
 
+// IsNull tells if the instance is null
+func (e *ImplInvalidInstanceContent) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
 // AddConsequence ...
 func (e *ImplInvalidInstanceContent) AddConsequence(err error) Error {
 	if e.IsNull() {
@@ -854,6 +934,11 @@ func InconsistentError(msg ...interface{}) Error {
 	r := newError(nil, nil, debug.DecorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""))
 	r.grpcCode = codes.DataLoss
 	return &ImplInconsistent{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplInconsistent) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
@@ -897,6 +982,11 @@ func ExecutionError(exitError error, msg ...interface{}) Error {
 	}
 	_ = r.Annotate("retcode", retcode).Annotate("stderr", stderr)
 	return &ImplExecution{errorCore: r}
+}
+
+// IsNull tells if the instance is null
+func (e *ImplExecution) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
