@@ -27,23 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Stack) deleteSubnetOnError(err error, subnet *osc.Subnet) error {
-	if err == nil {
-		return nil
-	}
-	deleteSubnetRequest := osc.DeleteSubnetRequest{
-		SubnetId: subnet.SubnetId,
-	}
-	_, _, err2 := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-		CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
-	})
-	if err2 != nil {
-		return scerr.Wrap(err, err2.Error())
-	}
-	return err
-}
-
-func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*osc.Subnet, error) {
+func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
 	// Create a subnet with the same CIDR than the network
 	createSubnetRequest := osc.CreateSubnetRequest{
 		IpRange:       req.CIDR,
@@ -57,12 +41,30 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*osc.S
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil {
+			if !scerr.ImplementsCauser(err) {
+				err = scerr.Wrap(err, "")
+			}
+
+			deleteSubnetRequest := osc.DeleteSubnetRequest{
+				SubnetId: resSubnet.Subnet.SubnetId,
+			}
+			_, _, derr := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
+				CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
+			})
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
+
 	err = s.setResourceTags(resSubnet.Subnet.SubnetId, map[string]string{
 		"name": req.Name,
 	})
 
 	if err != nil {
-		return nil, s.deleteSubnetOnError(err, &resSubnet.Subnet)
+		return nil, err
 	}
 	// Prevent automatic assignment of public ip to VM created in the subnet
 	updateSubnetRequest := osc.UpdateSubnetRequest{
@@ -73,7 +75,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (*osc.S
 		UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
 	})
 	if err != nil {
-		return nil, s.deleteSubnetOnError(err, &resSubnet.Subnet)
+		return nil, err
 	}
 	return &resSubnet.Subnet, nil
 }

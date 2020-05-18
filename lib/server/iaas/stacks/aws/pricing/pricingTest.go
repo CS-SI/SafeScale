@@ -19,6 +19,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/aws/aws-sdk-go/aws"
@@ -31,7 +32,7 @@ import (
 	ouraws "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 )
 
-func TryConnection(bucketName, key string) {
+func TryConnection(bucketName, key string) error {
 	s := session.Must(session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials("", "", ""),
 		S3ForcePathStyle: aws.Bool(true),
@@ -40,7 +41,7 @@ func TryConnection(bucketName, key string) {
 
 	c := pricing.New(s, &aws.Config{})
 	if c == nil {
-		panic("Failure")
+		return scerr.Errorf("Failure creating pricing session", nil)
 	}
 	prods, err := c.GetProducts(&pricing.GetProductsInput{
 		Filters: []*pricing.Filter{
@@ -59,7 +60,7 @@ func TryConnection(bucketName, key string) {
 		ServiceCode: aws.String("AmazonEC2"),
 	})
 	if err != nil {
-		panic(err)
+		return scerr.Wrap(err, "unable to fetch products list")
 	}
 
 	hostTemplates := make(map[string]resources.HostTemplate)
@@ -89,8 +90,12 @@ func TryConnection(bucketName, key string) {
 
 	fmt.Print(spew.Sdump(hostTemplates))
 	fmt.Print(len(hostTemplates))
+	return nil
 }
 
 func main() {
-	TryConnection("", "")
+	err := TryConnection("", "")
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
 }

@@ -27,9 +27,11 @@ import (
 	"strings"
 )
 
-// provider is the providerementation of the Ebrc provider
+// provider is the provider implementation of the Ebrc provider
 type provider struct {
 	*ebrc.StackEbrc
+
+	tenantParameters map[string]interface{}
 }
 
 // Build build a new Client from configuration parameter
@@ -84,7 +86,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	return &provider{StackEbrc: stack}, nil
+	return &provider{
+		StackEbrc:        stack,
+		tenantParameters: params,
+	}, nil
 }
 
 // GetAuthOpts returns the auth options
@@ -121,6 +126,16 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "ebrc"
+}
+
+// GetTenantParameters returns the tenant parameters as-is
+func (p *provider) GetTenantParameters() map[string]interface{} {
+	return p.tenantParameters
+}
+
+// GetCapabilities returns the capabilities of the provider
+func (p *provider) GetCapabilities() providers.Capabilities {
+	return providers.Capabilities{}
 }
 
 func init() {
