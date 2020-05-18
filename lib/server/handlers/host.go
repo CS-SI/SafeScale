@@ -337,22 +337,14 @@ func (handler *HostHandler) Create(
 			return nil, err
 		}
 	} else {
-		hostThere, err := handler.service.GetHostState(name)
-		if err == nil {
+		hostThere, hsErr := handler.service.GetHostState(name)
+		if hsErr == nil {
 			logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
 			if hostThere != hoststate.TERMINATED {
 				return nil, resources.ResourceDuplicateError("host", name)
 			}
-		} else {
-			switch err.(type) {
-			case scerr.ErrNotFound:
-			case scerr.ErrTimeout:
-				logrus.Warnf("timeout problem retrieving status of host %s: %v", name, err)
-				return nil, resources.ResourceDuplicateError("host", name)
-			default:
-				return nil, resources.ResourceDuplicateError("host", name)
-			}
 		}
+		return nil, resources.ResourceDuplicateError("host", name)
 	}
 
 	var (

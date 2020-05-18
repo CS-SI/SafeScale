@@ -124,7 +124,7 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
 		vol, err := s.GetVolume(volumeID)
 		if err != nil {
-			return scerr.AbortedError("", err)
+			return scerr.Errorf("", err)
 		}
 		if vol.State != state {
 			return scerr.Errorf("wrong state", nil)

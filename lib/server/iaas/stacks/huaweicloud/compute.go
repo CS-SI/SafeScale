@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -518,7 +517,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		var fip *FloatingIP
 		fip, err = s.attachFloatingIP(host)
 		if err != nil {
-			spew.Dump(err) // FIXME Remove spew.Dump
 			return nil, userData, scerr.Errorf(fmt.Sprintf("error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err)), err)
 		}
 		if fip == nil {
@@ -576,13 +574,12 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 	e := s.Validate(req)
 	if e.HasErrors() {
 		errorList, _ := e.GetErrorsByKey("ResourceName")
-		var errs []string
+		var errs []error
 		for _, msg := range errorList {
-			errs = append(errs, msg.Error())
+			errs = append(errs, fmt.Errorf(msg.Error()))
 		}
 
-		// FIXME Not like this, is not an empty cause
-		return false, scerr.Errorf(fmt.Sprintf(strings.Join(errs, " + ")), nil)
+		return false, scerr.Errorf("failure validating host name", scerr.ErrListError(errs))
 	}
 	return true, nil
 }
@@ -609,33 +606,30 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
-	server, err := s.queryServer(host.ID)
+	serverState, err := s.GetHostState(host.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = s.complementHost(host, server); err != nil {
-		return nil, err
-	}
+	if serverState == hoststate.STARTED || serverState == hoststate.STOPPED {
+		server, err := s.waitHostState(host.ID, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay())
+		if err != nil {
+			return nil, err
+		}
 
-	if !host.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		err = s.complementHost(host, server)
+		if err != nil {
+			return nil, err
+		}
+
+		if !host.OK() {
+			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		}
+	} else {
+		host.LastState = serverState
 	}
 
 	return host, err
-}
-
-func (s *Stack) queryServer(id string) (server *servers.Server, err error) {
-	server, err = s.waitHostState(id, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay())
-	if err != nil {
-		return nil, err
-	}
-
-	if server == nil {
-		return nil, resources.ResourceNotFoundError("host", id)
-	}
-
-	return server, nil
 }
 
 // complementHost complements Host data with content of server parameter
