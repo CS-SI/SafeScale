@@ -57,7 +57,7 @@ func (iw *VMInfoWaiterStruct) Register(name string) chan VMInfo {
 	return channel
 }
 
-func (iw *VMInfoWaiterStruct) deregister(name string) error {
+func (iw *VMInfoWaiterStruct) deregister(name string) fail.Error {
 	iw.mutex.Lock()
 	channel, found := iw.chansByName[name]
 	if found {
@@ -67,14 +67,14 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Unlock()
 
 	if !found {
-		return fail.NotFoundReport("nothing registered with the name %s", name)
+		return fail.NotFoundError("nothing registered with the name %s", name)
 	}
 	logrus.Infof("Deregistered: %s", name)
 	return nil
 }
 
 // GetInfoWaiter get the global var vmInfoWaiter and setup the listner if it is not set
-func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
+func GetInfoWaiter() (*VMInfoWaiterStruct, fail.Error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
@@ -94,7 +94,7 @@ func infoHandler() {
 	for {
 		conn, err := (*vmInfoWaiter.listner).Accept()
 		if err != nil {
-			panic(fmt.Sprintf("Info handler, Report accepting: %s", err.Error()))
+			panic(fmt.Sprintf("Info handler, Error accepting: %s", err.Error()))
 		}
 
 		go func(net.Conn) {
@@ -108,7 +108,7 @@ func infoHandler() {
 
 			nbChars, err := conn.Read(buffer)
 			if err != nil {
-				panic(fmt.Sprintf("Info handler, Report reading: %s", err.Error()))
+				panic(fmt.Sprintf("Info handler, Error reading: %s", err.Error()))
 			}
 
 			message := string(buffer[0:nbChars])
@@ -129,7 +129,7 @@ func infoHandler() {
 			channel <- info
 			err = vmInfoWaiter.deregister(hostName)
 			if err != nil {
-				panic(fmt.Sprintf("Info handler, Report deregistering: %s", err.Error()))
+				panic(fmt.Sprintf("Info handler, Error deregistering: %s", err.Error()))
 			}
 		}(conn)
 	}

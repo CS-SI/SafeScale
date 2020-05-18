@@ -23,33 +23,32 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, error) {
+func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, fail.Error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if host == nil {
-		return nil, fail.InvalidParameterReport("host", "cannot be nil")
+		return nil, fail.InvalidParameterError("host", "cannot be nil")
 	}
 
-	network, err := host.GetDefaultNetwork(task)
-	if err != nil {
-		return nil, err
+	rn, xerr := host.GetDefaultNetwork(task)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	gw, err := network.GetGateway(task, true)
-	if err == nil {
-		_, err = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
+	gw, xerr := rn.GetGateway(task, true)
+	if xerr == nil {
+		_, xerr = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
 	}
 
-	if err != nil {
-		gw, err = network.GetGateway(task, false)
-		if err == nil {
-			_, err = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
+	if xerr != nil {
+		if gw, xerr = rn.GetGateway(task, false); xerr == nil {
+			_, xerr = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
 		}
 	}
 
-	if err != nil {
-		return nil, fail.NotAvailableReport("no gateway available")
+	if xerr != nil {
+		return nil, fail.NotAvailableError("no gateway available")
 	}
 	return gw, nil
 }

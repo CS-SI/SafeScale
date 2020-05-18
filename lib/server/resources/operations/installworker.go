@@ -117,7 +117,7 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum, a installaction.Enum, cb alterCommandCB) (*worker, error) {
+func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum, a installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
 		feature:   f.(*feature),
 		target:    t,
@@ -139,7 +139,7 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	if !f.SafeGetSpecs().IsSet(w.rootKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxReport(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
+		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
 	}
 
 	return &w, nil
@@ -151,14 +151,14 @@ func (w *worker) ConcernsCluster() bool {
 }
 
 // CanProceed tells if the combination Feature/Target can work
-func (w *worker) CanProceed(s resources.FeatureSettings) error {
+func (w *worker) CanProceed(s resources.FeatureSettings) fail.Error {
 	switch w.target.SafeGetTargetType() {
 	case featuretargettype.CLUSTER:
-		err := w.validateContextForCluster()
-		if err == nil && !s.SkipSizingRequirements {
-			err = w.validateClusterSizing()
+		xerr := w.validateContextForCluster()
+		if xerr == nil && !s.SkipSizingRequirements {
+			xerr = w.validateClusterSizing()
 		}
-		return err
+		return xerr
 	case featuretargettype.NODE:
 		return nil
 	case featuretargettype.HOST:
@@ -169,30 +169,30 @@ func (w *worker) CanProceed(s resources.FeatureSettings) error {
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster() (resources.Host, error) {
+func (w *worker) identifyAvailableMaster() (resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		var err error
-		w.availableMaster, err = w.cluster.FindAvailableMaster(w.feature.task)
-		if err != nil {
-			return nil, err
+		var xerr fail.Error
+		w.availableMaster, xerr = w.cluster.FindAvailableMaster(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 	}
 	return w.availableMaster, nil
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode() (resources.Host, error) {
+func (w *worker) identifyAvailableNode() (resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		var err error
-		w.availableNode, err = w.cluster.FindAvailableNode(w.feature.task)
-		if err != nil {
-			return nil, err
+		var xerr fail.Error
+		w.availableNode, xerr = w.cluster.FindAvailableNode(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 	}
 	return w.availableNode, nil
@@ -200,18 +200,18 @@ func (w *worker) identifyAvailableNode() (resources.Host, error) {
 
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyConcernedMasters() ([]resources.Host, error) {
+func (w *worker) identifyConcernedMasters() ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
 	if w.concernedMasters == nil {
-		hosts, err := w.identifyAllMasters()
-		if err != nil {
-			return nil, err
+		hosts, xerr := w.identifyAllMasters()
+		if xerr != nil {
+			return nil, xerr
 		}
-		concernedHosts, err := w.extractHostsFailingCheck(hosts)
-		if err != nil {
-			return nil, err
+		concernedHosts, xerr := w.extractHostsFailingCheck(hosts)
+		if xerr != nil {
+			return nil, xerr
 		}
 		w.concernedMasters = concernedHosts
 	}
@@ -221,28 +221,28 @@ func (w *worker) identifyConcernedMasters() ([]resources.Host, error) {
 // extractHostsFailingCheck identifies from the list passed as parameter which
 // hosts fail feature check.
 // The checks are done in parallel.
-func (w *worker) extractHostsFailingCheck(hosts []resources.Host) ([]resources.Host, error) {
+func (w *worker) extractHostsFailingCheck(hosts []resources.Host) ([]resources.Host, fail.Error) {
 	var concernedHosts []resources.Host
-	dones := map[resources.Host]chan error{}
-	results := map[resources.Host]chan resources.Results{}
+	dones := map[resources.Host]chan fail.Error{}
+	res := map[resources.Host]chan resources.Results{}
 	for _, h := range hosts {
-		d := make(chan error)
+		d := make(chan fail.Error)
 		r := make(chan resources.Results)
 		dones[h] = d
-		results[h] = r
-		go func(host resources.Host, res chan resources.Results, done chan error) {
-			results, err := w.feature.Check(host, w.variables, w.settings)
-			if err != nil {
+		res[h] = r
+		go func(host resources.Host, res chan resources.Results, done chan fail.Error) {
+			r2, innerXErr := w.feature.Check(host, w.variables, w.settings)
+			if innerXErr != nil {
 				res <- nil
-				done <- err
+				done <- innerXErr
 				return
 			}
-			res <- results
+			res <- r2
 			done <- nil
 		}(h, r, d)
 	}
 	for h := range dones {
-		r := <-results[h]
+		r := <-res[h]
 		d := <-dones[h]
 		if d != nil {
 			return nil, d
@@ -256,20 +256,20 @@ func (w *worker) extractHostsFailingCheck(hosts []resources.Host) ([]resources.H
 
 // identifyAllMasters returns a list of all the hosts acting as masters and keep this list
 // during all the install session
-func (w *worker) identifyAllMasters() ([]resources.Host, error) {
+func (w *worker) identifyAllMasters() ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
-		masters, err := w.cluster.ListMasterIDs(w.feature.task)
-		if err != nil {
-			return nil, err
+		masters, xerr := w.cluster.ListMasterIDs(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 		for _, i := range masters {
-			host, err := LoadHost(w.feature.task, w.cluster.SafeGetService(), i)
-			if err != nil {
-				return nil, err
+			host, xerr := LoadHost(w.feature.task, w.cluster.SafeGetService(), i)
+			if xerr != nil {
+				return nil, xerr
 			}
 			w.allMasters = append(w.allMasters, host)
 		}
@@ -279,19 +279,19 @@ func (w *worker) identifyAllMasters() ([]resources.Host, error) {
 
 // identifyConcernedNodes returns a list of all the hosts acting nodes and keep this list
 // during all the install session
-func (w *worker) identifyConcernedNodes() ([]resources.Host, error) {
+func (w *worker) identifyConcernedNodes() ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
 
 	if w.concernedNodes == nil {
-		hosts, err := w.identifyAllNodes()
-		if err != nil {
-			return nil, err
+		hosts, xerr := w.identifyAllNodes()
+		if xerr != nil {
+			return nil, xerr
 		}
-		concernedHosts, err := w.extractHostsFailingCheck(hosts)
-		if err != nil {
-			return nil, err
+		concernedHosts, xerr := w.extractHostsFailingCheck(hosts)
+		if xerr != nil {
+			return nil, xerr
 		}
 		w.concernedNodes = concernedHosts
 	}
@@ -300,21 +300,21 @@ func (w *worker) identifyConcernedNodes() ([]resources.Host, error) {
 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the install session
-func (w *worker) identifyAllNodes() ([]resources.Host, error) {
+func (w *worker) identifyAllNodes() ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
 
 	if w.allNodes == nil {
 		var allHosts []resources.Host
-		list, err := w.cluster.ListNodeIDs(w.feature.task)
-		if err != nil {
-			return nil, err
+		list, xerr := w.cluster.ListNodeIDs(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 		for _, i := range list {
-			host, err := LoadHost(w.feature.task, w.cluster.SafeGetService(), i)
-			if err != nil {
-				return nil, err
+			host, xerr := LoadHost(w.feature.task, w.cluster.SafeGetService(), i)
+			if xerr != nil {
+				return nil, xerr
 			}
 			allHosts = append(allHosts, host)
 		}
@@ -326,44 +326,43 @@ func (w *worker) identifyAllNodes() ([]resources.Host, error) {
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
 // For now, only one gateway is allowed, but in the future we may have 2 for High Availability
-func (w *worker) identifyAvailableGateway() (resources.Host, error) {
+func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 	if w.availableGateway != nil {
 		return w.availableGateway, nil
 	}
 
 	// Not in cluster context
 	if w.cluster == nil {
-		network, err := w.host.GetDefaultNetwork(w.feature.task)
-		if err != nil {
-			return nil, err
+		network, xerr := w.host.GetDefaultNetwork(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 
-		gw, err := network.GetGateway(w.feature.task, true)
-		if err == nil {
-			_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		gw, xerr := network.GetGateway(w.feature.task, true)
+		if xerr == nil {
+			_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
 		}
 
-		if err != nil {
-			gw, err = network.GetGateway(w.feature.task, false)
-			if err == nil {
-				_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		if xerr != nil {
+			if gw, xerr = network.GetGateway(w.feature.task, false); xerr == nil {
+				_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
 			}
 		}
 
-		if err != nil {
-			return nil, fail.NotAvailableReport("no gateway available")
+		if xerr != nil {
+			return nil, fail.NotAvailableError("no gateway available")
 		}
 
 		w.availableGateway = gw
 	} else {
 		// FIXME: secondary gateway not tried if the primary doesn't respond in time
 		// In cluster context
-		netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
-		if err == nil {
-			w.availableGateway, err = LoadHost(w.feature.task, w.cluster.SafeGetService(), netCfg.GatewayID)
+		netCfg, xerr := w.cluster.GetNetworkConfig(w.feature.task)
+		if xerr == nil {
+			w.availableGateway, xerr = LoadHost(w.feature.task, w.cluster.SafeGetService(), netCfg.GatewayID)
 		}
-		if err != nil {
-			return nil, err
+		if xerr != nil {
+			return nil, xerr
 		}
 	}
 	return w.availableGateway, nil
@@ -371,26 +370,25 @@ func (w *worker) identifyAvailableGateway() (resources.Host, error) {
 
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
 // and keep this list during all the install session
-func (w *worker) identifyConcernedGateways() ([]resources.Host, error) {
+func (w *worker) identifyConcernedGateways() (_ []resources.Host, xerr fail.Error) {
 	var hosts []resources.Host
 
 	if w.host != nil {
-		host, err := gatewayFromHost(w.feature.task, w.host)
-		if err != nil {
-			return nil, err
+		host, xerr := gatewayFromHost(w.feature.task, w.host)
+		if xerr != nil {
+			return nil, xerr
 		}
 		hosts = []resources.Host{host}
 	} else if w.cluster != nil {
-		var err error
-		hosts, err = w.identifyAllGateways()
-		if err != nil {
-			return nil, err
+		hosts, xerr = w.identifyAllGateways()
+		if xerr != nil {
+			return nil, xerr
 		}
 	}
 
-	concernedHosts, err := w.extractHostsFailingCheck(hosts)
-	if err != nil {
-		return nil, err
+	concernedHosts, xerr := w.extractHostsFailingCheck(hosts)
+	if xerr != nil {
+		return nil, xerr
 	}
 	w.concernedGateways = concernedHosts
 	return w.concernedGateways, nil
@@ -398,56 +396,52 @@ func (w *worker) identifyConcernedGateways() ([]resources.Host, error) {
 
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the install session
-func (w *worker) identifyAllGateways() ([]resources.Host, error) {
+func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 	if w.allGateways != nil {
 		return w.allGateways, nil
 	}
 
 	var (
-		list    []resources.Host
-		network resources.Network
-		err     error
+		list []resources.Host
+		rn   resources.Network
 	)
 
 	if w.cluster != nil {
-		netCfg, err := w.cluster.GetNetworkConfig(w.feature.task)
-		if err != nil {
-			return nil, err
+		netCfg, xerr := w.cluster.GetNetworkConfig(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
-		network, err = LoadNetwork(w.feature.task, w.cluster.SafeGetService(), netCfg.NetworkID)
-		if err != nil {
-			return nil, err
+		rn, xerr = LoadNetwork(w.feature.task, w.cluster.SafeGetService(), netCfg.NetworkID)
+		if xerr != nil {
+			return nil, xerr
 		}
 	} else {
-		network, err = w.host.GetDefaultNetwork(w.feature.task)
-		if err != nil {
-			return nil, err
+		rn, xerr = w.host.GetDefaultNetwork(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 	}
 
-	gw, err := network.GetGateway(w.feature.task, true)
-	if err == nil {
-		_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
-		if err == nil {
+	gw, xerr := rn.GetGateway(w.feature.task, true)
+	if xerr == nil {
+		if _, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
-	gw, err = network.GetGateway(w.feature.task, false)
-	if err == nil {
-		_, err = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
-		if err == nil {
+	if gw, xerr = rn.GetGateway(w.feature.task, false); xerr == nil {
+		if _, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
 	if len(list) == 0 {
-		return nil, fail.NotAvailableReport("no gateways currently available")
+		return nil, fail.NotAvailableError("no gateways currently available")
 	}
 	w.allGateways = list
 	return list, nil
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes resources.Results, err error) {
+func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	w.variables = v
 	w.settings = s
 
@@ -456,23 +450,22 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	// 'pace' tells the order of execution
 	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
 	if pace == "" {
-		return nil, fail.SyntaxReport("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
+		return nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
 	}
 
 	// 'steps' describes the steps of the action
 	stepsKey := w.rootKey + "." + yamlStepsKeyword
 	steps := w.feature.specs.GetStringMap(stepsKey)
 	if len(steps) == 0 {
-		return nil, fail.InvalidRequestReport("nothing to do")
+		return nil, fail.InvalidRequestError("nothing to do")
 	}
 	order := strings.Split(pace, ",")
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
 	if w.action == installaction.Add && !s.SkipProxy {
 		if w.cluster != nil {
-			err := w.setReverseProxy()
-			if err != nil {
-				return nil, err
+			if xerr := w.setReverseProxy(); xerr != nil {
+				return nil, xerr
 			}
 		}
 	}
@@ -483,7 +476,7 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, fail.SyntaxReport(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
+			return outcomes, fail.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
 		}
 		params := data.Map{
 			"stepName":  k,
@@ -492,33 +485,33 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 			"variables": v,
 		}
 
-		subtask, err := w.feature.task.StartInSubtask(w.taskLaunchStep, params)
-		if err != nil {
-			return outcomes, err
+		subtask, xerr := w.feature.task.StartInSubtask(w.taskLaunchStep, params)
+		if xerr != nil {
+			return outcomes, xerr
 		}
 
-		tr, err := subtask.Wait()
+		tr, xerr := subtask.Wait()
+		if xerr != nil {
+			return outcomes, xerr
+		}
 		if tr != nil {
 			outcome := tr.(resources.UnitResults)
 			_ = outcomes.Add(k, outcome)
-		}
-		if err != nil {
-			return outcomes, err
 		}
 	}
 	return outcomes, nil
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, err error) {
+func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if w == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if params == nil {
-		return nil, fail.InvalidParameterReport("params", "can't be nil")
+		return nil, fail.InvalidParameterError("params", "can't be nil")
 	}
 	if w.feature == nil {
-		return nil, fail.InvalidInstanceContentReport("w.feature", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("w.feature", "cannot be nil")
 	}
 
 	var (
@@ -531,40 +524,40 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	p := params.(data.Map)
 
 	if anon, ok = p["stepName"]; !ok {
-		return nil, fail.InvalidParameterReport("params[stepName]", "is missing")
+		return nil, fail.InvalidParameterError("params[stepName]", "is missing")
 	}
 	if stepName, ok = anon.(string); !ok {
-		return nil, fail.InvalidParameterReport("param[stepName]", "must be a string")
+		return nil, fail.InvalidParameterError("param[stepName]", "must be a string")
 	}
 	if stepName == "" {
-		return nil, fail.InvalidParameterReport("param[stepName]", "cannot be an empty string")
+		return nil, fail.InvalidParameterError("param[stepName]", "cannot be an empty string")
 	}
 	if anon, ok = p["stepKey"]; !ok {
-		return nil, fail.InvalidParameterReport("params[stepKey]", "is missing")
+		return nil, fail.InvalidParameterError("params[stepKey]", "is missing")
 	}
 	if stepKey, ok = anon.(string); !ok {
-		return nil, fail.InvalidParameterReport("param[stepKey]", "must be a string")
+		return nil, fail.InvalidParameterError("param[stepKey]", "must be a string")
 	}
 	if stepKey == "" {
-		return nil, fail.InvalidParameterReport("param[stepKey]", "cannot be an empty string")
+		return nil, fail.InvalidParameterError("param[stepKey]", "cannot be an empty string")
 	}
 	if anon, ok = p["stepMap"]; !ok {
-		return nil, fail.InvalidParameterReport("params[stepMap]", "is missing")
+		return nil, fail.InvalidParameterError("params[stepMap]", "is missing")
 	}
 	if stepMap, ok = anon.(map[string]interface{}); !ok {
-		return nil, fail.InvalidParameterReport("params[stepMap]", "must be a map[string]interface{}")
+		return nil, fail.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
 	}
 	if anon, ok = p["variables"]; !ok {
-		return nil, fail.InvalidParameterReport("params[variables]", "is missing")
+		return nil, fail.InvalidParameterError("params[variables]", "is missing")
 	}
 	if vars, ok = anon.(data.Map); !ok {
-		return nil, fail.InvalidParameterReport("params[variables]", "must be a data.Map")
+		return nil, fail.InvalidParameterError("params[variables]", "must be a data.Map")
 	}
 	if vars == nil {
-		return nil, fail.InvalidParameterReport("params[variables]", "cannot be nil")
+		return nil, fail.InvalidParameterError("params[variables]", "cannot be nil")
 	}
 
-	defer fail.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)
+	defer fail.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &xerr)
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
 		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
@@ -580,7 +573,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	// Determine list of hosts concerned by the step
 	var hostsList []resources.Host
 	if w.target.SafeGetTargetType() == featuretargettype.NODE {
-		hostsList, err = w.identifyHosts(map[string]string{"hosts": "1"})
+		hostsList, xerr = w.identifyHosts(map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = stepMap[yamlTargetsKeyword]
 		if ok {
@@ -598,13 +591,13 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fail.SyntaxReport(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, fail.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
 		}
 
-		hostsList, err = w.identifyHosts(stepT)
+		hostsList, xerr = w.identifyHosts(stepT)
 	}
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 	if len(hostsList) == 0 {
 		return nil, nil
@@ -629,7 +622,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fail.SyntaxReport(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
 	}
 
 	// If there is an options file (for now specific to DCOS), upload it to the remote host
@@ -644,9 +637,9 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			ok      bool
 			content interface{}
 		)
-		complexity, err := w.cluster.GetComplexity(w.feature.task)
-		if err != nil {
-			return nil, err
+		complexity, xerr := w.cluster.GetComplexity(w.feature.task)
+		if xerr != nil {
+			return nil, xerr
 		}
 		c := strings.ToLower(complexity.String())
 		for k, anon := range options {
@@ -685,14 +678,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, err := normalizeScript(data.Map{
+	templateCommand, xerr := normalizeScript(data.Map{
 		"reserved_Name":    w.feature.SafeGetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
 		"reserved_Step":    stepName,
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Checks if step can be performed in parallel on selected hosts
@@ -718,17 +711,17 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		YamlKey:            stepKey,
 		Serial:             serial,
 	}
-	r, err := stepInstance.Run(hostsList, vars, w.settings)
+	r, xerr := stepInstance.Run(hostsList, vars, w.settings)
 	// If an error occurred, don't do the remaining steps, fail immediately
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if !r.Successful() {
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
 			logrus.Warnf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted())
-			return &r, fail.NewReport(r.ErrorMessages())
+			return &r, fail.NewError(r.ErrorMessages())
 		}
 		// not successful but completed, if action is check means the feature is not install, it's an information not a failure
 		if strings.Contains(w.action.String(), "Check") {
@@ -736,7 +729,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 
 		// For any other situations, raise error and break
-		return &r, fail.NewReport(r.ErrorMessages())
+		return &r, fail.NewError(r.ErrorMessages())
 	}
 
 	return &r, nil
@@ -745,10 +738,10 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // validateContextForCluster checks if the flavor of the cluster is listed in feature specification
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
-func (w *worker) validateContextForCluster() error {
-	clusterFlavor, err := w.cluster.GetFlavor(w.feature.task)
-	if err != nil {
-		return err
+func (w *worker) validateContextForCluster() fail.Error {
+	clusterFlavor, xerr := w.cluster.GetFlavor(w.feature.task)
+	if xerr != nil {
+		return xerr
 	}
 
 	yamlKey := "feature.suitableFor.cluster"
@@ -756,18 +749,18 @@ func (w *worker) validateContextForCluster() error {
 		yamlFlavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range yamlFlavors {
 			k = strings.ToLower(k)
-			e, err := clusterflavor.Parse(k)
-			if (err == nil && clusterFlavor == e) || (err != nil && k == "all") {
+			e, xerr := clusterflavor.Parse(k)
+			if (xerr == nil && clusterFlavor == e) || (xerr != nil && k == "all") {
 				return nil
 			}
 		}
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.SafeGetName(), clusterFlavor.String())
-	return fail.NotAvailableReport(msg)
+	return fail.NotAvailableError(msg)
 }
 
 // validateContextForHost ...
-func (w *worker) validateContextForHost() error {
+func (w *worker) validateContextForHost() fail.Error {
 	if w.node {
 		return nil
 	}
@@ -782,13 +775,13 @@ func (w *worker) validateContextForHost() error {
 	}
 	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.SafeGetName())
 	// logrus.Println(msg)
-	return fail.NotAvailableReport(msg)
+	return fail.NotAvailableError(msg)
 }
 
-func (w *worker) validateClusterSizing() error {
-	clusterFlavor, err := w.cluster.GetFlavor(w.feature.task)
-	if err != nil {
-		return err
+func (w *worker) validateClusterSizing() (xerr fail.Error) {
+	clusterFlavor, xerr := w.cluster.GetFlavor(w.feature.task)
+	if xerr != nil {
+		return xerr
 	}
 	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(clusterFlavor.String())
 	if !w.feature.specs.IsSet(yamlKey) {
@@ -799,37 +792,37 @@ func (w *worker) validateClusterSizing() error {
 	if anon, ok := sizing["masters"]; ok {
 		request, ok := anon.(string)
 		if !ok {
-			return fail.SyntaxReport("invalid masters key")
+			return fail.SyntaxError("invalid masters key")
 		}
-		count, _, _, err := w.parseClusterSizingRequest(request)
-		if err != nil {
-			return err
+		count, _, _, xerr := w.parseClusterSizingRequest(request)
+		if xerr != nil {
+			return xerr
 		}
-		masters, err := w.cluster.ListMasterIDs(w.feature.task)
-		if err != nil {
-			return err
+		masters, xerr := w.cluster.ListMasterIDs(w.feature.task)
+		if xerr != nil {
+			return xerr
 		}
 		curMasters := len(masters)
 		if curMasters < count {
-			return fail.NotAvailableReport("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)
+			return fail.NotAvailableError("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)
 		}
 	}
 	if anon, ok := sizing["nodes"]; ok {
 		request, ok := anon.(string)
 		if !ok {
-			return fail.SyntaxReport("invalid nodes key")
+			return fail.SyntaxError("invalid nodes key")
 		}
-		count, _, _, err := w.parseClusterSizingRequest(request)
-		if err != nil {
-			return err
+		count, _, _, xerr := w.parseClusterSizingRequest(request)
+		if xerr != nil {
+			return xerr
 		}
-		list, err := w.cluster.ListNodeIDs(w.feature.task)
-		if err != nil {
-			return err
+		list, xerr := w.cluster.ListNodeIDs(w.feature.task)
+		if xerr != nil {
+			return xerr
 		}
 		curNodes := len(list)
 		if curNodes < count {
-			return fail.NotAvailableReport("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)
+			return fail.NotAvailableError("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)
 		}
 	}
 
@@ -837,45 +830,43 @@ func (w *worker) validateClusterSizing() error {
 }
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
-func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, error) {
-
-	return 0, 0, 0.0, fail.NotImplementedReport("parseClusterSizingRequest() not yet implemented")
+func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
+	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
-func (w *worker) setReverseProxy() (err error) {
+func (w *worker) setReverseProxy() (xerr fail.Error) {
 	rules, ok := w.feature.specs.Get("feature.proxy.rules").([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
 
 	if w.cluster == nil {
-		return fail.InvalidParameterReport("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
+		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
 	if w.feature.task == nil {
-		return fail.InvalidParameterReport("w.feature.task", "nil task in setReverseProxy, cannot be nil")
+		return fail.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
 	svc := w.cluster.SafeGetService()
-	netprops, err := w.cluster.GetNetworkConfig(w.feature.task)
-	if err != nil {
-		return err
+	netprops, xerr := w.cluster.GetNetworkConfig(w.feature.task)
+	if xerr != nil {
+		return xerr
 	}
-	network, err := LoadNetwork(w.feature.task, svc, netprops.NetworkID)
-	if err != nil {
-		return err
+	network, xerr := LoadNetwork(w.feature.task, svc, netprops.NetworkID)
+	if xerr != nil {
+		return xerr
 	}
 
-	primaryKongController, err := NewKongController(svc, network, true)
-	if err != nil {
-		return fail.Wrap(err, "failed to apply reverse proxy rules")
+	primaryKongController, xerr := NewKongController(svc, network, true)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 	}
 	var secondaryKongController *KongController
 	if network.HasVirtualIP(w.feature.task) {
-		secondaryKongController, err = NewKongController(svc, network, false)
-		if err != nil {
-			return fail.Wrap(err, "failed to apply reverse proxy rules")
+		if secondaryKongController, xerr = NewKongController(svc, network, false); xerr != nil {
+			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 		}
 	}
 
@@ -889,7 +880,7 @@ func (w *worker) setReverseProxy() (err error) {
 		targets := stepTargets{}
 		rule, ok := r.(map[interface{}]interface{})
 		if !ok {
-			return fail.InvalidParameterReport("r", "is not a rule (map)")
+			return fail.InvalidParameterError("r", "is not a rule (map)")
 		}
 		anon, ok := rule["targets"].(map[interface{}]interface{})
 		if !ok {
@@ -912,29 +903,29 @@ func (w *worker) setReverseProxy() (err error) {
 				}
 			}
 		}
-		hosts, err := w.identifyHosts(targets)
-		if err != nil {
-			return fail.Wrap(err, "failed to apply proxy rules: %s")
+		hosts, xerr := w.identifyHosts(targets)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to apply proxy rules: %s")
 		}
 
 		for _, h := range hosts {
-			if primaryGatewayVariables["HostIP"], err = h.GetPrivateIP(w.feature.task); err != nil {
-				return err
+			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+				return xerr
 			}
 			primaryGatewayVariables["Hostname"] = h.SafeGetName()
-			tP, err := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
+			tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 				"ctrl": primaryKongController,
 				"rule": rule,
 				"vars": &primaryGatewayVariables,
 			})
-			if err != nil {
-				return fail.Wrap(err, "failed to apply proxy rules")
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to apply proxy rules")
 			}
 
-			var errS error
+			var errS fail.Error
 			if secondaryKongController != nil {
-				if secondaryGatewayVariables["HostIP"], err = h.GetPrivateIP(w.feature.task); err != nil {
-					return err
+				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+					return xerr
 				}
 				secondaryGatewayVariables["Hostname"] = h.SafeGetName()
 				tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
@@ -960,44 +951,43 @@ func (w *worker) setReverseProxy() (err error) {
 	return nil
 }
 
-func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, err error) {
+func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
 	ctrl, ok := params.(data.Map)["ctrl"].(*KongController)
 	if !ok {
-		return nil, fail.InvalidParameterReport("ctrl", "is not a *KongController")
+		return nil, fail.InvalidParameterError("ctrl", "is not a *KongController")
 	}
 	rule, ok := params.(data.Map)["rule"].(map[interface{}]interface{})
 	if !ok {
-		return nil, fail.InvalidParameterReport("rule", "is not a map")
+		return nil, fail.InvalidParameterError("rule", "is not a map")
 	}
 	vars, ok := params.(data.Map)["vars"].(*data.Map)
 	if !ok {
-		return nil, fail.InvalidParameterReport("vars", "is not a '*data.Map'")
+		return nil, fail.InvalidParameterError("vars", "is not a '*data.Map'")
 	}
 	hostName, ok := (*vars)["Hostname"].(string)
 	if !ok {
-		return nil, fail.InvalidParameterReport("Hostname", "is not a string")
+		return nil, fail.InvalidParameterError("Hostname", "is not a string")
 	}
 
-	ruleName, err := ctrl.Apply(rule, vars)
-
-	if err != nil {
+	ruleName, xerr := ctrl.Apply(rule, vars)
+	if xerr != nil {
 		msg := "failed to apply proxy rule"
 		if ruleName != "" {
 			msg += " '" + ruleName + "'"
 		}
 		msg += " for host '" + hostName
-		logrus.Error(msg + "': " + err.Error())
-		return nil, fail.Wrap(err, msg)
+		logrus.Error(msg + "': " + xerr.Error())
+		return nil, fail.Wrap(xerr, msg)
 	}
 	logrus.Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 	return nil, nil
 }
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
-func (w *worker) identifyHosts(targets stepTargets) ([]resources.Host, error) {
-	hostT, masterT, nodeT, gwT, err := targets.parse()
-	if err != nil {
-		return nil, err
+func (w *worker) identifyHosts(targets stepTargets) ([]resources.Host, fail.Error) {
+	hostT, masterT, nodeT, gwT, xerr := targets.parse()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	var (
@@ -1014,57 +1004,57 @@ func (w *worker) identifyHosts(targets stepTargets) ([]resources.Host, error) {
 
 	switch masterT {
 	case "1":
-		host, err := w.identifyAvailableMaster()
-		if err != nil {
-			return nil, err
+		host, xerr := w.identifyAvailableMaster()
+		if xerr != nil {
+			return nil, xerr
 		}
 		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == installaction.Add {
-			all, err = w.identifyConcernedMasters()
+			all, xerr = w.identifyConcernedMasters()
 		} else {
-			all, err = w.identifyAllMasters()
+			all, xerr = w.identifyAllMasters()
 		}
-		if err != nil {
-			return nil, err
+		if xerr != nil {
+			return nil, xerr
 		}
 		hostsList = append(hostsList, all...)
 	}
 
 	switch nodeT {
 	case "1":
-		host, err := w.identifyAvailableNode()
-		if err != nil {
-			return nil, err
+		host, xerr := w.identifyAvailableNode()
+		if xerr != nil {
+			return nil, xerr
 		}
 		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == installaction.Add {
-			all, err = w.identifyConcernedNodes()
+			all, xerr = w.identifyConcernedNodes()
 		} else {
-			all, err = w.identifyAllNodes()
+			all, xerr = w.identifyAllNodes()
 		}
-		if err != nil {
-			return nil, err
+		if xerr != nil {
+			return nil, xerr
 		}
 		hostsList = append(hostsList, all...)
 	}
 
 	switch gwT {
 	case "1":
-		host, err := w.identifyAvailableGateway()
-		if err != nil {
-			return nil, err
+		host, xerr := w.identifyAvailableGateway()
+		if xerr != nil {
+			return nil, xerr
 		}
 		hostsList = append(hostsList, host)
 	case "*":
 		if w.action == installaction.Add {
-			all, err = w.identifyConcernedGateways()
+			all, xerr = w.identifyConcernedGateways()
 		} else {
-			all, err = w.identifyAllGateways()
+			all, xerr = w.identifyAllGateways()
 		}
-		if err != nil {
-			return nil, err
+		if xerr != nil {
+			return nil, xerr
 		}
 		hostsList = append(hostsList, all...)
 	}
@@ -1073,7 +1063,7 @@ func (w *worker) identifyHosts(targets stepTargets) ([]resources.Host, error) {
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(params map[string]interface{}) (string, error) {
+func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string
@@ -1089,25 +1079,25 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 
 		// parse then execute the template
 		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
-		result, err := template.New("normalize_script").Parse(tmpl)
+		r, err := template.New("normalize_script").Parse(tmpl)
 		if err != nil {
-			return "", fail.SyntaxReport("error parsing bash template: %s", err.Error())
+			return "", fail.SyntaxError("error parsing bash template: %s", err.Error())
 		}
-		featureScriptTemplate.Store(result)
+		featureScriptTemplate.Store(r)
 		anon = featureScriptTemplate.Load()
 	}
 
 	// Configures BashLibrary template var
-	bashLibrary, err := system.GetBashLibrary()
-	if err != nil {
-		return "", err
+	bashLibrary, xerr := system.GetBashLibrary()
+	if xerr != nil {
+		return "", xerr
 	}
 	params["reserved_BashLibrary"] = bashLibrary
 
 	dataBuffer := bytes.NewBufferString("")
 	err = anon.(*template.Template).Execute(dataBuffer, params)
 	if err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 
 	return dataBuffer.String(), nil

@@ -30,7 +30,7 @@ import (
 
 // TemplateHandler defines API to manipulate hosts
 type TemplateHandler interface {
-	List(all bool) ([]abstract.HostTemplate, error)
+	List(all bool) ([]abstract.HostTemplate, fail.Error)
 }
 
 // templateHandler template service
@@ -45,18 +45,17 @@ func NewTemplateHandler(job server.Job) TemplateHandler {
 }
 
 // ErrorList returns the template list
-func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, err error) {
+func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	tlist, err = handler.job.SafeGetService().ListTemplates(all)
-	return tlist, err
+	return handler.job.SafeGetService().ListTemplates(all)
 }

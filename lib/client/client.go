@@ -22,8 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	logr "github.com/sirupsen/logrus"
-
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -104,7 +103,7 @@ func (s *Session) Disconnect() {
 	if s.connection != nil {
 		err := s.connection.Close()
 		if err != nil {
-			logr.Error(err)
+			logrus.Error(err)
 		}
 		s.connection = nil
 	}
@@ -113,7 +112,7 @@ func (s *Session) Disconnect() {
 // DecorateTimeoutError changes the error to something more comprehensible when
 // timeout occurred
 func DecorateTimeoutError(err error, action string, maySucceed bool) error {
-	if IsTimeoutError(err) {
+	if isTimeoutError(err) {
 		msg := "%s took too long (> %v) to respond"
 		if maySucceed {
 			msg += " (may eventually succeed)"
@@ -133,7 +132,7 @@ func DecorateTimeoutError(err error, action string, maySucceed bool) error {
 	return err
 }
 
-// IsTimeoutError tells if the err is a timeout kind
-func IsTimeoutError(err error) bool {
+// isTimeoutError tells if the err is a timeout kind
+func isTimeoutError(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }

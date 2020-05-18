@@ -43,11 +43,11 @@ type Stack struct {
 }
 
 // New authenticates and return interface Stack
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*Stack, error) {
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return nil, fail.InvalidParameterReport("auth.IdentityEndpoint", "cannot be empty string")
+		return nil, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
 	authOptions := auth
@@ -56,15 +56,15 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 		DomainName:  auth.DomainName,
 	}
 
-	stack, err := openstack.New(auth, &scope, cfg, nil)
-	if err != nil {
-		return nil, err
+	stack, xerr := openstack.New(auth, &scope, cfg, nil)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Identity API
 	identity, err := gcos.NewIdentityV3(stack.Driver, gophercloud.EndpointOpts{})
 	if err != nil {
-		return nil, fail.NewReport(openstack.ProviderErrorToString(err))
+		return nil, fail.NewError(openstack.ProviderErrorToString(err))
 	}
 
 	// Recover Project ID of region
@@ -74,16 +74,16 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	}
 	allPages, err := projects.List(identity, listOpts).AllPages()
 	if err != nil {
-		return nil, fail.NewReport("failed to query project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to query project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
 	}
 	allProjects, err := projects.ExtractProjects(allPages)
 	if err != nil {
-		return nil, fail.NewReport("failed to load project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to load project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
 	}
 	if len(allProjects) > 0 {
 		authOptions.ProjectID = allProjects[0].ID
 	} else {
-		return nil, fail.NewReport("failed to found project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to found project ID corresponding to region '%s': %s", authOptions.Region, openstack.ProviderErrorToString(err))
 	}
 
 	s := Stack{
@@ -95,44 +95,44 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	s.cfgOpts.UseFloatingIP = true
 
 	// Initializes the VPC
-	err = s.initVPC()
-	if err != nil {
-		return nil, err
+	xerr = s.initVPC()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return &s, nil
 }
 
 // initVPC initializes the VPC if it doesn't exist
-func (s *Stack) initVPC() error {
+func (s *Stack) initVPC() fail.Error {
 	// Tries to get VPC information
-	vpcID, err := s.findVPCID()
-	if err != nil {
-		return err
+	vpcID, xerr := s.findVPCID()
+	if xerr != nil {
+		return xerr
 	}
 	if vpcID != nil {
-		s.vpc, err = s.GetVPC(*vpcID)
-		return err
+		s.vpc, xerr = s.GetVPC(*vpcID)
+		return xerr
 	}
 
-	vpc, err := s.CreateVPC(VPCRequest{
+	vpc, xerr := s.CreateVPC(VPCRequest{
 		Name: s.authOpts.VPCName,
 		CIDR: s.authOpts.VPCCIDR,
 	})
-	if err != nil {
-		return fail.NewReport("failed to initialize VPC '%s': %s", s.authOpts.VPCName, openstack.ProviderErrorToString(err))
+	if xerr != nil {
+		return fail.NewError("failed to initialize VPC '%s'", s.authOpts.VPCName)
 	}
 	s.vpc = vpc
 	return nil
 }
 
 // findVPC returns the ID about the VPC
-func (s *Stack) findVPCID() (*string, error) {
+func (s *Stack) findVPCID() (*string, fail.Error) {
 	var router *openstack.Router
 	found := false
 	routers, err := s.Stack.ListRouters()
 	if err != nil {
-		return nil, fail.NewReport("error listing routers: %s", openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("error listing routers: %s", openstack.ProviderErrorToString(err))
 	}
 	for _, r := range routers {
 		if r.Name == s.authOpts.VPCName {

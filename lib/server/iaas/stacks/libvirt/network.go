@@ -37,12 +37,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func infoFromCidr(cidr string) (string, string, string, string, error) {
+func infoFromCidr(cidr string) (string, string, string, string, fail.Error) {
 	IP, IPNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return "", "", "", "", fail.Wrap(err, "failed to parse cidr")
-	} else if IPNet.Mask[3] >= 63 {
-		return "", "", "", "", fail.NewReport("please use a wider network range")
+	}
+	if IPNet.Mask[3] >= 63 {
+		return "", "", "", "", fail.InvalidRequestError("please use a wider network range")
 	}
 
 	mask := fmt.Sprintf("%d.%d.%d.%d", IPNet.Mask[0], IPNet.Mask[1], IPNet.Mask[2], IPNet.Mask[3])
@@ -52,7 +53,7 @@ func infoFromCidr(cidr string) (string, string, string, string, error) {
 	return IPNet.IP.String(), mask, dhcpStart, dhcpEnd, nil
 }
 
-func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Network, error) {
+func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Network, fail.Error) {
 	libvirtNetwork, err := libvirtService.LookupNetworkByUUIDString(ref)
 	if err != nil {
 		libvirtNetwork, err = libvirtService.LookupNetworkByName(ref)
@@ -69,7 +70,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 	return libvirtNetwork, nil
 }
 
-func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, error) {
+func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, fail.Error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed get network's xml description")
@@ -97,7 +98,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 			value, err := strconv.Atoi(netmaskBloc[i])
 			ipBloc[i], err = strconv.Atoi(ipBlocstring[i])
 			if err != nil {
-				return nil, fail.NewReport("failed to convert x.x.x.x nemask to [0-32] netmask")
+				return nil, fail.NewError("failed to convert x.x.x.x netmask to [0-32] netmask")
 			}
 			nbBits := 0
 			if value != 0 {
@@ -123,7 +124,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
 	name := req.Name
@@ -138,22 +139,22 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 
 	if ipVersion != ipversion.IPv4 {
 		// TODO implement IPV6 networks
-		return nil, fail.NotImplementedReport("only ipv4 networks are implemented")
+		return nil, fail.NotImplementedError("only ipv4 networks are implemented")
 	}
 	if len(dns) != 0 {
 		// TODO implement DNS for networks
-		return nil, fail.NotImplementedReport("DNS not implemented yet in networks creation")
+		return nil, fail.NotImplementedError("DNS not implemented yet in networks creation")
 	}
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)
 	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
+		if _, ok := err.(fail.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
 
 	if libvirtNetwork != nil {
-		return nil, fail.DuplicateReport("network '%s' already exists", name)
+		return nil, fail.DuplicateError("network '%s' already exists", name)
 	}
 
 	ip, netmask, dhcpStart, dhcpEnd, err := infoFromCidr(cidr)
@@ -204,7 +205,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
 	// FIXME: validate parameters
 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
@@ -232,7 +233,7 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 	return s.GetNetwork(ref)
 }
@@ -261,7 +262,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s *Stack) DeleteNetwork(ref string) error {
+func (s *Stack) DeleteNetwork(ref string) fail.Error {
 	// FIXME: validate parameter
 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
 
@@ -292,7 +293,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 // // CreateGateway creates a public Gateway for a private network
 // func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *abstract.HostTemplate, *userdata.Content, error) {
 // 	if s == nil {
-// 		return nil, nil, nil, fail.InvalidInstanceReport()
+// 		return nil, nil, nil, fail.InvalidInstanceError()
 // 	}
 //
 // 	defer concurrency.NewTracer(nil, "", true).Entering().OnExitTrace()
@@ -341,26 +342,26 @@ func (s *Stack) DeleteNetwork(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
-	return nil, fail.NotImplementedReport("CreateVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
-	return fail.NotImplementedReport("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, host *abstract.Host) (string, string, error) {
-	return fail.NotImplementedReport("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, host *abstract.Host) (string, string, fail.Error) {
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.Host) error {
-	return fail.NotImplementedReport("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.Host) fail.Error {
+	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
-	return fail.NotImplementedReport("DeleteVIP() not implemented yet") // FIXME: Technical debt
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
+	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

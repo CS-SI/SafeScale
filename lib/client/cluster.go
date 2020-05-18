@@ -91,12 +91,12 @@ func (c *cluster) Start(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Start(ctx, &protocol.Reference{Name: name})
+	_, err := service.Start(ctx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -104,12 +104,12 @@ func (c *cluster) Stop(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Stop(ctx, &protocol.Reference{Name: name})
+	_, err := service.Stop(ctx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -117,12 +117,13 @@ func (c *cluster) Stop(name string, timeout time.Duration) error {
 func (c *cluster) Create(def protocol.ClusterCreateRequest, timeout time.Duration) (*protocol.ClusterResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
+	service := protocol.NewClusterServiceClient(c.session.connection)
 	return service.Create(ctx, &def)
 }
 
@@ -130,13 +131,14 @@ func (c *cluster) Create(def protocol.ClusterCreateRequest, timeout time.Duratio
 func (c *cluster) Delete(name string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewHostServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Delete(ctx, &protocol.Reference{Name: name})
+	service := protocol.NewHostServiceClient(c.session.connection)
+	_, err := service.Delete(ctx, &protocol.Reference{Name: name})
 	return err
 }
 
@@ -144,12 +146,13 @@ func (c *cluster) Delete(name string, timeout time.Duration) error {
 func (c *cluster) Expand(def protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
+	service := protocol.NewClusterServiceClient(c.session.connection)
 	return service.Expand(ctx, &def)
 }
 
@@ -157,12 +160,13 @@ func (c *cluster) Expand(def protocol.ClusterResizeRequest, duration time.Durati
 func (c *cluster) Shrink(def protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
+	service := protocol.NewClusterServiceClient(c.session.connection)
 	return service.Shrink(ctx, &def)
 }
 
@@ -170,10 +174,10 @@ func (c *cluster) Shrink(def protocol.ClusterResizeRequest, duration time.Durati
 func (c *cluster) CheckFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewFeatureServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
 	req := protocol.FeatureActionRequest{
@@ -183,7 +187,8 @@ func (c *cluster) CheckFeature(clusterName, featureName string, params map[strin
 		Variables:  params,
 		Settings:   &settings,
 	}
-	_, err = service.Check(ctx, &req)
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	_, err := service.Check(ctx, &req)
 	return err
 }
 
@@ -191,10 +196,9 @@ func (c *cluster) CheckFeature(clusterName, featureName string, params map[strin
 func (c *cluster) AddFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewFeatureServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
 	req := protocol.FeatureActionRequest{
@@ -204,7 +208,8 @@ func (c *cluster) AddFeature(clusterName, featureName string, params map[string]
 		Variables:  params,
 		Settings:   &settings,
 	}
-	_, err = service.Add(ctx, &req)
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	_, err := service.Add(ctx, &req)
 	return err
 }
 
@@ -212,10 +217,10 @@ func (c *cluster) AddFeature(clusterName, featureName string, params map[string]
 func (c *cluster) RemoveFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
-	service := protocol.NewFeatureServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
 	req := protocol.FeatureActionRequest{
@@ -225,6 +230,7 @@ func (c *cluster) RemoveFeature(clusterName, featureName string, params map[stri
 		Variables:  params,
 		Settings:   &settings,
 	}
-	_, err = service.Remove(ctx, &req)
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	_, err := service.Remove(ctx, &req)
 	return err
 }

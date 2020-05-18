@@ -36,9 +36,9 @@ func (c *jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewJobServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(false)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(false)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return service.List(ctx, &googleprotobuf.Empty{})
@@ -49,11 +49,11 @@ func (c *jobManager) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewJobServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(false)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(false)
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = service.Stop(ctx, &protocol.JobDefinition{Uuid: uuid})
+	_, err := service.Stop(ctx, &protocol.JobDefinition{Uuid: uuid})
 	return err
 }

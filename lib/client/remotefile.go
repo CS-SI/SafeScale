@@ -17,8 +17,6 @@
 package client
 
 import (
-	"fmt"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -38,10 +36,10 @@ type RemoteFileItem struct {
 // Upload transfers the local file to the hostname
 func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 	if rfc.Local == "" {
-		return fail.InvalidInstanceContentReport("rfc.Local", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
 	}
 	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentReport("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
 	SSHClient := New().SSH
@@ -52,7 +50,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to copy file '%s'", rfc.Local)
+		return fail.NewError("failed to copy file '%s'", rfc.Local)
 	}
 
 	// Updates owner and access rights if asked for
@@ -71,7 +69,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to update owner and/or access rights of the remote file")
+		return fail.NewError("failed to update owner and/or access rights of the remote file")
 	}
 
 	return nil
@@ -80,7 +78,7 @@ func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
 // Upload transfers the local file to the hostname
 func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, hostname string) error {
 	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentReport("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
 	SSHClient := New().SSH
@@ -91,7 +89,7 @@ func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, ho
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to copy file '%s'", rfc.Local)
+		return fail.NewError("failed to copy file '%s'", rfc.Local)
 	}
 
 	// Updates owner and access rights if asked for
@@ -110,9 +108,8 @@ func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, ho
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to update owner and/or access rights of the remote file")
+		return fail.NewError("failed to update owner and/or access rights of the remote file")
 	}
-
 	return nil
 }
 
@@ -121,7 +118,7 @@ func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, hostname string) e
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, err := New().SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to remove file '%s:%s'", hostname, rfc.Remote)
+		return fail.NewError("failed to remove file '%s:%s'", hostname, rfc.Remote)
 	}
 	return nil
 }
@@ -156,9 +153,9 @@ func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, hostname string) er
 // Note: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
 func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, hostname string) {
 	for _, v := range rfh.items {
-		err := v.RemoveRemote(task, hostname)
-		if err != nil {
-			logrus.Warnf(err.Error())
+		xerr := v.RemoveRemote(task, hostname)
+		if xerr != nil {
+			logrus.Warnf(xerr.Error())
 		}
 	}
 }

@@ -61,9 +61,9 @@ func nullFeature() *feature {
 }
 
 // ListFeatures lists all features suitable for hosts or clusters
-func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, error) {
+func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, fail.Error) {
 	if task == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	features := allEmbeddedFeaturesMap
@@ -79,9 +79,9 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, err
 		if err == nil {
 			for _, f := range files {
 				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
-					feat, err := NewFeature(task, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
-					if err != nil {
-						logrus.Error(err) // FIXME Don't hide errors
+					feat, xerr := NewFeature(task, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					if xerr != nil {
+						logrus.Error(xerr) // FIXME: Don't hide errors
 						continue
 					}
 					casted := feat.(*feature)
@@ -119,7 +119,7 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, err
 				}
 			}
 		default:
-			return nil, fail.SyntaxReport("unknown parameter value: %s (should be 'host' or 'cluster')", suitableFor)
+			return nil, fail.SyntaxError("unknown parameter value: %s (should be 'host' or 'cluster')", suitableFor)
 		}
 	}
 
@@ -129,19 +129,19 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, err
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 // error contains :
-//    - fail.NotFound if no feature is found by its name
-//    - fail.Syntax if feature found contains syntax error
-func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err error) {
+//    - fail.ErrNotFound if no feature is found by its name
+//    - fail.ErrSyntax if feature found contains syntax error
+func NewFeature(task concurrency.Task, name string) (_ resources.Feature, xerr fail.Error) {
 	if task == nil {
-		return nullFeature(), fail.InvalidParameterReport("task", "cannot be nil")
+		return nullFeature(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nullFeature(), fail.InvalidParameterReport("name", "cannot be empty string")
+		return nullFeature(), fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	v := viper.New()
 	v.AddConfigPath(".")
@@ -151,22 +151,23 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err er
 	v.SetConfigName(name)
 
 	casted := nullFeature()
-	err = v.ReadInConfig()
+	err := v.ReadInConfig()
 	if err != nil {
 		switch err.(type) {
 		case viper.ConfigFileNotFoundError:
 			// Failed to find a spec file on filesystem, trying with embedded ones
-			err = nil
+			xerr = nil
 			var ok bool
 			if _, ok = allEmbeddedFeaturesMap[name]; !ok {
-				err = fail.NotFoundReport("failed to find a feature named '%s'", name)
+				xerr = fail.NotFoundError("failed to find a feature named '%s'", name)
 			} else {
 				casted = allEmbeddedFeaturesMap[name].Clone().(*feature)
 				casted.task = task
 				casted.displayFileName = name + ".yml [embedded]"
+				xerr = nil
 			}
 		default:
-			err = fail.SyntaxReport("failed to read the specification file of feature called '%s': %s", name, err.Error())
+			xerr = fail.SyntaxError("failed to read the specification file of feature called '%s': %s", name, err.Error())
 		}
 	} else if v.IsSet("feature") {
 		casted = &feature{
@@ -176,33 +177,33 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, err er
 			specs:           v,
 			task:            task,
 		}
+		xerr = nil
 	}
-	return casted, err
+	return casted, xerr
 }
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(task concurrency.Task, name string) (_ resources.Feature, err error) {
+func NewEmbeddedFeature(task concurrency.Task, name string) (_ resources.Feature, xerr fail.Error) {
 	if task == nil {
-		return nullFeature(), fail.InvalidParameterReport("task", "cannot be nil")
+		return nullFeature(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nullFeature(), fail.InvalidParameterReport("name", "cannot be empty string")
+		return nullFeature(), fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	casted := nullFeature()
 	if _, ok := allEmbeddedFeaturesMap[name]; !ok {
-		err = fail.NotFoundReport(fmt.Sprintf("failed to find a feature named '%s'", name))
-	} else {
-		casted = allEmbeddedFeaturesMap[name].Clone().(*feature)
-		casted.task = task
-		casted.fileName += " [embedded]"
+		return casted, fail.NotFoundError("failed to find a feature named '%s'", name)
 	}
-	return casted, err
+	casted = allEmbeddedFeaturesMap[name].Clone().(*feature)
+	casted.task = task
+	casted.fileName += " [embedded]"
+	return casted, nil
 }
 
 // IsNull tells if the instance represents a null value
@@ -237,9 +238,9 @@ func (f *feature) Replace(p data.Clonable) data.Clonable {
 }
 
 // GetName returns the display name of the feature, with error handling
-func (f *feature) GetName() (string, error) {
+func (f *feature) GetName() (string, fail.Error) {
 	if f.IsNull() {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	return f.displayName, nil
 }
@@ -251,9 +252,9 @@ func (f *feature) SafeGetName() string {
 }
 
 // GetFilename returns the filename of the feature definition, with error handling
-func (f *feature) GetFilename() (string, error) {
+func (f *feature) GetFilename() (string, fail.Error) {
 	if f.IsNull() {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	return f.fileName, nil
 }
@@ -265,9 +266,9 @@ func (f *feature) SafeGetFilename() string {
 }
 
 // GetDisplayFilename returns the filename of the feature definition, beautifulled, with error handling
-func (f *feature) GetDisplayFilename() (string, error) {
+func (f *feature) GetDisplayFilename() (string, fail.Error) {
 	if f.IsNull() {
-		return "", fail.InvalidInstanceReport()
+		return "", fail.InvalidInstanceError()
 	}
 	return f.displayFileName, nil
 }
@@ -283,7 +284,7 @@ func (f *feature) installerOfMethod(m installmethod.Enum) Installer {
 	var installer Installer
 	switch m {
 	case installmethod.Bash:
-		installer = NewBashInstaller()
+		installer = newBashInstaller()
 	case installmethod.Apt:
 		installer = NewAptInstaller()
 	case installmethod.Yum:
@@ -320,12 +321,12 @@ func (f *feature) Applyable(t resources.Targetable) bool {
 
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (f *feature) Check(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
+func (f *feature) Check(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	if f.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
-		return nil, fail.InvalidParameterReport("target", "cannot be nil")
+		return nil, fail.InvalidParameterError("target", "cannot be nil")
 	}
 
 	featureName := f.SafeGetName()
@@ -334,7 +335,7 @@ func (f *feature) Check(target resources.Targetable, v data.Map, s resources.Fea
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	// cacheKey := f.DisplayName() + "@" + t.Name()
 	// if anon, ok := checkCache.Get(cacheKey); ok {
@@ -352,7 +353,7 @@ func (f *feature) Check(target resources.Targetable, v data.Map, s resources.Fea
 		}
 	}
 	if installer == nil {
-		return nil, fail.NewReport("failed to find a way to check '%s'", featureName)
+		return nil, fail.NewError("failed to find a way to check '%s'", featureName)
 	}
 
 	logrus.Debugf("Checking if feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
@@ -365,31 +366,29 @@ func (f *feature) Check(target resources.Targetable, v data.Map, s resources.Fea
 	myV := v.Clone()
 
 	// Inits target parameters
-	err = target.ComplementFeatureParameters(f.task, myV)
-	if err != nil {
-		return nil, err
+	if xerr = target.ComplementFeatureParameters(f.task, myV); xerr != nil {
+		return nil, xerr
 	}
 
 	// Checks required parameters have their values
-	err = checkParameters(f, myV)
-	if err != nil {
-		return nil, err
+	if xerr = checkParameters(f, myV); xerr != nil {
+		return nil, xerr
 	}
 
-	results, err := installer.Check(f, target, myV, s)
+	r, xerr := installer.Check(f, target, myV, s)
 	// _ = checkCache.ForceSet(cacheKey, results)
-	return results, err
+	return r, xerr
 }
 
 // Check if required parameters defined in specification file have been set in 'v'
-func checkParameters(f *feature, v data.Map) error {
+func checkParameters(f *feature, v data.Map) fail.Error {
 	if f.specs.IsSet("feature.parameters") {
 		params := f.specs.GetStringSlice("feature.parameters")
 		for _, k := range params {
 			splitted := strings.Split(k, "=")
 			if _, ok := v[splitted[0]]; !ok {
 				if len(splitted) == 1 {
-					return fail.InvalidRequestReport("missing value for parameter '%s'", k)
+					return fail.InvalidRequestError("missing value for parameter '%s'", k)
 				}
 				v[splitted[0]] = strings.Join(splitted[1:], "=")
 			}
@@ -400,12 +399,12 @@ func checkParameters(f *feature, v data.Map) error {
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
+func (f *feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	if f.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
-		return nil, fail.InvalidParameterReport("target", "cannot be nil")
+		return nil, fail.InvalidParameterError("target", "cannot be nil")
 	}
 
 	featureName := f.SafeGetName()
@@ -414,7 +413,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	methods := target.SafeGetInstallMethods(f.task)
 	var (
@@ -431,7 +430,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		}
 	}
 	if installer == nil {
-		return nil, fail.NotAvailableReport("failed to find a way to install '%s'", featureName)
+		return nil, fail.NotAvailableError("failed to find a way to install '%s'", featureName)
 	}
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -447,21 +446,19 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 	myV := v.Clone()
 
 	// Inits target parameters
-	err = target.ComplementFeatureParameters(f.task, myV)
-	if err != nil {
-		return nil, err
+	if xerr = target.ComplementFeatureParameters(f.task, myV); xerr != nil {
+		return nil, xerr
 	}
 
 	// Checks required parameters have value
-	err = checkParameters(f, myV)
-	if err != nil {
-		return nil, err
+	if xerr = checkParameters(f, myV); xerr != nil {
+		return nil, xerr
 	}
 
 	if !s.AddUnconditionally {
-		results, err := f.Check(target, v, s)
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to check feature '%s'", featureName)
+		results, xerr := f.Check(target, v, s)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to check feature '%s'", featureName)
 		}
 		if results.Successful() {
 			logrus.Infof("Feature '%s' is already installed.", featureName)
@@ -470,27 +467,24 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 	}
 
 	if !s.SkipFeatureRequirements {
-		err := f.installRequirements(target, v, s)
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to install requirements")
+		if xerr = f.installRequirements(target, v, s); xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to install requirements")
 		}
 	}
-	results, err := installer.Add(f, target, myV, s)
-	if err == nil {
+	results, xerr := installer.Add(f, target, myV, s)
+	if xerr == nil {
 		// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
-		return nil, err
 	}
-
-	return results, err
+	return results, xerr
 }
 
 // Remove uninstalls the feature from the target
-func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, err error) {
+func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	if f.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
-		return nil, fail.InvalidParameterReport("target", "cannot be nil")
+		return nil, fail.InvalidParameterError("target", "cannot be nil")
 	}
 
 	featureName := f.SafeGetName()
@@ -499,7 +493,7 @@ func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.Fe
 
 	tracer := concurrency.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	var (
 		results   resources.Results
@@ -515,7 +509,7 @@ func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.Fe
 		}
 	}
 	if installer == nil {
-		return nil, fail.NotAvailableReport("failed to find a way to uninstall '%s'", featureName)
+		return nil, fail.NotAvailableError("failed to find a way to uninstall '%s'", featureName)
 	}
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -533,32 +527,32 @@ func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.Fe
 	// // Inits implicit parameters
 	// err = f.setImplicitParameters(t, myV)
 	// Inits target parameters
-	err = target.ComplementFeatureParameters(f.task, myV)
-	if err != nil {
-		return nil, err
+	if xerr = target.ComplementFeatureParameters(f.task, myV); xerr != nil {
+		return nil, xerr
 	}
 
 	// Checks required parameters have value
-	err = checkParameters(f, myV)
-	if err != nil {
-		return nil, err
+	if xerr = checkParameters(f, myV); xerr != nil {
+		return nil, xerr
 	}
 
-	results, err = installer.Remove(f, target, myV, s)
-	// checkCache.Reset(f.DisplayName() + "@" + targetName)
-	return results, err
+	results, xerr = installer.Remove(f, target, myV, s)
+	// if xerr == nil {
+	// 	checkCache.Reset(f.DisplayName() + "@" + targetName)
+	// }
+	return results, xerr
 }
 
 // GetRequirements returns a list of features needed as requirements
-func (f *feature) GetRequirements() ([]string, error) {
+func (f *feature) GetRequirements() ([]string, fail.Error) {
 	if f.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
-	return nil, fail.NotImplementedReport("GetRequirements() is not yet implemented")
+	return nil, fail.NotImplementedError("GetRequirements() is not yet implemented")
 }
 
 // installRequirements walks through requirements and installs them if needed
-func (f *feature) installRequirements(t resources.Targetable, v data.Map, s resources.FeatureSettings) error {
+func (f *feature) installRequirements(t resources.Targetable, v data.Map, s resources.FeatureSettings) fail.Error {
 	yamlKey := "feature.requirements.features"
 	if f.specs.IsSet(yamlKey) {
 		{
@@ -566,30 +560,30 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 			var msgTail string
 			switch t.SafeGetTargetType() {
 			case featuretargettype.HOST:
-				msgTail = fmt.Sprintf("on host '%s'", t.(data.Identifyable).SafeGetName())
+				msgTail = fmt.Sprintf("on host '%s'", t.(data.Identifiable).SafeGetName())
 			case featuretargettype.NODE:
-				msgTail = fmt.Sprintf("on cluster node '%s'", t.(data.Identifyable).SafeGetName())
+				msgTail = fmt.Sprintf("on cluster node '%s'", t.(data.Identifiable).SafeGetName())
 			case featuretargettype.CLUSTER:
-				msgTail = fmt.Sprintf("on cluster '%s'", t.(data.Identifyable).SafeGetName())
+				msgTail = fmt.Sprintf("on cluster '%s'", t.(data.Identifiable).SafeGetName())
 			}
 			logrus.Debugf("%s %s...", msgHead, msgTail)
 		}
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
-			needed, err := NewFeature(f.task, requirement)
-			if err != nil {
-				return fail.Wrap(err, "failed to find required feature '%s'", requirement)
+			needed, xerr := NewFeature(f.task, requirement)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to find required feature '%s'", requirement)
 			}
-			results, err := needed.Check(t, v, s)
-			if err != nil {
-				return fail.Wrap(err, "failed to check required feature '%s' for feature '%s'", requirement, f.SafeGetName())
+			results, xerr := needed.Check(t, v, s)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to check required feature '%s' for feature '%s'", requirement, f.SafeGetName())
 			}
 			if !results.Successful() {
-				results, err := needed.Add(t, v, s)
-				if err != nil {
-					return fail.Wrap(err, "failed to install required feature '%s'", requirement)
+				results, xerr := needed.Add(t, v, s)
+				if xerr != nil {
+					return fail.Wrap(xerr, "failed to install required feature '%s'", requirement)
 				}
 				if !results.Successful() {
-					return fail.NewReport("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
+					return fail.NewError("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
 				}
 			}
 		}

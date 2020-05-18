@@ -57,12 +57,12 @@ type Share struct {
 }
 
 // NewShare creates a share struct corresponding to the export of path on server
-func NewShare(server *Server, path, options string) (*Share, error) {
+func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 	if path == "" {
-		return nil, fail.InvalidParameterReport("path", "cannot be empty")
+		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 	if !filepath.IsAbs(path) {
-		return nil, fail.InvalidParameterReport("path", "must be absolute")
+		return nil, fail.InvalidParameterError("path", "must be absolute")
 	}
 	share := Share{
 		Server: server,
@@ -80,7 +80,7 @@ func NewShare(server *Server, path, options string) (*Share, error) {
 // }
 
 // Add configures and exports the share
-func (s *Share) Add(task concurrency.Task) error {
+func (s *Share) Add(task concurrency.Task) fail.Error {
 	// var acls string
 	// for _, a := range s.ACLs {
 	// 	acl := a.Host + "("
@@ -143,6 +143,11 @@ func (s *Share) Add(task concurrency.Task) error {
 		"Options": s.Options,
 	}
 
-	retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to export a shared directory")
+	// retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
+	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
+	_, xerr := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
+	if xerr != nil {
+		return fail.Wrap(xerr, "error executing script to export a shared directory")
+	}
+	return nil
 }

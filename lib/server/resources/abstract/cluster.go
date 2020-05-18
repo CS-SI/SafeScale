@@ -81,7 +81,7 @@ func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 }
 
 // SafeGetName returns the name of the cluster
-// Satisfies interface data.Identifyable
+// Satisfies interface data.Identifiable
 func (i *ClusterIdentity) SafeGetName() string {
 	if i == nil {
 		return ""
@@ -90,7 +90,7 @@ func (i *ClusterIdentity) SafeGetName() string {
 }
 
 // SafeGetID returns the ID of the cluster (== Name)
-// Satisfies interface data.Identifyable
+// Satisfies interface data.Identifiable
 func (i *ClusterIdentity) SafeGetID() string {
 	return i.SafeGetName()
 }

@@ -25,23 +25,23 @@ import (
 )
 
 // New creates an instance of resources.Volume
-func New(svc iaas.Service) (resources.Volume, error) {
+func New(svc iaas.Service) (resources.Volume, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	return operations.NewVolume(svc)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Volume, err error) {
+func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	// FIXME: tracer...

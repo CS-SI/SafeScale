@@ -63,13 +63,13 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 
 	// Validating content...
 	if !v.IsSet("feature") {
-		return "", nil, fail.SyntaxReport("feature specification file '%s' must begin with 'feature:'", name)
+		return "", nil, fail.SyntaxError("feature specification file '%s' must begin with 'feature:'", name)
 	}
 	if !v.IsSet("feature.install") {
-		return "", nil, fail.SyntaxReport("syntax error in feature specification file '%s': missing 'install'", name)
+		return "", nil, fail.SyntaxError("syntax error in feature specification file '%s': missing 'install'", name)
 	}
 	if len(v.GetStringMap("feature.install")) == 0 {
-		return "", nil, fail.SyntaxReport("syntax error in feature specification file '%s': 'install' defines no method", name)
+		return "", nil, fail.SyntaxError("syntax error in feature specification file '%s': 'install' defines no method", name)
 	}
 	return name, v, nil
 }
@@ -94,7 +94,7 @@ func dockerFeature() *feature {
 // 	name := "docker-compose"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report()
+// 		panic(err.Error()
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -199,7 +199,7 @@ func kubernetesFeature() *feature {
 // 	name := "nexus3"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -214,7 +214,7 @@ func kubernetesFeature() *feature {
 // 	name := "elasticsearch"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -229,7 +229,7 @@ func kubernetesFeature() *feature {
 // 	name := "logstash"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -289,7 +289,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "mpich-ospkg"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -304,7 +304,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "mpich-build"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -319,7 +319,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "ohpc-slurm-master"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -334,7 +334,7 @@ func remoteDesktopFeature() *feature {
 // 	name := "ohpc-slurm-node"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -379,7 +379,7 @@ func proxycacheClientFeature() *feature {
 // 	name := "apache-ignite"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -394,7 +394,7 @@ func proxycacheClientFeature() *feature {
 // 	name := "metricbeat"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -409,7 +409,7 @@ func proxycacheClientFeature() *feature {
 // 	name := "filebeat"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -469,7 +469,7 @@ func keycloak4platformFeature() *feature {
 // 	name := "kibana"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -484,7 +484,7 @@ func keycloak4platformFeature() *feature {
 // 	name := "elassandra"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,
@@ -529,7 +529,7 @@ func monitoring4platformFeature() *feature {
 // 	name := "geoserver"
 // 	filename, specs, err := loadSpecFile(name)
 // 	if err != nil {
-// 		panic(err.Report())
+// 		panic(err.Error())
 // 	}
 // 	return &feature{
 // 		displayName: name,

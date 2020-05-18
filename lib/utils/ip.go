@@ -27,7 +27,7 @@ import (
 var networks = map[string]*net.IPNet{}
 
 // CIDRToIPv4Range converts CIDR to IPv4 range
-func CIDRToIPv4Range(cidr string) (string, string, error) {
+func CIDRToIPv4Range(cidr string) (string, string, fail.Error) {
 	start, end, err := CIDRToUInt32Range(cidr)
 	if err != nil {
 		return "", "", err
@@ -40,9 +40,9 @@ func CIDRToIPv4Range(cidr string) (string, string, error) {
 }
 
 // CIDRToUInt32Range converts CIDR to IPv4 range
-func CIDRToUInt32Range(cidr string) (uint32, uint32, error) {
+func CIDRToUInt32Range(cidr string) (uint32, uint32, fail.Error) {
 	if cidr == "" {
-		return 0, 0, fail.InvalidParameterReport("cidr", "cannot be empty string")
+		return 0, 0, fail.InvalidParameterError("cidr", "cannot be empty string")
 	}
 
 	var (
@@ -101,7 +101,7 @@ func UInt32ToIPv4String(value uint32) string {
 }
 
 // IsCIDRRoutable tells if the network is routable
-func IsCIDRRoutable(cidr string) (bool, error) {
+func IsCIDRRoutable(cidr string) (bool, fail.Error) {
 	first, last, err := CIDRToIPv4Range(cidr)
 	if err != nil {
 		return false, err
@@ -126,7 +126,7 @@ func CIDROverlap(n1, n2 net.IPNet) bool {
 // with the given number of additional prefix bits 'maskAddition'.
 //
 // For example, 192.168.0.0/16, extended by 8 bits becomes 192.168.0.0/24.
-func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, error) {
+func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, fail.Error) {
 	return NthIncludedSubnet(base, maskAddition, 0)
 }
 
@@ -134,7 +134,7 @@ func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, error) 
 // given numver of additional prefix bits 'maskAddition'
 //
 // For example, 192.168.0.0/16, extended by 8 bits gives as 4th subnet 192.168.4.0/24.
-func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet, error) {
+func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet, fail.Error) {
 	ip := base.IP
 	mask := base.Mask
 
@@ -142,12 +142,12 @@ func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet,
 	newPrefixLen := parentLen + int(maskAddition)
 
 	if newPrefixLen > addrLen {
-		return net.IPNet{}, fail.OverflowReport(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
+		return net.IPNet{}, fail.OverflowError(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
 	}
 
 	maxNetNum := uint64(1<<uint64(maskAddition)) - 1
 	if uint64(1) > maxNetNum {
-		return net.IPNet{}, fail.OverflowReport(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
+		return net.IPNet{}, fail.OverflowError(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
 	}
 
 	ipAsNumber := IPv4ToUInt32(ip)

@@ -17,53 +17,47 @@
 package fail
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/sirupsen/logrus"
 )
 
 // ErrorList ...
 type ErrorList = *errorList
 type errorList struct {
-	*reportCore
+	*errorCore
 	errors []error
 }
 
-// ErrorListReport creates a ErrorList
-func ErrorListReport(errors []error) *errorList {
+// NewErrorList creates a ErrorList
+func NewErrorList(errors []error) Error {
 	if len(errors) == 0 {
-		return nil
+		return &errorList{}
 	}
 
 	return &errorList{
-		reportCore: &reportCore{},
-		errors:     errors,
+		errorCore: newError(nil, nil, ""),
+		errors:    errors,
 	}
 }
 
 // AddConsequence ...
-func (e *errorList) AddConsequence(err error) Report {
+func (e *errorList) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
-		return nullReport()
+		return e
 	}
-	if err != nil {
-		if e.consequences == nil {
-			e.consequences = []error{}
-		}
-		e.consequences = append(e.consequences, err)
-	}
+	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
-// WithField ...
-func (e *errorList) WithField(key string, value interface{}) Report {
+// Annotate ...
+// satisfies interface data.Annotatable
+func (e *errorList) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
-		return nullReport()
+		return e
 	}
-	if e.fields != nil {
-		e.fields[key] = value
-	}
-
+	_ = e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -82,10 +76,10 @@ func (e *errorList) Error() string {
 	return r
 }
 
-// ToErrors transforms ErrorList to []error
-func (e *errorList) ToErrors() []error {
+// ToErrorSlice transforms ErrorList to []error
+func (e *errorList) ToErrorSlice() []error {
 	if e.IsNull() {
-		logrus.Errorf("invalid call of NotFound.AddConsequence() from null instance")
+		logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
 		return []error{}
 	}
 	return e.errors

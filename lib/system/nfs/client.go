@@ -29,39 +29,46 @@ type Client struct {
 }
 
 // NewNFSClient creates a new NFS client instance
-func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
+func NewNFSClient(sshconfig *system.SSHConfig) (*Client, fail.Error) {
 	if sshconfig == nil {
-		return nil, fail.InvalidParameterReport("sshconfig", "cannot be nil")
+		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
-	client := &Client{
-		SSHConfig: sshconfig,
-	}
-	return client, nil
+	return &Client{SSHConfig: sshconfig}, nil
 }
 
 // Install installs NFS client on remote host
-func (c *Client) Install(task concurrency.Task) error {
-	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to install NFS client")
+func (c *Client) Install(task concurrency.Task) fail.Error {
+	stdout, xerr := executeScript(task, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return fail.Wrap(xerr, "error executing script to install NFS client on remote host")
+	}
+	return nil
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(task concurrency.Task, export string, mountPoint string, withCache bool) error {
+func (c *Client) Mount(task concurrency.Task, export string, mountPoint string, withCache bool) fail.Error {
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
-	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_share_mount.sh", data)
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to mount remote NFS share")
+	stdout, xerr := executeScript(task, *c.SSHConfig, "nfs_client_share_mount.sh", data)
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return fail.Wrap(xerr, "error executing script to mount remote NFS share")
+	}
+	return nil
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(task concurrency.Task, export string) error {
-	data := map[string]interface{}{
-		"Export": export,
+func (c *Client) Unmount(task concurrency.Task, export string) fail.Error {
+	data := map[string]interface{}{"Export": export}
+	stdout, xerr := executeScript(task, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
+	if xerr != nil {
+		_ = xerr.Annotate("stdout", stdout)
+		return fail.Wrap(xerr, "error executing script to unmount remote NFS share")
 	}
-	retcode, stdout, stderr, err := executeScript(task, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
-	return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Report executing script to unmount remote NFS share")
+	return nil
 }

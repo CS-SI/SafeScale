@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -73,25 +74,26 @@ func (v *Volume) OK() bool {
 }
 
 // Serialize serializes Host instance into bytes (output json code)
-func (v *Volume) Serialize() ([]byte, error) {
+func (v *Volume) Serialize() ([]byte, fail.Error) {
 	if v == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
-	return json.Marshal(v)
+	r, err := json.Marshal(v)
+	return r, fail.ToError(err)
 }
 
 // Deserialize reads json code and restores an Host
-func (v *Volume) Deserialize(buf []byte) (err error) {
+func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
 	if v == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
-	defer fail.OnPanic(&err) // json.Unmarshal may panic
-	return json.Unmarshal(buf, v)
+	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
+	return fail.ToError(json.Unmarshal(buf, v))
 }
 
 // SafeGetName returns the name of the volume
-// Satisfies interface data.Identifyable
+// Satisfies interface data.Identifiable
 func (v *Volume) SafeGetName() string {
 	if v == nil {
 		return ""
@@ -100,7 +102,7 @@ func (v *Volume) SafeGetName() string {
 }
 
 // SafeGetID returns the ID of the volume
-// Satisfies interface data.Identifyable
+// Satisfies interface data.Identifiable
 func (v *Volume) SafeGetID() string {
 	if v == nil {
 		return ""

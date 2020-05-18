@@ -42,15 +42,15 @@ import (
 
 // HostHandler defines API to manipulate hosts
 type HostHandler interface {
-	Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements, force bool) (resources.Host, fail.Report)
-	List(all bool) (abstract.HostList, fail.Report)
-	Inspect(ref string) (resources.Host, fail.Report)
-	Delete(ref string) fail.Report
-	SSH(ref string) (*system.SSHConfig, fail.Report)
-	Reboot(ref string) fail.Report
-	Resize(name string, sizing abstract.HostSizingRequirements) (resources.Host, fail.Report)
-	Start(ref string) fail.Report
-	Stop(ref string) fail.Report
+	Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements, force bool) (resources.Host, fail.Error)
+	List(all bool) (abstract.HostList, fail.Error)
+	Inspect(ref string) (resources.Host, fail.Error)
+	Delete(ref string) fail.Error
+	SSH(ref string) (*system.SSHConfig, fail.Error)
+	Reboot(ref string) fail.Error
+	Resize(name string, sizing abstract.HostSizingRequirements) (resources.Host, fail.Error)
+	Start(ref string) fail.Error
+	Stop(ref string) fail.Error
 }
 
 // hostHandler host service
@@ -64,103 +64,103 @@ func NewHostHandler(job server.Job) HostHandler {
 }
 
 // Start starts a host
-func (handler *hostHandler) Start(ref string) (err fail.Report) {
+func (handler *hostHandler) Start(ref string) (xerr fail.Error) {
 	if handler == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		return err
+	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		return xerr
 	}
 	return objh.Start(task)
 }
 
 // Stop stops a host
-func (handler *hostHandler) Stop(ref string) (err error) {
+func (handler *hostHandler) Stop(ref string) (xerr fail.Error) {
 	if handler == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return fail.InvalidParameterReport("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		return err
+	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		return xerr
 	}
 	return objh.Stop(task)
 }
 
 // Reboot reboots a host
-func (handler *hostHandler) Reboot(ref string) (err error) {
+func (handler *hostHandler) Reboot(ref string) (xerr fail.Error) {
 	if handler == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return fail.InvalidParameterReport("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		return err
+	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		return xerr
 	}
 	return objh.Reboot(task)
 }
 
 // Resize ...
-func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (newHost resources.Host, err error) {
+func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (newHost resources.Host, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+	defer fail.OnPanic(&xerr)
 
-	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		return nil, err
+	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	reduce := false
-	err = objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) error {
-		return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) error {
+	xerr = objh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
 			nhs, ok := clonable.(*propertiesv1.HostSizing)
 			if !ok {
-				return fail.InconsistentReport("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			reduce = reduce || (sizing.MinCores < nhs.RequestedSize.MinCores)
 			reduce = reduce || (sizing.MinRAMSize < nhs.RequestedSize.MinRAMSize)
@@ -170,30 +170,30 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 			return nil
 		})
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 	if reduce {
 		logrus.Warn("Asking for less resource..., ain't gonna happen :(")
 	}
 
-	err = objh.Resize(sizing)
-	return objh, err
+	xerr = objh.Resize(sizing)
+	return objh, xerr
 }
 
 // Create creates a host
 func (handler *hostHandler) Create(
 	req abstract.HostRequest, sizing abstract.HostSizingRequirements, force bool,
-) (newHost resources.Host, err error) {
+) (newHost resources.Host, xerr fail.Error) {
 
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if req.ResourceName == "" {
-		return nil, fail.InvalidParameterReport("req.Name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("req.Name", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
@@ -203,7 +203,7 @@ func (handler *hostHandler) Create(
 		if len(req.Networks) > 0 {
 			networkName = req.Networks[0].Name
 		} else {
-			return nil, fail.InvalidParameterReport("req.Networks", "must contain at least on network if req.PublicIP is false")
+			return nil, fail.InvalidParameterError("req.Networks", "must contain at least on network if req.PublicIP is false")
 		}
 	} else {
 		networkName = abstract.SingleHostNetworkName
@@ -214,123 +214,122 @@ func (handler *hostHandler) Create(
 		"('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, networkName, req.ImageID, req.PublicIP, force,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+	defer fail.OnPanic(&xerr)
 
-	objh, err := hostfactory.New(handler.job.SafeGetService())
-	if err != nil {
-		return nil, err
+	objh, xerr := hostfactory.New(handler.job.SafeGetService())
+	if xerr != nil {
+		return nil, xerr
 	}
-	_, err = objh.Create(task, req, sizing)
-	if err != nil {
-		return nil, err
+	if _, xerr = objh.Create(task, req, sizing); xerr != nil {
+		return nil, xerr
 	}
 	return objh, nil
 }
 
 // ErrorList returns the host list
-func (handler *hostHandler) List(all bool) (hosts abstract.HostList, err error) {
+func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	if all {
 		return handler.job.SafeGetService().ListHosts(true)
 	}
 
-	objh, err := hostfactory.New(handler.job.SafeGetService())
-	if err != nil {
-		return nil, err
+	objh, xerr := hostfactory.New(handler.job.SafeGetService())
+	if xerr != nil {
+		return nil, xerr
 	}
 	hosts = abstract.HostList{}
-	err = objh.Browse(task, func(ahc *abstract.HostCore) error {
+	xerr = objh.Browse(task, func(ahc *abstract.HostCore) fail.Error {
 		hosts = append(hosts, converters.HostCoreToHostFull(*ahc))
 		return nil
 	})
-	return hosts, err
+	return hosts, xerr
 }
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
-func (handler *hostHandler) Inspect(ref string) (host resources.Host, err error) {
+func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); ok {
+	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); ok {
 			return nil, nil
 		}
-		return nil, err
+		return nil, xerr
 	}
 	return objh, nil
 }
 
 // Delete deletes host referenced by ref
-func (handler *hostHandler) Delete(ref string) (err error) {
+func (handler *hostHandler) Delete(ref string) (xerr fail.Error) {
 	if handler == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return fail.InvalidParameterReport("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+	defer fail.OnPanic(&xerr)
 
-	objh, err := hostfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		return err
+	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		return xerr
 	}
 	return objh.Delete(task)
 }
 
 // SSH returns ssh parameters to access the host referenced by ref
-func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, err error) {
+func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be nil")
+		return nil, fail.InvalidParameterError("ref", "cannot be nil")
 	}
 
 	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	sshHandler := NewSSHHandler(handler.job)
-	sshConfig, err = sshHandler.GetConfig(ref)
-	if err != nil {
-		return nil, err
+	sshConfig, xerr = sshHandler.GetConfig(ref)
+	if xerr != nil {
+		return nil, xerr
 	}
 	return sshConfig, nil
 }

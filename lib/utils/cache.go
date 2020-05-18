@@ -18,16 +18,18 @@ package utils
 
 import (
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_cache.go -package=mocks github.com/CS-SI/SafeScale/lib/utils Cache
 
 // Cache is an interface for caching elements
 type Cache interface {
-	SetBy(string, func() (interface{}, error)) error
-	Set(string, interface{}) error
-	ForceSetBy(string, func() (interface{}, error)) error
-	ForceSet(string, interface{}) error
+	SetBy(string, func() (interface{}, fail.Error)) fail.Error
+	Set(string, interface{}) fail.Error
+	ForceSetBy(string, func() (interface{}, fail.Error)) fail.Error
+	ForceSet(string, interface{}) fail.Error
 	Reset(string) Cache
 	Get(string) (interface{}, bool)
 	GetOrDefault(string, interface{}) interface{}
@@ -47,7 +49,7 @@ func NewMapCache() Cache {
 }
 
 // SetBy ...
-func (c *MapCache) SetBy(key string, by func() (interface{}, error)) error {
+func (c *MapCache) SetBy(key string, by func() (interface{}, fail.Error)) fail.Error {
 	c.lock.Lock()
 	if _, ok := c.cache[key]; !ok {
 		value, err := by()
@@ -61,40 +63,43 @@ func (c *MapCache) SetBy(key string, by func() (interface{}, error)) error {
 }
 
 // ForceSetBy ...
-func (c *MapCache) ForceSetBy(key string, by func() (interface{}, error)) error {
+func (c *MapCache) ForceSetBy(key string, by func() (interface{}, fail.Error)) fail.Error {
 	c.lock.Lock()
-	value, err := by()
-	if err != nil {
-		return err
+	defer c.lock.Unlock()
+
+	value, xerr := by()
+	if xerr != nil {
+		return xerr
 	}
 	c.cache[key] = value
-	c.lock.Unlock()
 	return nil
 }
 
 // Set ...
-func (c *MapCache) Set(key string, value interface{}) error {
-	return c.SetBy(key, func() (interface{}, error) { return value, nil })
+func (c *MapCache) Set(key string, value interface{}) fail.Error {
+	return c.SetBy(key, func() (interface{}, fail.Error) { return value, nil })
 }
 
 // ForceSet ...
-func (c *MapCache) ForceSet(key string, value interface{}) error {
-	return c.ForceSetBy(key, func() (interface{}, error) { return value, nil })
+func (c *MapCache) ForceSet(key string, value interface{}) fail.Error {
+	return c.ForceSetBy(key, func() (interface{}, fail.Error) { return value, nil })
 }
 
 // Reset ...
 func (c *MapCache) Reset(key string) Cache {
 	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	delete(c.cache, key)
-	c.lock.Unlock()
 	return c
 }
 
 // Get ...
 func (c *MapCache) Get(key string) (value interface{}, ok bool) {
 	c.lock.RLock()
+	defer c.lock.Unlock()
+
 	value, ok = c.cache[key]
-	c.lock.RUnlock()
 	return
 }
 

@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -44,17 +43,14 @@ type BucketListener struct{}
 
 // ErrorList available buckets
 func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *protocol.BucketList, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot list buckets").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list buckets")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -64,20 +60,20 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "bucket list")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "bucket list")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	buckets, err := handler.List()
+	buckets, xerr := handler.List()
 	if err != nil {
-		return nil, err
+		return nil, xerr
 	}
 
 	return converters.BucketListFromAbstractToProtocol(buckets), nil
@@ -85,21 +81,18 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 
 // Create a new bucket
 func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot create bucket").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport().ToGRPCStatus()
+		return empty, fail.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "can't be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -109,21 +102,20 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "bucket create")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "bucket create")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	err = handler.Create(bucketName)
-	if err != nil {
-		return empty, err
+	if xerr = handler.Create(bucketName); xerr != nil {
+		return empty, xerr
 	}
 
 	return empty, nil
@@ -131,21 +123,18 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 
 // Delete a bucket
 func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot delete bucket").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport().ToGRPCStatus()
+		return empty, fail.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "can't be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -155,20 +144,19 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "bucket list")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "bucket list")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	err = handler.Delete(bucketName)
-	if err != nil {
+	if err = handler.Delete(bucketName); err != nil {
 		return empty, err
 	}
 
@@ -177,20 +165,17 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 
 // Inspect a bucket
 func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *protocol.BucketMountingPoint, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot inspect bucket").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect bucket")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "can't be nil")
+		return nil, fail.InvalidParameterError("in", "can't be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -200,46 +185,43 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "bucket inspect")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "bucket inspect")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	bucketName := in.GetName()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	resp, err := handler.Inspect(bucketName)
-	if err != nil {
-		return nil, err
+	resp, xerr := handler.Inspect(bucketName)
+	if xerr != nil {
+		return nil, xerr
 	}
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if resp == nil {
-		return nil, fail.NotFoundReport(fmt.Sprintf("bucket '%s' not found", bucketName))
+		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
 	return converters.BucketMountPointFromResourceToProtocol(resp)
 }
 
 // Mount a bucket on the filesystem of the host
 func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingPoint) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot mount bucket").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot mount bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport().ToGRPCStatus()
+		return empty, fail.InvalidInstanceError().ToGRPCStatus()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "can't be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -249,9 +231,9 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "bucket mount")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "bucket mount")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -259,33 +241,29 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 	hostName := in.GetHost().Name
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	err = handler.Mount(bucketName, hostName, in.GetPath())
-	if err != nil {
-		return empty, err
+	if xerr = handler.Mount(bucketName, hostName, in.GetPath()); xerr != nil {
+		return empty, xerr
 	}
 	return empty, nil
 }
 
 // Unmount a bucket from the filesystem of the host
 func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountingPoint) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot unmount bucket").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot unmount bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "can't be nil")
+		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -295,9 +273,9 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "bucket unmount")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "bucket unmount")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -305,12 +283,11 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 	hostName := in.GetHost().Name
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	err = handler.Unmount(bucketName, hostName)
-	if err != nil {
-		return empty, err
+	if xerr = handler.Unmount(bucketName, hostName); xerr != nil {
+		return empty, xerr
 	}
 	return empty, nil
 }

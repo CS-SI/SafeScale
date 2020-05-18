@@ -19,6 +19,7 @@ package operations
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_installer.go -package=mocks github.com/CS-SI/SafeScale/lib/server/resources/operations Installer
@@ -26,9 +27,9 @@ import (
 // Installer defines the API of an Installer
 type Installer interface {
 	// Check checks if the feature is installed
-	Check(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, error)
+	Check(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)
 	// Add executes installation of feature
-	Add(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, error)
+	Add(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)
 	// Remove executes deletion of feature
-	Remove(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, error)
+	Remove(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)
 }

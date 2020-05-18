@@ -28,21 +28,21 @@ type Result struct {
 }
 
 // RefreshResult ...
-func RefreshResult(oco OpContext) (res Result, err error) {
+func RefreshResult(oco OpContext) (res Result, xerr fail.Error) {
+	var err error
 	res = Result{}
-
 	if oco.Operation != nil {
 		if oco.Operation.Zone != "" { // nolint
 			zoneURL, ierr := url.Parse(oco.Operation.Zone)
 			if ierr != nil {
-				return res, ierr
+				return res, fail.ToError(ierr)
 			}
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 		} else if oco.Operation.Region != "" {
 			regionURL, ierr := url.Parse(oco.Operation.Region)
 			if ierr != nil {
-				return res, ierr
+				return res, fail.ToError(ierr)
 			}
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
@@ -52,22 +52,22 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 
 		if oco.Operation == nil {
 			if err == nil {
-				return res, fmt.Errorf("no operation")
+				return res, fail.NewError("no operation")
 			}
-			return res, err
+			return res, fail.ToError(err)
 		}
 
 		res.State = oco.Operation.Status
 		res.Error = err
 		res.Done = res.State == oco.DesiredState
 
-		return res, err
+		return res, fail.ToError(err)
 	}
 
-	return res, fail.NewReport("no operation")
+	return res, fail.NewError("no operation")
 }
 
-func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, duration time.Duration) (err error) {
+func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, duration time.Duration) (xerr fail.Error) {
 	retryErr := retry.WhileUnsuccessful(func() error {
 		r, anerr := RefreshResult(oco)
 		if anerr != nil {
@@ -79,7 +79,7 @@ func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, 
 		return nil
 	}, poll, duration)
 
-	return retryErr
+	return fail.ToError(retryErr)
 }
 
 // SelfLink ...
@@ -129,7 +129,7 @@ func getRegionFromSelfLink(link SelfLink) (string, error) {
 		}
 		return "", fmt.Errorf("not a region link")
 	}
-	return "", fail.InvalidRequestReport("not a region link")
+	return "", fail.InvalidRequestError("not a region link")
 }
 
 // func assertEq(exp, got interface{}) error {

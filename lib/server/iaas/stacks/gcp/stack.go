@@ -10,6 +10,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Stack ...
@@ -32,7 +33,7 @@ func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
+func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
 	stack := &Stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
@@ -41,17 +42,17 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 
 	d1, err := json.MarshalIndent(localCfg, "", "  ")
 	if err != nil {
-		return &Stack{}, err
+		return &Stack{}, fail.ToError(err)
 	}
 
 	cred, err := google.CredentialsFromJSON(context.Background(), d1, iam.CloudPlatformScope)
 	if err != nil {
-		return &Stack{}, err
+		return &Stack{}, fail.ToError(err)
 	}
 
 	stack.ComputeService, err = compute.NewService(context.Background(), option.WithTokenSource(cred.TokenSource))
 	if err != nil {
-		return &Stack{}, err
+		return &Stack{}, fail.ToError(err)
 	}
 
 	return stack, nil

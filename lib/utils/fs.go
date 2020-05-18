@@ -10,7 +10,7 @@ import (
 
 // LazyRemove is identical to os.Remove, but doesn't raise an error, and
 // log.Warn every error except "file not found" which is ignored
-func LazyRemove(path string) fail.Report {
+func LazyRemove(path string) fail.Error {
 	err := os.Remove(path)
 	if err != nil {
 		switch err.(type) {

@@ -26,7 +26,7 @@ import (
 )
 
 // GetSecurityGroup returns the default security group
-func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
+func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, fail.Error) {
 	var sgList []secgroups.SecGroup
 	opts := secgroups.ListOpts{
 		Name: s.DefaultSecurityGroupName,
@@ -44,26 +44,25 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 		return true, nil
 	})
 	if len(sgList) == 0 {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	if len(sgList) > 1 {
-		return nil, fail.OverflowReport(nil, 1, "several security groups named '%s' found", name)
+		return nil, fail.OverflowError(nil, 1, "several security groups named '%s' found", name)
 	}
 
 	return &sgList[0], nil
 }
 
-func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
+func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, fail.Error) {
 	sg, err := s.GetSecurityGroup(s.DefaultSecurityGroupName)
 	if err != nil {
-		return nil, fail.NewReport("error listing routers: %s", ProviderErrorToString(err))
+		return nil, fail.NewError("error listing routers: %s", ProviderErrorToString(err))
 	}
-
 	return sg, nil
 }
 
 // createTCPRules creates TCP rules to configure the default security group
-func (s *Stack) createTCPRules(groupID string) error {
+func (s *Stack) createTCPRules(groupID string) fail.Error {
 	// Open TCP Ports
 	ruleOpts := secrules.CreateOpts{
 		Direction:      secrules.DirIngress,
@@ -77,7 +76,7 @@ func (s *Stack) createTCPRules(groupID string) error {
 
 	_, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	ruleOpts = secrules.CreateOpts{
 		Direction:      secrules.DirIngress,
@@ -90,7 +89,7 @@ func (s *Stack) createTCPRules(groupID string) error {
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 
 	// Outbound = egress == going to Outside
@@ -105,7 +104,7 @@ func (s *Stack) createTCPRules(groupID string) error {
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	ruleOpts = secrules.CreateOpts{
 		Direction:      secrules.DirEgress,
@@ -117,11 +116,11 @@ func (s *Stack) createTCPRules(groupID string) error {
 		RemoteIPPrefix: "::/0",
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	return err
+	return fail.ToError(err)
 }
 
 // createUDPRules creates UDP rules to configure the default security group
-func (s *Stack) createUDPRules(groupID string) error {
+func (s *Stack) createUDPRules(groupID string) fail.Error {
 	// Inbound == ingress == coming from Outside
 	ruleOpts := secrules.CreateOpts{
 		Direction:      secrules.DirIngress,
@@ -134,7 +133,7 @@ func (s *Stack) createUDPRules(groupID string) error {
 	}
 	_, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	ruleOpts = secrules.CreateOpts{
 		Direction:      secrules.DirIngress,
@@ -147,7 +146,7 @@ func (s *Stack) createUDPRules(groupID string) error {
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 
 	// Outbound = egress == going to Outside
@@ -162,7 +161,7 @@ func (s *Stack) createUDPRules(groupID string) error {
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	ruleOpts = secrules.CreateOpts{
 		Direction:      secrules.DirEgress,
@@ -174,7 +173,7 @@ func (s *Stack) createUDPRules(groupID string) error {
 		RemoteIPPrefix: "::/0",
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	return err
+	return fail.ToError(err)
 }
 
 // createICMPRules creates ICMP rules inside the default security group
@@ -189,7 +188,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 	}
 	_, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	ruleOpts = secrules.CreateOpts{
 		Direction:      secrules.DirIngress,
@@ -200,7 +199,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 
 	// Outbound = egress == going to Outside
@@ -213,7 +212,7 @@ func (s *Stack) createICMPRules(groupID string) error {
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 	ruleOpts = secrules.CreateOpts{
 		Direction:      secrules.DirEgress,
@@ -223,19 +222,19 @@ func (s *Stack) createICMPRules(groupID string) error {
 		RemoteIPPrefix: "::/0",
 	}
 	_, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-	return err
+	return fail.ToError(err)
 }
 
 // InitDefaultSecurityGroup create an open Security Group
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
-func (s *Stack) InitDefaultSecurityGroup() error {
+func (s *Stack) InitDefaultSecurityGroup() fail.Error {
 	if s.DefaultSecurityGroupName == "" {
 		s.DefaultSecurityGroupName = stacks.DefaultSecurityGroupName
 	}
-	sg, err := s.getDefaultSecurityGroup()
-	if err != nil {
-		return err
+	sg, rerr := s.getDefaultSecurityGroup()
+	if rerr != nil {
+		return rerr
 	}
 	if sg != nil {
 		s.SecurityGroup = sg
@@ -251,25 +250,25 @@ func (s *Stack) InitDefaultSecurityGroup() error {
 
 	group, err := secgroups.Create(s.NetworkClient, opts).Extract()
 	if err != nil {
-		return err
+		return fail.ToError(err)
 	}
 
 	err = s.createTCPRules(group.ID)
 	if err != nil {
 		secgroups.Delete(s.NetworkClient, group.ID)
-		return err
+		return fail.ToError(err)
 	}
 
 	err = s.createUDPRules(group.ID)
 	if err != nil {
 		secgroups.Delete(s.NetworkClient, group.ID)
-		return err
+		return fail.ToError(err)
 	}
 
 	err = s.createICMPRules(group.ID)
 	if err != nil {
 		secgroups.Delete(s.NetworkClient, group.ID)
-		return err
+		return fail.ToError(err)
 	}
 
 	s.SecurityGroup = group

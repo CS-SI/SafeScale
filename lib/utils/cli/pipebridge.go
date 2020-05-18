@@ -35,9 +35,9 @@ type StdoutBridge struct {
 }
 
 // NewStdoutBridge creates an PipeBridge from a bufio.ReadCloser
-func NewStdoutBridge(pipe io.ReadCloser) (*StdoutBridge, fail.Report) {
+func NewStdoutBridge(pipe io.ReadCloser) (*StdoutBridge, fail.Error) {
 	if pipe == nil {
-		return nil, fail.InvalidParameterReport("pipe", "cannot be nil")
+		return nil, fail.InvalidParameterError("pipe", "cannot be nil")
 	}
 	sp := StdoutBridge{
 		coreBridge: coreBridge{
@@ -58,9 +58,9 @@ type StderrBridge struct {
 }
 
 // NewStderrBridge creates a pipe displaying on stderr
-func NewStderrBridge(pipe io.ReadCloser) (*StderrBridge, fail.Report) {
+func NewStderrBridge(pipe io.ReadCloser) (*StderrBridge, fail.Error) {
 	if pipe == nil {
-		return nil, fail.InvalidParameterReport("pipe", "cannot be nil")
+		return nil, fail.InvalidParameterError("pipe", "cannot be nil")
 	}
 	sp := StderrBridge{
 		coreBridge: coreBridge{
@@ -86,9 +86,9 @@ type PipeBridgeController struct {
 }
 
 // NewPipeBridgeController creates a new controller of bridges of pipe
-func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail.Report) {
+func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail.Error) {
 	if bridges == nil {
-		return nil, fail.InvalidParameterReport("pipes", "cannot be nil")
+		return nil, fail.InvalidParameterError("pipes", "cannot be nil")
 	}
 
 	var validatedBridges []PipeBridge
@@ -99,7 +99,7 @@ func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail
 	}
 	count := uint(len(validatedBridges))
 	if count == 0 {
-		return nil, fail.InvalidRequestReport("no pipe to bridge")
+		return nil, fail.InvalidRequestError("no pipe to bridge")
 	}
 
 	ob := PipeBridgeController{bridges: validatedBridges, count: count}
@@ -107,15 +107,15 @@ func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail
 }
 
 // Start initiates the capture of pipe outputs and the display of what is captured
-func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Report {
+func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	if pbc == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if pbc.bridges == nil {
-		return fail.InvalidInstanceContentReport("pbc.bridges", "cannot be nil")
+		return fail.InvalidInstanceContentError("pbc.bridges", "cannot be nil")
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	pipeCount := uint(len(pbc.bridges))
@@ -125,7 +125,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Report {
 	}
 
 	// First starts the "displayer" routine...
-	var err fail.Report
+	var err fail.Error
 	pbc.displayTask, err = concurrency.NewTaskWithParent(task)
 	if err != nil {
 		return err
@@ -165,14 +165,14 @@ func (oi outputItem) Print() {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, oerr fail.Report) {
+func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if p == nil {
-		return nil, fail.InvalidParameterReport("p", "cannot be nil")
+		return nil, fail.InvalidParameterError("p", "cannot be nil")
 	}
 
 	params, ok := p.(data.Map)
 	if !ok {
-		return nil, fail.InvalidParameterReport("p", "must be a 'data.Map'")
+		return nil, fail.InvalidParameterError("p", "must be a 'data.Map'")
 	}
 
 	var (
@@ -180,24 +180,24 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 		displayCh chan<- outputItem
 	)
 	if bridge, ok = params["bridge"].(PipeBridge); !ok {
-		return nil, fail.InvalidParameterReport("params['bridge']", "must be a PipeBridge")
+		return nil, fail.InvalidParameterError("params['bridge']", "must be a PipeBridge")
 	}
 	if bridge == nil {
-		return nil, fail.InvalidParameterReport("params['bridge']", "cannot be nil")
+		return nil, fail.InvalidParameterError("params['bridge']", "cannot be nil")
 	}
 	if displayCh, ok = params["displayCh"].(chan<- outputItem); !ok {
-		return nil, fail.InvalidParameterReport("params['displayCh']", "must be a 'chan<- outputItem'")
+		return nil, fail.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
 	}
 
 	tracer := concurrency.NewTracer(t, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &oerr)
+	// defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	// bufio.Scanner.Scan() may panic...
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			oerr = fail.ErrorToReport(panicErr)
+			xerr = fail.ToError(panicErr)
 		}
 	}()
 	defer fail.OnPanic(&panicErr)
@@ -227,19 +227,19 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 			err = nil
 		} else {
 			switch err.(type) {
-			// case fail.Aborted, *os.PathError:
+			// case fail.ErrAborted, *os.PathError:
 			case *os.PathError:
 				err = nil
 			}
 		}
 	}
-	return nil, fail.ErrorToReport(err)
+	return nil, fail.ToError(err)
 }
 
-func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Report) {
+func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 	displayCh, ok := p.(<-chan outputItem)
 	if !ok {
-		return nil, fail.InvalidParameterReport("p", "must be a '<-chan outputItem'")
+		return nil, fail.InvalidParameterError("p", "must be a '<-chan outputItem'")
 	}
 	for item := range displayCh {
 		item.Print()
@@ -248,15 +248,15 @@ func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.
 }
 
 // Wait waits the end of the goroutines
-func (pbc *PipeBridgeController) Wait() fail.Report {
+func (pbc *PipeBridgeController) Wait() fail.Error {
 	if pbc == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if pbc.displayTask == nil {
-		return fail.InvalidInstanceContentReport("pbc.displayTask", "cannot be nil")
+		return fail.InvalidInstanceContentError("pbc.displayTask", "cannot be nil")
 	}
 	if pbc.readersGroup == nil {
-		return fail.InvalidInstanceContentReport("pbc.readersGroup", "cannot be nil")
+		return fail.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
 	_, err := pbc.readersGroup.WaitGroup()
 	close(pbc.displayCh)
@@ -269,15 +269,15 @@ func (pbc *PipeBridgeController) Wait() fail.Report {
 }
 
 // Stop the captures and the display.
-func (pbc *PipeBridgeController) Stop() fail.Report {
+func (pbc *PipeBridgeController) Stop() fail.Error {
 	if pbc == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if pbc.count == 0 {
 		return nil
 	}
 	if pbc.readersGroup == nil {
-		return fail.InvalidInstanceContentReport("pbc.readersGroup", "cannot be nil")
+		return fail.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
 
 	// Try to wait the end of the task group
@@ -291,7 +291,7 @@ func (pbc *PipeBridgeController) Stop() fail.Report {
 		err = pbc.Wait()
 		if err != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it
-			if _, ok = err.(fail.Aborted); !ok {
+			if _, ok = err.(fail.ErrAborted); !ok {
 				return err
 			}
 		}

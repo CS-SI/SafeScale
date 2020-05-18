@@ -98,7 +98,7 @@ func Decrypt(ciphertext []byte, key *Key) ([]byte, error) {
 	}
 
 	if len(ciphertext) < gcm.NonceSize() {
-		return nil, fail.InvalidParameterReport("ciphertext", "malformed (corrupted?)")
+		return nil, fail.InvalidParameterError("ciphertext", "malformed (corrupted?)")
 	}
 
 	return gcm.Open(nil,

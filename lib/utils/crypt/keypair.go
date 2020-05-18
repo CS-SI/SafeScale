@@ -28,19 +28,19 @@ import (
 )
 
 // GenerateRSAKeyPair creates a key pair
-func GenerateRSAKeyPair(name string) (*abstract.KeyPair, error) {
+func GenerateRSAKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	if name == "" {
-		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	publicKey := privateKey.PublicKey
 	pub, err := ssh.NewPublicKey(&publicKey)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	pubBytes := ssh.MarshalAuthorizedKey(pub)
 	pubKey := string(pubBytes)

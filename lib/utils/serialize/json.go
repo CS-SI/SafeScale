@@ -55,9 +55,9 @@ type JSONProperties struct {
 }
 
 // NewJSONProperties creates a new JSonProperties instance
-func NewJSONProperties(module string) (*JSONProperties, fail.Report) {
+func NewJSONProperties(module string) (*JSONProperties, fail.Error) {
 	if module == "" {
-		return nil, fail.InvalidParameterReport("module", "can't be empty string")
+		return nil, fail.InvalidParameterError("module", "can't be empty string")
 	}
 	return &JSONProperties{
 		Properties: data.Map{},
@@ -98,24 +98,24 @@ func (x *JSONProperties) Count() int {
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector func(clonable data.Clonable) fail.Report) fail.Report {
+func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector func(clonable data.Clonable) fail.Error) fail.Error {
 	if x == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		return fail.InvalidInstanceContentReport("x.properties", "can't be nil")
+		return fail.InvalidInstanceContentError("x.properties", "can't be nil")
 	}
 	if x.module == "" {
-		return fail.InvalidInstanceContentReport("x.module", "can't be empty string")
+		return fail.InvalidInstanceContentError("x.module", "can't be empty string")
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if key == "" {
-		return fail.InvalidParameterReport("key", "cannot be empty string")
+		return fail.InvalidParameterError("key", "cannot be empty string")
 	}
 	if inspector == nil {
-		return fail.InvalidParameterReport("inspector", "cannot be nil")
+		return fail.InvalidParameterError("inspector", "cannot be nil")
 	}
 
 	var (
@@ -144,24 +144,24 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 // Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
 // If no extension exists corresponding to the key, an empty one is created (in other words, this call
 // can't fail because a key doesn't exist).
-func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(data.Clonable) fail.Report) fail.Report {
+func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(data.Clonable) fail.Error) fail.Error {
 	if x == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		return fail.InvalidInstanceContentReport("x.properties", "cannot be nil")
+		return fail.InvalidInstanceContentError("x.properties", "cannot be nil")
 	}
 	if x.module == "" {
-		return fail.InvalidInstanceContentReport("x.module", "cannot be empty string")
+		return fail.InvalidInstanceContentError("x.module", "cannot be empty string")
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if key == "" {
-		return fail.InvalidParameterReport("key", "cannot be empty string")
+		return fail.InvalidParameterError("key", "cannot be empty string")
 	}
 	if alterer == nil {
-		return fail.InvalidParameterReport("alterer", "cannot be nil")
+		return fail.InvalidParameterError("alterer", "cannot be nil")
 	}
 
 	var (
@@ -193,12 +193,12 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
-func (x *JSONProperties) SetModule(module string) fail.Report {
+func (x *JSONProperties) SetModule(module string) fail.Error {
 	if x == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if module == "" {
-		return fail.InvalidParameterReport("key", "can't be empty string")
+		return fail.InvalidParameterError("key", "can't be empty string")
 	}
 
 	x.Lock()
@@ -212,15 +212,15 @@ func (x *JSONProperties) SetModule(module string) fail.Report {
 
 // Serialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Report) {
+func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 	if x == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if x.Properties == nil {
-		return nil, fail.InvalidParameterReport("x.properties", "can't be nil")
+		return nil, fail.InvalidParameterError("x.properties", "can't be nil")
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	x.RLock()
@@ -236,28 +236,22 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Report) 
 	}
 	r, jserr := json.Marshal(mapped)
 	if jserr != nil {
-		return nil, fail.NewReport(jserr.Error())
+		return nil, fail.NewError(jserr.Error())
 	}
 	return r, nil
 }
 
 // Deserialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (oerr fail.Report) {
+func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
 	if x == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	var panicErr error
-	defer func() {
-		if panicErr != nil {
-			oerr = fail.ErrorToReport(panicErr)
-		}
-	}()
-	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
+	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
 	x.Lock()
 	defer x.Unlock()
@@ -266,7 +260,7 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (oerr fa
 	var unjsoned = map[string]string{}
 	if jserr := json.Unmarshal(buf, &unjsoned); jserr != nil {
 		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
-		return fail.NewReport(jserr.Error())
+		return fail.NewError(jserr.Error())
 	}
 
 	var (

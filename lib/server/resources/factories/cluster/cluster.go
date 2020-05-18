@@ -27,7 +27,7 @@ import (
 // New creates a new instance of resources.Cluster
 func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	return operations.NewCluster(task, svc)
 }
@@ -35,10 +35,10 @@ func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err erro
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
 func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, err error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("t", "cannot be nil")
+		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	return operations.LoadCluster(task, svc, name)

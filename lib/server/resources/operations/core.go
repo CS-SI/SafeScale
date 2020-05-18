@@ -18,7 +18,6 @@ package operations
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -60,20 +59,20 @@ func nullCore() *core {
 }
 
 // NewCore creates an instance of core
-func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, fail.Report) {
+func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, fail.Error) {
 	if svc == nil {
-		return nullCore(), fail.InvalidParameterReport("svc", "cannot be nil")
+		return nullCore(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if kind == "" {
-		return nullCore(), fail.InvalidParameterReport("kind", "cannot be empty string")
+		return nullCore(), fail.InvalidParameterError("kind", "cannot be empty string")
 	}
 	if path == "" {
-		return nullCore(), fail.InvalidParameterReport("path", "cannot be empty string")
+		return nullCore(), fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	fld, err := newFolder(svc, path)
-	if err != nil {
-		return nullCore(), err
+	fld, xerr := newFolder(svc, path)
+	if xerr != nil {
+		return nullCore(), xerr
 	}
 	props, err := serialize.NewJSONProperties("resources." + kind)
 	if err != nil {
@@ -104,7 +103,7 @@ func (c *core) SafeGetService() iaas.Service {
 
 // SafeGetID returns the id of the data protected
 //
-// satisfies interface data.Identifyable
+// satisfies interface data.Identifiable
 func (c *core) SafeGetID() string {
 	if c.IsNull() {
 		return "<NullCore>"
@@ -117,7 +116,7 @@ func (c *core) SafeGetID() string {
 
 // SafeGetName returns the name of the data protected
 //
-// satisfies interface data.Identifyable
+// satisfies interface data.Identifiable
 func (c *core) SafeGetName() string {
 	if c.IsNull() {
 		return "<NullCore>"
@@ -129,18 +128,18 @@ func (c *core) SafeGetName() string {
 }
 
 // Inspect protects the data for shared read
-func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err fail.Report) {
+func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err fail.Error) {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
-		return fail.InvalidParameterReport("callback", "cannot be nil")
+		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 	if c.properties == nil {
-		return fail.InvalidInstanceContentReport("c.properties", "cannot be nil")
+		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
 	}
 
 	// Reload reloads data from objectstorage to be sure to have the last revision
@@ -149,28 +148,28 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 		return err
 	}
 
-	return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Report {
+	return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
 }
 
 // Alter protects the data for exclusive write
-func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err fail.Report) {
+func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err fail.Error) {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
-		return fail.InvalidParameterReport("callback", "cannot be nil")
+		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
 	if c.shielded == nil {
-		return fail.InvalidInstanceContentReport("c.shielded", "cannot be nil")
+		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
 	}
 
 	// Make sure c.properties is populated
@@ -187,7 +186,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err fa
 		return err
 	}
 
-	err = c.shielded.Alter(task, func(clonable data.Clonable) fail.Report {
+	err = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
 	if err != nil {
@@ -198,31 +197,31 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err fa
 }
 
 // Carry links metadata with real data
-// If c is already carrying a shielded data, returns fail.NotAvailableReport
+// If c is already carrying a shielded data, returns fail.NotAvailableError
 //
 // errors returned :
-// - fail.InvalidInstance
-// - fail.InvalidParameter
-// - fail.NotAvailable if the core instance already carries a data
-func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Report {
+// - fail.ErrInvalidInstance
+// - fail.ErrInvalidParameter
+// - fail.ErrNotAvailable if the core instance already carries a data
+func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Error {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if clonable == nil {
-		return fail.InvalidParameterReport("clonable", "cannot be nil")
+		return fail.InvalidParameterError("clonable", "cannot be nil")
 	}
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
 	if c.loaded {
-		return fail.NotAvailableReport("already carrying a shielded value")
+		return fail.NotAvailableError("already carrying a shielded value")
 	}
 	if c.shielded == nil {
-		return fail.InvalidInstanceContentReport("c.shielded", "cannot be nil")
+		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
 	}
 
 	c.shielded = concurrency.NewShielded(clonable)
@@ -234,12 +233,12 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Report 
 	return c.write(task)
 }
 
-func (c *core) updateIdentity(task concurrency.Task) fail.Report {
+func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 	if c.loaded {
-		return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Report {
-			ident, ok := clonable.(data.Identifyable)
+		return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
+			ident, ok := clonable.(data.Identifiable)
 			if !ok {
-				return fail.InconsistentReport("'data.Identifyable' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			c.name.Store(ident.SafeGetName())
 			c.id.Store(ident.SafeGetID())
@@ -253,31 +252,31 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Report {
 }
 
 // Read gets the data from Object Storage
-// if error is NotFound then read by name; if error is NotFound return this error
+// if error is ErrNotFound then read by name; if error is ErrNotFound return this error
 // In case of any other error, abort the retry to propagate the error
 // If retry times out, returns errNotFound
-func (c *core) Read(task concurrency.Task, ref string) fail.Report {
+func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if ref == "" {
-		return fail.InvalidParameterReport("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 	if c.loaded {
-		return fail.NotAvailableReport("metadata is already carrying a value")
+		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
-	err := retry.WhileUnsuccessfulDelay1Second(
+	xerr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			inErr := c.readByReference(task, ref)
 			if inErr != nil {
-				if _, ok := inErr.(fail.NotFound); ok {
+				if _, ok := inErr.(fail.ErrNotFound); ok {
 					return inErr
 				}
 				return retry.StopRetryError(inErr)
@@ -286,14 +285,14 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Report {
 		},
 		10*time.Second,
 	)
-	if err != nil {
-		switch err.(type) {
+	if xerr != nil {
+		switch xerr.(type) {
 		case retry.ErrTimeout:
-			return fail.NotFoundReport("failed to load metadata of %s '%s'", c.kind, ref)
+			return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
 		case retry.ErrStopRetry:
-			return fail.Cause(err)
+			return fail.ToError(xerr.Cause())
 		default:
-			return err
+			return xerr
 		}
 	}
 
@@ -302,46 +301,44 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Report {
 }
 
 // readByReference gets the data from Object Storage
-// if error is NotFound then read by name; if error is still NotFound return this error
-func (c *core) readByReference(task concurrency.Task, ref string) fail.Report {
-	err := c.readByID(task, ref)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
-			return err
+// if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
+func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
+	if xerr = c.readByID(task, ref); xerr != nil {
+		var ok bool
+		if _, ok = xerr.(fail.ErrNotFound); !ok {
+			return xerr
 		}
-		err = c.readByName(task, ref)
+		xerr = c.readByName(task, ref)
 	}
-	return err
+	return xerr
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (c *core) readByID(task concurrency.Task, id string) fail.Report {
-	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Report {
+func (c *core) readByID(task concurrency.Task, id string) fail.Error {
+	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		return c.Deserialize(task, buf)
 	})
 }
 
 // readByName reads a metadata identified by name
-func (c *core) readByName(task concurrency.Task, name string) fail.Report {
-	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Report {
+func (c *core) readByName(task concurrency.Task, name string) fail.Error {
+	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Error {
 		return c.Deserialize(task, buf)
 	})
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (c *core) write(task concurrency.Task) fail.Report {
+func (c *core) write(task concurrency.Task) fail.Error {
 	if !c.committed {
-		jsoned, err := c.Serialize(task)
-		if err != nil {
-			return fail.NewReport(err.Error())
+		jsoned, xerr := c.Serialize(task)
+		if xerr != nil {
+			return xerr
 		}
-		err = c.folder.Write(byNameFolderName, c.SafeGetName(), jsoned)
-		if err != nil {
-			return fail.NewReport(err.Error())
+		if xerr = c.folder.Write(byNameFolderName, c.SafeGetName(), jsoned); xerr != nil {
+			return xerr
 		}
-		err = c.folder.Write(byIDFolderName, c.SafeGetID(), jsoned)
-		if err != nil {
-			return fail.NewReport(err.Error())
+		if xerr = c.folder.Write(byIDFolderName, c.SafeGetID(), jsoned); xerr != nil {
+			return xerr
 		}
 		c.loaded = true
 		c.committed = true
@@ -350,48 +347,47 @@ func (c *core) write(task concurrency.Task) fail.Report {
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance (being written or not...)
-func (c *core) Reload(task concurrency.Task) fail.Report {
+func (c *core) Reload(task concurrency.Task) fail.Error {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	err := c.readByID(task, c.SafeGetID())
-	if err != nil {
-		if _, ok := err.(fail.NotFound); ok {
-			return fail.NotFoundReport(fmt.Sprintf("the metadata of %s '%s' vanished", c.kind, c.name))
+	if xerr := c.readByID(task, c.SafeGetID()); xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); ok {
+			return fail.NotFoundError("the metadata of %s '%s' vanished", c.kind, c.name)
 		}
-		return err
+		return xerr
 	}
 	return nil
 }
 
 // BrowseFolder walks through host folder and executes a callback for each entries
-func (c *core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Report) fail.Report {
+func (c *core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
-		return fail.InvalidParameterReport("callback", "cannot be nil")
+		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Report {
+	return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
 		return callback(buf)
 	})
 }
 
 // Delete deletes the matadata
-func (c *core) Delete(task concurrency.Task) fail.Report {
+func (c *core) Delete(task concurrency.Task) fail.Error {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	c.SafeLock(task)
@@ -402,21 +398,19 @@ func (c *core) Delete(task concurrency.Task) fail.Report {
 	name := c.SafeGetName()
 
 	// Checks entries exist in Object Storage
-	err := c.folder.Search(byIDFolderName, id)
-	if err != nil {
+	if xerr := c.folder.Search(byIDFolderName, id); xerr != nil {
 		// If not found, consider it not an error
-		if _, ok := err.(fail.NotFound); !ok {
-			return err
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return xerr
 		}
 	} else {
 		idFound = true
 	}
 
-	err = c.folder.Search(byNameFolderName, name)
-	if err != nil {
+	if xerr := c.folder.Search(byNameFolderName, name); xerr != nil {
 		// If entry not found, consider it not an error
-		if _, ok := err.(fail.NotFound); !ok {
-			return err
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return xerr
 		}
 	} else {
 		nameFound = true
@@ -424,15 +418,13 @@ func (c *core) Delete(task concurrency.Task) fail.Report {
 
 	// Deletes entries found
 	if idFound {
-		err = c.folder.Delete(byIDFolderName, id)
-		if err != nil {
-			return err
+		if xerr := c.folder.Delete(byIDFolderName, id); xerr != nil {
+			return xerr
 		}
 	}
 	if nameFound {
-		err = c.folder.Delete(byNameFolderName, name)
-		if err != nil {
-			return err
+		if xerr := c.folder.Delete(byNameFolderName, name); xerr != nil {
+			return xerr
 		}
 	}
 
@@ -443,17 +435,17 @@ func (c *core) Delete(task concurrency.Task) fail.Report {
 
 // Serialize serializes instance into bytes (output json code)
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (c *core) Serialize(task concurrency.Task) (_ []byte, err fail.Report) {
+func (c *core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 	if c.IsNull() {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "failed to serialize %s resource '%s'", c.kind, c.SafeGetName())
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to serialize %s resource '%s'", c.kind, c.SafeGetName())
 		}
 	}()
 
@@ -462,18 +454,18 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, err fail.Report) {
 		shieldedMapped = map[string]interface{}{}
 		propsMapped    = map[string]string{}
 	)
-	defer fail.OnPanic(&err) // json.Unmarshal may panic
+	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
 
-	shieldedJSONed, err = c.shielded.Serialize(task)
-	if err != nil {
-		return nil, err
+	shieldedJSONed, xerr = c.shielded.Serialize(task)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if jserr := json.Unmarshal(shieldedJSONed, &shieldedMapped); jserr != nil {
+	if err := json.Unmarshal(shieldedJSONed, &shieldedMapped); err != nil {
 		// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
-		return nil, fail.NewReport(jserr.Error())
+		return nil, fail.NewError(err.Error())
 	}
 
 	if c.properties.Count() > 0 {
@@ -484,7 +476,7 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, err fail.Report) {
 		if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 			if jserr := json.Unmarshal(propsJSONed, &propsMapped); jserr != nil {
 				// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
-				return nil, jserr
+				return nil, fail.ToError(jserr)
 			}
 		}
 	}
@@ -492,38 +484,38 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, err fail.Report) {
 	shieldedMapped["properties"] = propsMapped
 	// logrus.Tracef("everything mapped:\n%s\n", spew.Sdump(shieldedMapped))
 
-	r, jserr := json.Marshal(shieldedMapped)
-	if jserr != nil {
-		return nil, fail.NewReport(jserr.Error())
+	r, err := json.Marshal(shieldedMapped)
+	if err != nil {
+		return nil, fail.ToError(err)
 	}
 	return r, nil
 }
 
 // Deserialize reads json code and reinstantiates
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (c *core) Deserialize(task concurrency.Task, buf []byte) (err fail.Report) {
+func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
 	if c.IsNull() {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "failed to deserialize %s resource", c.kind)
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to deserialize %s resource", c.kind)
 		}
 	}()
 
-	defer fail.OnPanic(&err) // json.Unmarshal may panic
+	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
 	if c.properties == nil {
-		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
-		if err != nil {
-			return err
+		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+		if xerr != nil {
+			return xerr
 		}
 	}
 
@@ -533,29 +525,27 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (err fail.Report) 
 		jsoned        []byte
 	)
 
-	if jserr := json.Unmarshal(buf, &mapped); jserr != nil {
+	if err := json.Unmarshal(buf, &mapped); err != nil {
 		logrus.Tracef("*core.Deserialize(): Unmarshalling buf to map failed!")
-		return fail.NewReport(jserr.Error())
+		return fail.ToError(err)
 	}
 	if props, ok = mapped["properties"].(map[string]interface{}); ok {
 		delete(mapped, "properties")
 	}
-	jsoned, jserr := json.Marshal(mapped)
-	if jserr != nil {
-		return fail.NewReport(jserr.Error())
-	}
-	err = c.shielded.Deserialize(task, jsoned)
+	jsoned, err := json.Marshal(mapped)
 	if err != nil {
-		return err
+		return fail.ToError(err)
+	}
+	if xerr = c.shielded.Deserialize(task, jsoned); xerr != nil {
+		return xerr
 	}
 	if len(props) > 0 {
-		jsoned, jserr = json.Marshal(props)
-		if jserr != nil {
-			return fail.NewReport(jserr.Error())
-		}
-		err = c.properties.Deserialize(task, jsoned)
+		jsoned, err = json.Marshal(props)
 		if err != nil {
-			return err
+			return fail.ToError(err)
+		}
+		if xerr = c.properties.Deserialize(task, jsoned); xerr != nil {
+			return xerr
 		}
 	}
 	return nil

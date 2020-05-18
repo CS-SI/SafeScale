@@ -84,15 +84,15 @@ type vpcDeleteResult struct { // nolint
 }
 
 // CreateVPC creates a network, which is managed by VPC in FlexibleEngine
-func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
+func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
 	// Only one VPC allowed by client instance
 	if s.vpc != nil {
-		return nil, fail.DuplicateReport("failed to create VPC '%s', a VPC with this name already exists", req.Name)
+		return nil, fail.DuplicateError("failed to create VPC '%s', a VPC with this name already exists", req.Name)
 	}
 
 	b, err := gophercloud.BuildRequestBody(req, "vpc")
 	if err != nil {
-		return nil, fail.NewReport("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	resp := vpcCreateResult{}
@@ -104,11 +104,11 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, fail.NewReport("failed to send a POST request to provider '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to send a POST request to provider '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc, err := resp.Extract()
 	if err != nil {
-		return nil, fail.NewReport("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
@@ -116,28 +116,28 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	if err != nil {
 		nerr := s.DeleteVPC(vpc.ID)
 		if nerr != nil {
-			logrus.Warnf("Report deleting VPC: %v", nerr)
+			logrus.Warnf("Error deleting VPC: %v", nerr)
 		}
-		return nil, fail.NewReport("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Router = router
 
 	// Searching for the Network binded to the VPC
 	network, err := s.findVPCBindedNetwork(vpc.Name)
 	if err != nil {
-		return nil, fail.NewReport("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 	vpc.Network = network
 
 	return vpc, nil
 }
 
-func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) {
+func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, fail.Error) {
 	var router *openstack.Router
 	found := false
-	routerList, err := s.Stack.ListRouters()
-	if err != nil {
-		return nil, fail.NewReport("failed to list routers: %s", openstack.ProviderErrorToString(err))
+	routerList, xerr := s.Stack.ListRouters()
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to list routers")
 	}
 	for _, r := range routerList {
 		if r.Name == vpcName {
@@ -147,18 +147,18 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 		}
 	}
 	if !found || router == nil {
-		return nil, fail.NotFoundReport(nil, nil, "failed to find router associated to VPC '%s'", vpcName)
+		return nil, fail.NotFoundError(nil, nil, "failed to find router associated to VPC '%s'", vpcName)
 	}
 
 	network, err := networks.Get(s.Stack.NetworkClient, router.NetworkID).Extract()
 	if err != nil {
-		return nil, fail.NotFoundReport("failed to find binded network of VPC '%s': %s", vpcName, openstack.ProviderErrorToString(err))
+		return nil, fail.NotFoundError("failed to find binded network of VPC '%s': %s", vpcName, openstack.ProviderErrorToString(err))
 	}
 	return network, nil
 }
 
 // GetVPC returns the information about a VPC identified by 'id'
-func (s *Stack) GetVPC(id string) (*VPC, error) {
+func (s *Stack) GetVPC(id string) (*VPC, fail.Error) {
 	r := vpcGetResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id
 	opts := gophercloud.RequestOpts{
@@ -169,45 +169,45 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 	r.Err = err
 	vpc, err := r.Extract()
 	if err != nil {
-		return nil, fail.NewReport("error getting Network %s: %s", id, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("error getting Network %s: %s", id, openstack.ProviderErrorToString(err))
 	}
 	return vpc, nil
 }
 
 // ListVPCs lists all the VPC created
-func (s *Stack) ListVPCs() ([]VPC, error) {
+func (s *Stack) ListVPCs() ([]VPC, fail.Error) {
 	var vpcList []VPC
-	return vpcList, fail.NotImplementedReport("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME Technical debt
+	return vpcList, fail.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteVPC deletes a Network (ie a VPC in Huawei Cloud) identified by 'id'
-func (s *Stack) DeleteVPC(id string) error {
-	return fail.NotImplementedReport("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME Technical debt
+func (s *Stack) DeleteVPC(id string) fail.Error {
+	return fail.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME Technical debt
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, xerr fail.Error) {
 	tracer := concurrency.NewTracer(nil, true, "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 
-	subnet, err := s.findSubnetByName(req.Name)
-	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
-			return nil, err
+	subnet, xerr := s.findSubnetByName(req.Name)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return nil, xerr
 		}
 	}
 	if subnet != nil {
-		return nil, fail.DuplicateReport("network '%s' already exists", req.Name)
+		return nil, fail.DuplicateError("network '%s' already exists", req.Name)
 	}
 
-	if ok, err := validateNetworkName(req); !ok {
-		return nil, fail.Wrap(err, "network name '%s' invalid", req.Name)
+	if ok, xerr := validateNetworkName(req); !ok {
+		return nil, fail.Wrap(xerr, "network name '%s' invalid", req.Name)
 	}
 
 	// Validates CIDR regarding the existing subnets
-	subnetworks, err := s.listSubnets()
-	if err != nil {
-		return nil, err
+	subnetworks, xerr := s.listSubnets()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Checks if CIDR is valid...
@@ -219,10 +219,10 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 		}
 		// ... and if CIDR is inside VPC's one
 		if !utils.CIDROverlap(*vpcnetDesc, *networkDesc) {
-			return nil, fail.InvalidRequestReport("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR)
+			return nil, fail.InvalidRequestError("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR)
 		}
 		if vpcnetDesc.IP.Equal(networkDesc.IP) {
-			return nil, fail.InvalidRequestReport("cannot create subnet with CIDR '%s': network part of CIDR is equal to VPC one (%s)", req.CIDR, networkDesc.IP.String())
+			return nil, fail.InvalidRequestError("cannot create subnet with CIDR '%s': network part of CIDR is equal to VPC one (%s)", req.CIDR, networkDesc.IP.String())
 		}
 	} else { // CIDR is empty, choose the first Class C available one
 		tracer.Trace("CIDR is empty, choosing one...")
@@ -241,16 +241,16 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 		limit = 1 << bitShift
 
 		for i = uint(1); i < limit; i++ {
-			newIPNet, err = utils.NthIncludedSubnet(*vpcnetDesc, bitShift, i)
-			if err != nil {
-				return nil, fail.Wrap(err, "failed to choose a CIDR for the subnet")
+			newIPNet, xerr = utils.NthIncludedSubnet(*vpcnetDesc, bitShift, i)
+			if xerr != nil {
+				return nil, fail.Wrap(xerr, "failed to choose a CIDR for the subnet")
 			}
 			if wouldOverlap(subnetworks, newIPNet) == nil {
 				break
 			}
 		}
 		if i >= limit {
-			return nil, fail.OverflowReport(nil, limit-1, "failed to find a free available subnet ")
+			return nil, fail.OverflowError(nil, limit-1, "failed to find a free available subnet ")
 		}
 
 		req.CIDR = newIPNet.String()
@@ -258,18 +258,18 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 	}
 
 	// Creates the subnet
-	subnet, err = s.createSubnet(req.Name, req.CIDR)
-	if err != nil {
-		return nil, fail.NewReport("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+	subnet, xerr = s.createSubnet(req.Name, req.CIDR)
+	if xerr != nil {
+		return nil, fail.NewError("error creating network '%s'", req.Name)
 	}
 
 	// starting from here delete network
 	defer func() {
-		if err != nil {
+		if xerr != nil {
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				logrus.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -284,7 +284,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 }
 
 // validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
-func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
+func validateNetworkName(req abstract.NetworkRequest) (bool, fail.Error) {
 	s := check.Struct{
 		"Name": check.Composite{
 			check.NonEmpty{},
@@ -300,14 +300,14 @@ func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
 		for _, msg := range errors {
 			errs = append(errs, msg.Error())
 		}
-		return false, fmt.Errorf(strings.Join(errs, "; "))
+		return false, fail.NewError(strings.Join(errs, "; "))
 	}
 	return true, nil
 }
 
 // wouldOverlap returns fail.ErrOverloadError if subnet overlaps one of the subnets in allSubnets
 // TODO: there is room for optimization here, 'allSubnets' is walked through at each call...
-func wouldOverlap(allSubnets []subnets.Subnet, subnet net.IPNet) error {
+func wouldOverlap(allSubnets []subnets.Subnet, subnet net.IPNet) fail.Error {
 	for _, s := range allSubnets {
 		_, sDesc, _ := net.ParseCIDR(s.CIDR)
 		if utils.CIDROverlap(subnet, *sDesc) {
@@ -318,12 +318,12 @@ func wouldOverlap(allSubnets []subnets.Subnet, subnet net.IPNet) error {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -335,7 +335,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
 			return nil, abstract.ResourceForbiddenError("network", name)
 		}
-		return nil, fail.NewReport("query for network '%s' failed: %v", name, r.Err)
+		return nil, fail.NewError("query for network '%s' failed: %v", name, r.Err)
 	}
 	subnetworks, found := r.Body.(map[string]interface{})["subnets"].([]interface{})
 	if found && len(subnetworks) > 0 {
@@ -353,12 +353,12 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
-	subnet, err := s.getSubnet(id)
-	if err != nil {
-		spew.Dump(err)
-		if !strings.Contains(err.Error(), id) {
-			return nil, fail.NewReport("failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err))
+func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
+	subnet, xerr := s.getSubnet(id)
+	if xerr != nil {
+		spew.Dump(xerr)
+		if !strings.Contains(xerr.Error(), id) {
+			return nil, fail.Wrap(xerr, "failed to get information about network '%s'", id)
 		}
 	}
 	if subnet == nil || subnet.ID == "" {
@@ -374,10 +374,10 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 }
 
 // ListNetworks lists networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
-	subnetList, err := s.listSubnets()
-	if err != nil {
-		return nil, fail.NewReport("failed to get networks list: %s", openstack.ProviderErrorToString(err))
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
+	subnetList, xerr := s.listSubnets()
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to get networks list")
 	}
 	var networkList []*abstract.Network
 	for _, subnet := range subnetList {
@@ -392,7 +392,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 }
 
 // DeleteNetwork consists to delete subnet in FlexibleEngine VPC
-func (s *Stack) DeleteNetwork(id string) error {
+func (s *Stack) DeleteNetwork(id string) fail.Error {
 	return s.deleteSubnet(id)
 }
 
@@ -438,18 +438,18 @@ type subnetDeleteResult struct {
 }
 
 // createSubnet creates a subnet using native FlexibleEngine API
-func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
+func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Error) {
 	const CANNOT = "cannot create subnet"
 
 	network, networkDesc, _ := net.ParseCIDR(cidr)
 
 	// Validates CIDR regarding the existing subnets
-	subnetworks, err := s.listSubnets()
-	if err != nil {
-		return nil, err
+	subnetworks, xerr := s.listSubnets()
+	if xerr != nil {
+		return nil, xerr
 	}
-	if err = wouldOverlap(subnetworks, *networkDesc); err != nil {
-		return nil, fail.Wrap(err, CANNOT)
+	if xerr = wouldOverlap(subnetworks, *networkDesc); xerr != nil {
+		return nil, fail.Wrap(xerr, CANNOT)
 	}
 	// for _, s := range subnetworks {
 	// 	_, sDesc, _ := net.ParseCIDR(s.CIDR)
@@ -489,7 +489,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	b, err := gophercloud.BuildRequestBody(req, "subnet")
 	if err != nil {
-		return nil, fail.NewReport("error preparing subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("error preparing subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
 	}
 
 	respCreate := subnetCreateResult{}
@@ -503,16 +503,16 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	if err != nil {
 		tErr := openstack.TranslateProviderError(err)
 		switch tErr.(type) { // nolint
-		case fail.InvalidRequest:
+		case fail.ErrInvalidRequest:
 			body := map[string]interface{}{}
 			err = json.Unmarshal([]byte(tErr.Error()), &body)
 			if err != nil {
-				err = fail.InconsistentReport("response is not json")
+				err = fail.InconsistentError("response is not json")
 			} else {
 				code, _ := body["code"].(string)
 				switch code {
 				case "VPC.0003":
-					err = fail.NotFoundReport("VPC has vanished")
+					err = fail.NotFoundError("VPC has vanished")
 				default:
 					err = fail.Wrap(tErr, fmt.Sprintf("response code '%s' is not handled", code))
 				}
@@ -554,7 +554,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 }
 
 // ListSubnets lists available subnet in VPC
-func (s *Stack) listSubnets() ([]subnets.Subnet, error) {
+func (s *Stack) listSubnets() ([]subnets.Subnet, fail.Error) {
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets?vpc_id=" + s.vpc.ID
 	pager := pagination.NewPager(s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
@@ -563,24 +563,22 @@ func (s *Stack) listSubnets() ([]subnets.Subnet, error) {
 	paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := subnets.ExtractSubnets(page)
 		if err != nil {
-			return false, fail.NewReport("error listing subnets: %s", openstack.ProviderErrorToString(err))
+			return false, fail.NewError("error listing subnets: %s", openstack.ProviderErrorToString(err))
 		}
 
 		subnetList = append(subnetList, list...)
 
 		return true, nil
 	})
-
-	// TODO previously we ignored the error here, consider returning nil, paginationErr
 	if paginationErr != nil {
 		logrus.Warnf("We have a pagination error: %v", paginationErr)
+		return nil, fail.ToError(paginationErr)
 	}
-
 	return subnetList, nil
 }
 
 // getSubnet lists available subnet in VPC
-func (s *Stack) getSubnet(id string) (*subnets.Subnet, error) {
+func (s *Stack) getSubnet(id string) (*subnets.Subnet, fail.Error) {
 	r := subnetGetResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id
 	opts := gophercloud.RequestOpts{
@@ -591,13 +589,13 @@ func (s *Stack) getSubnet(id string) (*subnets.Subnet, error) {
 	r.Err = err
 	subnet, err := r.Extract()
 	if err != nil {
-		return nil, fail.NewReport("failed to get information for subnet id '%s': %s", id, openstack.ProviderErrorToString(err))
+		return nil, fail.NewError("failed to get information for subnet id '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return &subnet.Subnet, nil
 }
 
 // deleteSubnet deletes a subnet
-func (s *Stack) deleteSubnet(id string) error {
+func (s *Stack) deleteSubnet(id string) fail.Error {
 	resp := subnetDeleteResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + s.vpc.ID + "/subnets/" + id
 	opts := gophercloud.RequestOpts{
@@ -607,11 +605,11 @@ func (s *Stack) deleteSubnet(id string) error {
 	// FlexibleEngine has the curious behavior to be able to tell us all Hosts are deleted, but
 	// cannot delete the subnet because there is still at least one host...
 	// So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
-	err := retry.Action(
+	xerr := retry.Action(
 		func() error {
 			r, _ := s.Stack.Driver.Request("DELETE", url, &opts)
 			if r == nil {
-				return fail.NewReport("failed to acknowledge DELETE command submission")
+				return fail.NewError("failed to acknowledge DELETE command submission")
 			}
 			switch r.StatusCode {
 			case 404:
@@ -639,22 +637,22 @@ func (s *Stack) deleteSubnet(id string) error {
 			}
 		},
 	)
-	if err != nil {
-		return fail.Wrap(err, "failed to submit deletion of subnet '%s'", id)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to submit deletion of subnet '%s'", id)
 	}
 	// Deletion submit has been executed, checking returned error code
-	err = resp.ExtractErr()
+	err := resp.ExtractErr()
 	if err != nil {
-		return fail.NewReport("error deleting subnet '%s': %s", id, openstack.ProviderErrorToString(err))
+		return fail.NewError("error deleting subnet '%s': %s", id, openstack.ProviderErrorToString(err))
 	}
 	return nil
 }
 
 // findSubnetByName returns a subnets.Subnet if subnet named as 'name' exists
-func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
-	subnetList, err := s.listSubnets()
-	if err != nil {
-		return nil, fail.Wrap(err, "failed to find 'name' in subnets")
+func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, fail.Error) {
+	subnetList, xerr := s.listSubnets()
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to find 'name' in subnets")
 	}
 	found := false
 	var subnet subnets.Subnet
@@ -683,10 +681,10 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // // to contain only one hostID
 // func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
 // 	if s == nil {
-// 		return nil, nil, fail.InvalidInstanceReport()
+// 		return nil, nil, fail.InvalidInstanceError()
 // 	}
 // 	if req.Network == nil {
-// 		return nil, nil, fail.InvalidParameterReport("req.Network", "cannot be nil")
+// 		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
 // 	}
 //
 // 	gwname := req.Name
@@ -709,10 +707,10 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // 	host, userData, err := s.CreateHost(hostReq)
 // 	if err != nil {
 // 		switch err.(type) {
-// 		case fail.InvalidRequest:
+// 		case fail.ErrInvalidRequest:
 // 			return nil, userData, err
 // 		default:
-// 			return nil, userData, fail.NewReport("error creating gateway: %s", openstack.ProviderErrorToString(err))
+// 			return nil, userData, fail.NewError("error creating gateway: %s", openstack.ProviderErrorToString(err))
 // 		}
 // 	}
 // 	return host, userData, err
@@ -725,7 +723,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -736,7 +734,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, e
 	}
 	port, err := ports.Create(s.NetworkClient, options).Extract()
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	vip := abstract.VirtualIP{
 		ID:        port.ID,

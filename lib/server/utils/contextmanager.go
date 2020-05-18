@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc/metadata"
 )
@@ -32,26 +33,26 @@ var mutexContextManager sync.Mutex
 // --------------------- CLIENT ---------------------------------
 
 // GetContext ...
-func GetContext(storeUUID bool) (context.Context, error) {
+func GetContext(storeUUID bool) (context.Context, fail.Error) {
 	clientContext := context.Background()
-	aUUID, err := generateUUID(storeUUID)
-	if err != nil {
-		return nil, err
+	aUUID, xerr := generateUUID(storeUUID)
+	if xerr != nil {
+		return nil, xerr
 	}
 	clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", aUUID)
 	return clientContext, nil
 }
 
-// GetTimeoutContext return a context for grpc commands
-func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, error) {
+// GetTimeoutContext return a context for gRPC commands
+func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, fail.Error) {
 	if parentCtx != context.TODO() {
 		ctx, cancel := context.WithTimeout(parentCtx, timeout)
 		return ctx, cancel, nil
 	}
 
-	aContext, err := GetContext(true)
-	if err != nil {
-		return nil, nil, err
+	aContext, xerr := GetContext(true)
+	if xerr != nil {
+		return nil, nil, xerr
 	}
 
 	ctx, cancel := context.WithTimeout(aContext, timeout)
@@ -66,12 +67,12 @@ func GetUUID() string {
 }
 
 // generateUUID ...
-func generateUUID(store bool) (string, error) {
+func generateUUID(store bool) (string, fail.Error) {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()
 	newUUID, err := uuid.NewV4()
 	if err != nil {
-		return "", err
+		return "", fail.ToError(err)
 	}
 	if store {
 		uuidSet = true

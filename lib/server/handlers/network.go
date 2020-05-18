@@ -31,10 +31,10 @@ import (
 
 // NetworkHandler defines API to manage networks
 type NetworkHandler interface {
-	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool, bool) (resources.Network, error)
-	List(bool) ([]*abstract.Network, error)
-	Inspect(string) (resources.Network, error)
-	Delete(string) error
+	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool, bool) (resources.Network, fail.Error)
+	List(bool) ([]*abstract.Network, fail.Error)
+	Inspect(string) (resources.Network, fail.Error)
+	Delete(string) fail.Error
 }
 
 // FIXME: Technical debt Input verification
@@ -55,19 +55,19 @@ func (handler *networkHandler) Create(
 	name string, cidr string, ipVersion ipversion.Enum,
 	sizing abstract.HostSizingRequirements, theos string, gwname string,
 	failover bool, keepOnFailure bool,
-) (network resources.Network, err error) {
+) (network resources.Network, xerr fail.Error) {
 
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterReport("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 	if failover && gwname != "" {
-		return nil, fail.InvalidParameterReport("gwname", "cannot be set if failover is set")
+		return nil, fail.InvalidParameterError("gwname", "cannot be set if failover is set")
 	}
 
 	task := handler.job.SafeGetTask()
@@ -77,12 +77,12 @@ func (handler *networkHandler) Create(
 		"('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover,
 	).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
-	objn, err := networkfactory.New(handler.job.SafeGetService())
-	if err != nil {
-		return nil, err
+	objn, xerr := networkfactory.New(handler.job.SafeGetService())
+	if xerr != nil {
+		return nil, xerr
 	}
 	req := abstract.NetworkRequest{
 		Name:          name,
@@ -91,82 +91,82 @@ func (handler *networkHandler) Create(
 		HA:            failover,
 		KeepOnFailure: keepOnFailure,
 	}
-	err = objn.Create(task, req, gwname, &sizing)
-	if err != nil {
-		return nil, err
+	xerr = objn.Create(task, req, gwname, &sizing)
+	if xerr != nil {
+		return nil, xerr
 	}
 	return objn, nil
 }
 
 // ErrorList returns the network list
-func (handler *networkHandler) List(all bool) (netList []*abstract.Network, err error) {
+func (handler *networkHandler) List(all bool) (netList []*abstract.Network, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
-	objn, err := networkfactory.New(handler.job.SafeGetService())
-	if err != nil {
-		return nil, err
+	objn, xerr := networkfactory.New(handler.job.SafeGetService())
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	err = objn.Browse(task, func(rn *abstract.Network) error {
+	xerr = objn.Browse(task, func(rn *abstract.Network) fail.Error {
 		netList = append(netList, rn)
 		return nil
 	})
-	return netList, err
+	return netList, xerr
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (handler *networkHandler) Inspect(ref string) (network resources.Network, err error) {
+func (handler *networkHandler) Inspect(ref string) (network resources.Network, xerr fail.Error) {
 	if handler == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
 	return networkfactory.Load(task, handler.job.SafeGetService(), ref)
 }
 
 // Delete deletes network referenced by ref
-func (handler *networkHandler) Delete(ref string) (err error) {
+func (handler *networkHandler) Delete(ref string) (xerr fail.Error) {
 	if handler == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return fail.InvalidInstanceContentReport("handler.job", "cannot be nil")
+		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return fail.InvalidParameterReport("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	task := handler.job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	// defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-	defer fail.OnPanic(&err)
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnPanic(&xerr)
 
-	objn, err := networkfactory.Load(task, handler.job.SafeGetService(), ref)
-	if err != nil {
-		return err
+	objn, xerr := networkfactory.Load(task, handler.job.SafeGetService(), ref)
+	if xerr != nil {
+		return xerr
 	}
 	return objn.Delete(task)
 }

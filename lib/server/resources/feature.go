@@ -23,11 +23,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Targetable is an interface that target must satisfy to be able to install something on it
 type Targetable interface {
-	data.Identifyable
+	data.Identifiable
 
 	// GetTargetType returns the type of the target
 	SafeGetTargetType() featuretargettype.Enum
@@ -36,7 +37,7 @@ type Targetable interface {
 	// GetInstalledFatures returns a list of installed features
 	SafeGetInstalledFeatures(concurrency.Task) []string
 	// ComplementFeatureParameters adds parameters corresponding to the target in preparation of feature installation
-	ComplementFeatureParameters(t concurrency.Task, v data.Map) error
+	ComplementFeatureParameters(t concurrency.Task, v data.Map) fail.Error
 }
 
 // Feature defines the interface of feature
@@ -44,11 +45,11 @@ type Feature interface {
 	data.Clonable
 
 	// GetName returns the name of the feature
-	GetName() (string, error)
+	GetName() (string, fail.Error)
 	// GetFilename returns the filename of the feature
-	GetFilename() (string, error)
+	GetFilename() (string, fail.Error)
 	// GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetDisplayFilename() (string, error)
+	GetDisplayFilename() (string, fail.Error)
 	// SafeGetName returns the name of the feature
 	SafeGetName() string
 	// SafeGetFilename returns the filename of the feature
@@ -58,15 +59,15 @@ type Feature interface {
 	// GetSpecs returns the feature specs
 	SafeGetSpecs() *viper.Viper
 	// Requirements returns the other features needed as requirements
-	GetRequirements() ([]string, error)
+	GetRequirements() ([]string, fail.Error)
 	// Applyable tells if the feature is installable on the target
 	Applyable(Targetable) bool
 	// Check if feature is installed on target
-	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, error)
+	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)
 	// Add installs the feature on the target
-	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, error)
+	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)
 	// Remove uninstalls the feature from the target
-	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, error)
+	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)
 }
 
 // FeatureSettings are used to tune the feature

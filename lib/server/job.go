@@ -39,7 +39,7 @@ type Job interface {
 	SafeGetService() iaas.Service
 	SafeGetDuration() time.Duration
 	String() string
-	Abort() error
+	Abort() fail.Error
 	Aborted() bool
 	Close()
 }
@@ -56,22 +56,21 @@ type job struct {
 }
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (Job, fail.Report) {
+func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (Job, fail.Error) {
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if cancel == nil {
-		return nil, fail.InvalidParameterReport("cancel", "cannot be nil")
+		return nil, fail.InvalidParameterError("cancel", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	var (
-		md  metadata.MD
-		id  string
-		err error
-		ok  bool
+		md metadata.MD
+		id string
+		ok bool
 	)
 
 	md, ok = metadata.FromIncomingContext(ctx)
@@ -85,21 +84,21 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	} else {
 		u := md.Get("uuid")
 		if len(u) == 0 {
-			return nil, fail.InvalidParameterReport("ctx", "does not contain a grpc uuid")
+			return nil, fail.InvalidParameterError("ctx", "does not contain a grpc uuid")
 		}
 
 		if id = u[0]; id == "" {
-			return nil, fail.InvalidParameterReport("ctx", "does not contain a valid grpc uuid")
+			return nil, fail.InvalidParameterError("ctx", "does not contain a valid grpc uuid")
 		}
 	}
 
-	task, err := concurrency.NewTaskWithContext(ctx, nil)
-	if err != nil {
-		return nil, err
+	task, xerr := concurrency.NewTaskWithContext(ctx, nil)
+	if xerr != nil {
+		return nil, xerr
 	}
-	err = task.SetID("job-task:" + id)
-	if err != nil {
-		return nil, err
+	xerr = task.SetID("job-task:" + id)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	nj := job{
@@ -111,9 +110,9 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		tenant:      svc.GetName(),
 		startTime:   time.Now(),
 	}
-	err = register(&nj)
-	if err != nil {
-		return nil, err
+	xerr = register(&nj)
+	if xerr != nil {
+		return nil, xerr
 	}
 	return &nj, nil
 }
@@ -144,19 +143,19 @@ func (j *job) SafeGetDuration() time.Duration {
 }
 
 // Abort tells the job it has to abort operations
-func (j *job) Abort() fail.Report {
+func (j *job) Abort() fail.Error {
 	if j == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if j.cancel == nil {
-		return fail.InvalidInstanceContentReport("j.cancel", "cannot be nil")
+		return fail.InvalidInstanceContentError("j.cancel", "cannot be nil")
 	}
 	j.cancel()
 	j.cancel = nil
 	return nil
 }
 
-// Aborted tells if the job has been aborted
+// ErrAborted tells if the job has been aborted
 func (j *job) Aborted() bool {
 	status, _ := j.task.GetStatus()
 
@@ -182,7 +181,7 @@ var (
 )
 
 // register ...
-func register(job Job) error {
+func register(job Job) fail.Error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
@@ -191,31 +190,31 @@ func register(job Job) error {
 }
 
 // deregister ...
-func deregister(job Job) error {
+func deregister(job Job) fail.Error {
 	if job == nil {
-		return fail.InvalidParameterReport("job", "cannot be nil")
+		return fail.InvalidParameterError("job", "cannot be nil")
 	}
 	return deregisterUUID(job.SafeGetID())
 }
 
-func deregisterUUID(uuid string) error {
+func deregisterUUID(uuid string) fail.Error {
 	if uuid == "" {
-		return fail.InvalidParameterReport("uuid", "cannot be empty string")
+		return fail.InvalidParameterError("uuid", "cannot be empty string")
 	}
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
 	if _, ok := jobMap[uuid]; !ok {
-		return fail.NotFoundReport(fmt.Sprintf("no job identified by '%s' found", uuid))
+		return fail.NotFoundError("no job identified by '%s' found", uuid)
 	}
 	delete(jobMap, uuid)
 	return nil
 }
 
 // AbortJobByID asks the job identified by 'id' to abort
-func AbortJobByID(id string) error {
+func AbortJobByID(id string) fail.Error {
 	if id == "" {
-		return fail.InvalidParameterReport("id", "cannot be empty string")
+		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 	if job, ok := jobMap[id]; ok {
 		err := job.Abort()
@@ -224,7 +223,7 @@ func AbortJobByID(id string) error {
 		}
 		return nil
 	}
-	return fail.NotFoundReport(fmt.Sprintf("no job identified by '%s' found", id))
+	return fail.NotFoundError("no job identified by '%s' found", id)
 }
 
 // ListJobs ...

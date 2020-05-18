@@ -18,12 +18,12 @@ type Stack struct {
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
-	return nil, fail.NotImplementedReport("WaitHostReady not implemented yet!") // FIXME: Technical debt
+func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error {
+	return nil, fail.NotImplementedError("WaitHostReady not implemented yet!") // FIXME: Technical debt
 }
 
 // Build Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
+func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
 	stack := &Stack{
 		Config:        &cfg,
 		LibvirtConfig: &localCfg,

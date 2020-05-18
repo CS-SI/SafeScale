@@ -35,12 +35,12 @@ const (
 )
 
 // BuildMetadataBucketName builds the name of the bucket/container that will store metadata
-func BuildMetadataBucketName(driver, region, domain, project string) (name string, err error) {
+func BuildMetadataBucketName(driver, region, domain, project string) (name string, xerr fail.Error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-	_, err = hash.Write([]byte(sig))
-	if err != nil {
-		return "", err
+	_, herr := hash.Write([]byte(sig))
+	if herr != nil {
+		return "", fail.ToError(herr)
 	}
 	hashed := hex.EncodeToString(hash.Sum(nil))
 	name = bucketNamePrefix + "-" + hashed
@@ -49,7 +49,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
-			return "", fail.OverflowReport(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+			return "", fail.OverflowError(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
 		}
 	}
 

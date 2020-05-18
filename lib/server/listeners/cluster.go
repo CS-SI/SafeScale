@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -27,92 +26,66 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // ClusterListener host service server grpc
 type ClusterListener struct{}
 
 // ErrorList lists clusters
-func (s *ClusterListener) List(ctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot list clusters").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) List(ctx context.Context, in *googleprotobuf.Empty) (hl *protocol.ClusterListResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list clusters")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster list")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "cluster list")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
-	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "(%v)", all).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	hosts, err := handler.List(all)
-	if lerr != nil {
-		return nil, lerr
-	}
-
-	// build response mapping abstract.Host to protocol.Host
-	var pbhost []*protocol.Host
-	for _, host := range hosts {
-		pbhost = append(pbhost, converters.HostFullFromAbstractToProtocol(host))
-	}
-	rv := &protocol.HostList{Hosts: pbhost}
-	return rv, nil
+	return nil, fail.NotImplementedError()
 }
 
 // Create creates a new cluster
-func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreateRequest) (_ *protocol.ClusterResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot create cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreateRequest) (_ *protocol.ClusterResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create cluster")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster create")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "cluster create")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -120,117 +93,61 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var sizing *abstract.HostSizingRequirements
-	if in.SizingAsString != "" {
-		sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.SizingAsString)
-		if err != nil {
-			return nil, err
-		}
-	} else if in.Sizing != nil {
-		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
-	}
-	if sizing == nil {
-		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
-	}
-	sizing.Image = in.GetImageId()
-
-	hostReq := abstract.HostRequest{
-		ResourceName:  name,
-		PublicIP:      in.GetPublic(),
-		KeepOnFailure: in.GetKeepOnFailure(),
-	}
-	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
-		networkCore, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		hostReq.Networks = []*abstract.Network{networkCore}
-		return nil
-	})
-
-	handler := handlers.NewHostHandler(job)
-	host, err := handler.Create(hostReq, *sizing, in.Force)
-	if err != nil {
-		return nil, err
-	}
-	// logrus.Infof("Host '%s' created", name)
-	r, err := host.ToProtocol(task)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return nil, fail.NotImplementedError()
 }
 
 // Status returns the status of a cluster
-func (s *ClusterListener) Status(ctx context.Context, in *protocol.Reference) (ht *protocol.ClusterStateResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot get cluster status").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht *protocol.ClusterStateResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get cluster status")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	ref := srvutils.GetReference(in)
+	if ref == "" {
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	ref := srvutils.GetReference(in)
-	if ref == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
-	}
-
-	job, lerr := PrepareJob(ctx, "", "cluster state")
-	if lerr != nil {
-		return nil, lerr
+	job, xerr := PrepareJob(ctx, "", "cluster state")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &lerr)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	host, lerr := handler.Inspect(ref)
-	if lerr != nil {
-		return nil, lerr
-	}
-	r, err := converters.HostStatusFromAbstractToProtocol(host.SafeGetName(), host.SafeGetState(task))
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return nil, fail.NotImplementedError()
 }
 
 // Inspect a cluster
-func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot inspect cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect cluster")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -239,7 +156,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 
 	clusterName := srvutils.GetReference(in)
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
 	job, err := PrepareJob(ctx, "", "cluster inspect")
@@ -251,178 +168,142 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	host, err := handler.Inspect(ref)
-	if err != nil {
-		return nil, err
-	}
-	r, err := host.ToProtocol(task)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return nil, fail.NotImplementedError()
 }
 
 // Start ...
-func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot start cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot start cluster")
+	// defer func() {
+	// 	if err != nil {
+	// 		err = fail.Wrap(err, "cannot start cluster").ToGRPCStatus()
+	// 	}
+	// }()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return empty, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster start")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "cluster start")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Start(ref)
-	if err != nil {
-		return empty, err
-	}
-
-	tracer.Trace("Host '%s' successfully started", ref)
-	return empty, nil
+	return empty, fail.NotImplementedError()
 }
 
 // Stop shutdowns a entire cluster (including the gateways)
-func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot stop cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError("cannot stop cluster", &err)
+	// defer func() {
+	// 	if err != nil {
+	// 		err = fail.Wrap(err, "cannot stop cluster").ToGRPCStatus()
+	// 	}
+	// }()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "can't be nil")
+		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
 	clusterName := srvutils.GetReference(in)
 	if clusterName == "" {
-		return empty, fail.InvalidRequestReport("cluster name is missing")
+		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "host stop")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "host stop")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Stop(ref)
-	if err != nil {
-		return empty, err
-	}
-
-	tracer.Trace("Cluster '%s' stopped successfully.", clusterName)
-	return empty, nil
+	return empty, fail.NotImplementedError()
 }
 
 // Delete a cluster
-func (s *ClusterListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot delete cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDeleteRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete cluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
-
-	clusterName := srvutils.GetReference(in)
+	clusterName := in.GetName()
 	if clusterName == "" {
-		return empty, fail.InvalidRequestReport("cluster name is missing")
+		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster delete")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "cluster delete")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return empty, err
-	}
-	tracer.Trace("Cluster '%s' successfully deleted.", ref)
-	return empty, nil
+	return empty, fail.NotImplementedError()
 }
 
 // Expand adds node(s) to a cluster
-func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot expand cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError("cannot expand cluster", &err)
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -431,7 +312,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
 	job, err := PrepareJob(ctx, "", "host delete")
@@ -442,34 +323,24 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 // Shrink removes node(s) from a cluster
-func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot shrink cluster").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot shrink cluster")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -478,45 +349,35 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, "", "host delete")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "host delete")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 // ListNodes lists node(s) of a cluster
-func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot list cluster nodes").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list cluster nodes")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -525,7 +386,7 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 
 	clusterName := srvutils.GetReference(in)
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
 	job, err := PrepareJob(ctx, "", "cluster node list")
@@ -536,34 +397,24 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 // InspectNode inspects a node of the cluster
-func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostDefinition, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot inspect cluster node").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect cluster node")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -572,50 +423,40 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 	nodeRef := srvutils.GetReference(in.GetHost())
 	if nodeRef == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id of node is provided")
+		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	job, err := PrepareJob(ctx, "", "host delete")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "host delete")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 // DeleteNode removes node(s) from a cluster
-func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot delete cluster node").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete cluster node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -624,7 +465,7 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 	nodeRef := srvutils.GetReference(in.GetHost()) // If NodeRef is empty string, asks to delete the last added node
 
@@ -636,35 +477,25 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return empty, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return empty, nil
+	return empty, fail.NotImplementedError()
 }
 
 // StopNode stops a node of the cluster
-func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot stop cluster node").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot stop cluster node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -673,50 +504,40 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 	nodeRef := srvutils.GetReference(in.GetHost())
 	if nodeRef == "" {
 		return nil, status.Errorf(codes.FailedPrecondition, "neither name nor id of node is provided")
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster node stop")
-	if err != nil {
-		return empty, err
+	job, xerr := PrepareJob(ctx, "", "cluster node stop")
+	if xerr != nil {
+		return empty, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return empty, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return empty, nil
+	return empty, fail.NotImplementedError()
 }
 
 // StartNode starts a stopped node of the cluster
-func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empt, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot start cluster node").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot start cluster node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -725,49 +546,39 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 	nodeRef := srvutils.GetReference(in.GetHost())
 	if nodeRef == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id of node is provided")
+		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster node start")
-	if err != nil {
-		return empty, err
+	job, xerr := PrepareJob(ctx, "", "cluster node start")
+	if xerr != nil {
+		return empty, xerr
 	}
 	defer job.Close()
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return empty, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return empty, nil
+	return empty, fail.NotImplementedError()
 }
 
 // StateNode returns the state of a node of the cluster
-func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostState, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot get cluster node state").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.ClusterStateResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get cluster node state")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -776,11 +587,11 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 	nodeRef := srvutils.GetReference(in.GetHost())
 	if nodeRef == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id of node is provided")
+		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
 	job, err := PrepareJob(ctx, "", "cluster node state")
@@ -791,34 +602,24 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 // ListMasters returns the list of masters of the cluster
-func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot list masters").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Reference) (_ *protocol.ClusterNodeListResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list masters")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -827,7 +628,7 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 
 	clusterName := srvutils.GetReference(in)
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
 	job, err := PrepareJob(ctx, "", "cluster master list")
@@ -838,33 +639,24 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 // InspectMaster returns the information about a master of the cluster
-func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.ClusterNodeListResponse, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot inspect cluster master").ToGRPCStatus()
-		}
-	}()
+func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect cluster master")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -873,11 +665,11 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestReport("cluster name is missing")
+		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 	masterRef := srvutils.GetReference(in.GetHost())
-	if nodeRef == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id of master is provided")
+	if masterRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id of master is provided")
 	}
 
 	job, err := PrepareJob(ctx, "", "cluster master inspect")
@@ -888,13 +680,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s', '%s')", clusterName, masterRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewHostHandler(job)
-	err = handler.Delete(ref)
-	if err != nil {
-		return nil, err
-	}
-	tracer.Trace("Host '%s' successfully deleted.", ref)
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }

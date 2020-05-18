@@ -21,12 +21,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
+	godebug "runtime/debug"
 	"strings"
-	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -67,7 +67,7 @@ func NewTracer(t Task, enabled bool, msg ...interface{}) *Tracer {
 	if pc, file, line, ok := runtime.Caller(1); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
 			tracer.funcName = f.Name()
-			filename := strings.Replace(file, getPartToRemove(), "", 1)
+			filename := strings.Replace(file, debug.SourceFilePartToRemove(), "", 1)
 			tracer.inOutMessage = fmt.Sprintf("%s %s%s [%s:%d]", tracer.taskSig, filepath.Base(tracer.funcName), message, filename, line)
 		}
 	}
@@ -134,42 +134,24 @@ func (t *Tracer) Exiting() *Tracer {
 }
 
 // TraceMessage returns a string containing a trace message
-func (t *Tracer) TraceMessage(format string, a ...interface{}) string {
-	return "---" + t.inOutMessage + ": " + fmt.Sprintf(format, a...)
+func (t *Tracer) TraceMessage(msg ...interface{}) string {
+	return "---" + t.inOutMessage + ": " + strprocess.FormatStrings(msg...)
 }
 
 // Trace traces a message
-func (t *Tracer) Trace(format string, a ...interface{}) *Tracer {
+func (t *Tracer) Trace(msg ...interface{}) *Tracer {
 	if t.enabled {
-		logrus.Tracef(t.TraceMessage(format, a...))
+		logrus.Tracef(t.TraceMessage(msg...))
 	}
 	return t
 }
 
 // TraceCallStack logs the call stack as a trace (displayed only if tracing is enabled)
 func (t *Tracer) TraceCallStack() *Tracer {
-	return t.Trace("%s", string(debug.Stack()))
+	return t.Trace("%s", string(godebug.Stack()))
 }
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
 func (t *Tracer) Stopwatch() temporal.Stopwatch {
 	return t.sw
-}
-
-// removePart contains the basedir to remove from file pathes
-var removePart atomic.Value
-
-func getPartToRemove() string {
-	if anon := removePart.Load(); anon != nil {
-		return anon.(string)
-	}
-	return "github.com/CS-SI/SafeScale/"
-}
-
-func init() {
-	var rootPath string
-	if _, file, _, ok := runtime.Caller(0); ok {
-		rootPath = strings.Split(file, "lib/utils")[0]
-	}
-	removePart.Store(rootPath)
 }

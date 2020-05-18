@@ -36,41 +36,37 @@ type TemplateListener struct{}
 
 // ErrorList available templates
 func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (tl *protocol.TemplateList, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot list templates").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list templates")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "template list")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, "", "template list")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
+	task := job.SafeGetTask()
 
 	all := in.GetAll()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewTemplateHandler(job)
-	templates, err := handler.List(all)
-	if err != nil {
-		return nil, err
+	templates, xerr := handler.List(all)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Build response mapping resources.Host to protocol.Host

@@ -207,41 +207,41 @@ func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 }
 
 // Serialize serializes Host instance into bytes (output json code)
-func (hc *HostCore) Serialize() ([]byte, fail.Report) {
+func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 	if hc == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	r, jserr := json.Marshal(hc)
 	if jserr != nil {
-		return nil, fail.NewReport(jserr.Error())
+		return nil, fail.NewError(jserr.Error())
 	}
 	return r, nil
 }
 
 // Deserialize reads json code and reinstantiates an Host
-func (hc *HostCore) Deserialize(buf []byte) (oerr fail.Report) {
+func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	if hc == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			oerr = fail.ErrorToReport(panicErr) // If panic occured, transforms err to a fail.Report if needed
+			xerr = fail.ToError(panicErr) // If panic occured, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
 
 	jserr := json.Unmarshal(buf, hc)
 	if jserr != nil {
-		return fail.NewReport(jserr.Error())
+		return fail.NewError(jserr.Error())
 	}
 	return nil
 }
 
 // SafeGetName returns the name of the host
-// Satisfies interface data.Identifyable
+// Satisfies interface data.Identifiable
 func (hc *HostCore) SafeGetName() string {
 	if hc == nil {
 		return ""
@@ -250,7 +250,7 @@ func (hc *HostCore) SafeGetName() string {
 }
 
 // SafeGetID returns the ID of the host
-// Satisfies interface data.Identifyable
+// Satisfies interface data.Identifiable
 func (hc *HostCore) SafeGetID() string {
 	if hc == nil {
 		return ""

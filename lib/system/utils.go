@@ -17,9 +17,7 @@
 package system
 
 import (
-	"os/exec"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	rice "github.com/GeertJohan/go.rice"
@@ -31,18 +29,18 @@ import (
 var bashLibraryContent atomic.Value
 
 // GetBashLibrary generates the content of {{.reserved_BashLibrary}}
-func GetBashLibrary() (string, error) {
+func GetBashLibrary() (string, fail.Error) {
 	anon := bashLibraryContent.Load()
 	if anon == nil {
 		box, err := rice.FindBox("../system/scripts")
 		if err != nil {
-			return "", err
+			return "", fail.ToError(err)
 		}
 
 		// get file contents as string
 		tmplContent, err := box.String("bash_library.sh")
 		if err != nil {
-			return "", err
+			return "", fail.ToError(err)
 		}
 		bashLibraryContent.Store(tmplContent)
 		anon = bashLibraryContent.Load()
@@ -50,20 +48,20 @@ func GetBashLibrary() (string, error) {
 	return anon.(string), nil
 }
 
-// ExtractRetCode extracts info from the error
-func ExtractRetCode(err error) (string, int, error) {
-	retCode := -1
-	msg := "__ NO MESSAGE __"
-	if ee, ok := err.(*exec.ExitError); ok {
-		// Try to get retCode
-		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-			retCode = status.ExitStatus()
-		} else {
-			return msg, retCode, fail.NewReport("ExitError.Sys is not a 'syscall.WaitStatus'")
-		}
-		// Retrive error message
-		msg = ee.Error()
-		return msg, retCode, nil
-	}
-	return msg, retCode, fail.NewReport("error is not an 'ExitError'")
-}
+// // ExtractRetCode extracts info from the error
+// func ExtractRetCode(xerr fail.Error) (string, int, error) {
+// 	retCode := -1
+// 	msg := "__ NO MESSAGE __"
+// 	if ee, ok := err.(*exec.ExitError); ok {
+// 		// Try to get retCode
+// 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+// 			retCode = status.ExitStatus()
+// 		} else {
+// 			return msg, retCode, fail.NewError("ExitError.Sys is not a 'syscall.WaitStatus'")
+// 		}
+// 		// Retrive error message
+// 		msg = ee.Error()
+// 		return msg, retCode, nil
+// 	}
+// 	return msg, retCode, fail.NewError("error is not an 'ExitError'")
+// }

@@ -66,24 +66,20 @@ type StoredCPUInfo struct {
 }
 
 // Start ...
-func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot start host").ToGRPCStatus()
-		}
-	}()
+func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot start host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return empty, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -98,7 +94,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	err = handler.Start(ref)
@@ -111,27 +107,23 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 }
 
 // Stop shutdowns a host.
-func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot stop host").ToGRPCStatus()
-		}
-	}()
+func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot stop host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "can't be nil")
+		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, fail.InvalidRequestReport("cannot stop host: neither name nor id of host has been provided")
+		return empty, fail.InvalidRequestError("cannot stop host: neither name nor id of host has been provided")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil").ToGRPCStatus()
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -146,7 +138,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	err = handler.Stop(ref)
@@ -159,24 +151,20 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 }
 
 // Reboot reboots a host.
-func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot reboot host").ToGRPCStatus()
-		}
-	}()
+func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot reboot host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return empty, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -191,7 +179,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	err = handler.Reboot(ref)
@@ -204,19 +192,15 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 }
 
 // ErrorList lists hosts managed by SafeScale only, or all hosts.
-func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot list hosts").ToGRPCStatus()
-		}
-	}()
+func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list hosts")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -232,7 +216,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	all := in.GetAll()
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	hosts, err := handler.List(all)
@@ -250,22 +234,18 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 }
 
 // Create creates a new host
-func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, oerr error) {
-	var err fail.Report
-	defer func() {
-		if err != nil {
-			oerr = fail.Wrap(err, "cannot create host").ToGRPCStatus()
-		}
-	}()
+func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create host")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -282,8 +262,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
-
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	var sizing *abstract.HostSizingRequirements
 	if in.SizingAsString != "" {
 		sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.SizingAsString)
@@ -308,10 +287,10 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		PublicIP:      in.GetPublic(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}
-	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Report {
+	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		networkCore, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		hostReq.Networks = []*abstract.Network{networkCore}
 		return nil
@@ -328,20 +307,17 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 // Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot resize host").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot resize host")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -361,7 +337,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	host, err := handler.Resize(
@@ -383,20 +359,17 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 
 // Status returns the status of a host (running or stopped mainly)
 func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *protocol.HostStatus, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot get host status").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host status")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -408,7 +381,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, fail.InvalidRequestReport("cannot get host status: neither name nor id given as reference").ToGRPCStatus()
+		return nil, fail.InvalidRequestError("cannot get host status: neither name nor id given as reference").ToGRPCStatus()
 	}
 
 	job, err := PrepareJob(ctx, "", "host state")
@@ -420,7 +393,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	host, err := handler.Inspect(ref)
@@ -432,20 +405,17 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 
 // Inspect an host
 func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot inspect host").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect host")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -457,7 +427,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, fail.InvalidRequestReport("neither name nor id given as reference")
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
 	job, err := PrepareJob(ctx, "", "host inspect")
@@ -469,7 +439,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	task := job.SafeGetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	host, err := handler.Inspect(ref)
@@ -481,21 +451,18 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 
 // Delete an host
 func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot delete host").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceReport()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterReport("in", "cannot be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -518,7 +485,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	err = handler.Delete(ref)
@@ -531,20 +498,17 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 
 // SSH returns ssh parameters to access an host
 func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *protocol.SshConfig, err error) {
-	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, "cannot get host ssh config").ToGRPCStatus()
-		}
-	}()
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
 
 	if s == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterReport("in", "cannot be nil")
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterReport("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -556,7 +520,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, fail.InvalidRequestReport("cannot get ssh config of host: neither name nor id given as reference")
+		return nil, fail.InvalidRequestError("cannot get ssh config of host: neither name nor id given as reference")
 	}
 
 	job, err := PrepareJob(ctx, "", "host ssh")
@@ -567,7 +531,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 
 	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	sshConfig, err := handler.SSH(ref)

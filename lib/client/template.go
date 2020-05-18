@@ -33,11 +33,12 @@ type template struct {
 func (t *template) List(all bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
-	service := protocol.NewTemplateServiceClient(t.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
-	return service.List(ctx, &protocol.TemplateListRequest{All: all})
 
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewTemplateServiceClient(t.session.connection)
+	return service.List(ctx, &protocol.TemplateListRequest{All: all})
 }

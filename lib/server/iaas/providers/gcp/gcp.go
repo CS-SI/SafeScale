@@ -41,17 +41,17 @@ func New() apiprovider.Provider {
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fail.SyntaxReport("section 'identity' not found in tenants.toml")
+		return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")
 	}
 
 	computeCfg, ok := params["compute"].(map[string]interface{})
 	if !ok {
-		return &provider{}, fail.SyntaxReport("section 'compute' not found in tenants.toml")
+		return &provider{}, fail.SyntaxError("section 'compute' not found in tenants.toml")
 	}
 
 	networkName := "safescale"
@@ -136,9 +136,9 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		ProviderName:     providerName,
 	}
 
-	stack, err := gcp.New(authOptions, gcpConf, cfgOptions)
-	if err != nil {
-		return nil, err
+	stack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
+	if xerr != nil {
+		return nil, xerr
 	}
 	newP := &provider{
 		Stack:            stack,
@@ -152,7 +152,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -165,7 +165,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -185,7 +185,7 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	return p.Stack.ListImages()
 }
 

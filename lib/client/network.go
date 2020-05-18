@@ -37,9 +37,9 @@ func (n *network) List(all bool, timeout time.Duration) (*protocol.NetworkList, 
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return service.List(ctx, &protocol.NetworkListRequest{
@@ -53,9 +53,9 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
 	}
 
 	var (
@@ -93,9 +93,9 @@ func (n *network) Inspect(name string, timeout time.Duration) (*protocol.Network
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return service.Inspect(ctx, &protocol.Reference{Name: name})
@@ -107,11 +107,10 @@ func (n *network) Create(def protocol.NetworkDefinition, timeout time.Duration) 
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return service.Create(ctx, &def)
-
 }

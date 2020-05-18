@@ -18,10 +18,9 @@ package debug
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var settings map[string]map[string]bool = nil
@@ -29,13 +28,13 @@ var settings map[string]map[string]bool = nil
 // RegisterTraceSettings keeps track of what has to be traced
 func RegisterTraceSettings(jsonSettings string) error {
 	if settings != nil {
-		return fail.DuplicateReport("trace settings are already defined")
+		return fmt.Errorf("trace settings are already defined")
 	}
 
 	newSettings := map[string]map[string]bool{}
 	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
 	if err != nil {
-		return fail.Wrap(fail.SyntaxReport(err.Error()), "no trace are enabled, an error occured loading trace settings")
+		return fmt.Errorf("no trace are enabled, an error occured loading trace settings: %v", err)
 	}
 
 	// Check with env variable SAFESCALE_TRACE if key or key.subkey is inside

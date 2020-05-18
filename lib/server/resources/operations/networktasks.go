@@ -32,26 +32,26 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	defer fail.OnPanic(&err)
+func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 
 	var (
 		inputs data.Map
 		ok     bool
 	)
 	if inputs, ok = params.(data.Map); !ok {
-		return nil, fail.InvalidParameterReport("params", "must be a data.Map")
+		return nil, fail.InvalidParameterError("params", "must be a data.Map")
 	}
 
 	hostReq, ok := inputs["request"].(abstract.HostRequest)
 	if !ok {
-		return nil, fail.InvalidParameterReport("params['request']", "must be a abstract.GatewayRequest")
+		return nil, fail.InvalidParameterError("params['request']", "must be a abstract.GatewayRequest")
 	}
 	if hostReq.TemplateID == "" {
-		return nil, fail.InvalidRequestReport("params['request'].TemplateID", "cannot be empty string")
+		return nil, fail.InvalidRequestError("params['request'].TemplateID", "cannot be empty string")
 	}
 	if len(hostReq.Networks) == 0 {
-		return nil, fail.InvalidRequestReport("params['request'].Networks", "cannot be an empty '[]*abstract.Network'")
+		return nil, fail.InvalidRequestError("params['request'].Networks", "cannot be an empty '[]*abstract.Network'")
 	}
 	hostSizing, ok := inputs["sizing"].(abstract.HostSizingRequirements)
 	if !ok {
@@ -59,7 +59,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	}
 	primary, ok := inputs["primary"].(bool)
 	if !ok {
-		return nil, fail.InvalidRequestReport("params['primary']", "is mandatory")
+		return nil, fail.InvalidRequestError("params['primary']", "is mandatory")
 	}
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
@@ -67,135 +67,129 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
 
-	objgw, err := NewHost(svc)
-	if err != nil {
-		return nil, err
+	rgw, xerr := NewHost(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
-	userData, err := objgw.Create(task, hostReq, hostSizing)
-	if err != nil {
-		return nil, err
+	userData, xerr := rgw.Create(task, hostReq, hostSizing)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
-		if err != nil && !hostReq.KeepOnFailure {
+		if xerr != nil && !hostReq.KeepOnFailure {
 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' host resource...", hostReq.ResourceName)
-			derr := objgw.Delete(task)
+			derr := rgw.Delete(task)
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
-				case fail.NotFound:
+				case fail.ErrNotFound:
 					logrus.Errorf(msgRoot+", resource not found: %v", hostReq.ResourceName, derr)
-				case fail.Timeout:
+				case fail.ErrTimeout:
 					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 				default:
 					logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
 				}
-				err = fail.AddConsequence(err, derr)
+				_ = xerr.AddConsequence(derr)
 			} else {
 				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 			}
-			err = fail.AddConsequence(err, derr)
+			_ = xerr.AddConsequence(derr)
 		}
 	}()
 
 	// Set link to network
-	err = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) error {
+	xerr = objn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentReport("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if primary {
-			an.GatewayID = objgw.SafeGetID()
+			an.GatewayID = rgw.SafeGetID()
 		} else {
-			an.SecondaryGatewayID = objgw.SafeGetID()
+			an.SecondaryGatewayID = rgw.SafeGetID()
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Binds gateway to VIP if needed
 	if an := hostReq.Networks[0]; an != nil && an.VIP != nil {
-		err = svc.BindHostToVIP(an.VIP, objgw.SafeGetID())
-		if err != nil {
-			return nil, err
+		if xerr = svc.BindHostToVIP(an.VIP, rgw.SafeGetID()); xerr != nil {
+			return nil, xerr
 		}
 	}
 
 	r := data.Map{
-		"host":     objgw,
+		"host":     rgw,
 		"userdata": userData,
 	}
 	return r, nil
 }
 
-func (objn *network) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (objn *network) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	var (
 		objgw    *host
 		userData *userdata.Content
 		ok       bool
 	)
 	if objgw, ok = params.(data.Map)["host"].(*host); !ok {
-		return nil, fail.InvalidParameterReport("params['host']", "is missing or is not a '*operations.host'")
+		return nil, fail.InvalidParameterError("params['host']", "is missing or is not a '*operations.host'")
 	}
 	if userData, ok = params.(data.Map)["userdata"].(*userdata.Content); !ok {
-		return nil, fail.InvalidParameterReport("params['userdata']", "is missing or is not a '*userdata.Content'")
+		return nil, fail.InvalidParameterError("params['userdata']", "is missing or is not a '*userdata.Content'")
 	}
 	gwname := objgw.SafeGetName()
 
 	// Executes userdata phase2 script to finalize host installation
 	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting configuration phase 3 on the gateway '%s'...", gwname),
 		fmt.Sprintf("Ending configuration phase 3 on the gateway '%s'", gwname),
 	)()
-	defer fail.OnPanic(&err)
+	defer fail.OnPanic(&xerr)
 
-	err = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData)
-	if err != nil {
-		return nil, err
+	if xerr = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
+		return nil, xerr
 	}
 
-	err = objgw.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userData)
-	if err != nil {
-		return nil, err
+	if xerr = objgw.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userData); xerr != nil {
+		return nil, xerr
 	}
 
 	// intermediate gateway reboot
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command := "sudo systemctl reboot"
-	retcode, _, _, err := objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return nil, err
+	retcode, _, _, xerr := objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		return nil, xerr
 	}
 	if retcode != 0 {
 		logrus.Warnf("Unexpected problem rebooting...")
 	}
 
 	// final phase...
-	err = objgw.runInstallPhase(task, userdata.PHASE5_FINAL, userData)
-	if err != nil {
-		return nil, err
+	if xerr = objgw.runInstallPhase(task, userdata.PHASE5_FINAL, userData); xerr != nil {
+		return nil, xerr
 	}
 
 	// Final gatewqay reboot
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command = "sudo systemctl reboot"
-	retcode, _, _, err = objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return nil, err
+	if retcode, _, _, xerr = objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()); xerr != nil {
+		return nil, xerr
 	}
 	if retcode != 0 {
 		logrus.Warnf("Unexpected problem rebooting...")
 	}
 
-	_, err = objgw.waitInstallPhase(task, "final")
-	if err != nil {
-		return nil, err
+	if _, xerr = objgw.waitInstallPhase(task, "final"); xerr != nil {
+		return nil, xerr
 	}
 
 	return nil, nil

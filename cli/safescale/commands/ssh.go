@@ -74,9 +74,9 @@ var sshRun = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
 
-		task, err := concurrency.NewTask()
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		task, xerr := concurrency.NewTask()
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		var timeout time.Duration
@@ -122,9 +122,9 @@ var sshCopy = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
 		}
 
-		task, err := concurrency.NewTask()
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		task, xerr := concurrency.NewTask()
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		var timeout time.Duration

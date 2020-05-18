@@ -126,13 +126,10 @@ func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as
 }
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func (ud *Content) Prepare(
-	options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
-) error {
+func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string) fail.Error {
 
 	// Generate password for user safescale
 	var (
-		err error
 		// autoHostNetworkInterfaces bool
 		useLayer3Networking bool
 		dnsList             []string
@@ -205,7 +202,7 @@ func (ud *Content) Prepare(
 }
 
 // Generate generates the script file corresponding to the phase
-func (ud *Content) Generate(phase Phase) ([]byte, error) {
+func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	var (
 		box    *rice.Box
 		result []byte
@@ -224,7 +221,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 			}
 
 			if !problems && box != nil {
-				_, err := box.String(fmt.Sprintf("userdata%s.init.sh", suffixCandidate))
+				_, err = box.String(fmt.Sprintf("userdata%s.init.sh", suffixCandidate))
 				problems = err != nil
 				_, err = box.String(fmt.Sprintf("userdata%s.netsec.sh", suffixCandidate))
 				problems = problems || (err != nil)
@@ -249,7 +246,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 	anon, ok := userdataPhaseTemplates[phase]
 	userdataPhaseTemplatesLock.RUnlock()
 	if !ok {
-		return nil, fail.NotImplementedReport("phase '%s' not managed", phase)
+		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
 	}
 	var tmpl *template.Template
 	if anon != nil {
@@ -260,7 +257,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 
 		box, err = rice.FindBox("../userdata/scripts")
 		if err != nil {
-			return nil, err
+			return nil, fail.ToError(err)
 		}
 		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
 		if err != nil {
@@ -276,7 +273,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, error) {
 	buf := bytes.NewBufferString("")
 	err = tmpl.Execute(buf, ud)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	result = buf.Bytes()
 	for tagname, tagcontent := range ud.Tags[phase] {

@@ -68,15 +68,15 @@ import (
 // with its content
 func New(task concurrency.Task, name string) (resources.Feature, error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterReport("name", "can't be empty string!")
+		return nil, fail.InvalidParameterError("name", "can't be empty string!")
 	}
 
 	feat, err := operations.NewFeature(task, name)
 	if err != nil {
-		if _, ok := err.(fail.NotFound); !ok {
+		if _, ok := err.(fail.ErrNotFound); !ok {
 			return nil, err
 		}
 
@@ -93,10 +93,10 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 // with its content
 func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterReport("name", "canno't be empty string!")
+		return nil, fail.InvalidParameterError("name", "canno't be empty string!")
 	}
 
 	return operations.NewEmbeddedFeature(task, name)

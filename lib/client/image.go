@@ -34,9 +34,9 @@ func (img *image) List(all bool, timeout time.Duration) (*protocol.ImageList, er
 	img.session.Connect()
 	defer img.session.Disconnect()
 	service := protocol.NewImageServiceClient(img.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return service.List(ctx, &protocol.ImageListRequest{All: all})

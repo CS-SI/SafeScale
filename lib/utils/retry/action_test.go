@@ -53,79 +53,79 @@ func quickSleepyFailure() error {
 func complexSleepyFailure() error {
 	fmt.Println("Quick fail")
 	time.Sleep(1 * 10 * time.Millisecond)
-	return fail.NotFoundReport("Not here")
+	return fail.NotFoundError("Not here")
 }
 
-func CreateErrorWithNConsequences(n uint) (err error) {
-	err = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
-	if err != nil {
+func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
+	xerr = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
-			err = fail.AddConsequence(err, nerr)
+			_ = xerr.AddConsequence(nerr)
 		}
 	}
-	return err
+	return xerr
 }
 
-func CreateSkippableError() (err error) {
-	err = WhileSuccessfulDelay1Second(func() error {
+func CreateSkippableError() (xerr fail.Error) {
+	xerr = WhileSuccessfulDelay1Second(func() error {
 		fmt.Println("Around the world...")
-		return StopRetryError(fail.NotFoundReport("wrong place"), "no more")
+		return StopRetryError(fail.NotFoundError("wrong place"), "no more")
 	}, 60*time.Millisecond)
-	return err
+	return xerr
 }
 
-func CreateComplexErrorWithNConsequences(n uint) (err error) {
-	err = WhileUnsuccessfulDelay1Second(complexSleepyFailure, time.Duration(5)*10*time.Millisecond)
-	if err != nil {
+func CreateComplexErrorWithNConsequences(n uint) (xerr fail.Error) {
+	xerr = WhileUnsuccessfulDelay1Second(complexSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
-			err = fail.AddConsequence(err, nerr)
+			_ = xerr.AddConsequence(nerr)
 		}
 	}
-	return err
+	return xerr
 }
 
-func JustThrowBasicError() (err error) {
+func JustThrowBasicError() error {
 	return fmt.Errorf("something happened")
 }
 
-func JustThrowError() (err error) {
+func JustThrowError() fail.Error {
 	return abstract.ResourceDuplicateError("host", "boo")
 }
 
-func JustThrowComplexError() (err error) {
-	err = abstract.ResourceDuplicateError("host", "booboo")
-	err = fail.AddConsequence(err, fmt.Errorf("cleanup error"))
-	return err
+func JustThrowComplexError() (xerr fail.Error) {
+	xerr = abstract.ResourceDuplicateError("host", "booboo")
+	_ = xerr.AddConsequence(fmt.Errorf("cleanup error"))
+	return xerr
 }
 
-func CreateDeferredErrorWithNConsequences(n uint) (err error) {
+func CreateDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
 	defer func() {
-		if err != nil {
+		if xerr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				err = fail.AddConsequence(err, nerr)
+				_ = xerr.AddConsequence(nerr)
 			}
 		}
 	}()
 
-	err = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
-	return err
+	xerr = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	return xerr
 }
 
-func CreateWrappedDeferredErrorWithNConsequences(n uint) (err error) {
+func CreateWrappedDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
 	defer func() {
-		if err != nil {
+		if xerr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
-				err = fail.AddConsequence(err, nerr)
+				_ = xerr.AddConsequence(nerr)
 			}
 		}
 	}()
 
-	err = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
-	return err
+	xerr = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	return xerr
 }
 
 func TestDeferredWrappedConsequence(t *testing.T) {
@@ -146,7 +146,7 @@ func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
 		if _, ok := recovered.(ErrTimeout); !ok {
-			t.Errorf("It should be a 'Timeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
+			t.Errorf("It should be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := fail.Cause(recovered); cause != nil {
@@ -157,12 +157,12 @@ func TestVerifyErrorType(t *testing.T) {
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
 		if _, ok := recovered.(ErrTimeout); !ok {
-			t.Errorf("It should be a 'Timeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
+			t.Errorf("It should be a 'ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := fail.Cause(recovered); cause != nil {
-			if _, ok := cause.(fail.NotFound); !ok {
-				t.Errorf("It should be a 'fail.NotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
+			if _, ok := cause.(fail.ErrNotFound); !ok {
+				t.Errorf("It should be a 'fail.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
 		}
 	}
@@ -172,14 +172,14 @@ func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
 		if _, ok := recovered.(ErrTimeout); ok {
-			t.Errorf("It should NOT be a 'Timeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
+			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := fail.Cause(recovered); cause != nil {
-			if _, ok := cause.(fail.NotFound); ok {
+			if _, ok := cause.(fail.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
-				t.Errorf("This should be a 'fail.NotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
+				t.Errorf("This should be a 'fail.ErrNotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
 			}
 		}
 	}
@@ -215,7 +215,7 @@ func TestConsequence(t *testing.T) {
 
 	recovered = JustThrowError()
 	if recovered != nil {
-		recovered = fail.AddConsequence(recovered, fmt.Errorf("another disgrace"))
+		_ = recovered.AddConsequence(fmt.Errorf("another disgrace"))
 		cons := fail.Consequences(recovered)
 		if len(cons) == 0 {
 			t.Errorf("This error should have consequences...")
@@ -318,7 +318,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 			if err != nil {
 				if tt.wantTOErr {
 					if _, ok := err.(ErrTimeout); !ok {
-						t.Errorf("'Timeout' not received...")
+						t.Errorf("'ErrTimeout' not received...")
 					}
 				}
 			}
@@ -364,7 +364,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 			if err != nil {
 				if tt.wantTOErr {
 					if _, ok := err.(ErrTimeout); !ok {
-						t.Errorf("Timeout error not received...")
+						t.Errorf("ErrTimeout error not received...")
 					}
 				}
 			}
@@ -394,15 +394,15 @@ func genAbort() error {
 
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
-	if _, ok := nerr.(fail.NotFound); !ok {
-		t.Errorf("Is not a 'NotFound', it's instead a '%s'", reflect.TypeOf(nerr).String())
+	if _, ok := nerr.(fail.ErrNotFound); !ok {
+		t.Errorf("Is not a 'ErrNotFound', it's instead a '%s'", reflect.TypeOf(nerr).String())
 	}
 }
 
 func TestKeepType(t *testing.T) {
 	toe := genTimeout()
 	if _, ok := toe.(ErrTimeout); !ok {
-		t.Errorf("Is not a 'Timeout', it's instead a '%s'", reflect.TypeOf(toe).String())
+		t.Errorf("Is not a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(toe).String())
 	}
 
 	leo := genLimit()

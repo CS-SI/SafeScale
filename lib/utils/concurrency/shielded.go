@@ -45,18 +45,18 @@ func (d *Shielded) Clone() *Shielded {
 }
 
 // Inspect is used to lock a clonable for read
-func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fail.Report) (err fail.Report) {
+func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fail.Error) (err fail.Error) {
 	if d == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if inspector == nil {
-		return fail.InvalidParameterReport("inspector", "cannot be nil")
+		return fail.InvalidParameterError("inspector", "cannot be nil")
 	}
 	if d.witness == nil {
-		return fail.InvalidParameterReport("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
+		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
 	err = d.lock.RLock(task)
@@ -77,18 +77,18 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 }
 
 // Alter allows to update a cloneable using a write lock
-func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Report) (err fail.Report) {
+func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (err fail.Error) {
 	if d == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if alterer == nil {
-		return fail.InvalidParameterReport("alterer", "cannot be nil")
+		return fail.InvalidParameterError("alterer", "cannot be nil")
 	}
 	if d.witness == nil {
-		return fail.InvalidParameterReport("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
+		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
 	err = d.lock.Lock(task)
@@ -116,19 +116,19 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Report) (er
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (d *Shielded) Serialize(task Task) ([]byte, fail.Report) {
+func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 	if d == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var jsoned []byte
-	err := d.Inspect(task, func(clonable data.Clonable) fail.Report {
+	err := d.Inspect(task, func(clonable data.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
-		return fail.NewReport(innerErr.Error())
+		return fail.NewError(innerErr.Error())
 	})
 	if err != nil {
 		return nil, err
@@ -138,19 +138,19 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Report) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (d *Shielded) Deserialize(task Task, buf []byte) fail.Report {
+func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 	if d == nil {
-		return fail.InvalidInstanceReport()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterReport("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if len(buf) == 0 {
-		return fail.InvalidParameterReport("buf", "cannot be empty []byte")
+		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	return d.Alter(task, func(clonable data.Clonable) fail.Report {
+	return d.Alter(task, func(clonable data.Clonable) fail.Error {
 		innerErr := json.Unmarshal(buf, clonable)
-		return fail.NewReport(innerErr.Error())
+		return fail.NewError(innerErr.Error())
 	})
 }

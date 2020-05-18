@@ -38,13 +38,13 @@ import (
 // 	return ur.completed
 // }
 
-// func (ur unitResult) Report() error {
+// func (ur unitResult) Error() error {
 // 	return ur.err
 // }
 
 // func (ur unitResult) ErrorMessage() string {
 // 	if ur.err != nil {
-// 		return ur.err.Report()
+// 		return ur.err.Error()
 // 	}
 // 	return ""
 // }
@@ -118,7 +118,7 @@ func (r results) Add(key string, urs resources.UnitResults) error {
 		r = results{}
 	}
 	if urs == nil {
-		return fail.InvalidParameterReport("urs", "cannot be nil")
+		return fail.InvalidParameterError("urs", "cannot be nil")
 	}
 
 	r[key] = urs
@@ -131,7 +131,7 @@ func (r results) AddUnit(key, unitName string, ur resources.UnitResult) error {
 		r = results{}
 	}
 	if ur == nil {
-		return fail.InvalidParameterReport("ur", "cannot be nil")
+		return fail.InvalidParameterError("ur", "cannot be nil")
 	}
 	if _, ok := r[key]; !ok {
 		r[key] = &unitResults{}

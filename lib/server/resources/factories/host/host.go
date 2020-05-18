@@ -27,9 +27,9 @@ import (
 )
 
 // ErrorList returns a list of available hosts
-func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, fail.Report) {
+func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	// FIXME: get code from HostListener
@@ -43,7 +43,7 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 		return nil, err
 	}
 	hosts := abstract.HostList{}
-	err = objh.Browse(task, func(hc *abstract.HostCore) fail.Report {
+	err = objh.Browse(task, func(hc *abstract.HostCore) fail.Error {
 		hf := converters.HostCoreToHostFull(*hc)
 		hosts = append(hosts, hf)
 		return nil
@@ -52,9 +52,9 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 }
 
 // New creates an instance of resources.Host
-func New(svc iaas.Service) (_ resources.Host, err fail.Report) {
+func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidInstanceReport()
+		return nil, fail.InvalidInstanceError()
 	}
 	host, err := operations.NewHost(svc)
 	if err != nil {
@@ -64,15 +64,15 @@ func New(svc iaas.Service) (_ resources.Host, err fail.Report) {
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
-func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err fail.Report) {
+func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
 	if task == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterReport("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, fail.InvalidParameterReport("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	// FIXME: tracer...

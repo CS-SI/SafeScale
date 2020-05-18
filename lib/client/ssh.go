@@ -47,10 +47,10 @@ type ssh struct {
 // Run executes the command
 func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	if s == nil {
-		return -1, "", "", fail.InvalidInstanceReport()
+		return -1, "", "", fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return -1, "", "", fail.InvalidParameterReport("task", "cannot be nil")
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var (
@@ -80,20 +80,19 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 	// defer cancel()
 
 	// Create the command
-	var sshCmd *system.SSHCommand
-	sshCmd, err = sshCfg.Command(task, command)
-	if err != nil {
-		return -1, "", "", err
+	sshCmd, xerr := sshCfg.Command(task, command)
+	if xerr != nil {
+		return -1, "", "", xerr
 	}
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			var innerErr error
+			var innerErr fail.Error
 			retcode, stdout, stderr, innerErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if innerErr != nil {
-				if _, ok := innerErr.(fail.Timeout); ok {
+				if _, ok := innerErr.(fail.ErrTimeout); ok {
 					return innerErr
 				}
 				retcode = -1
@@ -101,7 +100,7 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
-				return fail.NewReport("failed to connect")
+				return fail.NewError("failed to connect")
 			}
 			return nil
 		},
@@ -132,70 +131,70 @@ func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, error) {
 
 const protocolSeparator = ":"
 
-func extracthostName(in string) (string, error) {
+func extracthostName(in string) (string, fail.Error) {
 	parts := strings.Split(in, protocolSeparator)
 	if len(parts) == 1 {
 		return "", nil
 	}
 	if len(parts) > 2 {
-		return "", fmt.Errorf("too many parts in path")
+		return "", fail.OverflowError(nil, 2, "too many parts in path")
 	}
 	hostName := strings.TrimSpace(parts[0])
 	for _, protocol := range []string{"file", "http", "https", "ftp"} {
 		if strings.ToLower(hostName) == protocol {
-			return "", fmt.Errorf("no protocol expected. Only host name")
+			return "", fail.SyntaxError("no protocol expected. Only host name")
 		}
 	}
 
 	return hostName, nil
 }
 
-func extractPath(in string) (string, error) {
+func extractPath(in string) (string, fail.Error) {
 	parts := strings.Split(in, protocolSeparator)
 	if len(parts) == 1 {
 		return in, nil
 	}
 	if len(parts) > 2 {
-		return "", fmt.Errorf("too many parts in path")
+		return "", fail.OverflowError(nil, 2, "too many parts in path")
 	}
-	_, err := extracthostName(in)
-	if err != nil {
-		return "", err
+	_, xerr := extracthostName(in)
+	if xerr != nil {
+		return "", xerr
 	}
 
 	return strings.TrimSpace(parts[1]), nil
 }
 
 // Copy ...
-func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) { // FIXME CRITICAL Use context
+func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
 	// Try extract host
-	hostFrom, err := extracthostName(from)
-	if err != nil {
-		return -1, "", "", err
+	hostFrom, xerr := extracthostName(from)
+	if xerr != nil {
+		return -1, "", "", xerr
 	}
-	hostTo, err := extracthostName(to)
-	if err != nil {
-		return -1, "", "", err
+	hostTo, xerr := extracthostName(to)
+	if xerr != nil {
+		return -1, "", "", xerr
 	}
 
 	// Host checks
 	if hostFrom != "" && hostTo != "" {
-		return -1, "", "", fmt.Errorf("copy between 2 hosts is not supported yet")
+		return -1, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
 	}
 	if hostFrom == "" && hostTo == "" {
-		return -1, "", "", fmt.Errorf("no host name specified neither in from nor to")
+		return -1, "", "", fail.NotImplementedError("no host name specified neither in from nor to")
 	}
 
-	fromPath, err := extractPath(from)
-	if err != nil {
-		return -1, "", "", err
+	fromPath, rerr := extractPath(from)
+	if rerr != nil {
+		return -1, "", "", rerr
 	}
-	toPath, err := extractPath(to)
-	if err != nil {
-		return -1, "", "", err
+	toPath, rerr := extractPath(to)
+	if rerr != nil {
+		return -1, "", "", rerr
 	}
 
 	if hostFrom != "" {
@@ -237,16 +236,16 @@ func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, ex
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, err = sshCfg.CopyWithTimeout(task, remotePath, localPath, upload, executionTimeout)
+			retcode, stdout, stderr, xerr = sshCfg.CopyWithTimeout(task, remotePath, localPath, upload, executionTimeout)
 			// If an error occurred, stop the loop and propagates this error
-			if err != nil {
+			if xerr != nil {
 				retcode = -1
 				return nil
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
-				err = fmt.Errorf("failed to connect")
-				return err
+				xerr = fail.NewError("failed to connect")
+				return xerr
 			}
 			return nil
 		},
@@ -254,39 +253,40 @@ func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, ex
 		connectionTimeout,
 	)
 	if retryErr != nil {
-		switch retryErr.(type) { // nolint
+		switch cErr := retryErr.(type) { // nolint
 		case retry.ErrTimeout:
-			return -1, "", "", fmt.Errorf("failed to copy after %v: %s", connectionTimeout, err.Error())
+			return -1, "", "", cErr
 		}
 	}
-	return retcode, stdout, stderr, err
+	return retcode, stdout, stderr, retryErr
 }
 
 // getSSHConfigFromName ...
-func (s *ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConfig, error) {
+func (s *ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConfig, fail.Error) {
 	// conn := utils.GetConnection()
 	// defer conn.Close()
 	s.session.Connect()
 	defer s.session.Disconnect()
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
-	service := protocol.NewHostServiceClient(s.session.connection)
 
+	service := protocol.NewHostServiceClient(s.session.connection)
 	sshConfig, err := service.SSH(ctx, &protocol.Reference{Name: name})
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
 }
 
 // Connect ...
 func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) error {
-	sshCfg, err := s.getSSHConfigFromName(hostname, timeout)
-	if err != nil {
-		return err
+	sshCfg, xerr := s.getSSHConfigFromName(hostname, timeout)
+	if xerr != nil {
+		return xerr
 	}
+
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
 			return sshCfg.Enter(username, shell)
@@ -301,9 +301,9 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 }
 
 func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
-	sshCfg, err := s.getSSHConfigFromName(name, timeout)
-	if err != nil {
-		return err
+	sshCfg, xerr := s.getSSHConfigFromName(name, timeout)
+	if xerr != nil {
+		return xerr
 	}
 
 	if sshCfg.GatewayConfig == nil {
@@ -321,7 +321,6 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
-
 			tunnels, _, err := sshCfg.CreateTunneling()
 			if err != nil {
 				for _, t := range tunnels {
@@ -330,9 +329,8 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 						logrus.Errorf("error closing ssh tunnel: %v", nerr)
 					}
 				}
-				return fmt.Errorf("unable to create command : %s", err.Error())
+				return fail.Wrap(err, "unable to create command")
 			}
-
 			return nil
 		},
 		temporal.GetConnectSSHTimeout(),
@@ -345,9 +343,9 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 }
 
 func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
-	sshCfg, err := s.getSSHConfigFromName(name, timeout)
-	if err != nil {
-		return err
+	sshCfg, xerr := s.getSSHConfigFromName(name, timeout)
+	if xerr != nil {
+		return xerr
 	}
 
 	if sshCfg.GatewayConfig == nil {
@@ -393,6 +391,6 @@ func (s *ssh) WaitReady(task concurrency.Task, hostName string, timeout time.Dur
 		return err
 	}
 
-	_, err = sshCfg.WaitServerReady(task, "ready", timeout)
-	return err
+	_, xerr := sshCfg.WaitServerReady(task, "ready", timeout)
+	return xerr
 }
