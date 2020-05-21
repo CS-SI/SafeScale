@@ -228,6 +228,16 @@ func ImplementsConsequencer(inErr error) bool {
 	return false
 }
 
+// Message return the message of an error if it implements the causer interface
+func Message(err error) string {
+	cause, ok := err.(causer)
+	if ok {
+		return cause.Message()
+	}
+
+	return ""
+}
+
 // Cause returns the cause of an error if it implements the causer interface
 func Cause(err error) (resp error) {
 	resp = err
