@@ -51,10 +51,10 @@ type VolumeListener struct{}
 // List the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ *pb.VolumeList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	all := in.GetAll()
 
@@ -77,7 +77,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	handler := VolumeHandler(tenant.Service)
 	volumes, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map resources.Volume to pb.Volume
@@ -92,10 +92,10 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 // Create a new volume
 func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_ *pb.Volume, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	name := in.GetName()
 	speed := in.GetSpeed()
@@ -108,7 +108,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 	defer srvutils.JobDeregister(ctx)
 
@@ -121,7 +121,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	handler := VolumeHandler(tenant.Service)
 	vol, err := handler.Create(ctx, name, int(size), volumespeed.Enum(speed))
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Infof("Volume '%s' created", name)
@@ -145,7 +145,7 @@ func (s *VolumeListener) Expand(ctx context.Context, in *pb.VolumeSizeChange) (*
 
 	err := handler.Expand(ctx, volumeName, hostName, in.ChangeSize, in.ChangeSizeType)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Println(fmt.Sprintf("Volume '%s' expanded", volumeName))
@@ -169,7 +169,7 @@ func (s *VolumeListener) Shrink(ctx context.Context, in *pb.VolumeSizeChange) (*
 
 	err := handler.Shrink(ctx, volumeName, hostName, in.ChangeSize, in.ChangeSizeType)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Println(fmt.Sprintf("Volume '%s' shrinked", volumeName))
@@ -180,10 +180,10 @@ func (s *VolumeListener) Shrink(ctx context.Context, in *pb.VolumeSizeChange) (*
 func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_ *googleprotobuf.Empty, err error) {
 	empty := &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
@@ -212,7 +212,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	ctx, cancelFunc := context.WithCancel(ctx)
 	err = srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeRef+" to host "+hostRef)
 	if err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 	defer srvutils.JobDeregister(ctx)
 
@@ -225,7 +225,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	handler := VolumeHandler(tenant.Service)
 	_, err = handler.Attach(ctx, volumeRef, hostRef, mountPath, filesystem, doNotFormat)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	return empty, nil
@@ -235,10 +235,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_ *googleprotobuf.Empty, err error) {
 	empty := &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
@@ -268,7 +268,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 	handler := VolumeHandler(tenant.Service)
 	err = handler.Detach(ctx, volumeRef, hostRef)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Infof("Volume '%s' detached from '%s'", volumeRef, hostRef)
@@ -279,10 +279,10 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googleprotobuf.Empty, err error) {
 	empty := &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -308,7 +308,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 	handler := VolumeHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, fmt.Sprintf("cannot delete volume '%s': %s", ref, err.Error()))
+		return empty, status.Errorf(codes.Internal, fmt.Sprintf("cannot delete volume '%s': %s", ref, getUserMessage(err)))
 	}
 	log.Infof("Volume '%s' successfully deleted.", ref)
 	return empty, nil
@@ -317,10 +317,10 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 // Inspect a volume
 func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.VolumeInfo, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -346,7 +346,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	handler := VolumeHandler(tenant.Service)
 	volume, mounts, err := handler.Inspect(ctx, ref)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if volume == nil {
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect volume '%s': volume not found", ref))

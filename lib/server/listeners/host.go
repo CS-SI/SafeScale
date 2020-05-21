@@ -68,11 +68,11 @@ type StoredCPUInfo struct {
 func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Message())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -81,7 +81,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Start Host "+in.GetName()); err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -93,7 +93,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 	handler := HostHandler(tenant.Service)
 	err = handler.Start(ctx, ref)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Infof("Host '%s' successfully started", ref)
@@ -104,11 +104,11 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Message())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -129,7 +129,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 	handler := HostHandler(tenant.Service)
 	err = handler.Stop(ctx, ref)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Infof("Host '%s' stopped", ref)
@@ -140,11 +140,11 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Message())
 	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -166,7 +166,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	handler := HostHandler(tenant.Service)
 	err = handler.Reboot(ctx, ref)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	log.Infof("Host '%s' successfully rebooted.", ref)
@@ -176,7 +176,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb.HostList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	all := in.GetAll()
 
@@ -199,7 +199,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	handler := HostHandler(tenant.Service)
 	hosts, err := handler.List(ctx, all)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map resources.Host to pb.Host
@@ -214,10 +214,10 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 // Create creates a new host
 func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb.Host, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	name := in.GetName()
 
@@ -262,7 +262,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		in.Force,
 	)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	log.Infof("Host '%s' created", name)
 	return srvutils.ToPBHost(host), nil
@@ -272,10 +272,10 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 // Resize an host
 func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb.Host, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	name := in.GetName()
 
@@ -304,7 +304,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 		float32(in.GetCpuFreq()),
 	)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	log.Infof("Host '%s' resized", name)
 	return srvutils.ToPBHost(host), nil
@@ -313,10 +313,10 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 // Status returns the status of a host (running or stopped mainly)
 func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.HostStatus, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -341,7 +341,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return srvutils.ToHostStatus(host), nil
 }
@@ -349,10 +349,10 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 // Inspect an host
 func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Host, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -377,7 +377,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, fmt.Sprintf("cannot inspect host: %v", err))
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("cannot inspect host: %s", getUserMessage(err)))
 	}
 	return srvutils.ToPBHost(host), nil
 }
@@ -386,10 +386,10 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
@@ -414,7 +414,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	handler := HostHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, err.Error())
+		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	log.Infof("Host '%s' successfully deleted.", ref)
 	return empty, nil
@@ -423,10 +423,10 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 // SSH returns ssh parameters to access an host
 func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshConfig, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
