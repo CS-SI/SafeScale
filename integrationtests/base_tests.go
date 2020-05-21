@@ -152,8 +152,7 @@ func Basic(t *testing.T, provider providers.Enum) {
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
 	out, err = GetOutput("safescale share list")
-	fmt.Println(out)
-	require.Nil(t, err)
+	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	fmt.Println("Creating Share " + names.Shares[0])
 
@@ -166,8 +165,6 @@ func Basic(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale share list")
-	fmt.Println(out)
-	require.Nil(t, err)
 	require.True(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("safescale share inspect " + names.Shares[0])
@@ -195,8 +192,6 @@ func Basic(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale share list")
-	fmt.Println(out)
-	require.Nil(t, err)
 	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("safescale volume list")
@@ -327,8 +322,7 @@ func BasicPrivate(t *testing.T, provider providers.Enum) {
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
 	out, err = GetOutput("safescale share list")
-	fmt.Println(out)
-	require.Nil(t, err)
+	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	fmt.Println("Creating Share " + names.Shares[0])
 
@@ -341,8 +335,6 @@ func BasicPrivate(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale share list")
-	fmt.Println(out)
-	require.Nil(t, err)
 	require.True(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("safescale share inspect " + names.Shares[0])
@@ -370,8 +362,6 @@ func BasicPrivate(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale share list")
-	fmt.Println(out)
-	require.Nil(t, err)
 	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("safescale volume list")
@@ -404,7 +394,7 @@ func BasicPrivate(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
 
-	out, err = GetOutput("safescale volume  detach " + names.Volumes[0] + " " + names.Hosts[0])
+	out, err = GetOutput("safescale volume detach " + names.Volumes[0] + " " + names.Hosts[0])
 	fmt.Println(out)
 	require.Nil(t, err)
 
@@ -590,16 +580,14 @@ func ShareError(t *testing.T, provider providers.Enum) {
 	_, err = GetOutput("safescale share delete " + names.Shares[0])
 	require.NoError(t, err)
 
+	time.Sleep(temporal.GetDefaultDelay())
+
 	out, err = GetOutput("safescale host delete " + names.Hosts[0])
-	if err != nil {
-		fmt.Println(err.Error())
-		fmt.Println(out)
-	}
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.True(t, strings.Contains(out, "success"))
 
 	out, err = GetOutput("safescale network delete " + names.Networks[0])
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.True(t, strings.Contains(out, "success"))
 }
 
@@ -669,17 +657,21 @@ func StopStart(t *testing.T, provider providers.Enum) {
 
 	fmt.Println("Creating VM " + names.Hosts[0])
 
-	_, err = GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
+	out, err = GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
+	require.NoError(t, err)
+	require.True(t, strings.Contains(out, "success"))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
+
+	out, err = GetOutput("safescale host stop " + names.Hosts[0])
+	require.True(t, strings.Contains(out, "success"))
 	require.NoError(t, err)
 
-	_, err = GetOutput("safescale host stop " + names.Hosts[0])
-	require.NoError(t, err)
+	time.Sleep(2 * temporal.GetDefaultDelay())
 
-	out = ""
-	for !strings.Contains(out, "STOPPED") {
-		out, err = GetOutput("safescale host status " + names.Hosts[0])
-		require.NotNil(t, err)
-	}
+	out, err = GetOutput("safescale host status " + names.Hosts[0])
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "success"))
+	require.True(t, strings.Contains(out, "STOPPED"))
 
 	_, err = GetOutput("safescale host start " + names.Hosts[0])
 	require.Nil(t, err)
@@ -740,9 +732,6 @@ func DeleteVolumeMounted(t *testing.T, provider providers.Enum) {
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	_, err = GetOutput("safescale share list")
-	require.Nil(t, err)
-
 	fmt.Println("Creating Share " + names.Shares[0])
 
 	_, err = GetOutput("safescale share create " + names.Shares[0] + " " + names.Hosts[0])
@@ -751,8 +740,7 @@ func DeleteVolumeMounted(t *testing.T, provider providers.Enum) {
 	_, err = GetOutput("safescale share mount " + names.Shares[0] + " " + names.Hosts[1])
 	require.Nil(t, err)
 
-	out, err = GetOutput("safescale share list")
-	require.Nil(t, err)
+	out, _ = GetOutput("safescale share list")
 	require.True(t, strings.Contains(out, names.Shares[0]))
 
 	_, err = GetOutput("safescale share inspect " + names.Shares[0])
@@ -774,7 +762,6 @@ func DeleteVolumeMounted(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale share list")
-	require.Nil(t, err)
 	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	out, err = GetOutput("safescale volume list")
@@ -837,20 +824,23 @@ func UntilShare(t *testing.T, provider providers.Enum) {
 
 	fmt.Println("Creating VM " + names.Hosts[1])
 
-	_, err = GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
+	out, err = GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
+	if err != nil {
+		fmt.Println(err)
+	}
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
-	_, err = GetOutput("safescale share list")
-	require.Nil(t, err)
+	out, err = GetOutput("safescale share list")
+	require.False(t, strings.Contains(out, names.Shares[0]))
 
 	fmt.Println("Creating Share " + names.Shares[0])
 
-	_, err = GetOutput("safescale share create " + names.Shares[0] + " " + names.Hosts[0])
-	require.Nil(t, err)
+	out, err = GetOutput("safescale share create " + names.Shares[0] + " " + names.Hosts[0])
+	require.NoError(t, err)
 }
 
 func UntilVolume(t *testing.T, provider providers.Enum) {
@@ -901,6 +891,8 @@ func UntilVolume(t *testing.T, provider providers.Enum) {
 
 	_, err = GetOutput("safescale volume create " + names.Volumes[0])
 	require.Nil(t, err)
+
+	time.Sleep(temporal.GetDefaultDelay())
 
 	out, err = GetOutput("safescale volume list")
 	require.Nil(t, err)
