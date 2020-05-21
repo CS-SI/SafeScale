@@ -217,12 +217,12 @@ func Basic(t *testing.T, provider providers.Enum) {
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	fmt.Println(out)
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "still attached"))
+	require.True(t, strings.Contains(out, "still attached") || strings.Contains(err.Error(), "still attached"))
 
 	out, err = GetOutput("safescale volume inspect " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.True(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
+	require.True(t, strings.Contains(out, names.Hosts[0]))
 
 	out, err = GetOutput("safescale volume  detach " + names.Volumes[0] + " " + names.Hosts[0])
 	fmt.Println(out)
@@ -231,7 +231,7 @@ func Basic(t *testing.T, provider providers.Enum) {
 	out, err = GetOutput("safescale volume inspect " + names.Volumes[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-	require.False(t, strings.Contains(out, host0.ID) || strings.Contains(out, names.Hosts[0]))
+	require.False(t, strings.Contains(out, names.Hosts[0]))
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	fmt.Println(out)
@@ -743,7 +743,8 @@ func DeleteVolumeMounted(t *testing.T, provider providers.Enum) {
 	out, _ = GetOutput("safescale share list")
 	require.True(t, strings.Contains(out, names.Shares[0]))
 
-	_, err = GetOutput("safescale share inspect " + names.Shares[0])
+	out, err = GetOutput("safescale share inspect " + names.Shares[0])
+	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, names.Shares[0]))
 	require.True(t, strings.Contains(out, names.Hosts[0]))
@@ -753,6 +754,7 @@ func DeleteVolumeMounted(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 
 	out, err = GetOutput("safescale share inspect " + names.Shares[0])
+	fmt.Println(out)
 	require.Nil(t, err)
 	require.True(t, strings.Contains(out, names.Shares[0]))
 	require.True(t, strings.Contains(out, names.Hosts[0]))
@@ -782,13 +784,7 @@ func DeleteVolumeMounted(t *testing.T, provider providers.Enum) {
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	require.NotNil(t, err)
-	require.True(t, strings.Contains(out, "still attached"))
-
-	// TODO Parse message received
-	messageReceived := "Could not delete volume 'volumetest': rpc error: code = Unknown desc = Error deleting volume: Bad request with: [DELETE https://volume.compute.sbg3.cloud.ovh.net/v1/7bf42a51e07a4be98e62b0435bfc1765/volumes/906e8b9c-b6ac-461b-9916-a8bc7afa8449], error message: {'badRequest': {'message': 'Volume 906e8b9c-b6ac-461b-9916-a8bc7afa8449 is still attached, detach volume first.', 'code': 400}}"
-	_ = messageReceived
-
-	fmt.Println(err.Error())
+	require.True(t, strings.Contains(out, "still attached to ") || strings.Contains(err.Error(), "still attached to"))
 }
 
 func UntilShare(t *testing.T, provider providers.Enum) {
