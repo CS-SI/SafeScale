@@ -42,10 +42,10 @@ type JobManagerListener struct{}
 func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	uuid := in.Uuid
 	if in.Uuid == "" {
@@ -78,7 +78,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 // List running process
 func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *pb.JobList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
@@ -100,7 +100,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	handler := JobManagerHandler(tenant.Service)
 	processMap, err := handler.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list Process %s", err.Error())
+		return nil, fmt.Errorf("failed to list Process %s", getUserMessage(err))
 	}
 	var pbProcessList []*pb.JobDefinition
 	for uuid, info := range processMap {

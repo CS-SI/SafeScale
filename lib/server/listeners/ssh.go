@@ -47,10 +47,10 @@ type SSHListener struct{}
 // Run executes an ssh command on a remote host
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshResponse, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	host := in.GetHost().GetName()
 	command := in.GetCommand()
@@ -76,7 +76,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	handler := SSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Run(ctx, host, command, outputs.DISPLAY)
 	if err != nil {
-		err = status.Errorf(codes.Internal, err.Error())
+		err = status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return &pb.SshResponse{
 		Status:    int32(retcode),
@@ -88,10 +88,10 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.SshResponse, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	source := in.Source
 	dest := in.Destination
@@ -116,7 +116,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 	handler := SSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Copy(ctx, source, dest)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if retcode != 0 {
 		return nil, fmt.Errorf("cannot copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
