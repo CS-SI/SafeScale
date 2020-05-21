@@ -2,6 +2,7 @@ package scerr
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -103,5 +104,29 @@ func TestLogErrorWithPanic(t *testing.T) {
 		if !strings.Contains(message, "Ouch") {
 			t.Errorf("Panic should contain panic info...")
 		}
+	}
+}
+
+func sender() error {
+	return Errorf("what", Errorf("something else", nil))
+}
+
+func specialSender() error {
+	return InvalidInstanceError()
+}
+
+func TestRecognizeErrCore(t *testing.T) {
+	var err error
+	err = sender()
+
+	if !ImplementsCauser(err) {
+		t.Fail()
+	}
+
+	if eb, ok := err.(causer); ok {
+		require.True(t, strings.Contains(eb.Error(), "caused by"))
+		require.False(t, strings.Contains(eb.Message(), "caused by"))
+	} else {
+		t.Fail()
 	}
 }
