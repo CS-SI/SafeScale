@@ -80,6 +80,9 @@ func (handler *ShareHandler) Create(
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
@@ -243,6 +246,9 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
@@ -325,7 +331,9 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -351,11 +359,15 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 		return shares, nil
 	}
 
+	var warnings []error
+
 	hostSvc := NewHostHandler(handler.service)
 	for _, serverID := range servers {
 		host, err := hostSvc.Inspect(ctx, serverID)
 		if err != nil {
-			return nil, err
+			warnings = append(warnings, err)
+			log.Warn(err)
+			continue
 		}
 
 		err = host.Properties.LockForRead(hostproperty.SharesV1).ThenUse(func(clonable data.Clonable) error {
@@ -364,9 +376,15 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			warnings = append(warnings, err)
+			log.Warn(err)
 		}
 	}
+
+	if len(shares) == 0 && len(warnings) != 0 {
+		return shares, scerr.Errorf("there have been problems iterating the list of shares", scerr.ErrListError(warnings))
+	}
+
 	return shares, nil
 }
 
@@ -379,6 +397,9 @@ func (handler *ShareHandler) Mount(
 
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
@@ -446,7 +467,11 @@ func (handler *ShareHandler) Mount(
 		if clonable.(*propsv1.HostNetwork).DefaultGatewayPrivateIP == server.GetPrivateIP() {
 			export = server.GetPrivateIP() + ":" + share.Path
 		} else {
-			export = server.GetAccessIP() + ":" + share.Path
+			if server.GetPrivateIP() != "" {
+				export = server.GetPrivateIP() + ":" + share.Path
+			} else {
+				export = server.GetAccessIP() + ":" + share.Path
+			}
 		}
 		return nil
 	})
@@ -495,25 +520,21 @@ func (handler *ShareHandler) Mount(
 			sshHandler := NewSSHHandler(handler.service)
 			sshConfig, derr := sshHandler.GetConfig(ctx, target)
 			if derr != nil {
-				log.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
 			nfsClient, derr := nfs.NewNFSClient(sshConfig)
 			if derr != nil {
-				log.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
 			derr = nfsClient.Install()
 			if derr != nil {
-				log.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 
 			derr = nfsClient.Unmount(export)
 			if derr != nil {
-				log.Warn(derr)
 				err = scerr.AddConsequence(err, derr)
 			}
 		}
@@ -607,6 +628,9 @@ func (handler *ShareHandler) Mount(
 func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
@@ -725,6 +749,9 @@ func (handler *ShareHandler) ForceInspect(
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return nil, nil, nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
 	// FIXME: validate parameters
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
@@ -750,6 +777,9 @@ func (handler *ShareHandler) Inspect(
 
 	if handler == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, nil, nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
