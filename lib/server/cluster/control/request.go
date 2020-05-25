@@ -28,6 +28,8 @@ type Request struct {
 	Name string
 	// CIDR defines the network to create
 	CIDR string
+	// Domain defines the domain to use to build host names
+	Domain string
 	// Complexity is the implementation wanted, can be Small, Normal or Large
 	Complexity complexity.Enum
 	// Flavor tells what kind of cluster to create

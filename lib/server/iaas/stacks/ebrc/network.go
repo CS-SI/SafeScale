@@ -755,7 +755,7 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources
 	if req.Network == nil {
 		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
-	gwname := req.Name
+	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
 	}
@@ -763,6 +763,7 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
+		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
 		Networks:     []*resources.Network{req.Network},

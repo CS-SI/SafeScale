@@ -38,6 +38,7 @@ type Network struct {
 	PrimaryPublicIP    string `json:"primary_public_ip"`    // contains the public IP of the primary gateway
 	SecondaryPublicIP  string `json:"secondary_public_ip"`  // contains the public IP of the secondary gateway
 	EndpointIP         string `json:"endpoint_ip"`          // contains the IP of the external Endpoint
+	Domain             string `json:"domain,omitempty"`     // contains the domain used to define the host FQDN at creation (taken from the network)
 }
 
 func newNetwork() *Network {

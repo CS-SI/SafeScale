@@ -129,8 +129,8 @@ EOF
 put_hostname_in_hosts() {
 	echo "{{ .HostName }}" >/etc/hostname
 	hostname {{ .HostName }}
-	HON=$(hostname -s)
-	ping -n -c1 -w5 $HON 2>/dev/null || echo "127.0.1.1 $HON" >>/etc/hosts
+	SHORT_HOSTNAME=$(hostname -s)
+	sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced

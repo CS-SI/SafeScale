@@ -168,48 +168,48 @@ identify_nics() {
     NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
     NICS=${NICS/[[:cntrl:]]/ }
 
-    for IF in $NICS; do
+    for IF in ${NICS}; do
         IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-        [ ! -z $IP ] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
+        [[ ! -z $IP ]] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
     done
-    PR_IFs=$(echo $PR_IFs | xargs) || true
+    PR_IFs=$(echo ${PR_IFs} | xargs) || true
     PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
-    PU_IP=$(ip a | grep $PU_IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    if [ ! -z $PU_IP ]; then
+    PU_IP=$(ip a | grep ${PU_IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+    if [[ ! -z ${PU_IP} ]]; then
         if is_ip_private $PU_IP; then
             PU_IF=
 
             NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
-            if [ -z $NO404 ]; then
+            if [[ -z $NO404 ]]; then
                 # Works with FlexibleEngine and potentially with AWS (not tested yet)
                 PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
-                [ -z $PU_IP ] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+                [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
             fi
         fi
     fi
-    [ -z $PR_IFs ] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
+    [[ -z ${PR_IFs} ]] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
 
     # Keeps track of interfaces identified for future scripting use
     echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
     echo "$PU_IF" >${SF_VARDIR}/state/public_nics
 
-    if [ ! -z $PU_IP ]; then
-      if [ -z $PU_IF ]; then
-        if [ -z $NO404 ]; then
-          echo "It seems AWS"
-          AWS=1
-        else
-          AWS=0
+    if [[ ! -z ${PU_IP} ]]; then
+        if [[ -z ${PU_IF} ]]; then
+             if [[ -z ${NO404} ]]; then
+                 echo "It seems AWS"
+                 AWS=1
+            else
+                 AWS=0
+            fi
         fi
-      fi
     fi
 
-    if [ "{{.ProviderName}}" == "aws" ]; then
-      echo "It actually IS AWS"
-      AWS=1
+    if [[ "{{.ProviderName}}" == "aws" ]]; then
+        echo "It actually IS AWS"
+        AWS=1
     else
-      echo "It is NOT AWS"
-      AWS=0
+        echo "It is NOT AWS"
+        AWS=0
     fi
 
     echo "NICS identified: $NICS"
@@ -243,6 +243,12 @@ ensure_network_connectivity() {
 }
 
 configure_dns() {
+    # Sometimes NetworkManager is enabled, we don't want it
+    if systemctl is-enabled NetworkManager &>/dev/null; then
+        systemctl disable NetworkManager
+        systemctl stop NetworkManager
+    fi
+
     if systemctl status systemd-resolved &>/dev/null; then
         echo "Configuring dns with resolved"
         configure_dns_systemd_resolved
@@ -253,6 +259,16 @@ configure_dns() {
         echo "Configuring dns legacy"
         configure_dns_legacy
     fi
+}
+
+# adds entry in /etc/hosts corresponding to FQDN hostname with private IP
+update_fqdn() {
+	SHORT_HOSTNAME=$(hostname -s)
+    [[ "$SHORT_HOSTNAME" == "$(hostname -f)" ]] && return
+    IF=${PR_IFs[0]}
+    [[ -z ${IF} ]] && return
+    IP=$(ip a | grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+    sed -i -nr "/^${IP}"'/!p;$a'"${IP}"'\t{{ .HostName }}' /etc/hosts
 }
 
 configure_network() {
@@ -288,6 +304,8 @@ configure_network() {
     install_keepalived || fail 195
     {{- end }}
 
+    update_fqdn
+
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
         fail 196
@@ -299,18 +317,18 @@ configure_network_debian() {
     echo "Configuring network (debian-like)..."
 
     local path=/etc/network/interfaces.d
-    mkdir -p $path
-    local cfg=$path/50-cloud-init.cfg
-    rm -f $cfg
+    mkdir -p ${path}
+    local cfg=${path}/50-cloud-init.cfg
+    rm -f ${cfg}
 
-    for IF in $NICS; do
-        if [ "$IF" = "$PU_IF" ]; then
-            cat <<-EOF >$path/10-$IF-public.cfg
+    for IF in ${NICS}; do
+        if [[ "$IF" = "$PU_IF" ]]; then
+            cat <<-EOF >${path}/10-${IF}-public.cfg
 auto ${IF}
 iface ${IF} inet dhcp
 EOF
         else
-            cat <<-EOF >$path/11-$IF-private.cfg
+            cat <<-EOF >${path}/11-${IF}-private.cfg
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
@@ -363,9 +381,9 @@ configure_network_systemd_networkd() {
     rm -f /etc/netplan/*
 
     # Recreate netplan configuration with last netplan version and more settings
-    for IF in $NICS; do
-        if [ "$IF" = "$PU_IF" ]; then
-            cat <<-EOF >/etc/netplan/10-$IF-public.yaml
+    for IF in ${NICS}; do
+        if [[ "$IF" = "$PU_IF" ]]; then
+            cat <<-EOF >/etc/netplan/10-${IF}-public.yaml
 network:
   version: 2
   renderer: networkd
@@ -380,13 +398,13 @@ network:
           use-routes: true
 EOF
         else
-            cat <<-EOF >/etc/netplan/11-$IF-private.yaml
+            cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
 network:
   version: 2
   renderer: networkd
 
   ethernets:
-    $IF:
+    ${IF}:
       dhcp4: true
       dhcp6: false
       critical: true
@@ -406,7 +424,7 @@ EOF
         fi
     done
 
-    if [ "{{.ProviderName}}" == "aws" ]; then
+    if [[ "{{.ProviderName}}" == "aws" ]]; then
       echo "It actually IS AWS"
       AWS=1
     else
@@ -418,15 +436,15 @@ EOF
       if [[ $ISGW -eq 0 ]]; then
         rm -f /etc/netplan/*
         # Recreate netplan configuration with last netplan version and more settings
-        for IF in $NICS; do
-            if [ "$IF" = "$PU_IF" ]; then
+        for IF in ${NICS}; do
+            if [[ "$IF" = "$PU_IF" ]]; then
                 cat <<-EOF >/etc/netplan/10-$IF-public.yaml
 network:
   version: 2
   renderer: networkd
 
   ethernets:
-    $IF:
+    ${IF}:
       dhcp4: true
       dhcp6: false
       critical: true
@@ -435,13 +453,13 @@ network:
           use-routes: true
 EOF
             else
-                cat <<-EOF >/etc/netplan/11-$IF-private.yaml
+                cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
 network:
   version: 2
   renderer: networkd
 
   ethernets:
-    $IF:
+    ${IF}:
       dhcp4: true
       dhcp6: false
       critical: true
@@ -463,7 +481,7 @@ EOF
       fi
     fi
 
-    if [[ $AWS -eq 1 ]]; then
+    if [[ ${AWS} -eq 1 ]]; then
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 0"
@@ -473,7 +491,7 @@ EOF
 
     netplan generate && netplan apply || fail 198
 
-    if [[ $AWS -eq 1 ]]; then
+    if [[ ${AWS} -eq 1 ]]; then
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 1"
@@ -483,7 +501,7 @@ EOF
 
     configure_dhclient
 
-    if [[ $AWS -eq 1 ]]; then
+    if [[ ${AWS} -eq 1 ]]; then
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 2"
@@ -493,7 +511,7 @@ EOF
 
     systemctl restart systemd-networkd
 
-    if [[ $AWS -eq 1 ]]; then
+    if [[ ${AWS} -eq 1 ]]; then
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 3"
@@ -510,7 +528,7 @@ EOF
 configure_network_redhat() {
     echo "Configuring network (redhat7-like)..."
 
-    if [ -z $VERSION_ID -o $VERSION_ID -lt 7 ]; then
+    if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
         disable_svc() {
             chkconfig $1 off
         }
@@ -545,8 +563,8 @@ configure_network_redhat() {
 
     # Configure all network interfaces in dhcp
     for IF in $NICS; do
-        if [ $IF != "lo" ]; then
-            cat >/etc/sysconfig/network-scripts/ifcfg-$IF <<-EOF
+        if [[ $IF != "lo" ]]; then
+            cat >/etc/sysconfig/network-scripts/ifcfg-${IF} <<-EOF
 DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
@@ -555,15 +573,15 @@ EOF
             {{- if .DNSServers }}
             i=1
             {{- range .DNSServers }}
-            echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
             i=$((i+1))
             {{- end }}
             {{- else }}
             EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
-            if [ -z $EXISTING_DNS ]; then
-                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+            if [[ -z ${EXISTING_DNS} ]]; then
+                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
             else
-                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-$IF
+                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
             fi
             {{- end }}
         fi
@@ -587,7 +605,7 @@ EOF
 
 check_for_ip() {
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
-    [ -z "$ip" ] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
+    [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
 }
 
@@ -598,21 +616,21 @@ check_for_network() {
     NETROUNDS=24
     REACHED=0
 
-    for i in $(seq $NETROUNDS); do
-    if which wget; then
-        wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-    else
-        ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
-    fi
-		done
+    for i in $(seq ${NETROUNDS}); do
+        if which wget; then
+            wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        else
+            ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+        fi
+    done
 
-		[ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
+    [ ${REACHED} -eq 0 ] && echo "Unable to reach network" && return 1
 
-    [ ! -z "$PU_IF" ] && {
-        check_for_ip $PU_IF || return 1
+    [[ ! -z "$PU_IF" ]] && {
+        check_for_ip ${PU_IF} || return 1
     }
-    for i in $PR_IFs; do
-        check_for_ip $i || return 1
+    for i in ${PR_IFs}; do
+        check_for_ip ${i} || return 1
     done
     return 0
 }
@@ -620,10 +638,10 @@ check_for_network() {
 configure_as_gateway() {
     echo "Configuring host as gateway..."
 
-    if [ ! -z $PR_IFs ]; then
+    if [[ ! -z $PR_IFs ]]; then
         # Enable forwarding
         for i in /etc/sysctl.d/* /etc/sysctl.conf; do
-            grep -v "net.ipv4.ip_forward=" $i >${i}.new
+            grep -v "net.ipv4.ip_forward=" ${i} >${i}.new
             mv -f ${i}.new ${i}
         done
         cat >/etc/sysctl.d/21-gateway.conf <<-EOF
@@ -636,7 +654,7 @@ EOF
         esac
     fi
 
-    if [ ! -z $PU_IF ]; then
+    if [[ ! -z $PU_IF ]]; then
         # Dedicated public interface available...
 
         # Allows ping
@@ -785,7 +803,7 @@ EOF
 
     op=-1
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-    [ $op -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
+    [[ ${op} -ne 0 ]] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
 
     echo done
 }

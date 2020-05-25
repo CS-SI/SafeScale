@@ -341,7 +341,7 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	return dataBuffer.String(), nil
 }
 
-// realizeVariables replaces in every variable any template
+// realizeVariables replaces every variable in template
 func realizeVariables(variables Variables) (Variables, error) {
 	cloneV := variables.Clone()
 
