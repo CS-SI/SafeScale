@@ -54,7 +54,7 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool) (*resources.Network, error)
+	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool, string) (*resources.Network, error)
 	List(context.Context, bool) ([]*resources.Network, error)
 	Inspect(context.Context, string) (*resources.Network, error)
 	Delete(context.Context, string) error
@@ -79,7 +79,7 @@ func (handler *NetworkHandler) Create(
 	ctx context.Context,
 	name string, cidr string, ipVersion ipversion.Enum,
 	sizing resources.SizingRequirements, theos string, gwname string,
-	failover bool,
+	failover bool, domain string,
 ) (network *resources.Network, err error) {
 
 	if handler == nil {
@@ -129,6 +129,7 @@ func (handler *NetworkHandler) Create(
 		Name:      name,
 		IPVersion: ipVersion,
 		CIDR:      cidr,
+		Domain:    domain,
 	})
 	if err != nil {
 		switch err.(type) {
@@ -138,6 +139,7 @@ func (handler *NetworkHandler) Create(
 			return nil, err
 		}
 	}
+	network.Domain = domain
 
 	newNetwork := network
 	// Starting from here, delete network if exiting with error
@@ -261,6 +263,11 @@ func (handler *NetworkHandler) Create(
 		secondaryGatewayName = "gw2-" + network.Name
 	}
 
+	domain = strings.Trim(domain, ".")
+	if domain != "" {
+		domain = "."+domain
+	}
+
 	gwRequest := resources.GatewayRequest{
 		ImageID: img.ID,
 		Network: network,
@@ -280,7 +287,7 @@ func (handler *NetworkHandler) Create(
 
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
-	primaryRequest.Name = primaryGatewayName
+	primaryRequest.Name = primaryGatewayName + domain
 	keypair, err := handler.service.CreateKeyPair("kp_" + primaryGatewayName)
 	if err != nil {
 		return nil, err
@@ -305,7 +312,7 @@ func (handler *NetworkHandler) Create(
 	// Starts secondary gateway creation if asked for
 	if failover {
 		secondaryRequest := gwRequest
-		secondaryRequest.Name = secondaryGatewayName
+		secondaryRequest.Name = secondaryGatewayName + domain
 		keypair, err = handler.service.CreateKeyPair("kp_" + secondaryGatewayName)
 		if err != nil {
 			return nil, err
@@ -332,6 +339,9 @@ func (handler *NetworkHandler) Create(
 	if primaryErr == nil {
 		primaryGateway = primaryResult.(data.Map)["host"].(*resources.Host)
 		primaryUserdata = primaryResult.(data.Map)["userdata"].(*userdata.Content)
+		if domain != "" {
+			primaryUserdata.HostName = primaryGatewayName + domain
+		}
 		primaryMetadata = primaryResult.(data.Map)["metadata"].(*metadata.Gateway)
 
 		// Starting from here, deletes the primary gateway if exiting with error
@@ -367,6 +377,9 @@ func (handler *NetworkHandler) Create(
 		if secondaryErr == nil {
 			secondaryGateway = secondaryResult.(data.Map)["host"].(*resources.Host)
 			secondaryUserdata = secondaryResult.(data.Map)["userdata"].(*userdata.Content)
+			if domain != "" {
+				secondaryUserdata.HostName = secondaryGatewayName + domain
+			}
 			secondaryMetadata = secondaryResult.(data.Map)["metadata"].(*metadata.Gateway)
 
 			// Starting from here, deletes the secondary gateway if exiting with error
@@ -623,7 +636,6 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	logrus.Infof("Waiting until gateway '%s' is available by SSH ...", gw.Name)
 	sshHandler := NewSSHHandler(handler.service)
 	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
-	logrus.Infof("%v", ssh)
 	if err != nil {
 		return nil, err
 	}

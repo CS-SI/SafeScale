@@ -174,6 +174,11 @@ var networkCreate = cli.Command{
 			Usage: "Image name for the gateway",
 		},
 		cli.StringFlag{
+			Name: "domain",
+			Value: "",
+			Usage: "Defines the domain used to define host FQDN (default: empty)",
+		},
+		cli.StringFlag{
 			Name:  "gwname",
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
@@ -233,6 +238,7 @@ var networkCreate = cli.Command{
 			Cidr:     c.String("cidr"),
 			Name:     c.Args().Get(0),
 			FailOver: c.Bool("failover"),
+			Domain: c.String("domain"),
 			Gateway: &pb.GatewayDefinition{
 				ImageId: c.String("os"),
 				Name:    c.String("gwname"),
