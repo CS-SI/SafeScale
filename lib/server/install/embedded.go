@@ -89,21 +89,6 @@ func dockerFeature() *Feature {
 	}
 }
 
-// // dockerComposeFeature ...
-// func dockerComposeFeature() *Feature {
-// 	name := "docker-compose"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &Feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // certificateAuthorityFeature ...
 func certificateAuthorityFeature() *Feature {
 	name := "certificateauthority"
@@ -209,21 +194,6 @@ func kubernetesFeature() *Feature {
 	}
 }
 
-// // nexusFeature ...
-// func nexusFeature() *Feature {
-// 	name := "nexus3"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &Feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // elasticsearchFeature ...
 func elasticsearchFeature() *Feature {
 	name := "elasticsearch"
@@ -287,21 +257,6 @@ func sparkmaster4platformFeature() *Feature {
 // remoteDesktopFeature ...
 func remoteDesktopFeature() *Feature {
 	name := "remotedesktop"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// mpichOsPkgFeature ...
-func mpichOsPkgFeature() *Feature {
-	name := "mpich-ospkg"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
@@ -419,9 +374,54 @@ func metricbeatFeature() *Feature {
 	}
 }
 
+// elastalertFeature ...
+func elastalertFeature() *Feature {
+	name := "elastalert"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// heartbeatFeature ...
+func heartbeatFeature() *Feature {
+	name := "heartbeat"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // filebeatFeature ...
 func filebeatFeature() *Feature {
 	name := "filebeat"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// packetbeatFeature ...
+func packetbeatFeature() *Feature {
+	name := "packetbeat"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
@@ -553,26 +553,3 @@ func geoserverFeature() *Feature {
 		specs:       specs,
 	}
 }
-
-// ListAvailables returns an array of availables features with the usable installers
-// func ListAvailables() []string {
-// 	var output []string
-// 	for k, v := range allAvailables {
-// 		line := k
-// 		installers := v.Installers()
-// 		if len > 0 {
-// 			line += " ["
-// 			for n, i := range installers {
-// 				if n > 0 {
-// 					line += ", "
-// 				}
-// 				line += i.GetName()
-// 			}
-// 			line += "]"
-// 		}
-// 		output = append(output, fmt.Sprintf("%s"))
-// 	}
-// 	return output
-// }
-
-// Note: init() moved in zinit.go, to be sure the init() of rice-box.go is called first

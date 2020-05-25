@@ -15,10 +15,6 @@ func Test_DockerNotGateway(t *testing.T) {
 	integrationtests.DockerNotGateway(t, providers.OVH)
 }
 
-func Test_DockerCompose(t *testing.T) {
-	integrationtests.DockerCompose(t, providers.OVH)
-}
-
 func Test_RemoteDesktop(t *testing.T) {
 	integrationtests.RemoteDesktop(t, providers.OVH)
 }
