@@ -71,7 +71,7 @@ type TenantListener struct{}
 // List registered tenants
 func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (list *pb.TenantList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -104,7 +104,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn *pb.TenantName, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
 	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
@@ -129,10 +129,10 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn 
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Error())
+		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Error())
+		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	name := in.GetName()
 	// FIXME: validate parameters
@@ -153,7 +153,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 
 	service, err := iaas.UseService(in.GetName())
 	if err != nil {
-		return empty, fmt.Errorf("unable to set tenant '%s': %s", name, err.Error())
+		return empty, fmt.Errorf("unable to set tenant '%s': %s", name, getUserMessage(err))
 	}
 	currentTenant = &Tenant{name: in.GetName(), Service: service}
 	log.Infof("Current tenant is now '%s'", name)
