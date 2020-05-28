@@ -243,12 +243,6 @@ ensure_network_connectivity() {
 }
 
 configure_dns() {
-    # Sometimes NetworkManager is enabled, we don't want it
-    if systemctl is-enabled NetworkManager &>/dev/null; then
-        systemctl disable NetworkManager
-        systemctl stop NetworkManager
-    fi
-
     if systemctl status systemd-resolved &>/dev/null; then
         echo "Configuring dns with resolved"
         configure_dns_systemd_resolved
@@ -262,13 +256,32 @@ configure_dns() {
 }
 
 # adds entry in /etc/hosts corresponding to FQDN hostname with private IP
+# Follows CentOS rules :
+# - if there is a domain suffix in hostname, /etc/hosts contains FQDN as first entry and short hostname as second, after the IP
+# - if there is no domain suffix in hostname, /etc/hosts contains short hostname as first entry, after the IP
 update_fqdn() {
-	SHORT_HOSTNAME=$(hostname -s)
-    [[ "$SHORT_HOSTNAME" == "$(hostname -f)" ]] && return
+    cat /etc/hosts
+
+    FULL_HOSTNAME="{{ .HostName }}"
+    SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
+
+    # FlexibleEngine seems to add an entry "not not" in /etc/hosts, replace it with
+    sed -i -nr '/^not /!p' /etc/hosts
+
     IF=${PR_IFs[0]}
-    [[ -z ${IF} ]] && return
-    IP=$(ip a | grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    sed -i -nr "/^${IP}"'/!p;$a'"${IP}"'\t{{ .HostName }}' /etc/hosts
+    if [[ -z ${IF} ]]; then
+        sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
+    else
+        IP=$(ip a | grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+        sed -i -nr '/^127.0.1.1/!p' /etc/hosts
+        if [[ "${SHORT_HOSTNAME}" == "${FULL_HOSTNAME}" ]]; then
+            sed -i -nr '/^'"${IP}"'/!p;$a'"${IP}"'\t'"${SHORT_HOSTNAME}" /etc/hosts
+        else
+            sed -i -nr '/^'"${IP}"'/!p;$a'"${IP}"'\t'"${FULL_HOSTNAME} ${SHORT_HOSTNAME}" /etc/hosts
+        fi
+    fi
+
+    cat /etc/hosts
 }
 
 configure_network() {
@@ -801,6 +814,15 @@ nameserver 1.1.1.1
 {{- end }}
 EOF
 
+# VPL: need to determine if it's a good idea to update resolv.conf with search domain...
+#      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
+#    DNSDOMAIN="$(hostname -d)"
+#    if [[ ! -z "$DNSDOMAIN" ]]; then
+#cat <<-EOF >>/etc/resolv.conf
+#search $DNSDOMAIN
+#EOF
+#    fi
+
     op=-1
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
     [[ ${op} -ne 0 ]] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
@@ -822,6 +844,15 @@ nameserver {{ . }}
 nameserver 1.1.1.1
 {{- end }}
 EOF
+
+# VPL: need to determine if it's a good idea to update resolv.conf with search domain...
+#      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
+#    DNSDOMAIN="$(hostname -d)"
+#    if [[ ! -z "$DNSDOMAIN" ]]; then
+#        cat <<-EOF >>/etc/resolvconf/resolv.conf.d/head
+#search $DNSDOMAIN
+#EOF
+#    fi
 
     resolvconf -u
     echo done
@@ -845,6 +876,16 @@ DNS=1.1.1.1
 Cache=yes
 DNSStubListener=yes
 EOF
+
+# VPL: need to determine if it's a good idea to update resolv.conf with search domain...
+#      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
+#    DNSDOMAIN=$(hostname -d)
+#    if [[ ! -z "$DNSDOMAIN" ]]; then
+#        cat <<-EOF >>/etc/systemd/resolved.conf
+#Domains=$DNSDOMAIN
+#EOF
+#    fi
+
     systemctl restart systemd-resolved
     echo done
 }
