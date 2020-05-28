@@ -25,13 +25,6 @@ feature:
 
         # "clusterSizing" not honored currently
         clusterSizing:
-            dcos:
-                small:
-                    nodes: "count >= 2, cpu >= 2"   # 1 master, 1 node
-                normal:
-                    nodes: "count >= 4, cpu >= 2"   # 3 masters, 1 node
-                large:
-                    nodes: "count >= 6, cpu >= 2 "  # 3 masters, 3 nodes
             boh:
                 small:
                     masters: "count >= 1, cpu >= 2"
@@ -71,95 +64,6 @@ feature:
         - ControlplaneEndpointIP
 
     install:
-        dcos:
-            check:
-                pace: deploy
-                steps:
-                    deploy:
-                        targets:
-                            masters: one
-                        run: |
-                            sfDcos kubernetes &>/dev/null
-                            sfExit
-
-            add:
-                #pace: package,cli+config
-                pace: package,cli,config
-                steps:
-                    package:
-                        targets:
-                            masters: one
-                        options:
-                            small: |
-                                {
-                                    "kubernetes": {
-                                        "node_count": 1,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                            normal: |
-                                {
-                                    "kubernetes": {
-                                        "high_availability": true,
-                                        "node_count": 1,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                            large: |
-                                {
-                                    "kubernetes": {
-                                        "high_availability": true,
-                                        "node_count": 3,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                        run: |
-                            op=-1
-                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1) && op=$? || true
-                            [ $op -ne 0 ] && {
-                                echo $output
-                                echo $output | grep "already installed" &>/dev/null || sfFail $op
-                            }
-                            sfExit
-
-                    cli:
-                        targets:
-                            masters: all
-                        run: |
-                            sfDcos package install --yes kubernetes --cli
-                            sfExit
-
-                    config:
-                        targets:
-                            masters: all
-                        run: |
-                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || sfFail 192
-                            sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
-                            sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
-                            sfExit
-
-            remove:
-                pace: package
-                steps:
-                    package:
-                        targets:
-                            masters: one
-                        run: |
-                            sfDcos package remove --yes kubernetes || sfFail 192
-                            sfExit
-
         bash:
             check:
                 pace: nodes,kube
@@ -536,6 +440,9 @@ feature:
                             CP_ENDPOINT_IP={{ .HostIP }}
                             {{ end }}
 
+                            DNSDOMAIN=$(hostname -d)
+                            [ -z "${DNSDOMAIN}" ] && DNSDOMAIN=cluster.local
+
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
@@ -546,7 +453,7 @@ feature:
                                 local:
                                     dataDir: /var/lib/etcd
                             networking:
-                                dnsDomain: cluster.local
+                                dnsDomain: ${DNSDOMAIN}
                                 podSubnet: 10.244.0.0/16
                                 serviceSubnet: 10.96.0.0/12
                             {{ if eq .Hardening "true" }}
