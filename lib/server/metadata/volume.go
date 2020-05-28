@@ -138,11 +138,17 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	errID := mv.mayReadByID(ref)
-	errName := mv.mayReadByName(ref)
-
-	if errID != nil && errName != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError([]error{errID, errName}))
+	var errors []error
+	err = mv.mayReadByID(ref) // First read by ID ...
+	if err != nil {
+		errors = append(errors, err)
+		err = mv.mayReadByName(ref) // ... then read by name only if by id failed (no need to read twice if the 2 exist)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
+	if err != nil {
+		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
 	}
 
 	return nil

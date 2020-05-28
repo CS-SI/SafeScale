@@ -170,13 +170,19 @@ func (m *Network) ReadByReference(ref string) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	errID := m.mayReadByID(ref)
-	errName := m.mayReadByName(ref)
-
-	if errID != nil && errName != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError([]error{errID, errName}))
+	var errors []error
+	err = m.mayReadByID(ref) // First read by id...
+	if err != nil {
+		errors = append(errors)
+		err = m.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice if the 2 exist)
+		if err != nil {
+			errors = append(errors)
+		}
 	}
 
+	if err != nil {
+		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+	}
 	return nil
 }
 
