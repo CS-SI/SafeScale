@@ -204,7 +204,7 @@ feature:
                                 {{ if .ClusterFlavor }}
                                 CACN="{{ .ClusterName }}-CA.crt"
                                 {{ else }}
-                                CACN="{{ .Hostname }}-CA.crt"
+                                CACN="$(hostname -s)-CA.crt"
                                 {{ end }}
                                 SUBJ="${SUBJ}/CN=${CACN}"
                                 openssl req -config ${SF_ETCDIR}/pki/ca/openssl.cnf \
@@ -262,7 +262,7 @@ feature:
                             {{ if .ClusterFlavor }}
                             CACN="{{ .ClusterName }}-CA.crt"
                             {{ else }}
-                            CACN="{{ .Hostname }}-CA.crt"
+                            CACN="$(hostname -s)-CA.crt"
                             {{ end }}
                             # Add the new CA in system CAs
                             case $(sfGetFact "linux_kind") in
