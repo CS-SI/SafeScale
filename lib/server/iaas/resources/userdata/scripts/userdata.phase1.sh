@@ -25,7 +25,7 @@ print_error() {
 trap print_error ERR
 
 fail() {
-  echo "PROVISIONING_ERROR: $1"
+    echo "PROVISIONING_ERROR: $1"
 	echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 	exit $1
 }
@@ -126,11 +126,14 @@ EOF
 	echo done
 }
 
+# Follows the CentOS rules:
+# - /etc/hostname contains short hostname
 put_hostname_in_hosts() {
-	echo "{{ .HostName }}" >/etc/hostname
-	hostname {{ .HostName }}
-	SHORT_HOSTNAME=$(hostname -s)
-	sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
+    FULL_HOSTNAME="{{ .HostName }}"
+    SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
+
+	echo "${SHORT_HOSTNAME}" >/etc/hostname
+	hostname "${SHORT_HOSTNAME}"
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
