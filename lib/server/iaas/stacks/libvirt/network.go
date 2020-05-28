@@ -289,12 +289,12 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	templateID := req.TemplateID
 	imageID := req.ImageID
 	keyPair := req.KeyPair
-	gwName := req.Name
 
 	networkLibvirt, err := getNetworkFromRef(network.ID, s.LibvirtService)
 	if err != nil {
 		return nil, nil, err
 	}
+	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
 	if gwName == "" {
 		name, err := networkLibvirt.GetName()
 		if err != nil {
@@ -306,6 +306,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (*resources.Host, *u
 	hostReq := resources.HostRequest{
 		ImageID:      imageID,
 		KeyPair:      keyPair,
+		HostName:     req.Name,
 		ResourceName: gwName,
 		TemplateID:   templateID,
 		Networks:     []*resources.Network{network},

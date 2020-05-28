@@ -288,7 +288,12 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
-			cloneV["Hostname"] = h.Name
+			// if h.Domain != "" {
+			// 	cloneV["Hostname"] = h.Name+"."+h.Domain
+			// } else {
+				cloneV["Hostname"] = h.Name
+			// }
+			cloneV["ShortHostname"] = h.Name
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
 				return nil, err
@@ -321,7 +326,12 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
-			cloneV["Hostname"] = h.Name
+			// if h.Domain != "" {
+			// 	cloneV["Hostname"] = h.Name+"."+h.Domain
+			// } else {
+				cloneV["Hostname"] = h.Name
+			// }
+			cloneV["ShortHostname"] = h.Name
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
 				return nil, err

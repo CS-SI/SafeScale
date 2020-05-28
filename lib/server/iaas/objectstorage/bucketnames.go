@@ -65,7 +65,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 
 	name = strings.ToLower(name)
 
-	logrus.Warnf("Using bucket with name '%s'", name)
+	logrus.Infof("Using bucket named '%s'", name)
 
 	return name, nil
 }

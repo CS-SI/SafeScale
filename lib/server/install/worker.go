@@ -857,7 +857,13 @@ func (w *worker) setReverseProxy() (err error) {
 		for _, h := range hosts {
 			tP, _ := w.feature.task.New() // FIXME Later
 			primaryGatewayVariables["HostIP"] = h.PrivateIp
-			primaryGatewayVariables["Hostname"] = h.Name
+			// if h.Domain != "" {
+			// 	primaryGatewayVariables["Hostname"] = h.Name+"."+h.Domain
+			// } else {
+				primaryGatewayVariables["Hostname"] = h.Name
+			// }
+			primaryGatewayVariables["ShortHostname"] = h.Name
+
 			_, _ = tP.Start(taskApplyProxyRule, data.Map{ // FIXME Later
 				"ctrl": primaryKongController,
 				"rule": rule,
@@ -868,8 +874,13 @@ func (w *worker) setReverseProxy() (err error) {
 			if secondaryKongController != nil {
 				tS, _ := w.feature.task.New() // FIXME Later
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
-				secondaryGatewayVariables["Hostname"] = h.Name
-				_, _ = tS.Start(taskApplyProxyRule, data.Map{ // FIXME Later
+				// if h.Domain != "" {
+				// 	secondaryGatewayVariables["Hostname"] = h.Name+"."+h.Domain
+				// } else {
+					secondaryGatewayVariables["Hostname"] = h.Name
+				// }
+				secondaryGatewayVariables["ShortHostname"] = h.Name
+				_, _ = tS.Start(taskApplyProxyRule, data.Map{ // FIXME: Later
 					"ctrl": secondaryKongController,
 					"rule": rule,
 					"vars": &secondaryGatewayVariables,
@@ -894,7 +905,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	rule := params.(data.Map)["rule"].(map[interface{}]interface{})
 	vars := params.(data.Map)["vars"].(*Variables)
 
-	hostName := (*vars)["Hostname"].(string)
+	hostName := (*vars)["ShortHostname"].(string)
 	ruleName, err := ctrl.Apply(rule, vars)
 
 	// FIXME Check this later
