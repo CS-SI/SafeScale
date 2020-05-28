@@ -147,7 +147,7 @@ feature:
                             CMD ["/opt/safescale/entrypoint.sh"]
                             EOF
 
-                            cat >/opt/safescale/run/proxycache.compose.yml <<-'EOF'
+                            cat >${SF_VARDIR}/run/proxycache.compose.yml <<-'EOF'
                             version: '2.1'
                             services:
                                 server:

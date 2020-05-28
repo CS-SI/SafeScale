@@ -66,8 +66,8 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	handler := BucketHandler(tenant.Service)
 	buckets, err := handler.List(ctx)
 	if err != nil {
-		tbr := scerr.Wrap(err, "Can't list buckets")
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		tbr := scerr.Wrap(err, "Can't list buckets"+adaptedUserMessage(err))
+		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
 	return srvutils.ToPBBucketList(buckets), nil
@@ -82,7 +82,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Create : "+bucketName); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -94,8 +94,8 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	handler := BucketHandler(tenant.Service)
 	err = handler.Create(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot create bucket")
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		tbr := scerr.Wrap(err, "cannot create bucket"+adaptedUserMessage(err))
+		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
 	return &googleprotobuf.Empty{}, nil
@@ -111,7 +111,7 @@ func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *goo
 	ctx, cancelFunc := context.WithCancel(ctx)
 
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Destroy : "+bucketName); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -123,8 +123,8 @@ func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *goo
 	handler := BucketHandler(tenant.Service)
 	err = handler.Destroy(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot destroy bucket")
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		tbr := scerr.Wrap(err, "cannot destroy bucket"+adaptedUserMessage(err))
+		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
 	return &googleprotobuf.Empty{}, nil
@@ -140,7 +140,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	ctx, cancelFunc := context.WithCancel(ctx)
 
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Delete : "+bucketName); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -152,8 +152,8 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	handler := BucketHandler(tenant.Service)
 	err = handler.Delete(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot delete bucket")
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		tbr := scerr.Wrap(err, "cannot delete bucket"+adaptedUserMessage(err))
+		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
 	return &googleprotobuf.Empty{}, nil
@@ -168,7 +168,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -180,8 +180,8 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	handler := BucketHandler(tenant.Service)
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot inspect bucket")
-		return nil, status.Errorf(codes.Internal, tbr.Error())
+		tbr := scerr.Wrap(err, "cannot inspect bucket"+adaptedUserMessage(err))
+		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 	if resp == nil {
 		return nil, status.Errorf(codes.NotFound, "cannot inspect bucket '%s': not found", in.GetName())
@@ -199,7 +199,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Mount : "+bucketName+" on "+hostName); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
 	}
 
 	tenant := GetCurrentTenant()
@@ -211,7 +211,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	handler := BucketHandler(tenant.Service)
 	err = handler.Mount(ctx, bucketName, hostName, in.GetPath())
 	if err != nil {
-		return &googleprotobuf.Empty{}, status.Errorf(codes.Internal, err.Error())
+		return &googleprotobuf.Empty{}, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return &googleprotobuf.Empty{}, nil
 }
@@ -227,7 +227,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	ctx, cancelFunc := context.WithCancel(ctx)
 
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Unmount : "+bucketName+" off "+hostName); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", err.Error()).Error())
+		return nil, status.Errorf(codes.FailedPrecondition, "failed to register the process"+adaptedUserMessage(err))
 	}
 
 	tenant := GetCurrentTenant()
@@ -239,7 +239,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	handler := BucketHandler(tenant.Service)
 	err = handler.Unmount(ctx, bucketName, hostName)
 	if err != nil {
-		return &googleprotobuf.Empty{}, status.Errorf(codes.Internal, err.Error())
+		return &googleprotobuf.Empty{}, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return &googleprotobuf.Empty{}, nil
 }

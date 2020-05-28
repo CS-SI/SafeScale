@@ -22,10 +22,19 @@ feature:
         cluster: all
     install:
         bash:
-            check: |
-                which /usr/local/bin/mpiexec &>/dev/null
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            host: yes
+                            clusters:
+                                masters: all
+                                nodes: all
+                        run: |
+                            which /usr/local/bin/mpiexec &>/dev/null
 
-            add: |
+            add:
                 pace: fromsrc
                 steps:
                     fromsrc:

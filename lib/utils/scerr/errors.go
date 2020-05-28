@@ -99,7 +99,7 @@ func IsGRPCTimeout(err error) bool {
 
 // ErrCore ...
 type ErrCore struct {
-	Message      string
+	message      string
 	cause        error
 	consequences []error
 }
@@ -134,7 +134,7 @@ func (e ErrCore) CauseFormatter() string {
 func (e ErrCore) Reset(err error) ErrCore {
 	if err != nil {
 		if cerr, ok := err.(ErrCore); ok {
-			e.Message = cerr.Message
+			e.message = cerr.message
 			e.consequences = cerr.consequences
 			e.cause = cerr.cause
 		}
@@ -145,6 +145,10 @@ func (e ErrCore) Reset(err error) ErrCore {
 // Cause returns an error's cause
 func (e ErrCore) Cause() error {
 	return e.cause
+}
+
+func (e ErrCore) Message() string {
+	return e.message
 }
 
 // Consequences returns the consequences of current error (detected teardown problems)
@@ -169,14 +173,14 @@ func Errorf(message string, cause error) ErrCore {
 func NewErrCore(message string, cause error, consequences []error) ErrCore {
 	if consequences == nil {
 		return ErrCore{
-			Message:      message,
+			message:      message,
 			cause:        cause,
 			consequences: []error{},
 		}
 	}
 
 	return ErrCore{
-		Message:      message,
+		message:      message,
 		cause:        cause,
 		consequences: consequences,
 	}
@@ -195,7 +199,7 @@ func (e ErrCore) AddConsequence(err error) error {
 
 // Error returns a human-friendly error explanation
 func (e ErrCore) Error() string {
-	msgFinal := e.Message
+	msgFinal := e.message
 
 	msgFinal += e.CauseFormatter()
 
@@ -204,6 +208,8 @@ func (e ErrCore) Error() string {
 
 type causer interface {
 	Cause() error
+	Message() string
+	Error() string
 }
 
 func ImplementsCauser(inErr error) bool {
@@ -220,6 +226,16 @@ func ImplementsConsequencer(inErr error) bool {
 	}
 
 	return false
+}
+
+// Message return the message of an error if it implements the causer interface
+func Message(err error) string {
+	cause, ok := err.(causer)
+	if ok {
+		return cause.Message()
+	}
+
+	return ""
 }
 
 // Cause returns the cause of an error if it implements the causer interface
@@ -256,7 +272,7 @@ func (e ErrTimeout) AddConsequence(err error) error {
 func TimeoutError(msg string, timeout time.Duration, cause error) ErrTimeout {
 	return ErrTimeout{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        cause,
 			consequences: []error{},
 		},
@@ -279,7 +295,7 @@ func (e ErrNotFound) AddConsequence(err error) error {
 func NotFoundError(msg string) ErrNotFound {
 	return ErrNotFound{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -290,7 +306,7 @@ func NotFoundError(msg string) ErrNotFound {
 func NotFoundErrorWithCause(msg string, cause error) ErrNotFound {
 	return ErrNotFound{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        cause,
 			consequences: []error{},
 		},
@@ -312,7 +328,7 @@ func (e ErrNotAvailable) AddConsequence(err error) error {
 func NotAvailableError(msg string) ErrNotAvailable {
 	return ErrNotAvailable{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -334,7 +350,7 @@ func (e ErrDuplicate) AddConsequence(err error) error {
 func DuplicateError(msg string) ErrDuplicate {
 	return ErrDuplicate{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -356,7 +372,7 @@ func (e ErrInvalidRequest) AddConsequence(err error) error {
 func InvalidRequestError(msg string) ErrInvalidRequest {
 	return ErrInvalidRequest{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -378,7 +394,7 @@ func (e ErrUnauthorized) AddConsequence(err error) error {
 func UnauthorizedError(msg string) ErrUnauthorized {
 	return ErrUnauthorized{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -400,7 +416,7 @@ func (e ErrForbidden) AddConsequence(err error) error {
 func ForbiddenError(msg string) ErrForbidden {
 	return ErrForbidden{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -427,7 +443,7 @@ func AbortedError(msg string, err error) ErrAborted {
 	}
 	return ErrAborted{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        err,
 			consequences: []error{},
 		},
@@ -457,7 +473,7 @@ func OverflowError(msg string, limit uint, err error) ErrOverflow {
 	}
 	return ErrOverflow{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        err,
 			consequences: []error{},
 		},
@@ -481,7 +497,7 @@ func (e ErrOverload) AddConsequence(err error) error {
 func OverloadError(msg string) ErrOverload {
 	return ErrOverload{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -503,7 +519,7 @@ func (e ErrNotImplemented) AddConsequence(err error) error {
 func NotImplementedError(what string) ErrNotImplemented {
 	return ErrNotImplemented{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("not implemented yet", "", ""),
+			message:      decorateWithCallTrace("not implemented yet", "", ""),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -547,7 +563,7 @@ type ErrRuntimePanic struct {
 func RuntimePanicError(msg string) ErrRuntimePanic {
 	return ErrRuntimePanic{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -569,7 +585,7 @@ func (e ErrInvalidInstance) AddConsequence(err error) error {
 func InvalidInstanceError() ErrInvalidInstance {
 	return ErrInvalidInstance{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("invalid instance", "", "calling method from a nil pointer"),
+			message:      decorateWithCallTrace("invalid instance", "", "calling method from a nil pointer"),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -591,7 +607,7 @@ func (e ErrInvalidParameter) AddConsequence(err error) error {
 func InvalidParameterError(what, why string) ErrInvalidParameter {
 	return ErrInvalidParameter{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("invalid parameter", what, why),
+			message:      decorateWithCallTrace("invalid parameter", what, why),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -644,7 +660,7 @@ func (e ErrInvalidInstanceContent) AddConsequence(err error) error {
 func InvalidInstanceContentError(what, why string) ErrInvalidInstanceContent {
 	return ErrInvalidInstanceContent{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace("invalid instance content", what, why),
+			message:      decorateWithCallTrace("invalid instance content", what, why),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -666,7 +682,7 @@ func (e ErrInconsistent) AddConsequence(err error) error {
 func InconsistentError(msg string) ErrInconsistent {
 	return ErrInconsistent{
 		ErrCore: ErrCore{
-			Message:      decorateWithCallTrace(msg, "", ""),
+			message:      decorateWithCallTrace(msg, "", ""),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -688,7 +704,7 @@ func (e ErrSyntax) AddConsequence(err error) error {
 func SyntaxError(msg string) ErrSyntax {
 	return ErrSyntax{
 		ErrCore: ErrCore{
-			Message:      msg,
+			message:      msg,
 			cause:        nil,
 			consequences: []error{},
 		},
