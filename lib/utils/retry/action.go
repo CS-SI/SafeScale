@@ -79,7 +79,7 @@ func Action(
 		Last:    last,
 		Run:     run,
 		Notify:  notify,
-	}.loop()
+	}.loopWithSoftTimeout()
 
 }
 
@@ -105,11 +105,11 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 		First:   nil,
 		Last:    nil,
 		Notify:  nil,
-	}.loop()
+	}.loopWithSoftTimeout()
 }
 
-// WhileUnsuccessfulTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
-func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
+// WhileUnsuccessfulWithHardTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
+func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
 	}
@@ -130,7 +130,7 @@ func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout tim
 		First:   nil,
 		Last:    nil,
 		Notify:  nil,
-	}.loopWithTimeout(timeout)
+	}.loopWithHardTimeout(timeout)
 }
 
 // WhileUnsuccessfulDelay1Second retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
@@ -147,7 +147,7 @@ func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) fai
 
 // WhileUnsuccessfulDelay5SecondsTimeout ...
 func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulTimeout(run, 5*time.Second, timeout)
+	return WhileUnsuccessfulWithHardTimeout(run, 5*time.Second, timeout)
 }
 
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
@@ -178,11 +178,11 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 		First:   nil,
 		Last:    nil,
 		Notify:  notify,
-	}.loop()
+	}.loopWithSoftTimeout()
 }
 
 // WhileUnsuccessfulWhereRetcode255WithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
-// and this error has 255 as exit status code), waiting 'delay' after each try, expiring after 'timeout'
+// and this error has 255 as exit status code, typical for ssh failure for instance), waiting 'delay' after each try, expiring after 'timeout'
 func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
@@ -209,7 +209,7 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 		First:   nil,
 		Last:    nil,
 		Notify:  notify,
-	}.loop()
+	}.loopWithSoftTimeout()
 }
 
 // WhileUnsuccessfulDelay1SecondWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
@@ -257,7 +257,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 		First:   nil,
 		Last:    nil,
 		Notify:  nil,
-	}.loop()
+	}.loopWithSoftTimeout()
 }
 
 // WhileSuccessfulDelay1Second retries while 'run' is successful (ie 'run' returns an error == nil),
@@ -301,7 +301,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 		First:   nil,
 		Last:    nil,
 		Notify:  notify,
-	}.loop()
+	}.loopWithSoftTimeout()
 }
 
 // WhileSuccessfulDelay1SecondWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
@@ -318,8 +318,8 @@ func WhileSuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Durat
 	return WhileSuccessfulWithNotify(run, 5*time.Second, timeout, notify)
 }
 
-// loop executes the tries
-func (a action) loop() fail.Error {
+// loopWithSoftTimeout executes the tries and stops if the elapsed time is gone passed the timeout (hence the "soft timeout")
+func (a action) loopWithSoftTimeout() fail.Error {
 	var (
 		arbiter = a.Arbiter
 		start   = time.Now()
@@ -384,8 +384,8 @@ func (a action) loop() fail.Error {
 	}
 }
 
-// loop executes the tries
-func (a action) loopWithTimeout(timeout time.Duration) fail.Error {
+// loopWithHardTimeout executes the tries and stops at the exact timeout (hence the "hard timeout")
+func (a action) loopWithHardTimeout(timeout time.Duration) fail.Error {
 	var (
 		arbiter = a.Arbiter
 		start   = time.Now()
@@ -401,6 +401,7 @@ func (a action) loopWithTimeout(timeout time.Duration) fail.Error {
 		}
 	}
 
+	// FIXME: comment! what is the purpose of 'desist' ?
 	desist := time.After(timeout)
 	for count := uint(1); ; count++ {
 		var err error
