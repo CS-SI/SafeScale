@@ -211,28 +211,27 @@ func (ud *Content) Generate(phase string) ([]byte, error) {
 	// DEV VAR
 	provider := ""
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPT_FLAVOR"); suffixCandidate != "" {
-		if suffixCandidate != "" {
-			problems := false
+		problems := false
+		providerCandidate := fmt.Sprintf(".%s", suffixCandidate)
 
-			box, err = rice.FindBox("../userdata/scripts")
-			if err != nil || box == nil {
-				problems = true
+		box, err = rice.FindBox("../userdata/scripts")
+		if err != nil || box == nil {
+			problems = true
+		}
+
+		if !problems && box != nil {
+			_, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", providerCandidate))
+			problems = err != nil
+			_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", providerCandidate))
+			problems = problems || (err != nil)
+
+			if !problems {
+				provider = providerCandidate
 			}
+		}
 
-			if !problems && box != nil {
-				_, err := box.String(fmt.Sprintf("userdata%s.phase1.sh", suffixCandidate))
-				problems = err != nil
-				_, err = box.String(fmt.Sprintf("userdata%s.phase2.sh", suffixCandidate))
-				problems = problems || (err != nil)
-
-				if !problems {
-					provider = fmt.Sprintf(".%s", suffixCandidate)
-				}
-			}
-
-			if problems {
-				logrus.Warnf("Ignoring script flavor [%s]", suffixCandidate)
-			}
+		if problems {
+			logrus.Warnf("Ignoring script flavor [%s]", suffixCandidate)
 		}
 	}
 
