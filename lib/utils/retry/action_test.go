@@ -149,7 +149,7 @@ func TestVerifyErrorType(t *testing.T) {
 			t.Errorf("It should be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := fail.Cause(recovered); cause != nil {
+		if cause := fail.RootCause(recovered); cause != nil {
 			fmt.Println(cause.Error())
 		}
 	}
@@ -160,7 +160,7 @@ func TestVerifyErrorType(t *testing.T) {
 			t.Errorf("It should be a 'ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := fail.Cause(recovered); cause != nil {
+		if cause := fail.RootCause(recovered); cause != nil {
 			if _, ok := cause.(fail.ErrNotFound); !ok {
 				t.Errorf("It should be a 'fail.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
@@ -175,7 +175,7 @@ func TestSkipRetries(t *testing.T) {
 			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := fail.Cause(recovered); cause != nil {
+		if cause := fail.RootCause(recovered); cause != nil {
 			if _, ok := cause.(fail.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
@@ -331,7 +331,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 }
 
 func WhileUnsuccessfulDelay50msSecondsTimeout(run func() error, timeout time.Duration) error {
-	return WhileUnsuccessfulTimeout(run, 50*time.Millisecond, timeout)
+	return WhileUnsuccessfulWithHardTimeout(run, 50*time.Millisecond, timeout)
 }
 
 func WhileUnsuccessfulDelay50ms(run func() error, timeout time.Duration) error {
