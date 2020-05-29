@@ -197,6 +197,10 @@ var hostCreate = cli.Command{
 			Usage: "network name or network id",
 		},
 		cli.StringFlag{
+			Name:  "domain",
+			Usage: "Domain name to use to define host FQDN (default: value from network if set, empty otherwise)",
+		},
+		cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 18.04",
 			Usage: "Image name for the host",
@@ -664,6 +668,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 		Network: c.String("net"),
 		Public:  c.Bool("public"),
 		Force:   c.Bool("force"),
+		Domain: c.String("domain"),
 		Sizing:  &pb.HostSizing{},
 	}
 	if t, ok := tokens["cpu"]; ok {

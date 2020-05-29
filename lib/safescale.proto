@@ -94,6 +94,7 @@ message NetworkDefinition{
     string cidr = 3;
     GatewayDefinition gateway = 4;
     bool fail_over = 5;
+    string domain = 6;
 }
 
 message GatewayDefinition{
@@ -160,6 +161,7 @@ message HostDefinition{
     float cpu_freq = 12;    // Deprecated: replaced by sizing field
     bool force = 13;
     HostSizing sizing = 14;
+    string domain = 15;
 }
 
 enum HostState {

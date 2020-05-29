@@ -142,11 +142,18 @@ func (ms *Share) ReadByReference(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	errID := ms.mayReadByID(ref)
-	errName := ms.mayReadByName(ref)
+	var errors []error
+	err = ms.mayReadByID(ref) // First read by id ...
+	if err != nil {
+		errors = append(errors, err)
+		err = ms.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice)
+		if err != nil {
+			errors = append(errors, err)
+		}
+	}
 
-	if errID != nil && errName != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError([]error{errID, errName}))
+	if err != nil {
+		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
 	}
 
 	return nil

@@ -19,6 +19,7 @@ package openstack
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -322,7 +323,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	if req.Network == nil {
 		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
 	}
-	gwname := req.Name
+	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
 	}
@@ -334,6 +335,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
+		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
 		Networks:     []*resources.Network{req.Network},

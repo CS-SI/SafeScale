@@ -260,6 +260,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		in.GetPublic(),
 		sizing,
 		in.Force,
+		in.Domain,
 	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))

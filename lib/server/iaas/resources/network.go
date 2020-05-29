@@ -47,6 +47,8 @@ type NetworkRequest struct {
 	CIDR string
 	// DNSServers
 	DNSServers []string
+	// Domain contains the domain used to define host FQDN attached to the network
+	Domain string
 	// HA tells if 2 gateways and a VIP needs to be created; the VIP IP address will be used as gateway
 	HA bool
 }
@@ -61,16 +63,17 @@ type Network struct {
 	ID                 string                    `json:"id,omitempty"`                   // ID for the network (from provider)
 	Name               string                    `json:"name,omitempty"`                 // Name of the network
 	CIDR               string                    `json:"mask,omitempty"`                 // network in CIDR notation
+	Domain             string                    `json:"domain,omitempty"`               // contains the domain used to define host FQDN
 	GatewayID          string                    `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
 	SecondaryGatewayID string                    `json:"secondary_gateway_id,omitempty"` // contains the id of the host acting as secondary gateway for the network
 	VIP                *VirtualIP                `json:"vip,omitempty"`                  // contains the VIP of the network if created with HA
 	IPVersion          ipversion.Enum            `json:"ip_version,omitempty"`           // IPVersion is IPv4 or IPv6 (see IPVersion)
 	Properties         *serialize.JSONProperties `json:"properties,omitempty"`           // contains optional supplemental information
 
-	Subnetworks []SubNetwork `json:"subnetworks,omitempty"`
+	Subnetworks []SubNetwork `json:"subnetworks,omitempty"` // FIXME: comment!
 
-	Subnet bool
-	Parent string
+	Subnet bool // FIXME: comment!
+	Parent string // FIXME: comment!
 }
 
 // NewNetwork ...
