@@ -308,6 +308,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		Cidr:     req.CIDR,
 		Gateway:  &sizing,
 		FailOver: !gwFailoverDisabled,
+		Domain: req.Domain,
 	}
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(def, temporal.GetExecutionTimeout())

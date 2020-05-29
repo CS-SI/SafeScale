@@ -55,7 +55,7 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool) (*resources.Host, error)
+	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool, domain string) (*resources.Host, error)
 	List(ctx context.Context, all bool) ([]*resources.Host, error)
 	ForceInspect(ctx context.Context, ref string) (*resources.Host, error)
 	Inspect(ctx context.Context, ref string) (*resources.Host, error)
@@ -297,7 +297,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizingParam interface{}, force bool,
+	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string,
 ) (newHost *resources.Host, err error) {
 
 	if handler == nil {
@@ -451,9 +451,18 @@ func (handler *HostHandler) Create(
 		}
 	}
 
+	if domain == "" {
+		domain = defaultNetwork.Domain
+	}
+	domain = strings.Trim(domain, ".")
+	if domain != "" {
+		domain = "."+domain
+	}
+
 	hostRequest := resources.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
+		HostName:       name + domain,
 		TemplateID:     template.ID,
 		PublicIP:       public,
 		Networks:       networks,
@@ -575,6 +584,7 @@ func (handler *HostHandler) Create(
 		hostDescriptionV1 := clonable.(*propsv1.HostDescription)
 		hostDescriptionV1.Created = time.Now()
 		hostDescriptionV1.Creator = creator
+		hostDescriptionV1.Domain = domain
 		return nil
 	})
 	if err != nil {
@@ -723,7 +733,7 @@ func (handler *HostHandler) Create(
 		retrieveForensicsData(ctx, sshHandler, host)
 
 		// Setting err will trigger defers
-		err = fmt.Errorf("failed to finalize host '%s' installation: stdout[%s], stderr[%s]", host.Name, stdout, stderr)
+		err = fmt.Errorf("failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode, stdout, stderr)
 		if client.IsProvisioningError(err) {
 			logrus.Error(err)
 		}
@@ -1102,24 +1112,27 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		var hostBis *resources.Host
 		err2 := host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 			hostSizingV1 := clonable.(*propsv1.HostSizing)
-			return host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-				// FIXME: host's os name is not stored in metadatas so we used ubuntu 18.04 by default
-				var err3 error
-				sizing := resources.SizingRequirements{
-					MinCores:    hostSizingV1.AllocatedSize.Cores,
-					MaxCores:    hostSizingV1.AllocatedSize.Cores,
-					MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
-					MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
-					MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
-					MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
-					MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
-				}
-				hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true)
-				if err3 != nil {
-					return fmt.Errorf("failed to stop host deletion : %s", err3.Error())
-				}
-				return nil
+			return host.Properties.LockForRead(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
+				hostDescriptionV1 := clonable.(*propsv1.HostDescription)
+				return host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+					hostNetworkV1 := clonable.(*propsv1.HostNetwork)
+					// FIXME: host's os name is not stored in metadata so we used ubuntu 18.04 by default
+					var err3 error
+					sizing := resources.SizingRequirements{
+						MinCores:    hostSizingV1.AllocatedSize.Cores,
+						MaxCores:    hostSizingV1.AllocatedSize.Cores,
+						MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,
+						MinGPU:      hostSizingV1.AllocatedSize.GPUNumber,
+						MinRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+						MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
+						MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
+					}
+					hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true, hostDescriptionV1.Domain)
+					if err3 != nil {
+						return fmt.Errorf("failed to stop host deletion : %s", err3.Error())
+					}
+					return nil
+				})
 			})
 		})
 		if err2 != nil {

@@ -104,12 +104,13 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		gwImageID,
 		gwName,
 		in.FailOver,
+		in.Domain,
 	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
-	log.Infof("Network '%s' successfuly created.", networkName)
+	log.Infof("Network '%s' successfully created.", networkName)
 	return srvutils.ToPBNetwork(network), nil
 }
 

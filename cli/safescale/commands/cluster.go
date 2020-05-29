@@ -351,6 +351,11 @@ var clusterCreateCommand = cli.Command{
 			Value: "192.168.0.0/16",
 			Usage: "Defines the CIDR of the network to use with cluster",
 		},
+		cli.StringFlag{
+			Name: "domain",
+			Value: "cluster.local",
+			Usage: "Defines the domain name to use for the hostnames (default: cluster.local)",
+		},		
 		cli.StringSliceFlag{
 			Name: "disable",
 			Usage: `Allows to disable addition of default features (must be used several times to disable several features)
@@ -437,6 +442,7 @@ var clusterCreateCommand = cli.Command{
 		keep := c.Bool("keep-on-failure")
 
 		cidr := c.String("cidr")
+		domain := c.String("domain")
 
 		disable := c.StringSlice("disable")
 		disableFeatures := map[string]struct{}{}
@@ -509,6 +515,7 @@ var clusterCreateCommand = cli.Command{
 			Name:                    clusterName,
 			Complexity:              clusterComplexity,
 			CIDR:                    cidr,
+			Domain: domain,
 			Flavor:                  clusterFlavor,
 			KeepOnFailure:           keep,
 			GatewaysDef:             gatewaysDef,
