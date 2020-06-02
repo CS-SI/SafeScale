@@ -229,13 +229,6 @@ func (mh *Host) Delete() (err error) {
 		return scerr.ErrListError([]error{err1, err2})
 	}
 
-	if err1 != nil {
-		return err1
-	}
-	if err != nil {
-		return err2
-	}
-
 	return nil
 }
 
@@ -376,7 +369,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
 		case retry.ErrAborted:
-			return nil, realErr.Cause()
+			return nil, realErr
 		case scerr.ErrTimeout:
 			return nil, realErr
 		default:
