@@ -990,10 +990,15 @@ EOF
             # Force update of systemd and pciutils
             yum install -q -y pciutils yum-utils || fail 213
 
-            if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
-              echo "Skipping upgrade of systemd when only 1 core is available"
+            if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
+              if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
+                echo "Skipping upgrade of systemd when only 1 core is available"
+              else
+                # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+                yum install -q -y systemd || fail 213
+                ensure_network_connectivity
+              fi
             else
-              # systemd, if updated, is restarted, so we may need to ensure again network connectivity
               yum install -q -y systemd || fail 213
               ensure_network_connectivity
             fi
