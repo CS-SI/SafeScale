@@ -452,7 +452,10 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	handler := HostHandler(currentTenant.Service)
 	sshConfig, err := handler.SSH(ctx, ref)
 	if err != nil {
-		return nil, err
+		if _, ok := err.(scerr.ErrNotFound); ok {
+			return nil, status.Errorf(codes.Internal, fmt.Sprintf("host '%s' not found", ref))
+		}
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return srvutils.ToPBSshConfig(sshConfig), nil
 }

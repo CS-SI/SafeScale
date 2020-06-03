@@ -63,7 +63,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	handler := TemplateHandler(tenant.Service)
 	templates, err := handler.List(ctx, all)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map resources.Host to pb.Host
