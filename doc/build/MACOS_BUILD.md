@@ -14,7 +14,6 @@ $ brew update
 $ brew install golang
 ```
 
-
 ## Install protoc-gen-go
 Must provide at least `protoc-gen-go` version 1.3.
 ```bash
