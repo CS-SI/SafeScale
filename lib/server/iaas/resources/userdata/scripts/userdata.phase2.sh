@@ -91,13 +91,13 @@ reset_fw() {
         firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
     }
     {{- if or .PublicIP .IsGateway }}
-    [ -z $PU_IF ] && {
+    [[ -z ${PU_IF} ]] && {
         # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
         firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
     # Attach LAN interfaces to zone trusted
-    [ ! -z $PR_IFs ] && {
+    [[ ! -z ${PR_IFs} ]] && {
         for i in $PR_IFs; do
             # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
             firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
@@ -1047,6 +1047,18 @@ force_dbus_restart() {
     esac
 }
 
+# sets root password to the same as the one for SafeScale OperatorUsername (on distribution where root needs password),
+# to be able to connect root on console when emergency shell arises.
+# Root account not being usable remotely (and OperatorUsername being able to become root with sudo), this is not
+# considered a security risk. Especially when set after SSH and Firewall configuration applied.
+configure_root_password() {
+    case ${LINUX_KIND} in
+        redhat|centos)
+            echo "root:{{.Password}}" | chpasswd
+            ;;
+    esac
+}
+
 update_kernel_settings() {
     cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
@@ -1072,6 +1084,7 @@ install_packages
 lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 update_kernel_settings || fail 217
+configure_root_password || fail 218
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
