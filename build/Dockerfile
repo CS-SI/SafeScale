@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
 ARG BRANCH_NAME
 ARG GOVERSION=1.13.5
+ARG PROTOVERSION=3.6.1
 
 # -----------------
 # Standard packages
@@ -35,7 +36,7 @@ python3-pip \
 WORKDIR /tmp
 
 # ----------------------
-# Install GO 1.13
+# Install GO (Version 1.13.5 by default)
 # ----------------------
 RUN wget https://dl.google.com/go/go$GOVERSION.linux-amd64.tar.gz \
 && tar -C /usr/local -xzf go$GOVERSION.linux-amd64.tar.gz
@@ -43,12 +44,12 @@ ENV PATH $PATH:/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbi
 RUN rm /tmp/go$GOVERSION.linux-amd64.tar.gz
 
 # ----------------------
-# Install Protoc
+# Install Protoc (Version 3.6.1 by default)
 # ----------------------
-RUN wget https://github.com/google/protobuf/releases/download/v3.6.0/protoc-3.6.0-linux-x86_64.zip \
-&& unzip -d /usr/local/protoc protoc-3.6.0-linux-x86_64.zip \
+RUN wget https://github.com/google/protobuf/releases/download/v$PROTOVERSION/protoc-$PROTOVERSION-linux-x86_64.zip \
+&& unzip -d /usr/local/protoc protoc-$PROTOVERSION-linux-x86_64.zip \
 && ln -s /usr/local/protoc/bin/protoc /usr/local/bin
-RUN rm /tmp/protoc-3.6.0-linux-x86_64.zip
+RUN rm /tmp/protoc-$PROTOVERSION-linux-x86_64.zip
 
 ENV SHELL /bin/bash
 ENV GOPATH /go
