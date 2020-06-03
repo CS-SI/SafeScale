@@ -51,9 +51,6 @@ common: begin ground getdevdeps ensure generate
 versioncut:
 	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
 
-versioncut-future:
-	@echo "go1.12 $($(GO) version)" | tr ' ' '\n' | grep '\.' | sort -V -r | head -n 1 | grep $($(GO) version | awk '{print $3}') || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
-
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
 
