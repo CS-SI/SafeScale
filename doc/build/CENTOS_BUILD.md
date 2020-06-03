@@ -7,14 +7,14 @@ sudo yum groupinstall -y "Development Tools"
 sudo yum install -y wget unzip vim git
 ```
 
-## Install GO 1.10.3
+## Install GO 1.13.12
 ```
-wget https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.10.3.linux-amd64.tar.gz
-rm ./go1.10.3.linux-amd64.tar.gz
+wget https://dl.google.com/go/go1.13.12.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.13.12.linux-amd64.tar.gz
+rm ./go1.13.12.linux-amd64.tar.gz
 ```
 
-## Install Protoc 3.6
+## Install Protoc 3.6.1
 ```
 PROTOCZIP=$(echo "protoc-3.6.1-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip")
 wget https://github.com/google/protobuf/releases/download/v3.6.1/$PROTOCZIP
