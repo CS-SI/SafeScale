@@ -499,7 +499,6 @@ func (handler *HostHandler) Create(
 		}
 	}()
 
-	// Updates property propsv1.HostSizing
 	if host == nil {
 		return nil, fmt.Errorf("unexpected error creating host instance: host is nil")
 	}
@@ -535,6 +534,7 @@ func (handler *HostHandler) Create(
 		}
 	}()
 
+	// Updates property propsv1.HostSizing
 	if sizing != nil {
 		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 			hostSizingV1 := clonable.(*propsv1.HostSizing)
