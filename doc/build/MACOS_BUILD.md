@@ -7,14 +7,16 @@ Then, to install brew:
 $ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 ```
 
-## Install go (must provide go version 1.12 minimum)
+## Install go
+Must provide at least `go` version 1.12 (at the time this documentation is written, the version provided is 1.14.3)
 ```bash
 $ brew update
 $ brew install golang
 ```
 
 
-## Install protoc-gen-go (must provide protoc-gen-go 1.3 minimum)
+## Install protoc-gen-go
+Must provide at least `protoc-gen-go` version 1.3.
 ```bash
 $ brew install protoc-gen-go
 ```
@@ -27,7 +29,7 @@ $ export GOROOT=/usr/local/opt/go/libexec
 $ export PATH=$PATH:$GOPATH/bin
 $ export PATH=$PATH:$GOROOT/bin
 ```
-You may want to put these commands in ~~.bashrc or ~/.zshrc to keep them after logout/restart.
+You may want to put these commands in ~/.bashrc or ~/.zshrc to keep them after logout/restart.
  
 ## Build
 ```bash 
