@@ -369,7 +369,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
 		case retry.ErrAborted:
-			return nil, realErr
+			return nil, realErr.Cause()
 		case scerr.ErrTimeout:
 			return nil, realErr
 		default:

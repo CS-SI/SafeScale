@@ -86,7 +86,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	var tl []*pb.Tenant
