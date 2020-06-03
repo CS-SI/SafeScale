@@ -20,6 +20,8 @@ PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v /vendor/)
 # List of packages to test
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /vendor/ | grep -v lib/security/ | grep -v providers/aws | grep -v stacks/aws | grep -v sandbox)
 
+# Get go version
+GOVER := $(shell $(GO) version | awk '{print $$3}')
 
 # DEPENDENCIES MANAGEMENT
 STRINGER := golang.org/x/tools/cmd/stringer
@@ -52,7 +54,10 @@ versioncut:
 	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
 
 begin: versioncut
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins ...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Go: $(GOVER) ...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Gopath: $(GOPATH) ...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Gobin: $(GOBIN) ...$(NO_COLOR)\n";
 
 libvirt:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
