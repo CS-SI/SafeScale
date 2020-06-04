@@ -91,13 +91,13 @@ reset_fw() {
         firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
     }
     {{- if or .PublicIP .IsGateway }}
-    [ -z $PU_IF ] && {
+    [[ -z ${PU_IF} ]] && {
         # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
         firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
     # Attach LAN interfaces to zone trusted
-    [ ! -z $PR_IFs ] && {
+    [[ ! -z ${PR_IFs} ]] && {
         for i in $PR_IFs; do
             # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
             firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
@@ -1037,13 +1037,24 @@ configure_locale() {
     export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
-
 force_dbus_restart() {
     case $LINUX_KIND in
         ubuntu)
             sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
             sudo systemctl daemon-reexec
             sudo systemctl restart dbus.service
+            ;;
+    esac
+}
+
+# sets root password to the same as the one for SafeScale OperatorUsername (on distribution where root needs password),
+# to be able to connect root on console when emergency shell arises.
+# Root account not being usable remotely (and OperatorUsername being able to become root with sudo), this is not
+# considered a security risk. Especially when set after SSH and Firewall configuration applied.
+configure_root_password() {
+    case ${LINUX_KIND} in
+        redhat|centos)
+            echo "root:{{.Password}}" | chpasswd
             ;;
     esac
 }

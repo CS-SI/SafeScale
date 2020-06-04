@@ -44,7 +44,7 @@ LINUX_KIND=
 VERSION_ID=
 
 sfDetectFacts() {
-	[ -f /etc/os-release ] && {
+	[[ -f /etc/os-release ]] && {
 		. /etc/os-release
 		LINUX_KIND=$ID
 	} || {
@@ -53,7 +53,7 @@ sfDetectFacts() {
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
 		} || {
-			[ -f /etc/redhat-release ] && {
+			[[ -f /etc/redhat-release ]] && {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
