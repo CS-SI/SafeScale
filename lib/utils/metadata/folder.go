@@ -18,16 +18,16 @@ package metadata
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Folder describes a metadata folder
@@ -205,6 +205,9 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		}
 		err = callback(data)
 		if err != nil {
+			if _, ok := err.(*json.SyntaxError); ok && strings.Contains(err.Error(), "invalid character") {
+				err = scerr.SyntaxError(fmt.Sprintf("seems metadata '%s' is encrypted but not encryption key provided", i))
+			}
 			log.Errorf("Error browsing metadata: running callback: %+v", err)
 			return err
 		}
