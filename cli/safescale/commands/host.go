@@ -280,7 +280,7 @@ var hostCreate = cli.Command{
 		if err != nil {
 			return err
 		}
-		resp, err := client.New().Host.Create(*def, temporal.GetExecutionTimeout())
+		resp, err := client.New().Host.Create(def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
@@ -340,7 +340,7 @@ var hostResize = cli.Command{
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
-		resp, err := client.New().Host.Resize(def, temporal.GetExecutionTimeout())
+		resp, err := client.New().Host.Resize(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of host", true).Error())))
 		}
