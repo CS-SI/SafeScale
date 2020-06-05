@@ -32,18 +32,35 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
+// consequencer is the interface exposing the methods manipulating consequences
+type consequencer interface {
+	Consequences() []error      // returns a slice of consequences
+	AddConsequence(error) Error // adds a consequence to an error
+}
+
+// causer is the interface exposing the methods manipulating cause
+type causer interface {
+	CauseFormatter(func(Error) string) // defines a function used to format a causer output to string
+	Cause() error                      // returns the first immediate cause of an error
+	CauseError() string                // returns the cause of an error as an error
+	RootCause() error                  // returns the root cause of an error
+	RootCauseError() string            // returns the root cause of an error as string
+}
+
 // Error defines the interface of a SafeScale error
 type Error interface {
 	data.NullValue
 	data.Annotatable
+	causer
+	consequencer
 	error
 
-	CauseFormatter(func(Error) string)
-	Cause() error
+	// Cause() error     // returns the first immediate cause of an error
+	// RootCause() error // returns the root cause of an error
 
-	// ConsequenceFormatter(func(Error) string)
-	AddConsequence(err error) Error
-	Consequences() []error
+	// // ConsequenceFormatter(func(Error) string)
+	// AddConsequence(err error) Error
+	// Consequences() []error
 
 	AnnotationFormatter(func(data.Annotations) string)
 
@@ -56,7 +73,7 @@ type Error interface {
 // errorCore is the implementation of interface Error
 type errorCore struct {
 	message             string
-	causer              error
+	cause               error
 	causeFormatter      func(Error) string
 	annotations         data.Annotations
 	annotationFormatter func(data.Annotations) string
@@ -87,7 +104,7 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 	}
 	r := errorCore{
 		message:      strprocess.FormatStrings(msg...),
-		causer:       cause,
+		cause:        cause,
 		consequences: consequences,
 		annotations:  make(data.Annotations),
 		grpcCode:     codes.Unknown,
@@ -118,15 +135,16 @@ func defaultCauseFormatter(e Error) string {
 
 	msgFinal := ""
 
-	if e.Cause() != nil {
+	errCore := e.(*errorCore)
+	if errCore.cause != nil {
 		msgFinal += ": "
-		msgFinal += e.Cause().Error()
+		msgFinal += errCore.cause.Error()
 	}
 
-	lenConseq := len(e.Consequences())
+	lenConseq := len(errCore.consequences)
 	if lenConseq > 0 {
 		msgFinal += "[with consequences {"
-		for ind, con := range e.Consequences() {
+		for ind, con := range errCore.consequences {
 			msgFinal += con.Error()
 			if ind+1 < lenConseq {
 				msgFinal += ";"
@@ -152,12 +170,44 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 }
 
 // Cause returns an error's cause
-func (e errorCore) Cause() error {
+func (e *errorCore) Cause() error {
 	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.Cause() from null instance")
+		logrus.Errorf("invalid call of errorCore.RootCause() from null instance")
 		return nil
 	}
-	return e.causer
+	return Cause(e)
+}
+
+// CauseError returns the string of the error cause
+// VPL: is it really necessary ? e.Cause().Error() does the job...
+func (e *errorCore) CauseError() string {
+	if !e.IsNull() {
+		if e.cause != nil {
+			return e.cause.Error()
+		}
+	}
+	return ""
+}
+
+// RootCause returns the initial error's cause
+func (e *errorCore) RootCause() error {
+	if e.IsNull() {
+		logrus.Errorf("invalid call of errorCore.RootCause() from null instance")
+		return nil
+	}
+	return RootCause(e)
+}
+
+// RootCauseError returns the string corresponding to the root cause
+// VPL: is it reallyt necessary ? e.RootCause().Error() does the job...
+func (e *errorCore) RootCauseError() string {
+	if !e.IsNull() {
+		err := e.RootCause()
+		if err != nil {
+			return err.Error()
+		}
+	}
+	return ""
 }
 
 // defaultAnnotationFormatter ...
@@ -176,7 +226,7 @@ func defaultAnnotationFormatter(a data.Annotations) string {
 }
 
 // Annotations ...
-func (e errorCore) Annotations() data.Annotations {
+func (e *errorCore) Annotations() data.Annotations {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of errorCore.Annotations() from null instance")
 		return nil
@@ -185,7 +235,7 @@ func (e errorCore) Annotations() data.Annotations {
 }
 
 // Annotation ...
-func (e errorCore) Annotation(key string) (data.Annotation, bool) {
+func (e *errorCore) Annotation(key string) (data.Annotation, bool) {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of errorCore.Annotation() from null instance")
 		return nil, false
@@ -238,7 +288,7 @@ func (e *errorCore) AddConsequence(err error) Error {
 }
 
 // Consequences returns the consequences of current error (detected teardown problems)
-func (e errorCore) Consequences() []error {
+func (e *errorCore) Consequences() []error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of errorCore.Consequences() from null instance")
 		return nil
@@ -267,7 +317,7 @@ func (e *errorCore) Error() string {
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e errorCore) GRPCCode() codes.Code {
+func (e *errorCore) GRPCCode() codes.Code {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of errorCore.GRPCCode() from null instance")
 		return codes.Unknown
@@ -276,7 +326,7 @@ func (e errorCore) GRPCCode() codes.Code {
 }
 
 // ToGRPCStatus returns a grpcstatus struct from error
-func (e errorCore) ToGRPCStatus() error {
+func (e *errorCore) ToGRPCStatus() error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of errorCore.ToGRPCStatus() from null instance")
 		return nil

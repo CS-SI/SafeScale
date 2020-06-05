@@ -17,6 +17,8 @@
 package fail
 
 import (
+	"fmt"
+
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -27,13 +29,12 @@ import (
 // AddConsequence adds an error 'err' to the list of consequences
 func AddConsequence(err error, cons error) error {
 	if err != nil {
-		conseq, ok := err.(Error)
-		if ok {
+		if conseq, ok := err.(consequencer); ok {
 			if cons != nil {
 				nerr := conseq.AddConsequence(cons)
 				return nerr
 			}
-			return conseq
+			return err
 		}
 		if cons != nil {
 			logrus.Errorf("trying to add error [%s] to existing error [%s] but failed", cons, err)
@@ -45,8 +46,7 @@ func AddConsequence(err error, cons error) error {
 // Consequences returns the list of consequences
 func Consequences(err error) []error {
 	if err != nil {
-		conseq, ok := err.(Error)
-		if ok {
+		if conseq, ok := err.(consequencer); ok {
 			return conseq.Consequences()
 		}
 	}
@@ -131,26 +131,29 @@ func ToGRPCStatus(err error) error {
 	return grpcstatus.Errorf(codes.Unknown, err.Error())
 }
 
-// Wrap creates a new error with a message 'message' and a causer error 'causer'
-func Wrap(cause error, msg ...interface{}) Error {
-	// If the cause is already an Error, make sure we don't lose its real type during the operation
-	if coreErr, ok := cause.(*errorCore); ok {
+// Prepend prepends a message to an existing error, trying to keep error type when possible
+func Prepend(err error, msg ...interface{}) Error {
+	if coreErr, ok := err.(*errorCore); ok {
 		coreErr.message = strprocess.FormatStrings(msg...) + ": " + coreErr.message
-		return cause.(Error)
+		return err.(Error)
 	}
 
-	// classical error, create a new Error
+	return NewError("%s: %s", fmt.Errorf(strprocess.FormatStrings(msg...), err.Error()))
+}
+
+// Wrap creates a new error with a message 'msg' and a causer error 'cause'
+func Wrap(cause error, msg ...interface{}) Error {
 	newErr := &errorCore{
 		message:      strprocess.FormatStrings(msg...),
-		causer:       cause,
+		cause:        cause,
 		consequences: []error{},
 		grpcCode:     codes.Unknown,
 	}
 	return newErr
 }
 
-// Cause returns the root cause of an error, or nil if there no root cause
-func Cause(err error) (resp error) {
+// RootCause returns the root cause of an error, or nil if there no root cause
+func RootCause(err error) (resp error) {
 	resp = err
 
 	for err != nil {
@@ -164,6 +167,19 @@ func Cause(err error) (resp error) {
 		}
 	}
 
+	return resp
+}
+
+// Cause returns the first immediate cause of an error, or nil if there no cause
+func Cause(err error) (resp error) {
+	resp = err
+	cause, ok := err.(Error)
+	if ok {
+		err = cause.Cause()
+		if err != nil {
+			resp = err
+		}
+	}
 	return resp
 }
 
