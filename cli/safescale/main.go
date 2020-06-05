@@ -78,7 +78,7 @@ func main() {
 	app.Writer = os.Stderr
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
-	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
+	app.Version = Version + ", build " + Revision + " (" + BuildDate + "), compiled with "+runtime.Version()
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "CS-SI",

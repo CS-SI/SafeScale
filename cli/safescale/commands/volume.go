@@ -149,7 +149,7 @@ var volumeCreate = cli.Command{
 			Speed: pb.VolumeSpeed(volSpeed),
 		}
 
-		volume, err := client.New().Volume.Create(def, temporal.GetExecutionTimeout())
+		volume, err := client.New().Volume.Create(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of volume", true).Error())))
 		}
@@ -190,7 +190,7 @@ var volumeAttach = cli.Command{
 			Host:        &pb.Reference{Name: c.Args().Get(1)},
 			Volume:      &pb.Reference{Name: c.Args().Get(0)},
 		}
-		err := client.New().Volume.Attach(def, temporal.GetExecutionTimeout())
+		err := client.New().Volume.Attach(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "attach of volume", true).Error())))
 		}

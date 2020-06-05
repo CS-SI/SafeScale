@@ -21,6 +21,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -31,7 +32,10 @@ type share struct {
 }
 
 // Create ...
-func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
+func (n *share) Create(def *pb.ShareDefinition, timeout time.Duration) error {
+	if def == nil {
+		return scerr.InvalidParameterError("def", "cannot be nil")
+	}
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
@@ -40,7 +44,7 @@ func (n *share) Create(def pb.ShareDefinition, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = service.Create(ctx, &def)
+	_, err = service.Create(ctx, def)
 	if err != nil {
 		return DecorateError(err, "creation of share", true)
 	}
@@ -82,7 +86,11 @@ func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 }
 
 // Mount ...
-func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error {
+func (n *share) Mount(def *pb.ShareMountDefinition, timeout time.Duration) error {
+	if def == nil {
+		return scerr.InvalidParameterError("def", "cannot be nil")
+	}
+
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
@@ -91,7 +99,7 @@ func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error 
 		return err
 	}
 
-	_, err = service.Mount(ctx, &def)
+	_, err = service.Mount(ctx, def)
 	if err != nil {
 		return DecorateError(err, "mount of share", true)
 	}
@@ -99,7 +107,11 @@ func (n *share) Mount(def pb.ShareMountDefinition, timeout time.Duration) error 
 }
 
 // Unmount ...
-func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) error {
+func (n *share) Unmount(def *pb.ShareMountDefinition, timeout time.Duration) error {
+	if def == nil {
+		return scerr.InvalidParameterError("def", "cannot be nil")
+	}
+
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := pb.NewShareServiceClient(n.session.connection)
@@ -108,7 +120,7 @@ func (n *share) Unmount(def pb.ShareMountDefinition, timeout time.Duration) erro
 		return err
 	}
 
-	_, err = service.Unmount(ctx, &def)
+	_, err = service.Unmount(ctx, def)
 	if err != nil {
 		return DecorateError(err, "unmount of share", true)
 	}

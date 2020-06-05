@@ -25,6 +25,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // var sshCfgCache = cache.NewMapCache()
@@ -117,7 +118,11 @@ func (h *host) Stop(name string, timeout time.Duration) error {
 }
 
 // Create ...
-func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
+func (h *host) Create(def *pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
+	if def == nil {
+		return nil, scerr.InvalidParameterError("def", "cannot be nil")
+	}
+
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
@@ -126,7 +131,7 @@ func (h *host) Create(def pb.HostDefinition, timeout time.Duration) (*pb.Host, e
 		return nil, err
 	}
 
-	return service.Create(ctx, &def)
+	return service.Create(ctx, def)
 }
 
 // Delete deletes several hosts at the same time in goroutines
@@ -195,7 +200,11 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	return sshCfg, err
 }
 
-func (h *host) Resize(def pb.HostDefinition, duration time.Duration) (*pb.Host, error) {
+func (h *host) Resize(def *pb.HostDefinition, duration time.Duration) (*pb.Host, error) {
+	if def == nil {
+		return nil, scerr.InvalidParameterError("def", "cannot be nil")
+	}
+
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := pb.NewHostServiceClient(h.session.connection)
@@ -204,5 +213,5 @@ func (h *host) Resize(def pb.HostDefinition, duration time.Duration) (*pb.Host, 
 		return nil, err
 	}
 
-	return service.Resize(ctx, &def)
+	return service.Resize(ctx, def)
 }

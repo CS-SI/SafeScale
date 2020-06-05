@@ -26,6 +26,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -560,7 +561,7 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 }
 
 func main() {
-	logrus.Printf("%s version %s\n", os.Args[0], Version+", build "+Revision+" ("+BuildDate+")")
+	logrus.Printf("%s version %s\n", os.Args[0], Version+", build "+Revision+" ("+BuildDate+"), compiled with "+runtime.Version())
 
 	safescaledPort := 50051
 
