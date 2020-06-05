@@ -226,16 +226,27 @@ func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 }
 
 // FromPBHostDefinitionToPBGatewayDefinition converts a pb.HostDefinition to pb.GatewayDefinition
-func FromPBHostDefinitionToPBGatewayDefinition(in pb.HostDefinition) pb.GatewayDefinition {
-	def := pb.GatewayDefinition{
+func FromPBHostDefinitionToPBGatewayDefinition(in *pb.HostDefinition) *pb.GatewayDefinition {
+	if in == nil {
+		return &pb.GatewayDefinition{}
+	}
+
+	def := &pb.GatewayDefinition{
 		ImageId:  in.ImageId,
 		Cpu:      in.CpuCount,
 		Ram:      in.Ram,
 		Disk:     in.Disk,
 		GpuCount: in.GpuCount,
-		Sizing:   &pb.HostSizing{},
+		Sizing:   &pb.HostSizing{
+			MinCpuCount: in.Sizing.MinCpuCount,
+			MaxCpuCount: in.Sizing.MaxCpuCount,
+			MinRamSize: in.Sizing.MinRamSize,
+			MaxRamSize: in.Sizing.MaxRamSize,
+			MinDiskSize: in.Sizing.MinDiskSize,
+			GpuCount: in.Sizing.GpuCount,
+			MinCpuFreq: in.Sizing.MinCpuFreq,
+		},
 	}
-	*def.Sizing = *in.Sizing
 	return def
 }
 
@@ -270,7 +281,7 @@ func ToPBImage(in *resources.Image) *pb.Image {
 
 // ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *resources.Network) *pb.Network {
-	var pbVIP pb.VirtualIp
+	var pbVIP *pb.VirtualIp
 	if in.VIP != nil {
 		pbVIP = ToPBVirtualIP(*in.VIP)
 	}
@@ -280,7 +291,7 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 		Cidr:               in.CIDR,
 		GatewayId:          in.GatewayID,
 		SecondaryGatewayId: in.SecondaryGatewayID,
-		VirtualIp:          &pbVIP,
+		VirtualIp:          pbVIP,
 		Failover:           in.SecondaryGatewayID != "",
 	}
 }
@@ -296,8 +307,8 @@ func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, f
 }
 
 // ToPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
-func ToPBHostSizing(src resources.SizingRequirements) pb.HostSizing {
-	return pb.HostSizing{
+func ToPBHostSizing(src resources.SizingRequirements) *pb.HostSizing {
+	return &pb.HostSizing{
 		MinCpuCount: int32(src.MinCores),
 		MaxCpuCount: int32(src.MaxCores),
 		MinCpuFreq:  src.MinFreq,
@@ -309,7 +320,7 @@ func ToPBHostSizing(src resources.SizingRequirements) pb.HostSizing {
 }
 
 // FromPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
-func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
+func FromPBHostSizing(src *pb.HostSizing) resources.SizingRequirements {
 	return resources.SizingRequirements{
 		MinCores:    int(src.MinCpuCount),
 		MaxCores:    int(src.MaxCpuCount),
@@ -322,8 +333,8 @@ func FromPBHostSizing(src pb.HostSizing) resources.SizingRequirements {
 }
 
 // ToPBVirtualIP converts a resources.VirtualIP to a pb.VirtualIp
-func ToPBVirtualIP(src resources.VirtualIP) pb.VirtualIp {
-	dest := pb.VirtualIp{
+func ToPBVirtualIP(src resources.VirtualIP) *pb.VirtualIp {
+	dest := &pb.VirtualIp{
 		Id:        src.ID,
 		NetworkId: src.NetworkID,
 		PrivateIp: src.PrivateIP,
@@ -332,4 +343,41 @@ func ToPBVirtualIP(src resources.VirtualIP) pb.VirtualIp {
 	dest.Hosts = make([]string, len(src.Hosts))
 	copy(dest.Hosts, src.Hosts)
 	return dest
+}
+
+// ClonePBHostSizing ...
+func ClonePBHostSizing(in *pb.HostSizing) *pb.HostSizing {
+	if in == nil {
+		return &pb.HostSizing{}
+	}
+	return &pb.HostSizing{
+		MinCpuCount: in.MinCpuCount,
+		MaxCpuCount: in.MaxCpuCount,
+		MinRamSize: in.MinRamSize,
+		MaxRamSize: in.MaxRamSize,
+		MinDiskSize: in.MinDiskSize,
+		GpuCount: in.GpuCount,
+		MinCpuFreq: in.MinCpuFreq,
+	}
+}
+
+// ClonePBHostDefinition ...
+func ClonePBHostDefinition(in *pb.HostDefinition) *pb.HostDefinition {
+	if in == nil {
+		return &pb.HostDefinition{}
+	}
+	return &pb.HostDefinition{
+		Name: in.Name,
+		Network: in.Network,
+		CpuCount: in.CpuCount,
+		Ram: in.Ram,
+		Disk: in.Disk,
+		ImageId: in.ImageId,
+		Public: in.Public,
+		GpuCount: in.GpuCount,
+		CpuFreq: in.CpuFreq,
+		Force: in.Force,
+		Sizing: ClonePBHostSizing(in.Sizing),
+		Domain: in.Domain,
+	}
 }
