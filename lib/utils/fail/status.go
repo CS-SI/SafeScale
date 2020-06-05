@@ -49,7 +49,7 @@ func Success(msg string, args ...interface{}) Status {
 	}
 }
 
-// message ...
+// Message ...
 func (msg *status) Message() string {
 	return msg.message
 }
