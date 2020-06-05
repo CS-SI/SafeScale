@@ -104,6 +104,7 @@ getdevdeps: begin
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u $(ERRCHECK); \
 	fi
 	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
+  		mkdir ./vendor || true; \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && govendor fetch $(CONVEY)@v1.6.3 && GOBIN=$(GOPATH)/bin $(GO) install vendor/github.com/smartystreets/goconvey/goconvey.go; \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
