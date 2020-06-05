@@ -98,8 +98,8 @@ func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int
 	return masterCount, privateNodeCount, 0
 }
 
-func gatewaySizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
-	return pb.HostDefinition{
+func gatewaySizing(task concurrency.Task, foreman control.Foreman) *pb.HostDefinition {
+	return &pb.HostDefinition{
 		Sizing: &pb.HostSizing{
 			MinCpuCount: 2,
 			MaxCpuCount: 4,
@@ -111,8 +111,8 @@ func gatewaySizing(task concurrency.Task, foreman control.Foreman) pb.HostDefini
 	}
 }
 
-func masterSizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
-	return pb.HostDefinition{
+func masterSizing(task concurrency.Task, foreman control.Foreman) *pb.HostDefinition {
+	return &pb.HostDefinition{
 		Sizing: &pb.HostSizing{
 			MinCpuCount: 4,
 			MaxCpuCount: 8,
@@ -124,8 +124,8 @@ func masterSizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinit
 	}
 }
 
-func nodeSizing(task concurrency.Task, foreman control.Foreman) pb.HostDefinition {
-	return pb.HostDefinition{
+func nodeSizing(task concurrency.Task, foreman control.Foreman) *pb.HostDefinition {
+	return &pb.HostDefinition{
 		Sizing: &pb.HostSizing{
 			MinCpuCount: 2,
 			MaxCpuCount: 4,

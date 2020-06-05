@@ -678,7 +678,7 @@ func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task *c
 	err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
 		defaultsV2 := clonable.(*clusterpropsv2.Defaults)
 		sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
-		nodeDef.Sizing = &sizing
+		nodeDef.Sizing = sizing
 		hostImage = defaultsV2.Image
 		return nil
 	})
@@ -711,7 +711,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		return hosts, err
 	}
 
-	nodeDef = complementHostDefinition(req, *nodeDef)
+	nodeDef = complementHostDefinition(req, nodeDef)
 	if nodeDef.ImageId == "" {
 		nodeDef.ImageId = hostImage
 	}

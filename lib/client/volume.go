@@ -101,7 +101,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 }
 
 // Create ...
-func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
+func (v *volume) Create(def *pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
@@ -110,12 +110,12 @@ func (v *volume) Create(def pb.VolumeDefinition, timeout time.Duration) (*pb.Vol
 		return nil, err
 	}
 
-	return service.Create(ctx, &def)
+	return service.Create(ctx, def)
 
 }
 
 // Attach ...
-func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
+func (v *volume) Attach(def *pb.VolumeAttachment, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 	service := pb.NewVolumeServiceClient(v.session.connection)
@@ -124,7 +124,7 @@ func (v *volume) Attach(def pb.VolumeAttachment, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = service.Attach(ctx, &def)
+	_, err = service.Attach(ctx, def)
 	return err
 
 }
