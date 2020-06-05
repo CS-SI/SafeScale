@@ -1,12 +1,17 @@
 #!/bin/bash
 
-WRKDIR=$(readlink -f $(dirname "$0"))
+WRKDIR=$(readlink -f $(dirname "$0") >/dev/null 2>&1)
 
 if [ ! -z "$1" ]
 then
   if [[ $1 == "-f" ]]; then
     date > marker
   fi
+fi
+
+if [ -z "$WRKDIR" ]
+then
+  WRKDIR=.
 fi
 
 if [ ! -f ./marker ]; then
