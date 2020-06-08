@@ -24,14 +24,15 @@ fi
 stamp=`date +"%s"`
 
 #BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) GOVERSION=1.13.5 envsubst <Dockerfile > Dockerfile.$stamp
-BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-echo docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME -f ${WRKDIR}/Dockerfile -t safescale:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') $WRKDIR
-docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME -f ${WRKDIR}/Dockerfile -t safescale:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') $WRKDIR
+[ -z "$BRANCH_NAME" ] && BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+[ -z "$GOVERSION" ] && GOVERSION=1.13.5
+echo docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
+docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
 [ $? -ne 0 ] && echo "Docker build failed !!" && rm -f ./marker && exit 1
 
 echo "Docker build OK"
 
-docker create -ti --name dummy safescale:$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') bash
+docker create -ti --name dummy "safescale:${BRANCH_NAME/\//_}" bash
 [ $? -ne 0 ] && echo "Failure extracting binaries 1/3" && exit 1
 docker cp dummy:/exported .
 [ $? -ne 0 ] && echo "Failure extracting binaries 2/3" && exit 1
