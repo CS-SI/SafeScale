@@ -87,7 +87,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 			MinFreq:     in.Gateway.Sizing.MinCpuFreq,
 		}
 	} else {
-		s := srvutils.FromPBHostSizing(*in.Gateway.Sizing)
+		s := srvutils.FromPBHostSizing(in.Gateway.Sizing)
 		sizing = &s
 	}
 	if in.Gateway != nil {
