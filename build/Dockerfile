@@ -36,7 +36,7 @@ python3-pip \
 WORKDIR /tmp
 
 # ----------------------
-# Install GO (Version 1.13.5 by default)
+# Install GO
 # ----------------------
 RUN wget https://dl.google.com/go/go$GOVERSION.linux-amd64.tar.gz \
 && tar -C /usr/local -xzf go$GOVERSION.linux-amd64.tar.gz
