@@ -1023,11 +1023,17 @@ EOF
                 echo "Skipping upgrade of systemd when only 1 core is available"
               else
                 # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-                yum install -q -y systemd || fail 213
+                op=-1
+                msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                echo $msg | grep "Nothing to do" && return
+                [ $op -ne 0 ] && sfFail 213
                 ensure_network_connectivity
               fi
             else
-              yum install -q -y systemd || fail 213
+              op=-1
+              msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+              echo $msg | grep "Nothing to do" && return
+              [ $op -ne 0 ] && sfFail 213
               ensure_network_connectivity
             fi
 
