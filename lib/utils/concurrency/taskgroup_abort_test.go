@@ -157,9 +157,9 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 
 	_, xerr = overlord.WaitGroup()
 	if xerr != nil {
-		if eab, ok := xerr.(fail.ErrAborted); ok {
+		if eab, ok := xerr.(*fail.ErrAborted); ok {
 			cause := eab.Cause()
-			if causes, ok := cause.(fail.ErrorList); ok {
+			if causes, ok := cause.(*fail.ErrorList); ok {
 				errList := causes.ToErrorSlice()
 				errFound := false
 				for _, err := range errList {
@@ -222,9 +222,9 @@ func TestBadTaskActionCitizen(t *testing.T) {
 
 	_, xerr = overlord.WaitGroup()
 	if xerr != nil {
-		if eab, ok := xerr.(fail.ErrAborted); ok {
+		if eab, ok := xerr.(*fail.ErrAborted); ok {
 			cause := eab.Cause()
-			if causes, ok := cause.(fail.ErrorList); ok {
+			if causes, ok := cause.(*fail.ErrorList); ok {
 				errList := causes.ToErrorSlice()
 				errFound := false
 				for _, err := range errList {

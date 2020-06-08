@@ -251,7 +251,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	begin := time.Now()
 	waited, _, err := overlord.WaitFor(time.Duration(10) * 10 * time.Millisecond)
 	if err != nil {
-		if _, ok := err.(fail.ErrTimeout); !ok {
+		if _, ok := err.(*fail.ErrTimeout); !ok {
 			t.Errorf("Unexpected group wait, wrong error type: %s", err)
 		}
 	}

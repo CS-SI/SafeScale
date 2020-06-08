@@ -573,7 +573,7 @@ func (c *cluster) createNetwork(
 			if !gwFailoverDisabled {
 				secondaryGateway, innerXErr = network.GetGateway(task, false)
 				if innerXErr != nil {
-					if _, ok := innerXErr.(fail.ErrNotFound); !ok {
+					if _, ok := innerXErr.(*fail.ErrNotFound); !ok {
 						return innerXErr
 					}
 				}
@@ -630,7 +630,7 @@ func (c *cluster) createHosts(
 	}
 	secondaryGateway, xerr := network.GetGateway(task, false)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}
@@ -1178,7 +1178,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 			5*time.Minute, // FIXME: static timeout
 		)
 		if xerr != nil {
-			if _, ok := xerr.(retry.ErrTimeout); ok {
+			if _, ok := xerr.(*retry.ErrTimeout); ok {
 				xerr = fail.Wrap(xerr, "timeout waiting cluster to become started")
 			}
 			return xerr
@@ -1343,7 +1343,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 			5*time.Minute, // FIXME: static timeout
 		)
 		if xerr != nil {
-			if _, ok := xerr.(retry.ErrTimeout); ok {
+			if _, ok := xerr.(*retry.ErrTimeout); ok {
 				xerr = fail.Wrap(xerr, "timeout waiting cluster transitioning from state Stopping to Stopped")
 			}
 			return xerr
@@ -1853,7 +1853,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 
 		// Finally delete host
 		if innerErr = host.Delete(task); innerErr != nil {
-			if _, ok := innerErr.(fail.ErrNotFound); ok {
+			if _, ok := innerErr.(*fail.ErrNotFound); ok {
 				// host seems already deleted, so it's a success
 				return nil
 			}
@@ -2008,7 +2008,7 @@ func (c *cluster) FindAvailableMaster(task concurrency.Task) (master resources.H
 
 		_, err = master.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
 		if err != nil {
-			if _, ok := err.(retry.ErrTimeout); ok {
+			if _, ok := err.(*retry.ErrTimeout); ok {
 				lastError = err
 				continue
 			}
@@ -2171,7 +2171,7 @@ func (c *cluster) FindAvailableNode(task concurrency.Task) (node resources.Host,
 	for _, v := range list {
 		_, err = v.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
 		if err != nil {
-			if _, ok := err.(retry.ErrTimeout); ok {
+			if _, ok := err.(*retry.ErrTimeout); ok {
 				continue
 			}
 			return nil, err
@@ -2667,7 +2667,7 @@ func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskPara
 			return fail.NewError("failed to join host '%s' to swarm as worker: %s", node.SafeGetName(), stderr)
 		}
 		labelCmd := "docker node update " + node.SafeGetName() + " --label-add safescale.host.role=node"
-		retcode, _, stderr, err = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if xerr != nil || retcode != 0 {
 			return fail.NewError("failed to label swarm worker '%s' as node: %s", node.SafeGetName(), stderr)
 		}
@@ -2874,7 +2874,7 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 		host, xerr := LoadHost(task, c.service, hostID)
 		if xerr != nil {
 			// If host seems deleted, consider leaving as a success
-			if _, ok := xerr.(fail.ErrNotFound); ok {
+			if _, ok := xerr.(*fail.ErrNotFound); ok {
 				continue
 			}
 			return xerr
@@ -2942,7 +2942,7 @@ func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return fail.Wrap(retryErr, "SWARM worker '%s' didn't reach 'Down' state after %v", host.SafeGetName(), temporal.GetHostTimeout())
 		default:
 			return fail.Wrap(retryErr, "SWARM worker '%s' didn't reach 'Down' state", host.SafeGetName())

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -33,13 +34,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -912,7 +916,27 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
 				return xerr
 			}
-			primaryGatewayVariables["Hostname"] = h.SafeGetName()
+			primaryGatewayVariables["ShortHostname"] = h.SafeGetName()
+			domain := ""
+			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					domain = hostDescriptionV1.Domain
+					if domain != "" {
+						domain = "." + domain
+					}
+					return nil
+				})
+			})
+			if xerr != nil {
+				return xerr
+			}
+
+			primaryGatewayVariables["Hostname"] = h.SafeGetName() + domain
+
 			tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 				"ctrl": primaryKongController,
 				"rule": rule,
@@ -927,7 +951,26 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
 					return xerr
 				}
-				secondaryGatewayVariables["Hostname"] = h.SafeGetName()
+				secondaryGatewayVariables["ShortHostname"] = h.SafeGetName()
+				domain = ""
+				xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+						domain = hostDescriptionV1.Domain
+						if domain != "" {
+							domain = "." + domain
+						}
+						return nil
+					})
+				})
+				if xerr != nil {
+					return xerr
+				}
+				secondaryGatewayVariables["Hostname"] = h.SafeGetName() + domain
+
 				tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 					"ctrl": secondaryKongController,
 					"rule": rule,

@@ -145,7 +145,7 @@ func TestDeferredWrappedConsequence(t *testing.T) {
 func TestVerifyErrorType(t *testing.T) {
 	recovered := CreateErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(ErrTimeout); !ok {
+		if _, ok := recovered.(*ErrTimeout); !ok {
 			t.Errorf("It should be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
@@ -156,12 +156,12 @@ func TestVerifyErrorType(t *testing.T) {
 
 	recovered = CreateComplexErrorWithNConsequences(1)
 	if recovered != nil {
-		if _, ok := recovered.(ErrTimeout); !ok {
+		if _, ok := recovered.(*ErrTimeout); !ok {
 			t.Errorf("It should be a 'ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := fail.RootCause(recovered); cause != nil {
-			if _, ok := cause.(fail.ErrNotFound); !ok {
+			if _, ok := cause.(*fail.ErrNotFound); !ok {
 				t.Errorf("It should be a 'fail.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
 		}
@@ -171,12 +171,12 @@ func TestVerifyErrorType(t *testing.T) {
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
 	if recovered != nil {
-		if _, ok := recovered.(ErrTimeout); ok {
+		if _, ok := recovered.(*ErrTimeout); ok {
 			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
 		if cause := fail.RootCause(recovered); cause != nil {
-			if _, ok := cause.(fail.ErrNotFound); ok {
+			if _, ok := cause.(*fail.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
 				t.Errorf("This should be a 'fail.ErrNotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
@@ -317,7 +317,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(ErrTimeout); !ok {
+					if _, ok := err.(*ErrTimeout); !ok {
 						t.Errorf("'ErrTimeout' not received...")
 					}
 				}
@@ -363,7 +363,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 			}
 			if err != nil {
 				if tt.wantTOErr {
-					if _, ok := err.(ErrTimeout); !ok {
+					if _, ok := err.(*ErrTimeout); !ok {
 						t.Errorf("ErrTimeout error not received...")
 					}
 				}
@@ -394,24 +394,24 @@ func genAbort() error {
 
 func TestErrorHierarchy(t *testing.T) {
 	nerr := genErr()
-	if _, ok := nerr.(fail.ErrNotFound); !ok {
+	if _, ok := nerr.(*fail.ErrNotFound); !ok {
 		t.Errorf("Is not a 'ErrNotFound', it's instead a '%s'", reflect.TypeOf(nerr).String())
 	}
 }
 
 func TestKeepType(t *testing.T) {
 	toe := genTimeout()
-	if _, ok := toe.(ErrTimeout); !ok {
+	if _, ok := toe.(*ErrTimeout); !ok {
 		t.Errorf("Is not a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(toe).String())
 	}
 
 	leo := genLimit()
-	if _, ok := leo.(ErrLimit); !ok {
+	if _, ok := leo.(*ErrLimit); !ok {
 		t.Errorf("Is not a 'ErrLimit', it's instead a '%s'", reflect.TypeOf(leo).String())
 	}
 
 	abo := genAbort()
-	if _, ok := abo.(ErrStopRetry); !ok {
+	if _, ok := abo.(*ErrStopRetry); !ok {
 		t.Errorf("Is not a 'ErrStopRetry', it's instead a '%s'", reflect.TypeOf(abo).String())
 	}
 }

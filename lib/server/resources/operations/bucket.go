@@ -139,7 +139,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 
 	bucket, xerr := b.svc.InspectBucket(name)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}

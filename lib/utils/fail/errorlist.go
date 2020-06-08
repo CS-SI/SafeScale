@@ -22,8 +22,7 @@ import (
 )
 
 // ErrorList ...
-type ErrorList = *errorList
-type errorList struct {
+type ErrorList struct {
 	*errorCore
 	errors []error
 }
@@ -31,17 +30,17 @@ type errorList struct {
 // NewErrorList creates a ErrorList
 func NewErrorList(errors []error) Error {
 	if len(errors) == 0 {
-		return &errorList{}
+		return &ErrorList{}
 	}
 
-	return &errorList{
+	return &ErrorList{
 		errorCore: newError(nil, nil, ""),
 		errors:    errors,
 	}
 }
 
 // AddConsequence ...
-func (e *errorList) AddConsequence(err error) Error {
+func (e *ErrorList) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
 		return e
@@ -52,7 +51,7 @@ func (e *errorList) AddConsequence(err error) Error {
 
 // Annotate ...
 // satisfies interface data.Annotatable
-func (e *errorList) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrorList) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
 		return e
@@ -64,7 +63,7 @@ func (e *errorList) Annotate(key string, value data.Annotation) data.Annotatable
 // Note: no Reset() overloading, it's wanted... It doesn't have that much sense with ErrorList
 
 // Error returns a string containing all the errors
-func (e *errorList) Error() string {
+func (e *ErrorList) Error() string {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.Error() from null instance")
 		return ""
@@ -77,7 +76,7 @@ func (e *errorList) Error() string {
 }
 
 // ToErrorSlice transforms ErrorList to []error
-func (e *errorList) ToErrorSlice() []error {
+func (e *ErrorList) ToErrorSlice() []error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
 		return []error{}

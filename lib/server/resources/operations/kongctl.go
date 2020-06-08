@@ -304,7 +304,7 @@ func (k *KongController) addSourceControl(
 	url += "/plugins"
 	result, _, xerr := k.get(ruleName, url)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}

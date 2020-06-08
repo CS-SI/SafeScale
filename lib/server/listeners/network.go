@@ -93,7 +93,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 				return nil, xerr
 			}
 		} else if in.Gateway.Sizing != nil {
-			sizing = converters.HostSizingRequirementsFromProtocolToAbstract(*in.Gateway.Sizing)
+			sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Gateway.Sizing)
 		}
 	}
 	if sizing == nil {
@@ -111,6 +111,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		gwName,
 		in.FailOver,
 		in.KeepOnFailure,
+		in.Domain,
 	)
 	if xerr != nil {
 		return nil, xerr

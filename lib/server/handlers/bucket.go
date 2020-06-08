@@ -82,7 +82,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	svc := handler.job.SafeGetService()
 	rb, xerr := bucketfactory.Load(svc, name)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}

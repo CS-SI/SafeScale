@@ -134,3 +134,5 @@ WARN_STRING  = "[WARNING]"
 
 BUILD_TAGS = ""
 export BUILD_TAGS
+
+GO?=go

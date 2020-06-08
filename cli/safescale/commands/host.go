@@ -282,7 +282,7 @@ var hostCreate = &cli.Command{
 			SizingAsString: sizing,
 			KeepOnFailure:  c.Bool("keep-on-failure"),
 		}
-		resp, err := client.New().Host.Create(req, temporal.GetExecutionTimeout())
+		resp, err := client.New().Host.Create(&req, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -343,7 +343,7 @@ var hostResize = &cli.Command{
 			CpuFreq:  float32(c.Float64("cpu-freq")),
 			Force:    c.Bool("force"),
 		}
-		resp, err := client.New().Host.Resize(def, temporal.GetExecutionTimeout())
+		resp, err := client.New().Host.Resize(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -475,7 +475,7 @@ var hostAddFeatureCommand = &cli.Command{
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
-		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, settings, 0)
+		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
@@ -534,7 +534,7 @@ var hostCheckFeatureCommand = &cli.Command{
 			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
-		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, settings, 0)
+		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
@@ -594,7 +594,7 @@ var hostRemoveFeatureCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
-		err = client.New().Host.RemoveFeature(hostInstance.Id, featureName, values, settings, 0)
+		err = client.New().Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error removing feature '%s' on host '%s': %s", featureName, hostName, err.Error())

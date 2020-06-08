@@ -94,31 +94,31 @@ func FromGRPCStatus(err error) Error {
 	common := &errorCore{message: message, grpcCode: code}
 	switch code {
 	case codes.DeadlineExceeded:
-		return &ImplTimeout{errorCore: common, dur: 0}
+		return &ErrTimeout{errorCore: common, dur: 0}
 	case codes.Aborted:
-		return &ImplAborted{common}
+		return &ErrAborted{common}
 	case codes.FailedPrecondition:
-		return &ImplInvalidParameter{common}
+		return &ErrInvalidParameter{common}
 	case codes.AlreadyExists:
-		return &ImplDuplicate{common}
+		return &ErrDuplicate{common}
 	case codes.InvalidArgument:
-		return &ImplInvalidRequest{common}
+		return &ErrInvalidRequest{common}
 	case codes.NotFound:
-		return &ImplNotFound{common}
+		return &ErrNotFound{common}
 	case codes.PermissionDenied:
-		return &ImplForbidden{common}
+		return &ErrForbidden{common}
 	case codes.ResourceExhausted:
-		return &ImplOverload{common}
+		return &ErrOverload{common}
 	case codes.OutOfRange:
-		return &ImplOverflow{errorCore: common, limit: 0}
+		return &ErrOverflow{errorCore: common, limit: 0}
 	case codes.Unimplemented:
-		return &ImplNotImplemented{common}
+		return &ErrNotImplemented{common}
 	case codes.Internal:
-		return &ImplRuntimePanic{common}
+		return &ErrRuntimePanic{common}
 	case codes.DataLoss:
-		return &ImplInconsistent{common}
+		return &ErrInconsistent{common}
 	case codes.Unauthenticated:
-		return &ImplNotAuthenticated{common}
+		return &ErrNotAuthenticated{common}
 	}
 	return common
 }

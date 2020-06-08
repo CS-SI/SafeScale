@@ -100,7 +100,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 
 	volume, rerr = s.GetVolume(request.Name)
 	if rerr != nil {
-		if _, ok := rerr.(fail.ErrNotFound); !ok {
+		if _, ok := rerr.(*fail.ErrNotFound); !ok {
 			return nil, rerr
 		}
 	}

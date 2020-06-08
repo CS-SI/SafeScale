@@ -192,7 +192,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 
 	subnet, xerr := s.findSubnetByName(req.Name)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
 		}
 	}
@@ -503,7 +503,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
 	if err != nil {
 		tErr := openstack.TranslateProviderError(err)
 		switch tErr.(type) { // nolint
-		case fail.ErrInvalidRequest:
+		case *fail.ErrInvalidRequest:
 			body := map[string]interface{}{}
 			err = json.Unmarshal([]byte(tErr.Error()), &body)
 			if err != nil {

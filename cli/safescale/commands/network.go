@@ -234,7 +234,7 @@ var networkCreate = &cli.Command{
 			},
 			KeepOnFailure: c.Bool("keep-on-failure"),
 		}
-		network, err := client.New().Network.Create(netdef, temporal.GetExecutionTimeout())
+		network, err := client.New().Network.Create(&netdef, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network", true).Error())))

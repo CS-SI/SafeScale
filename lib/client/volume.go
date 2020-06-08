@@ -103,7 +103,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 }
 
 // Create ...
-func (v *volume) Create(def protocol.VolumeCreateRequest, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
+func (v *volume) Create(def *protocol.VolumeCreateRequest, timeout time.Duration) (*protocol.VolumeInspectResponse, error) {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -113,11 +113,11 @@ func (v *volume) Create(def protocol.VolumeCreateRequest, timeout time.Duration)
 	}
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	return service.Create(ctx, &def)
+	return service.Create(ctx, def)
 }
 
 // Attach ...
-func (v *volume) Attach(def protocol.VolumeAttachmentRequest, timeout time.Duration) error {
+func (v *volume) Attach(def *protocol.VolumeAttachmentRequest, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
@@ -127,7 +127,7 @@ func (v *volume) Attach(def protocol.VolumeAttachmentRequest, timeout time.Durat
 	}
 
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	_, err := service.Attach(ctx, &def)
+	_, err := service.Attach(ctx, def)
 	return err
 
 }

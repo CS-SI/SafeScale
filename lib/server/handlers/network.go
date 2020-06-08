@@ -31,7 +31,7 @@ import (
 
 // NetworkHandler defines API to manage networks
 type NetworkHandler interface {
-	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool, bool) (resources.Network, fail.Error)
+	Create(string, string, ipversion.Enum, abstract.HostSizingRequirements, string, string, bool, bool, string) (resources.Network, fail.Error)
 	List(bool) ([]*abstract.Network, fail.Error)
 	Inspect(string) (resources.Network, fail.Error)
 	Delete(string) fail.Error
@@ -54,7 +54,7 @@ func NewNetworkHandler(job server.Job) NetworkHandler {
 func (handler *networkHandler) Create(
 	name string, cidr string, ipVersion ipversion.Enum,
 	sizing abstract.HostSizingRequirements, theos string, gwname string,
-	failover bool, keepOnFailure bool,
+	failover bool, keepOnFailure bool, domain string,
 ) (network resources.Network, xerr fail.Error) {
 
 	if handler == nil {
@@ -90,6 +90,7 @@ func (handler *networkHandler) Create(
 		CIDR:          cidr,
 		HA:            failover,
 		KeepOnFailure: keepOnFailure,
+		Domain:        domain,
 	}
 	xerr = objn.Create(task, req, gwname, &sizing)
 	if xerr != nil {

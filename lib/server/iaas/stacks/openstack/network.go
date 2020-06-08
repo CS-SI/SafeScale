@@ -652,9 +652,9 @@ func (s *Stack) deleteSubnet(id string) (xerr fail.Error) {
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return abstract.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
-		case retry.ErrStopRetry:
+		case *retry.ErrStopRetry:
 			return fail.Wrap(retryErr.Cause(), "failed to delete subnet after %v", temporal.GetContextTimeout())
 		default:
 			return retryErr

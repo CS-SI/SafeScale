@@ -134,7 +134,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "safescaled"
 	app.Usage = "safescaled [OPTIONS]"
-	app.Version = Version + ", build " + Revision + " (" + BuildDate + ")"
+	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
 
 	app.Authors = []*cli.Author{
 		&cli.Author{

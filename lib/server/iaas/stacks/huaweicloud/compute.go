@@ -441,7 +441,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			server, xInnerErr = s.WaitHostState(ahc, hoststate.STARTED, temporal.GetHostTimeout())
 			if xInnerErr != nil {
 				switch xInnerErr.(type) {
-				case fail.ErrNotAvailable:
+				case *fail.ErrNotAvailable:
 					return fail.Wrap(xInnerErr, "host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fail.Wrap(xInnerErr, "timeout waiting host '%s' ready", request.ResourceName)
@@ -461,9 +461,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			derr := s.DeleteHost(ahc.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case fail.ErrNotFound:
+				case *fail.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr)
-				case fail.ErrTimeout:
+				case *fail.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
@@ -839,7 +839,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 					temporal.GetContextTimeout(),
 				)
 				if innerRetryErr != nil {
-					if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
+					if _, ok := innerRetryErr.(*retry.ErrTimeout); ok {
 						// retry deletion...
 						return fail.Wrap(abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout()),
 							"host '%s' not deleted after %v", id, temporal.GetContextTimeout())

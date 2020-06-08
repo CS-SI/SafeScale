@@ -118,7 +118,7 @@ var shareCreate = &cli.Command{
 			},
 			SecurityModes: c.StringSlice("securityModes"),
 		}
-		err := client.New().Share.Create(def, temporal.GetExecutionTimeout())
+		err := client.New().Share.Create(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "creation of share", true).Error()))
@@ -222,7 +222,7 @@ var shareMount = &cli.Command{
 			Type:      "nfs",
 			WithCache: c.Bool("ac"),
 		}
-		err := client.New().Share.Mount(def, temporal.GetExecutionTimeout())
+		err := client.New().Share.Mount(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "mount of nas", true).Error()))
@@ -249,7 +249,7 @@ var shareUnmount = &cli.Command{
 			Host:  &protocol.Reference{Name: hostName},
 			Share: &protocol.Reference{Name: shareName},
 		}
-		err := client.New().Share.Unmount(def, temporal.GetExecutionTimeout())
+		err := client.New().Share.Unmount(&def, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateTimeoutError(err, "unmount of share", true).Error()))

@@ -84,7 +84,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 
 	// LEGACY: NFSExportOptions of protocol has been deprecated and replaced by OptionsAsString
 	if in.OptionsAsString == "" && in.Options != nil {
-		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(*in.Options)
+		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
 	svc := job.SafeGetService()
 	rh, xerr := hostfactory.Load(task, svc, hostRef)

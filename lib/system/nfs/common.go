@@ -148,7 +148,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		temporal.GetHostTimeout(),
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(fail.ErrExecution); ok {
+		if _, ok := retryErr.(*fail.ErrExecution); ok {
 			xerr = retryErr
 		} else {
 			xerr = fail.ExecutionError(retryErr, "failed to copy script to remote host")
@@ -208,13 +208,13 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	)
 	if retryErr != nil {
 		switch cErr := retryErr.(type) {
-		case fail.ErrTimeout:
+		case *fail.ErrTimeout:
 			logrus.Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
 			xerr.Annotate("retcode", 255)
 			// return 255, stdout, stderr, retryErr
 			return stdout, xerr
-		case fail.ErrExecution:
+		case *fail.ErrExecution:
 			return stdout, cErr
 		default:
 			xerr = fail.ExecutionError(retryErr)

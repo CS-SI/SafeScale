@@ -42,7 +42,6 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	if inputs, ok = params.(data.Map); !ok {
 		return nil, fail.InvalidParameterError("params", "must be a data.Map")
 	}
-
 	hostReq, ok := inputs["request"].(abstract.HostRequest)
 	if !ok {
 		return nil, fail.InvalidParameterError("params['request']", "must be a abstract.GatewayRequest")
@@ -84,9 +83,9 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
-				case fail.ErrNotFound:
+				case *fail.ErrNotFound:
 					logrus.Errorf(msgRoot+", resource not found: %v", hostReq.ResourceName, derr)
-				case fail.ErrTimeout:
+				case *fail.ErrTimeout:
 					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 				default:
 					logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)

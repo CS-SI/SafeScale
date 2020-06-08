@@ -211,7 +211,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	netName := "net-safescale" // FIXME: Hardcoded string
 	network, xerr := networkfactory.Load(task, svc, netName)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 		network, xerr := networkfactory.New(svc)

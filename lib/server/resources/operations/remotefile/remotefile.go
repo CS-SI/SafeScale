@@ -88,9 +88,9 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
-		case retry.ErrStopRetry:
+		case *retry.ErrStopRetry:
 			return fail.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.SafeGetName())
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return fail.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.SafeGetName(), rfc.Remote)
 		}
 		return retryErr

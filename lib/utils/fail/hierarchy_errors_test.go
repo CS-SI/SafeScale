@@ -7,13 +7,13 @@ import (
 )
 
 func TestHierarchy(t *testing.T) {
-	var err Error
+	var err Error // nolint
 	err = ExecutionError(fmt.Errorf("whatever"))
 	assert.NotNil(t, err)
 }
 
 func TestConcreteHierarchy(t *testing.T) {
-	var err ErrExecution
+	var err *ErrExecution // nolint
 	err = ExecutionError(fmt.Errorf("whatever"))
 	assert.NotNil(t, err)
 }

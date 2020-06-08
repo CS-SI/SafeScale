@@ -123,7 +123,7 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 
 // IsNull tells if the instance is null
 func (e *errorCore) IsNull() bool {
-	return e == nil || e.message == ""
+	return e == nil || (e.message == "" && e.cause == nil)
 }
 
 // defaultCauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
@@ -335,39 +335,38 @@ func (e *errorCore) ToGRPCStatus() error {
 }
 
 // ErrTimeout defines a ErrTimeout error
-type ErrTimeout = *ImplTimeout
-type ImplTimeout struct {
+type ErrTimeout struct {
 	*errorCore
 	dur time.Duration
 }
 
 // TimeoutError returns an ErrTimeout instance
-func TimeoutError(cause error, dur time.Duration, msg ...interface{}) Error {
+func TimeoutError(cause error, dur time.Duration, msg ...interface{}) *ErrTimeout {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.DeadlineExceeded
-	return &ImplTimeout{
+	return &ErrTimeout{
 		errorCore: r,
 		dur:       dur,
 	}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplTimeout) IsNull() bool {
+func (e *ErrTimeout) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplTimeout) AddConsequence(err error) Error {
+func (e *ErrTimeout) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrTimeout.AddConsequence() from null instance")
-		return &ImplTimeout{}
+		return &ErrTimeout{}
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
 }
 
 // Annotate ...
-func (e *ImplTimeout) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrTimeout.Annotate() from null instance")
 		return e
@@ -377,25 +376,24 @@ func (e *ImplTimeout) Annotate(key string, value data.Annotation) data.Annotatab
 }
 
 // ErrNotFound resource not found error
-type ErrNotFound = *ImplNotFound
-type ImplNotFound struct {
+type ErrNotFound struct {
 	*errorCore
 }
 
 // NotFoundError creates a ErrNotFound error
-func NotFoundError(msg ...interface{}) Error {
+func NotFoundError(msg ...interface{}) *ErrNotFound {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.NotFound
-	return &ImplNotFound{r}
+	return &ErrNotFound{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplNotFound) IsNull() bool {
+func (e *ErrNotFound) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplNotFound) AddConsequence(err error) Error {
+func (e *ErrNotFound) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
 		return e
@@ -405,7 +403,7 @@ func (e *ImplNotFound) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplNotFound) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotFound.Annotate() from null instance")
 		return e
@@ -415,25 +413,24 @@ func (e *ImplNotFound) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 // ErrNotAvailable resource not available error
-type ErrNotAvailable = *ImplNotAvailable
-type ImplNotAvailable struct {
+type ErrNotAvailable struct {
 	*errorCore
 }
 
 // NotAvailableError creates a ErrNotAvailable error
-func NotAvailableError(msg ...interface{}) Error {
+func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Unavailable
-	return &ImplNotAvailable{r}
+	return &ErrNotAvailable{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplNotAvailable) IsNull() bool {
+func (e *ErrNotAvailable) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplNotAvailable) AddConsequence(err error) Error {
+func (e *ErrNotAvailable) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotAvailable.AddConsequence() from null instance")
 		return e
@@ -443,7 +440,7 @@ func (e *ImplNotAvailable) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplNotAvailable) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotAvailable.Annotate() from null instance")
 		return e
@@ -453,25 +450,24 @@ func (e *ImplNotAvailable) Annotate(key string, value data.Annotation) data.Anno
 }
 
 // ErrDuplicate already exists error
-type ErrDuplicate = *ImplDuplicate
-type ImplDuplicate struct {
+type ErrDuplicate struct {
 	*errorCore
 }
 
 // DuplicateError creates a ErrDuplicate error
-func DuplicateError(msg ...interface{}) Error {
+func DuplicateError(msg ...interface{}) *ErrDuplicate {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.AlreadyExists
-	return &ImplDuplicate{r}
+	return &ErrDuplicate{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplDuplicate) IsNull() bool {
+func (e *ErrDuplicate) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplDuplicate) AddConsequence(err error) Error {
+func (e *ErrDuplicate) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrDuplicate.AddConsequence() from null instance")
 		return e
@@ -482,7 +478,7 @@ func (e *ImplDuplicate) AddConsequence(err error) Error {
 
 // Annotate ...
 // satisfies interface data.Annotatable
-func (e *ImplDuplicate) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrDuplicate) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrDuplicate.Annotate() from null instance")
 		return e
@@ -492,8 +488,7 @@ func (e *ImplDuplicate) Annotate(key string, value data.Annotation) data.Annotat
 }
 
 // ErrInvalidRequest ...
-type ErrInvalidRequest = *ImplInvalidRequest
-type ImplInvalidRequest struct {
+type ErrInvalidRequest struct {
 	*errorCore
 }
 
@@ -501,16 +496,16 @@ type ImplInvalidRequest struct {
 func InvalidRequestError(msg ...interface{}) Error {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.InvalidArgument
-	return &ImplInvalidRequest{r}
+	return &ErrInvalidRequest{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplInvalidRequest) IsNull() bool {
+func (e *ErrInvalidRequest) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplInvalidRequest) AddConsequence(err error) Error {
+func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidRequest.AddConsequence() from null instance")
 		return e
@@ -521,7 +516,7 @@ func (e *ImplInvalidRequest) AddConsequence(err error) Error {
 
 // Annotate overloads errorCore.Annotate() to make sure the type returned is the same as the caller
 // satisfies interface data.Annotatable
-func (e *ImplInvalidRequest) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrInvalidRequest) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidRequest.Annotate() from null instance")
 		return e
@@ -531,25 +526,24 @@ func (e *ImplInvalidRequest) Annotate(key string, value data.Annotation) data.An
 }
 
 // ErrSyntax ...
-type ErrSyntax = *ImplSyntax
-type ImplSyntax struct {
+type ErrSyntax struct {
 	*errorCore
 }
 
 // SyntaxError creates a ErrSyntax error
-func SyntaxError(msg ...interface{}) Error {
+func SyntaxError(msg ...interface{}) *ErrSyntax {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Internal
-	return &ImplSyntax{r}
+	return &ErrSyntax{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplSyntax) IsNull() bool {
+func (e *ErrSyntax) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplSyntax) AddConsequence(err error) Error {
+func (e *ErrSyntax) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrSyntax.AddConsequence() from null instance")
 		return e
@@ -559,7 +553,7 @@ func (e *ImplSyntax) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplSyntax) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrSyntax.Annotate() from null instance")
 		return e
@@ -569,25 +563,24 @@ func (e *ImplSyntax) Annotate(key string, value data.Annotation) data.Annotatabl
 }
 
 // ErrNotAuthenticated when action is done without being authenticated first
-type ErrNotAuthenticated = *ImplNotAuthenticated
-type ImplNotAuthenticated struct {
+type ErrNotAuthenticated struct {
 	*errorCore
 }
 
 // NotAuthenticatedError creates a ErrNotAuthenticated error
-func NotAuthenticatedError(msg ...interface{}) Error {
+func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Unauthenticated
-	return &ImplNotAuthenticated{r}
+	return &ErrNotAuthenticated{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplNotAuthenticated) IsNull() bool {
+func (e *ErrNotAuthenticated) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplNotAuthenticated) AddConsequence(err error) Error {
+func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotAuthenticated.AddConsequence() from null instance")
 		return e
@@ -597,7 +590,7 @@ func (e *ImplNotAuthenticated) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplNotAuthenticated) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotAuthenticated.Annotate() from null instance")
 		return e
@@ -607,25 +600,24 @@ func (e *ImplNotAuthenticated) Annotate(key string, value data.Annotation) data.
 }
 
 // ErrForbidden when action is not allowed.
-type ErrForbidden = *ImplForbidden
-type ImplForbidden struct {
+type ErrForbidden struct {
 	*errorCore
 }
 
 // ForbiddenError creates a ErrForbidden error
-func ForbiddenError(msg ...interface{}) Error {
+func ForbiddenError(msg ...interface{}) *ErrForbidden {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.PermissionDenied
-	return &ImplForbidden{r}
+	return &ErrForbidden{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplForbidden) IsNull() bool {
+func (e *ErrForbidden) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplForbidden) AddConsequence(err error) Error {
+func (e *ErrForbidden) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrForbidden.AddConsequence() from null instance")
 		return e
@@ -635,7 +627,7 @@ func (e *ImplForbidden) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplForbidden) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrForbidden.Annotate() from null instance")
 		return e
@@ -645,31 +637,30 @@ func (e *ImplForbidden) Annotate(key string, value data.Annotation) data.Annotat
 }
 
 // ErrAborted ...
-type ErrAborted = *ImplAborted
-type ImplAborted struct {
+type ErrAborted struct {
 	*errorCore
 }
 
 // AbortedError creates a ErrAborted error
-func AbortedError(err error, msg ...interface{}) Error {
+func AbortedError(err error, msg ...interface{}) *ErrAborted {
 	var message string
 	if len(msg) == 0 {
-		message = "ImplAborted"
+		message = "ErrAborted"
 	} else {
 		message = strprocess.FormatStrings(msg...)
 	}
 	r := newError(err, nil, message)
 	r.grpcCode = codes.Aborted
-	return &ImplAborted{r}
+	return &ErrAborted{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplAborted) IsNull() bool {
+func (e *ErrAborted) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplAborted) AddConsequence(err error) Error {
+func (e *ErrAborted) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrAborted.AddConsequence() from null instance")
 		return e
@@ -679,7 +670,7 @@ func (e *ImplAborted) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplAborted) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrAborted.Annotate() from null instance")
 		return e
@@ -689,14 +680,13 @@ func (e *ImplAborted) Annotate(key string, value data.Annotation) data.Annotatab
 }
 
 // ErrOverflow is used when a limit is reached
-type ErrOverflow = *ImplOverflow
-type ImplOverflow struct {
+type ErrOverflow struct {
 	*errorCore
 	limit uint
 }
 
 // OverflowError creates a ErrOverflow error
-func OverflowError(err error, limit uint, msg ...interface{}) Error {
+func OverflowError(err error, limit uint, msg ...interface{}) *ErrOverflow {
 	message := strprocess.FormatStrings(msg...)
 	if limit > 0 {
 		limitMsg := fmt.Sprintf("(limit: %d)", limit)
@@ -707,19 +697,19 @@ func OverflowError(err error, limit uint, msg ...interface{}) Error {
 	}
 	r := newError(err, nil, message)
 	r.grpcCode = codes.OutOfRange
-	return &ImplOverflow{
+	return &ErrOverflow{
 		errorCore: r,
 		limit:     limit,
 	}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplOverflow) IsNull() bool {
+func (e *ErrOverflow) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplOverflow) AddConsequence(err error) Error {
+func (e *ErrOverflow) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrOverflow.AddConsequence() from null instance")
 		return e
@@ -729,7 +719,7 @@ func (e *ImplOverflow) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplOverflow) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of Oveflow.Annotate() from null instance")
 		return e
@@ -739,25 +729,24 @@ func (e *ImplOverflow) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 // ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occured in a given time).
-type ErrOverload = *ImplOverload
-type ImplOverload struct {
+type ErrOverload struct {
 	*errorCore
 }
 
 // OverloadError creates a ErrOverload error
-func OverloadError(msg ...interface{}) Error {
+func OverloadError(msg ...interface{}) *ErrOverload {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.ResourceExhausted
-	return &ImplOverload{r}
+	return &ErrOverload{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplOverload) IsNull() bool {
+func (e *ErrOverload) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplOverload) AddConsequence(err error) Error {
+func (e *ErrOverload) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrOverload.AddConsequence() from null instance")
 		return e
@@ -767,7 +756,7 @@ func (e *ImplOverload) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplOverload) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrOverload) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrOverload.Annotate() from null instance")
 		return e
@@ -777,20 +766,19 @@ func (e *ImplOverload) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 // ErrNotImplemented ...
-type ErrNotImplemented = *ImplNotImplemented
-type ImplNotImplemented struct {
+type ErrNotImplemented struct {
 	*errorCore
 }
 
 // NotImplementedError creates a ErrNotImplemented report
-func NotImplementedError(msg ...interface{}) Error {
+func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("not implemented yet:", strprocess.FormatStrings(msg...), ""))
 	r.grpcCode = codes.Unimplemented
-	return &ImplNotImplemented{r}
+	return &ErrNotImplemented{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplNotImplemented) IsNull() bool {
+func (e *ErrNotImplemented) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
@@ -798,11 +786,11 @@ func (e *ImplNotImplemented) IsNull() bool {
 func NotImplementedErrorWithReason(what string, why string) Error {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("not implemented yet:", what, why))
 	r.grpcCode = codes.Unimplemented
-	return &ImplNotImplemented{r}
+	return &ErrNotImplemented{r}
 }
 
 // AddConsequence ...
-func (e *ImplNotImplemented) AddConsequence(err error) Error {
+func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotImplemented.AddConsequence() from null instance")
 		return e
@@ -812,7 +800,7 @@ func (e *ImplNotImplemented) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplNotImplemented) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrNotImplemented.Annotate() from null instance")
 		return e
@@ -822,25 +810,24 @@ func (e *ImplNotImplemented) Annotate(key string, value data.Annotation) data.An
 }
 
 // ErrRuntimePanic ...
-type ErrRuntimePanic = *ImplRuntimePanic
-type ImplRuntimePanic struct {
+type ErrRuntimePanic struct {
 	*errorCore
 }
 
 // RuntimePanicError creates a ErrRuntimePanic error
-func RuntimePanicError(msg ...interface{}) Error {
+func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
 	r := newError(nil, nil, debug.DecorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""))
 	r.grpcCode = codes.Internal
-	return &ImplRuntimePanic{r}
+	return &ErrRuntimePanic{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplRuntimePanic) IsNull() bool {
+func (e *ErrRuntimePanic) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplRuntimePanic) AddConsequence(err error) Error {
+func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrRuntimePanic.AddConsequence() from null instance")
 		return e
@@ -850,7 +837,7 @@ func (e *ImplRuntimePanic) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplRuntimePanic) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrRuntimePanic) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrRuntimePanic.Annotate() from null instance")
 		return e
@@ -860,25 +847,24 @@ func (e *ImplRuntimePanic) Annotate(key string, value data.Annotation) data.Anno
 }
 
 // ErrInvalidInstance has to be used when a method is called from an instance equal to nil
-type ErrInvalidInstance = *ImplInvalidInstance
-type ImplInvalidInstance struct {
+type ErrInvalidInstance struct {
 	*errorCore
 }
 
 // InvalidInstanceError creates a ErrInvalidInstance error
-func InvalidInstanceError() Error {
+func InvalidInstanceError() *ErrInvalidInstance {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("invalid instance:", "", "calling method from a nil pointer"))
 	r.grpcCode = codes.FailedPrecondition
-	return &ImplInvalidInstance{r}
+	return &ErrInvalidInstance{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplInvalidInstance) IsNull() bool {
+func (e *ErrInvalidInstance) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplInvalidInstance) AddConsequence(err error) Error {
+func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidInstance.AddConsequence() from null instance")
 		return e
@@ -888,7 +874,7 @@ func (e *ImplInvalidInstance) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplInvalidInstance) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrInvalidInstance) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidInstance.Annotate() from null instance")
 		return e
@@ -898,25 +884,24 @@ func (e *ImplInvalidInstance) Annotate(key string, value data.Annotation) data.A
 }
 
 // ErrInvalidParameter ...
-type ErrInvalidParameter = *ImplInvalidParameter
-type ImplInvalidParameter struct {
+type ErrInvalidParameter struct {
 	*errorCore
 }
 
 // InvalidParameterError creates a ErrInvalidParameter error
-func InvalidParameterError(what, why string) Error {
+func InvalidParameterError(what, why string) *ErrInvalidParameter {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("invalid parameter:", what, why))
 	r.grpcCode = codes.FailedPrecondition
-	return &ImplInvalidParameter{r}
+	return &ErrInvalidParameter{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplInvalidParameter) IsNull() bool {
+func (e *ErrInvalidParameter) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplInvalidParameter) AddConsequence(err error) Error {
+func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidParameter.AddConsequence() from null instance")
 		return e
@@ -926,7 +911,7 @@ func (e *ImplInvalidParameter) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplInvalidParameter) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrInvalidParameter) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidParameter.Annotate() from null instance")
 		return e
@@ -936,25 +921,24 @@ func (e *ImplInvalidParameter) Annotate(key string, value data.Annotation) data.
 }
 
 // ErrInvalidInstanceContent has to be used when a property of an instance contains invalid property
-type ErrInvalidInstanceContent = *ImplInvalidInstanceContent
-type ImplInvalidInstanceContent struct {
+type ErrInvalidInstanceContent struct {
 	*errorCore
 }
 
 // InvalidInstanceContentError returns an instance of ErrInvalidInstanceContent.
-func InvalidInstanceContentError(what, why string) Error {
+func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 	r := newError(nil, nil, debug.DecorateWithCallTrace("invalid instance content:", what, why))
 	r.grpcCode = codes.FailedPrecondition
-	return &ImplInvalidInstanceContent{r}
+	return &ErrInvalidInstanceContent{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplInvalidInstanceContent) IsNull() bool {
+func (e *ErrInvalidInstanceContent) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplInvalidInstanceContent) AddConsequence(err error) Error {
+func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidInstanceContent.AddConsequence() from null instance")
 		return e
@@ -964,7 +948,7 @@ func (e *ImplInvalidInstanceContent) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplInvalidInstanceContent) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrInvalidInstanceContent) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInvalidInstanceContent.Annotate() from null instance")
 		return e
@@ -973,26 +957,25 @@ func (e *ImplInvalidInstanceContent) Annotate(key string, value data.Annotation)
 	return e
 }
 
-// ErrInconsistent is used when data used is ImplInconsistent
-type ErrInconsistent = *ImplInconsistent
-type ImplInconsistent struct {
+// ErrInconsistent is used when data used is ErrInconsistent
+type ErrInconsistent struct {
 	*errorCore
 }
 
 // InconsistentError creates a ErrInconsistent error
-func InconsistentError(msg ...interface{}) Error {
+func InconsistentError(msg ...interface{}) *ErrInconsistent {
 	r := newError(nil, nil, debug.DecorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""))
 	r.grpcCode = codes.DataLoss
-	return &ImplInconsistent{r}
+	return &ErrInconsistent{r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplInconsistent) IsNull() bool {
+func (e *ErrInconsistent) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplInconsistent) AddConsequence(err error) Error {
+func (e *ErrInconsistent) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInconsistent.AddConsequence() from null instance")
 		return e
@@ -1002,7 +985,7 @@ func (e *ImplInconsistent) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplInconsistent) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrInconsistent) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrInconsistent.Annotate() from null instance")
 		return e
@@ -1011,14 +994,13 @@ func (e *ImplInconsistent) Annotate(key string, value data.Annotation) data.Anno
 	return e
 }
 
-// ErrExecution is used when code ImplExecution failed
-type ErrExecution = *ImplExecution
-type ImplExecution struct {
+// ErrExecution is used when code ErrExecution failed
+type ErrExecution struct {
 	*errorCore
 }
 
 // ExecutionError creates a ErrExecution error
-func ExecutionError(exitError error, msg ...interface{}) Error {
+func ExecutionError(exitError error, msg ...interface{}) *ErrExecution {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Internal
 
@@ -1029,18 +1011,20 @@ func ExecutionError(exitError error, msg ...interface{}) Error {
 			retcode = status.ExitStatus()
 		}
 		stderr = string(ee.Stderr)
+	} else {
+		r.cause = exitError
 	}
 	_ = r.Annotate("retcode", retcode).Annotate("stderr", stderr)
-	return &ImplExecution{errorCore: r}
+	return &ErrExecution{errorCore: r}
 }
 
 // IsNull tells if the instance is null
-func (e *ImplExecution) IsNull() bool {
+func (e *ErrExecution) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
 // AddConsequence ...
-func (e *ImplExecution) AddConsequence(err error) Error {
+func (e *ErrExecution) AddConsequence(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrExecution.AddConsequence() from null instance")
 		return e
@@ -1050,7 +1034,7 @@ func (e *ImplExecution) AddConsequence(err error) Error {
 }
 
 // Annotate ...
-func (e *ImplExecution) Annotate(key string, value data.Annotation) data.Annotatable {
+func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of ErrExecution.Annotate() from null instance")
 		return e
