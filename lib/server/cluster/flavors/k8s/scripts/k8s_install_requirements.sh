@@ -92,7 +92,7 @@ case $(sfGetFact "linux_kind") in
         mandb
         ;;
     redhat|centos)
-        yum makecache fast
+        yum makecache
         yum install -y wget curl time rclone jq unzip
         ;;
     fedora)

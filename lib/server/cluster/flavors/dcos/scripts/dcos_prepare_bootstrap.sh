@@ -80,7 +80,7 @@ export -f download_nginx_image
 
 mkdir -p ${SF_VARDIR}/dcos/genconf/serve/docker && \
 cd ${SF_VARDIR}/dcos && \
-yum makecache fast && \
+yum makecache && \
 yum install -y wget curl time jq unzip || exit 204
 
 # Launch downloads in parallel
