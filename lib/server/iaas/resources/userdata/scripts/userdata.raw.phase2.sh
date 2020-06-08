@@ -808,7 +808,27 @@ EOF
         systemctl daemon-reload
     fi
 
-    sfService enable keepalived && sfService restart keepalived || return 1
+    sfService enable keepalived || return 1
+
+    op=-1
+    msg=$(sfService restart keepalived 2>&1) && op=$? || true
+
+    kop=-1
+    echo $msg | grep "Unit network.service not found" && kop=$? || true
+
+    if [[ op -ne 0 ]]; then
+      if [[ kop -eq 0 ]]; then
+        case $LINUX_KIND in
+          redhat|centos)
+              yum install -q -y network-scripts || return 1
+              ;;
+          *)
+              ;;
+        esac
+      fi
+    fi
+
+    sfService restart keepalived || return 1
     return 0
 }
 
