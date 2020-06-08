@@ -87,7 +87,7 @@ EOF
 
     # Installs PIP
     yum install -y epel-release && \
-    yum makecache fast && \
+    yum makecache && \
     yum install -y python-pip || yum install -y python2-pip || exit 194
 
     # Installs docker-python with pip
@@ -114,6 +114,6 @@ EOF
 }
 export -f install_common_requirements
 
-yum makecache fast
+yum makecache
 yum install -y time
 /usr/bin/time -p bash -c install_common_requirements
