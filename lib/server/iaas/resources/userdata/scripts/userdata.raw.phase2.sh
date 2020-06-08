@@ -29,6 +29,8 @@ fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
+    collect_installed_packages
+
     # For compatibility with previous user_data implementation (until v19.03.x)...
     mkdir -p /var/tmp || true
     ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
@@ -224,6 +226,32 @@ substring_diff() {
     echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
 }
 
+collect_original_packages() {
+  case $LINUX_KIND in
+		debian|ubuntu)
+			dpkg-query -l > ${SF_VARDIR}/log/user_data.phase1.packages.log
+			;;
+	  redhat|centos)
+	    rpm -qa | sort > ${SF_VARDIR}/log/user_data.phase1.packages.log
+	    ;;
+	  *)
+	    ;;
+	esac
+}
+
+collect_installed_packages() {
+	case $LINUX_KIND in
+		debian|ubuntu)
+			dpkg-query -l > ${SF_VARDIR}/log/user_data.phase2.packages.log
+			;;
+	  redhat|centos)
+	    rpm -qa | sort > ${SF_VARDIR}/log/user_data.phase2.packages.log
+	    ;;
+	  *)
+	    ;;
+	esac
+}
+
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
     op=-1
@@ -240,6 +268,8 @@ ensure_network_connectivity() {
     op=-1
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
     [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
+
+    [ $op -ne 0 ] && fail 220
 }
 
 configure_dns() {
@@ -986,9 +1016,20 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -q -y systemd pciutils yum-utils || fail 213
-            # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-            ensure_network_connectivity
+            yum install -q -y pciutils yum-utils || fail 213
+
+            if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
+              if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
+                echo "Skipping upgrade of systemd when only 1 core is available"
+              else
+                # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+                yum install -q -y systemd || fail 213
+                ensure_network_connectivity
+              fi
+            else
+              yum install -q -y systemd || fail 213
+              ensure_network_connectivity
+            fi
 
             # # install security updates
             # yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
@@ -1016,13 +1057,14 @@ add_common_repos() {
     case $LINUX_KIND in
         ubuntu)
             sfFinishPreviousInstall
-            add-apt-repository universe -y || return 1
+            add-apt-repository universe -y || fail 217
             codename=$(sfGetFact "linux_codename")
             echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
             ;;
         redhat|centos)
             # Install EPEL repo ...
-            yum install -y epel-release
+            yum install -y epel-release || fail 217
+            yum makecache || fail 218
             # ... but don't enable it by default
             yum-config-manager --disablerepo=epel &>/dev/null || true
             ;;
@@ -1070,6 +1112,8 @@ EOF
 }
 
 # ---- Main
+
+collect_original_packages
 
 configure_locale
 

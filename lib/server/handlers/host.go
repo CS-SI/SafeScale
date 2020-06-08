@@ -456,7 +456,7 @@ func (handler *HostHandler) Create(
 	}
 	domain = strings.Trim(domain, ".")
 	if domain != "" {
-		domain = "."+domain
+		domain = "." + domain
 	}
 
 	hostRequest := resources.HostRequest{
@@ -823,6 +823,8 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase2.sh", dumpName+"sh")
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.log", dumpName+"log")
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase1.packages.log", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages-%s.log", host.Name, "phase1")))
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.packages.log", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages-%s.log", host.Name, "phase2")))
 	}
 }
 
