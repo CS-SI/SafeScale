@@ -472,9 +472,10 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		}
 	}
 	results, xerr := installer.Add(f, target, myV, s)
-	if xerr == nil {
-		// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
+	if xerr != nil {
+		return nil, xerr
 	}
+	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
 	return results, xerr
 }
 

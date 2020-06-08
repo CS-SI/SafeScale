@@ -92,7 +92,7 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if innerErr != nil {
-				if _, ok := innerErr.(fail.ErrTimeout); ok {
+				if _, ok := innerErr.(*fail.ErrTimeout); ok {
 					return innerErr
 				}
 				retcode = -1
@@ -112,7 +112,7 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 		},
 	)
 	if retryErr != nil {
-		if realErr, ok := retryErr.(retry.ErrStopRetry); ok {
+		if realErr, ok := retryErr.(*retry.ErrStopRetry); ok {
 			return -1, "", "", realErr.Cause()
 		}
 		return -1, "", "", retryErr
@@ -254,7 +254,7 @@ func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, ex
 	)
 	if retryErr != nil {
 		switch cErr := retryErr.(type) { // nolint
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return -1, "", "", cErr
 		}
 	}

@@ -25,13 +25,6 @@ feature:
 
         # "clusterSizing" not honored currently
         clusterSizing:
-            dcos:
-                small:
-                    nodes: "count >= 2, cpu >= 2"   # 1 master, 1 node
-                normal:
-                    nodes: "count >= 4, cpu >= 2"   # 3 masters, 1 node
-                large:
-                    nodes: "count >= 6, cpu >= 2 "  # 3 masters, 3 nodes
             boh:
                 small:
                     masters: "count >= 1, cpu >= 2"
@@ -71,95 +64,6 @@ feature:
         - ControlplaneEndpointIP
 
     install:
-        dcos:
-            check:
-                pace: deploy
-                steps:
-                    deploy:
-                        targets:
-                            masters: one
-                        run: |
-                            sfDcos kubernetes &>/dev/null
-                            sfExit
-
-            add:
-                #pace: package,cli+config
-                pace: package,cli,config
-                steps:
-                    package:
-                        targets:
-                            masters: one
-                        options:
-                            small: |
-                                {
-                                    "kubernetes": {
-                                        "node_count": 1,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                            normal: |
-                                {
-                                    "kubernetes": {
-                                        "high_availability": true,
-                                        "node_count": 1,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                            large: |
-                                {
-                                    "kubernetes": {
-                                        "high_availability": true,
-                                        "node_count": 3,
-                                        "reserved_resources": {
-                                            "kube_cpus": 1,
-                                            "kube_mem": 1024,
-                                            "kube_disk": 512
-                                        }
-                                    }
-                                }
-                        run: |
-                            op=-1
-                            output=$(sfDcos package install --yes kubernetes {{.options}} 2>&1) && op=$? || true
-                            [ $op -ne 0 ] && {
-                                echo $output
-                                echo $output | grep "already installed" &>/dev/null || sfFail $op
-                            }
-                            sfExit
-
-                    cli:
-                        targets:
-                            masters: all
-                        run: |
-                            sfDcos package install --yes kubernetes --cli
-                            sfExit
-
-                    config:
-                        targets:
-                            masters: all
-                        run: |
-                            sfRetry 10m 20 sfDcos kubernetes plan show deploy --json | jq .status | grep COMPLETE &>/dev/null || sfFail 192
-                            sfDcos kubernetes kubeconfig --apiserver-url https://apiserver.kubernetes.l4lb.thisdcos.directory:6443 && \
-                            sfDcos config set-cluster kubernetes --server https://apiserver.kubernetes.l4lb.thisdcos.directory:6443
-                            sfExit
-
-            remove:
-                pace: package
-                steps:
-                    package:
-                        targets:
-                            masters: one
-                        run: |
-                            sfDcos package remove --yes kubernetes || sfFail 192
-                            sfExit
-
         bash:
             check:
                 pace: nodes,kube
@@ -170,10 +74,10 @@ feature:
                             nodes: all
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
-                                pidof kubelet &>/dev/null || sfFail 192
+                                pidof kubelet &>/dev/null || sfFail 192 "kubelet not running"
                                 sfExit
                             fi
-                            sfFail 193
+                            sfFail 193 "node didn't join (no .joined file)"
 
                     kube:
                         targets:
@@ -197,18 +101,27 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
                             # Enabling kernel modules required by Kubernetes
-                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh br_netfilter nf_conntrack_ipv4 nf_conntrack; do
+                            for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh br_netfilter; do
                                 echo $i >>/etc/modules-load.d/kubernetes.conf
                                 modprobe $i 2>/dev/null || sfFail 201 "Error enabling kernel module $i, error code $?"
                             done
+    
+                            op=-1
+                            for i in nf_conntrack_ipv4 nf_conntrack; do
+                                echo $i >>/etc/modules
+                                modprobe $i 2>/dev/null && op=0 || true
+                            done
+                            if [ $op -eq -1 ]; then
+                                sfFail 201 "Error enabling kernel module nf_conntrack and nf_conntrack_ipv4"
+                            fi
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfRetry 5m 5 sfApt install -y ebtables socat || sfFail 192
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ebtables socat || sfFail 192
                                     ;;
                                 redhat|centos)
-                                    sfRetry 5m 5 yum install -y ebtables socat || sfFail 193
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ebtables socat || sfFail 193
 
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
@@ -263,11 +176,11 @@ feature:
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
                                     sfApt update
-                                    sfRetry 5m 10 sfApt install -y auditd quota quotatool || sfFail 195
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
 
                                 centos|redhat)
-                                    sfRetry 5m 10 yum -y install audit audit-libs quota || sfFail 195
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum -y install audit audit-libs quota || sfFail 195
                                     ;;
 
                                 *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
@@ -527,6 +440,9 @@ feature:
                             CP_ENDPOINT_IP={{ .HostIP }}
                             {{ end }}
 
+                            DNSDOMAIN=$(hostname -d)
+                            [ -z "${DNSDOMAIN}" ] && DNSDOMAIN=cluster.local
+
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
                             apiVersion: kubeadm.k8s.io/v1beta1
@@ -537,7 +453,7 @@ feature:
                                 local:
                                     dataDir: /var/lib/etcd
                             networking:
-                                dnsDomain: cluster.local
+                                dnsDomain: ${DNSDOMAIN}
                                 podSubnet: 10.244.0.0/16
                                 serviceSubnet: 10.96.0.0/12
                             {{ if eq .Hardening "true" }}
@@ -597,7 +513,7 @@ feature:
                             {{ end }}
                             EOF
 
-                            sfRetry 5m 5 kubeadm config images pull || sfFail 202
+                            sfRetry {{.TemplatePullImagesTimeout}} {{.TemplateOperationDelay}} kubeadm config images pull || sfFail 202
                             sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 204
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 205
@@ -765,9 +681,9 @@ feature:
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 212
-                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 213
-                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 214
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 212
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 213
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 214
 
                             echo "cp1 init done"
                             sfExit
@@ -874,15 +790,15 @@ feature:
 
                             [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 227
                             # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
-                            sfRetry 10m 30 bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 228
+                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 228
                             [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 229
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 230
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry 5m 10 sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
-                            sfRetry 5m 10 sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
-                            sfRetry 5m 10 sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
 
                             # Configure firewall
                             case {{.CNI}} in
@@ -963,10 +879,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfRetry 3m 5 sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi

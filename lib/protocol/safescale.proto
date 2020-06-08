@@ -15,12 +15,10 @@
  */
 
 syntax = "proto3";
-package safescale_protocol;
-option go_package = "protocol";
+option go_package = ".;protocol";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
-
 
 // Common
 
@@ -194,9 +192,10 @@ message HostDefinition{
     int32 gpu_count = 11;   // Deprecated: replaced by sizing field
     float cpu_freq = 12;    // Deprecated: replaced by sizing field
     bool force = 13;
-    HostSizing sizing = 14; // Deprecated: replace by sizing_as_string field
-    string sizing_as_string = 15;
-    bool keep_on_failure = 16;
+    HostSizing sizing = 14; // Deprecated: replaced by sizing_as_string field
+    string domain = 15;
+    string sizing_as_string = 16;
+    bool keep_on_failure = 17;
 }
 
 
@@ -228,7 +227,7 @@ message Host{
     string private_ip = 7;
     HostState state = 8;
     string private_key = 9;
-    string gateway_id = 10;
+    string gateway_id = 10;     // Deprecated?
     string os_kind = 11;
     repeated string attached_volume_names = 12;
     string password = 13;
@@ -623,12 +622,6 @@ message FeatureListResponse {
     repeated FeatureResponse features = 1;
 }
 
-enum FeatureAction {
-    FA_CHECK = 0;
-    FA_ADD = 1;
-    FA_REMOVE = 2;
-}
-
 message FeatureSettings {
     bool skip_proxy = 1;
     bool serialize = 2;
@@ -638,7 +631,7 @@ message FeatureSettings {
 }
 
 message FeatureActionRequest {
-    FeatureAction action = 1;
+    string name = 1;
     FeatureTargetType target_type = 2;
     Reference target_ref = 3;
     map<string, string> variables = 4;

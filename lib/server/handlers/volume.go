@@ -117,7 +117,7 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 	objv, xerr := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
-		case fail.ErrNotFound:
+		case *fail.ErrNotFound:
 			return abstract.ResourceNotFoundError("volume", ref)
 		default:
 			logrus.Debugf("failed to delete volume: %+v", xerr)
@@ -169,7 +169,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 
 	objv, xerr := volumefactory.Load(task, handler.job.SafeGetService(), ref)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); ok {
+		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
 		}
 		return nil, xerr
@@ -569,7 +569,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// Load volume data
 	rv, xerr := volumefactory.Load(task, handler.job.SafeGetService(), volumeRef)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 		return abstract.ResourceNotFoundError("volume", volumeRef)

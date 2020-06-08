@@ -56,7 +56,11 @@ func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
 // 	return def
 // }
 
-func FeatureSettingsFromProtocolToResource(in protocol.FeatureSettings) resources.FeatureSettings {
+// FeatureSettingsFromProtocolToResource ...
+func FeatureSettingsFromProtocolToResource(in *protocol.FeatureSettings) resources.FeatureSettings {
+	if in == nil {
+		return resources.FeatureSettings{}
+	}
 	return resources.FeatureSettings{
 		SkipProxy:               in.SkipProxy,
 		Serialize:               in.Serialize,
@@ -66,7 +70,10 @@ func FeatureSettingsFromProtocolToResource(in protocol.FeatureSettings) resource
 	}
 }
 
-func HostSizingRequirementsFromProtocolToAbstract(in protocol.HostSizing) *abstract.HostSizingRequirements {
+func HostSizingRequirementsFromProtocolToAbstract(in *protocol.HostSizing) *abstract.HostSizingRequirements {
+	if in == nil {
+		return &abstract.HostSizingRequirements{}
+	}
 	return &abstract.HostSizingRequirements{
 		MinCores:    int(in.MinCpuCount),
 		MaxCores:    int(in.MaxCpuCount),
@@ -78,7 +85,11 @@ func HostSizingRequirementsFromProtocolToAbstract(in protocol.HostSizing) *abstr
 	}
 }
 
-func NFSExportOptionsFromProtocolToString(in protocol.NFSExportOptions) string {
+func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string {
+	if in == nil {
+		return "rw,async"
+	}
+
 	var out string
 	if in.ReadOnly {
 		out += "ro,"

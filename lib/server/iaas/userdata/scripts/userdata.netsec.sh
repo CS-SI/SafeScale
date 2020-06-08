@@ -250,7 +250,7 @@ update_fqdn() {
     IF=${PR_IFs[0]}
     [ -z ${IF} ] && return
     IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    ping -n -c1 -w5 {{ .HostName }} 2>/dev/null || echo "$IP {{ .HostName }}" >>/etc/hosts
+    sed -i -nr "/^${IP}"'/!p/$a'"${IP}"'\t{{ .HostName }}' /etc/hosts
 }
 
 configure_network() {

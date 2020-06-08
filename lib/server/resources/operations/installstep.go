@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"text/template"
 	"time"
@@ -27,13 +28,16 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -289,7 +293,24 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
 				return nil, xerr
 			}
-			cloneV["Hostname"] = h.SafeGetName()
+
+			cloneV["ShortHostname"] = h.SafeGetName()
+			domain := ""
+			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					domain = hostDescriptionV1.Domain
+					if domain != "" {
+						domain = "." + domain
+					}
+					return nil
+				})
+			})
+			cloneV["Hostname"] = h.SafeGetName() + domain
+
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
 			}
@@ -329,7 +350,23 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
 				return nil, xerr
 			}
-			cloneV["Hostname"] = h.SafeGetName()
+			cloneV["ShortHostname"] = h.SafeGetName()
+			domain := ""
+			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					domain = hostDescriptionV1.Domain
+					if domain != "" {
+						domain = "." + domain
+					}
+					return nil
+				})
+			})
+			cloneV["Hostname"] = h.SafeGetName() + domain
+
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
 			}

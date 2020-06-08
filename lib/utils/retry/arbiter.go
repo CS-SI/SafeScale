@@ -82,10 +82,10 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 func Unsuccessful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
-			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
 			return verdict.Retry, nil
@@ -99,10 +99,10 @@ func Unsuccessful() Arbiter {
 func UnsuccessfulWhereRetcode255() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(fail.ErrAborted); ok {
+			if _, ok := t.Err.(*fail.ErrAborted); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
-			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
 			_, retCode, _ := utils.ExtractRetCode(t.Err)
@@ -118,10 +118,10 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err == nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
-			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
 
@@ -135,10 +135,10 @@ func Successful() Arbiter {
 func Timeout(limit time.Duration) Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
-			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
 
@@ -155,10 +155,10 @@ func Timeout(limit time.Duration) Arbiter {
 func Max(limit uint) Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			if _, ok := t.Err.(ErrStopRetry); ok {
+			if _, ok := t.Err.(*ErrStopRetry); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
-			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, fail.ToError(t.Err)
 			}
 

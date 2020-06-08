@@ -334,7 +334,7 @@ func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
 
 	theNetwork, xerr := s.GetNetwork(ref)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}
@@ -368,7 +368,7 @@ func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
 	xerr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
-		case fail.ErrTimeout:
+		case *fail.ErrTimeout:
 			logrus.Warnf("ErrTimeout waiting for subnetwork deletion")
 			return xerr
 		default:

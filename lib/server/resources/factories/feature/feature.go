@@ -76,7 +76,7 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 
 	feat, err := operations.NewFeature(task, name)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); !ok {
+		if _, ok := err.(*fail.ErrNotFound); !ok {
 			return nil, err
 		}
 

@@ -53,7 +53,7 @@ func newFolder(svc iaas.Service, path string) (*folder, fail.Error) {
 
 	cryptKey, xerr := svc.GetMetadataKey()
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
 		}
 	} else {
@@ -129,7 +129,7 @@ func (f *folder) Delete(path string, name string) fail.Error {
 func (f *folder) Read(path string, name string, callback func([]byte) fail.Error) fail.Error {
 	xerr := f.Search(path, name)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); ok {
+		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return xerr
 		}
 		return fail.Wrap(xerr, "failed to search in Metadata Storage")

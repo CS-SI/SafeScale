@@ -291,7 +291,7 @@ func (pbc *PipeBridgeController) Stop() fail.Error {
 		err = pbc.Wait()
 		if err != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it
-			if _, ok = err.(fail.ErrAborted); !ok {
+			if _, ok = err.(*fail.ErrAborted); !ok {
 				return err
 			}
 		}

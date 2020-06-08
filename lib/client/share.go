@@ -31,7 +31,7 @@ type share struct {
 }
 
 // Create ...
-func (n *share) Create(def protocol.ShareDefinition, timeout time.Duration) error {
+func (n *share) Create(def *protocol.ShareDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -40,7 +40,7 @@ func (n *share) Create(def protocol.ShareDefinition, timeout time.Duration) erro
 		return xerr
 	}
 
-	_, err := service.Create(ctx, &def)
+	_, err := service.Create(ctx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "creation of share", true)
 	}
@@ -82,7 +82,7 @@ func (n *share) List(timeout time.Duration) (*protocol.ShareList, error) {
 }
 
 // Mount ...
-func (n *share) Mount(def protocol.ShareMountDefinition, timeout time.Duration) error {
+func (n *share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -91,7 +91,7 @@ func (n *share) Mount(def protocol.ShareMountDefinition, timeout time.Duration) 
 		return xerr
 	}
 
-	_, err := service.Mount(ctx, &def)
+	_, err := service.Mount(ctx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "mount of share", true)
 	}
@@ -99,7 +99,7 @@ func (n *share) Mount(def protocol.ShareMountDefinition, timeout time.Duration) 
 }
 
 // Unmount ...
-func (n *share) Unmount(def protocol.ShareMountDefinition, timeout time.Duration) error {
+func (n *share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -108,7 +108,7 @@ func (n *share) Unmount(def protocol.ShareMountDefinition, timeout time.Duration
 		return xerr
 	}
 
-	_, err := service.Unmount(ctx, &def)
+	_, err := service.Unmount(ctx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "unmount of share", true)
 	}

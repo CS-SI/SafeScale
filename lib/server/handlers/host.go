@@ -277,8 +277,8 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.
 
 	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); ok {
-			return nil, nil
+		if _, ok := xerr.(*fail.ErrNotFound); ok {
+			return nil, abstract.ResourceNotFoundError("host", ref)
 		}
 		return nil, xerr
 	}

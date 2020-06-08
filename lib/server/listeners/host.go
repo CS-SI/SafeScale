@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -270,20 +271,40 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			return nil, err
 		}
 	} else if in.Sizing != nil {
-		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(*in.Sizing)
+		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Sizing)
 	}
 	if sizing == nil {
 		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
 	sizing.Image = in.GetImageId()
 
-	network, err := networkfactory.Load(task, job.SafeGetService(), in.GetNetwork())
-	if err != nil {
-		return nil, err
+	network, xerr := networkfactory.Load(task, job.SafeGetService(), in.GetNetwork())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	domain := in.Domain
+	if domain == "" {
+		xerr = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			an, ok := clonable.(*abstract.Network)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			domain = an.Domain
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+	domain = strings.Trim(domain, ".")
+	if domain != "" {
+		domain = "." + domain
 	}
 
 	hostReq := abstract.HostRequest{
 		ResourceName:  name,
+		HostName:      name + domain,
 		PublicIP:      in.GetPublic(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}

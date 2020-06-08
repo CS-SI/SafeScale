@@ -124,7 +124,7 @@ func (h *host) Stop(name string, timeout time.Duration) error {
 }
 
 // Create creates a new host
-func (h *host) Create(req protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
+func (h *host) Create(req *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -134,7 +134,7 @@ func (h *host) Create(req protocol.HostDefinition, timeout time.Duration) (*prot
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Create(ctx, &req)
+	return service.Create(ctx, req)
 }
 
 // Delete deletes several hosts at the same time in goroutines
@@ -204,7 +204,7 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 	return sshCfg, err
 }
 
-func (h *host) Resize(def protocol.HostDefinition, duration time.Duration) (*protocol.Host, error) {
+func (h *host) Resize(def *protocol.HostDefinition, duration time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -214,7 +214,7 @@ func (h *host) Resize(def protocol.HostDefinition, duration time.Duration) (*pro
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Resize(ctx, &def)
+	return service.Resize(ctx, def)
 }
 
 func (h *host) ListFeatures(hostRef string, installedOnly bool) (*protocol.FeatureListResponse, error) {
@@ -235,7 +235,7 @@ func (h *host) ListFeatures(hostRef string, installedOnly bool) (*protocol.Featu
 	return service.List(ctx, &req)
 }
 
-func (h *host) CheckFeature(hostRef, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+func (h *host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -244,19 +244,19 @@ func (h *host) CheckFeature(hostRef, featureName string, params map[string]strin
 		return xerr
 	}
 
-	req := protocol.FeatureActionRequest{
-		Action:     protocol.FeatureAction_FA_CHECK,
+	req := &protocol.FeatureActionRequest{
+		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
 		TargetRef:  &protocol.Reference{Name: hostRef},
 		Variables:  params,
-		Settings:   &settings,
+		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	_, err := service.Add(ctx, &req)
+	_, err := service.Check(ctx, req)
 	return err
 }
 
-func (h *host) AddFeature(hostRef, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+func (h *host) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -265,19 +265,19 @@ func (h *host) AddFeature(hostRef, featureName string, params map[string]string,
 		return xerr
 	}
 
-	def := protocol.FeatureActionRequest{
-		Action:     protocol.FeatureAction_FA_ADD,
+	req := &protocol.FeatureActionRequest{
+		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
 		TargetRef:  &protocol.Reference{Name: hostRef},
 		Variables:  params,
-		Settings:   &settings,
+		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	_, err := service.Add(ctx, &def)
+	_, err := service.Add(ctx, req)
 	return err
 }
 
-func (h *host) RemoveFeature(hostRef, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+func (h *host) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -286,14 +286,14 @@ func (h *host) RemoveFeature(hostRef, featureName string, params map[string]stri
 		return xerr
 	}
 
-	def := protocol.FeatureActionRequest{
-		Action:     protocol.FeatureAction_FA_REMOVE,
+	req := &protocol.FeatureActionRequest{
+		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
 		TargetRef:  &protocol.Reference{Name: hostRef},
 		Variables:  params,
-		Settings:   &settings,
+		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	_, err := service.Add(ctx, &def)
+	_, err := service.Remove(ctx, req)
 	return fail.ToError(err)
 }

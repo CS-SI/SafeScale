@@ -21,6 +21,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -34,6 +36,10 @@ type cluster struct {
 
 // List ...
 func (c *cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -46,7 +52,14 @@ func (c *cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, er
 }
 
 // Inspect ...
-func (c *cluster) Inspect(name string, timeout time.Duration) (*protocol.ClusterResponse, error) {
+func (c *cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.ClusterResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -55,12 +68,19 @@ func (c *cluster) Inspect(name string, timeout time.Duration) (*protocol.Cluster
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &protocol.Reference{Name: name})
+	return service.Inspect(ctx, &protocol.Reference{Name: clusterName})
 
 }
 
 // GetState gets cluster status
-func (c *cluster) GetState(name string, timeout time.Duration) (*protocol.ClusterStateResponse, error) {
+func (c *cluster) GetState(clusteName string, timeout time.Duration) (*protocol.ClusterStateResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if clusteName == "" {
+		return nil, fail.InvalidParameterError("clusteName", "cannot be empty string")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -69,7 +89,7 @@ func (c *cluster) GetState(name string, timeout time.Duration) (*protocol.Cluste
 		return nil, err
 	}
 
-	return service.State(ctx, &protocol.Reference{Name: name})
+	return service.State(ctx, &protocol.Reference{Name: clusteName})
 }
 
 // // Reboots cluster
@@ -86,8 +106,12 @@ func (c *cluster) GetState(name string, timeout time.Duration) (*protocol.Cluste
 // 	return err
 // }
 
-// Start cluster
-func (c *cluster) Start(name string, timeout time.Duration) error {
+// Start starts all the hosts of the cluster
+func (c *cluster) Start(clusterName string, timeout time.Duration) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -96,11 +120,16 @@ func (c *cluster) Start(name string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Start(ctx, &protocol.Reference{Name: name})
+	_, err := service.Start(ctx, &protocol.Reference{Name: clusterName})
 	return err
 }
 
-func (c *cluster) Stop(name string, timeout time.Duration) error {
+// Stop stops all the hosts of the cluster
+func (c *cluster) Stop(clusterName string, timeout time.Duration) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -109,12 +138,19 @@ func (c *cluster) Stop(name string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Stop(ctx, &protocol.Reference{Name: name})
+	_, err := service.Stop(ctx, &protocol.Reference{Name: clusterName})
 	return err
 }
 
 // Create ...
-func (c *cluster) Create(def protocol.ClusterCreateRequest, timeout time.Duration) (*protocol.ClusterResponse, error) {
+func (c *cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duration) (*protocol.ClusterResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if def == nil {
+		return nil, fail.InvalidParameterError("def", "cannot be nil")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -124,11 +160,15 @@ func (c *cluster) Create(def protocol.ClusterCreateRequest, timeout time.Duratio
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Create(ctx, &def)
+	return service.Create(ctx, def)
 }
 
 // Delete deletes a cluster
-func (c *cluster) Delete(name string, timeout time.Duration) error {
+func (c *cluster) Delete(clusterName string, timeout time.Duration) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -138,12 +178,19 @@ func (c *cluster) Delete(name string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewHostServiceClient(c.session.connection)
-	_, err := service.Delete(ctx, &protocol.Reference{Name: name})
+	_, err := service.Delete(ctx, &protocol.Reference{Name: clusterName})
 	return err
 }
 
 // Expand ...
-func (c *cluster) Expand(def protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
+func (c *cluster) Expand(req *protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if req == nil {
+		return nil, fail.InvalidParameterError("req", "cannot be nil")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -153,11 +200,18 @@ func (c *cluster) Expand(def protocol.ClusterResizeRequest, duration time.Durati
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Expand(ctx, &def)
+	return service.Expand(ctx, req)
 }
 
 // Shrink ...
-func (c *cluster) Shrink(def protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
+func (c *cluster) Shrink(req *protocol.ClusterResizeRequest, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if req == nil {
+		return nil, fail.InvalidParameterError("req", "cannot be nil")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -167,11 +221,21 @@ func (c *cluster) Shrink(def protocol.ClusterResizeRequest, duration time.Durati
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.Shrink(ctx, &def)
+	return service.Shrink(ctx, req)
 }
 
 // CheckFeature ...
-func (c *cluster) CheckFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+func (c *cluster) CheckFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+	if featureName == "" {
+		return fail.InvalidParameterError("featureName", "cannot be empty string")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -180,20 +244,30 @@ func (c *cluster) CheckFeature(clusterName, featureName string, params map[strin
 		return xerr
 	}
 
-	req := protocol.FeatureActionRequest{
-		Action:     protocol.FeatureAction_FA_CHECK,
+	req := &protocol.FeatureActionRequest{
+		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
 		TargetRef:  &protocol.Reference{Name: clusterName},
 		Variables:  params,
-		Settings:   &settings,
+		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(c.session.connection)
-	_, err := service.Check(ctx, &req)
+	_, err := service.Check(ctx, req)
 	return err
 }
 
 // AddFeature ...
-func (c *cluster) AddFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+func (c *cluster) AddFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+	if featureName == "" {
+		return fail.InvalidParameterError("featureName", "cannot be empty string")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 	ctx, xerr := utils.GetContext(true)
@@ -201,20 +275,30 @@ func (c *cluster) AddFeature(clusterName, featureName string, params map[string]
 		return xerr
 	}
 
-	req := protocol.FeatureActionRequest{
-		Action:     protocol.FeatureAction_FA_ADD,
+	req := &protocol.FeatureActionRequest{
+		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
 		TargetRef:  &protocol.Reference{Name: clusterName},
 		Variables:  params,
-		Settings:   &settings,
+		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(c.session.connection)
-	_, err := service.Add(ctx, &req)
+	_, err := service.Add(ctx, req)
 	return err
 }
 
 // RemoveFeature ...
-func (c *cluster) RemoveFeature(clusterName, featureName string, params map[string]string, settings protocol.FeatureSettings, duration time.Duration) error {
+func (c *cluster) RemoveFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+	if featureName == "" {
+		return fail.InvalidParameterError("featureName", "cannot be empty string")
+	}
+
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -223,14 +307,14 @@ func (c *cluster) RemoveFeature(clusterName, featureName string, params map[stri
 		return xerr
 	}
 
-	req := protocol.FeatureActionRequest{
-		Action:     protocol.FeatureAction_FA_REMOVE,
+	req := &protocol.FeatureActionRequest{
+		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
 		TargetRef:  &protocol.Reference{Name: clusterName},
 		Variables:  params,
-		Settings:   &settings,
+		Settings:   settings,
 	}
 	service := protocol.NewFeatureServiceClient(c.session.connection)
-	_, err := service.Remove(ctx, &req)
+	_, err := service.Remove(ctx, req)
 	return err
 }

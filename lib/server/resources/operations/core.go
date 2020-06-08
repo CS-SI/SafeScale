@@ -276,7 +276,7 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 		func() error {
 			inErr := c.readByReference(task, ref)
 			if inErr != nil {
-				if _, ok := inErr.(fail.ErrNotFound); ok {
+				if _, ok := inErr.(*fail.ErrNotFound); ok {
 					return inErr
 				}
 				return retry.StopRetryError(inErr)
@@ -287,9 +287,9 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 	)
 	if xerr != nil {
 		switch xerr.(type) {
-		case retry.ErrTimeout:
+		case *retry.ErrTimeout:
 			return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
-		case retry.ErrStopRetry:
+		case *retry.ErrStopRetry:
 			return fail.ToError(xerr.Cause())
 		default:
 			return xerr
@@ -303,14 +303,23 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 // readByReference gets the data from Object Storage
 // if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
 func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
+	var (
+		errors []error
+		ok     bool
+	)
 	if xerr = c.readByID(task, ref); xerr != nil {
-		var ok bool
-		if _, ok = xerr.(fail.ErrNotFound); !ok {
-			return xerr
+		if _, ok = xerr.(*fail.ErrNotFound); !ok {
+			errors = append(errors, xerr)
 		}
 		xerr = c.readByName(task, ref)
+		if _, ok = xerr.(*fail.ErrNotFound); !ok {
+			errors = append(errors, xerr)
+		}
 	}
-	return xerr
+	if xerr != nil {
+		return fail.NewErrorList(errors)
+	}
+	return nil
 }
 
 // readByID reads a metadata identified by ID from Object Storage
@@ -356,7 +365,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 	}
 
 	if xerr := c.readByID(task, c.SafeGetID()); xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); ok {
+		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return fail.NotFoundError("the metadata of %s '%s' vanished", c.kind, c.name)
 		}
 		return xerr
@@ -400,7 +409,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 	// Checks entries exist in Object Storage
 	if xerr := c.folder.Search(byIDFolderName, id); xerr != nil {
 		// If not found, consider it not an error
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	} else {
@@ -409,7 +418,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 
 	if xerr := c.folder.Search(byNameFolderName, name); xerr != nil {
 		// If entry not found, consider it not an error
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	} else {

@@ -13,7 +13,7 @@ import (
 type ErrTimeout = fail.ErrTimeout
 
 // TimeoutError ...
-func TimeoutError(err error, limit time.Duration) fail.Error {
+func TimeoutError(err error, limit time.Duration) *ErrTimeout {
 	msg := fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit))
 	return fail.TimeoutError(err, limit, msg)
 }
@@ -22,7 +22,7 @@ func TimeoutError(err error, limit time.Duration) fail.Error {
 type ErrLimit = fail.ErrOverflow
 
 // LimitError ...
-func LimitError(err error, limit uint) fail.Error {
+func LimitError(err error, limit uint) *ErrLimit {
 	return fail.OverflowError(err, limit, "retry limit exceeded")
 }
 
@@ -30,7 +30,7 @@ func LimitError(err error, limit uint) fail.Error {
 type ErrStopRetry = fail.ErrAborted
 
 // StopRetryError ...
-func StopRetryError(err error, msg ...interface{}) fail.Error {
+func StopRetryError(err error, msg ...interface{}) *ErrStopRetry {
 	newMessage := strprocess.FormatStrings(msg...)
 	if newMessage == "" {
 		newMessage = "stopping retries"

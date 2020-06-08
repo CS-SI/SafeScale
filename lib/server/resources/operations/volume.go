@@ -98,7 +98,7 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 	)
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(retry.ErrTimeout); ok {
+		if _, ok := xerr.(*retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of rv '%s'", ref)
 			xerr = fail.NotFoundError("failed to load metadata of rv '%s': timeout", ref)
 		}
@@ -254,7 +254,7 @@ func (objv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 		svc := objv.SafeGetService()
 		innerXErr = svc.DeleteVolume(objv.SafeGetID())
 		if innerXErr != nil {
-			if _, ok := innerXErr.(fail.ErrNotFound); !ok {
+			if _, ok := innerXErr.(*fail.ErrNotFound); !ok {
 				return fail.Wrap(innerXErr, "cannot delete volume")
 			}
 			logrus.Warnf("Unable to find the volume on provider side, cleaning up metadata")
@@ -481,7 +481,7 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		2*time.Minute,
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(retry.ErrTimeout); ok {
+		if _, ok := retryErr.(*retry.ErrTimeout); ok {
 			return retryErr
 		}
 		return fail.Wrap(retryErr, fmt.Sprintf("failed to confirm the disk attachment after %s", 2*time.Minute))

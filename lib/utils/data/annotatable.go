@@ -24,6 +24,7 @@ type Annotation interface{}
 // Annotations ...
 type Annotations Map
 
+// Annotatable ...
 type Annotatable interface {
 	Annotate(key string, value Annotation) Annotatable // adds an annotation to instance, returning instance
 	Annotations() Annotations                          // gives the annotations

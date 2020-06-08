@@ -19,7 +19,7 @@ ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
 endif
 
-all:	sdk lib/protocol lib/system lib/utils lib/server lib/client
+all:	lib/protocol lib/system lib/utils lib/server lib/client sdk
 
 vet:
 	@$(GO) vet ./...

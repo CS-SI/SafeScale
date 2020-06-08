@@ -252,7 +252,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case fail.ErrTimeout:
+		case *fail.ErrTimeout:
 			return nil, retryErr
 		default:
 			return nil, fail.Wrap(retryErr, "error listing templates")
@@ -580,7 +580,7 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
 			net, xerr := s.GetNetwork(netid)
 			if xerr != nil {
 				switch xerr.(type) {
-				case fail.ErrNotFound:
+				case *fail.ErrNotFound:
 					logrus.Errorf(xerr.Error())
 					errors = append(errors, xerr)
 				default:
@@ -834,9 +834,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			derr := s.DeleteHost(ahc.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case fail.ErrNotFound:
+				case *fail.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-				case fail.ErrTimeout:
+				case *fail.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
@@ -1051,9 +1051,9 @@ func (s *Stack) WaitHostState(hostParam interface{}, state hoststate.Enum, timeo
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case fail.ErrTimeout:
+		case *fail.ErrTimeout:
 			return nil, fail.TimeoutError(retryErr.Cause(), timeout, "timeout waiting to get host '%s' information after %v", hostRef, timeout)
-		case fail.ErrAborted:
+		case *fail.ErrAborted:
 			return nil, retryErr
 		default:
 			return nil, retryErr
@@ -1225,7 +1225,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 					temporal.GetContextTimeout(),
 				)
 				if innerErr != nil {
-					if _, ok := innerErr.(fail.ErrTimeout); ok {
+					if _, ok := innerErr.(*fail.ErrTimeout); ok {
 						// retry deletion...
 						return abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout())
 					}

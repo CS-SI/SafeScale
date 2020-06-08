@@ -103,7 +103,7 @@ func (n *network) Inspect(name string, timeout time.Duration) (*protocol.Network
 }
 
 // Create ...
-func (n *network) Create(def protocol.NetworkDefinition, timeout time.Duration) (*protocol.Network, error) {
+func (n *network) Create(def *protocol.NetworkDefinition, timeout time.Duration) (*protocol.Network, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
@@ -112,5 +112,5 @@ func (n *network) Create(def protocol.NetworkDefinition, timeout time.Duration) 
 		return nil, xerr
 	}
 
-	return service.Create(ctx, &def)
+	return service.Create(ctx, def)
 }

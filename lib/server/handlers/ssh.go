@@ -142,7 +142,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 
 				gw, pgwErr := rn.GetGateway(task, true)
 				if pgwErr != nil {
-					if _, ok := pgwErr.(fail.ErrNotFound); !ok {
+					if _, ok := pgwErr.(*fail.ErrNotFound); !ok {
 						return pgwErr
 					}
 				} else {
@@ -172,7 +172,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 
 				gw, sgwErr := rn.GetGateway(task, false)
 				if sgwErr != nil {
-					if _, ok := sgwErr.(fail.ErrNotFound); !ok || sshConfig.GatewayConfig == nil {
+					if _, ok := sgwErr.(*fail.ErrNotFound); !ok || sshConfig.GatewayConfig == nil {
 						return sgwErr
 					}
 				} else {

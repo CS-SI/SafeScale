@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -473,7 +473,7 @@ var clusterCreateCommand = &cli.Command{
 			MasterSizing:  mastersDef,
 			NodeSizing:    nodesDef,
 		}
-		res, err := client.New().Cluster.Create(req, temporal.GetLongOperationTimeout())
+		res, err := client.New().Cluster.Create(&req, temporal.GetLongOperationTimeout())
 		// clusterInstance, err := cluster.Create(concurrency.RootTask(), resources.ClusterRequest{
 		// 	Name:                    clusterName,
 		// 	Complexity:              comp,
@@ -680,7 +680,7 @@ var clusterExpandCommand = &cli.Command{
 			NodeSizing: nodesDef,
 			ImageId:    los,
 		}
-		hosts, err := client.New().Cluster.Expand(req, temporal.GetLongOperationTimeout())
+		hosts, err := client.New().Cluster.Expand(&req, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -746,7 +746,7 @@ var clusterShrinkCommand = &cli.Command{
 			Name:  clusterName,
 			Count: int32(count),
 		}
-		_, err = client.New().Cluster.Shrink(req, temporal.GetLongOperationTimeout())
+		_, err = client.New().Cluster.Shrink(&req, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1073,7 +1073,7 @@ var clusterAddFeatureCommand = &cli.Command{
 
 		settings := protocol.FeatureSettings{}
 		settings.SkipProxy = c.Bool("skip-proxy")
-		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, settings, 0)
+		err = client.New().Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
@@ -1117,7 +1117,7 @@ var clusterCheckFeatureCommand = &cli.Command{
 		}
 
 		settings := protocol.FeatureSettings{}
-		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, settings, 0)
+		err = client.New().Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error checking feature '%s' on host '%s': %s", featureName, hostName, err.Error())
@@ -1166,7 +1166,7 @@ var clusterRemoveFeatureCommand = &cli.Command{
 		// will try to apply them... Quick fix: Setting SkipProxy to true prevent this
 		settings.SkipProxy = true
 
-		err = client.New().Cluster.RemoveFeature(clusterName, featureName, values, settings, 0)
+		err = client.New().Cluster.RemoveFeature(clusterName, featureName, values, &settings, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("error removing feature '%s' on host '%s': %s", featureName, hostName, err.Error())

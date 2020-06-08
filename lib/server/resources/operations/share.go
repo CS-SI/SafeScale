@@ -148,7 +148,7 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.S
 	)
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(retry.ErrTimeout); ok {
+		if _, ok := xerr.(*retry.ErrTimeout); ok {
 			logrus.Debugf("timeout reading metadata of rs '%s'", ref)
 			xerr = fail.NotFoundError("failed to load metadata of rs '%s': timeout", ref)
 		}
@@ -266,7 +266,7 @@ func (objs *share) Create(
 
 	// Check if a share already exists with the same name
 	if _, xerr = server.GetShare(task, shareName); xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}

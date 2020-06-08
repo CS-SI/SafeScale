@@ -148,7 +148,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
 
 	libvirtNetwork, err := getNetworkFromRef(name, s.LibvirtService)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); !ok {
+		if _, ok := err.(*fail.ErrNotFound); !ok {
 			return nil, err
 		}
 	}

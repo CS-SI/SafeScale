@@ -114,7 +114,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	)
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(retry.ErrTimeout); ok {
+		if _, ok := xerr.(*retry.ErrTimeout); ok {
 			xerr = fail.NotFoundError("metadata of host '%s' not found", ref)
 		}
 		return nullHost(), xerr
@@ -189,7 +189,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 				// Secondary gateway may not exist...
 				objgw, xerr = objn.GetGateway(task, false)
 				if xerr != nil {
-					if _, ok := xerr.(fail.ErrNotFound); !ok {
+					if _, ok := xerr.(*fail.ErrNotFound); !ok {
 						return xerr
 					}
 				} else {
@@ -321,7 +321,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// Check if host exists and is managed bySafeScale
 	if _, xerr = LoadHost(task, svc, hostReq.ResourceName); xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, fail.Wrap(xerr, "failed to check if it already exists")
 		}
 	} else {
@@ -330,7 +330,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// Check if host exists but is not managed by SafeScale
 	if _, xerr = svc.GetHostByName(hostReq.ResourceName); xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, fail.Wrap(xerr, "failed to check if host resource name '%s' is already used", hostReq.ResourceName)
 		}
 	} else {
@@ -422,7 +422,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	hostReq.Password = "safescale" // VPL:for debugging purpose, remove if you see this!
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrInvalidRequest); ok {
+		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
 			return nil, xerr
 		}
 		return nil, fail.Wrap(xerr, "failed to create compute resource '%s'", hostReq.ResourceName)
@@ -525,7 +525,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// TODO: configurable timeout here
 	status, xerr := rh.waitInstallPhase(task, userdata.PHASE1_INIT)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrTimeout); ok {
+		if _, ok := xerr.(*fail.ErrTimeout); ok {
 			return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
 		}
 		if abstract.IsProvisioningError(xerr) {
@@ -593,7 +593,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 		// TODO: configurable timeout here
 		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL); xerr != nil {
-			if _, ok := xerr.(fail.ErrTimeout); ok {
+			if _, ok := xerr.(*fail.ErrTimeout); ok {
 				return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
 			}
 			if abstract.IsProvisioningError(xerr) {
@@ -605,7 +605,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	} else {
 		// TODO: configurable timeout here
 		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY); xerr != nil {
-			if _, ok := xerr.(fail.ErrTimeout); ok {
+			if _, ok := xerr.(*fail.ErrTimeout); ok {
 				return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
 			}
 			if abstract.IsProvisioningError(xerr) {
@@ -663,7 +663,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase) (s
 	// TODO: configurable timeout here
 	status, xerr := sshCfg.WaitServerReady(task, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrTimeout); ok {
+		if _, ok := xerr.(*fail.ErrTimeout); ok {
 			return status, fail.Wrap(xerr, "ErrTimeout creating a host")
 		}
 		if abstract.IsProvisioningError(xerr) {
@@ -929,7 +929,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 				// FIXME: need to remove retry from svc.DeleteHost!
 				err := svc.DeleteHost(hostID)
 				if err != nil {
-					if _, ok := err.(fail.ErrNotFound); !ok {
+					if _, ok := err.(*fail.ErrNotFound); !ok {
 						return fail.Wrap(err, "cannot delete host")
 					}
 					// logrus.Warn("host resource not found on provider side, host metadata will be removed for consistency")
@@ -974,7 +974,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 	// Deletes metadata from Object Storage
 	if xerr = rh.core.Delete(task); xerr != nil {
 		// If entry not found, considered as success
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}
@@ -1039,7 +1039,7 @@ func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connec
 		func() error {
 			var innerXErr fail.Error
 			retCode, stdOut, stdErr, innerXErr = run(task, ssh, cmd, outs, executionTimeout)
-			if _, ok := innerXErr.(fail.ErrTimeout); ok {
+			if _, ok := innerXErr.(*fail.ErrTimeout); ok {
 				innerXErr = fail.NewError("failed to run command in %v delay", executionTimeout)
 			}
 			return innerXErr
@@ -1064,7 +1064,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 
 	retcode, stdout, stderr, xerr := sshCmd.RunWithTimeout(task, outs, timeout)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrExecution); ok {
+		if _, ok := xerr.(*fail.ErrExecution); ok {
 			// Adds stdout annotation to xerr
 			_ = xerr.Annotate("stdout", stdout)
 		}
@@ -1733,7 +1733,28 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 		return fail.InvalidParameterError("v", "cannot be nil")
 	}
 
-	v["Hostname"] = rh.SafeGetName()
+	v["ShortHostname"] = rh.SafeGetName()
+	domain := ""
+	xerr := rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			domain = hostDescriptionV1.Domain
+
+			if domain != "" {
+				domain = "." + domain
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	v["Hostname"] = rh.SafeGetName() + domain
+
 	v["HostIP"] = rh.SafeGetPrivateIP(task)
 	v["PublicIP"] = rh.SafeGetPublicIP(task)
 
@@ -1743,7 +1764,7 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 
 	// FIXME: gateway stuff has to be refactored (2 gateways possible)
 	var rn resources.Network
-	xerr := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			networkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
@@ -1771,7 +1792,7 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 
 	rgw, xerr = rn.GetGateway(task, false)
 	if xerr != nil {
-		if _, ok := xerr.(fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	} else {
@@ -1865,7 +1886,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 	)
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
-		if _, ok := retryErr.(retry.ErrTimeout); ok {
+		if _, ok := retryErr.(*retry.ErrTimeout); ok {
 			return fail.Wrap(retryErr, "timeout trying to copy temporary file to '%s'", to)
 		}
 		return xerr
@@ -1897,7 +1918,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
-			case retry.ErrTimeout:
+			case *retry.ErrTimeout:
 				return xerr
 			default:
 				return fail.Wrap(retryErr, "failed to change rights of file '%s' on host '%s'", filename, hostName)

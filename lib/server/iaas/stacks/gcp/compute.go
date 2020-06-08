@@ -351,7 +351,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 					killErr := s.DeleteHost(server.ID)
 					if killErr != nil {
 						switch killErr.(type) {
-						case fail.ErrTimeout:
+						case *fail.ErrTimeout:
 							logrus.Error("ErrTimeout cleaning up gcp instance")
 						default:
 							logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
@@ -387,7 +387,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 				killErr := s.DeleteHost(hostCore.ID)
 				if killErr != nil {
 					switch killErr.(type) {
-					case fail.ErrTimeout:
+					case *fail.ErrTimeout:
 						logrus.Error("ErrTimeout cleaning up gcp instance")
 					default:
 						logrus.Errorf("Something else happened to gcp instance: %+v", killErr)
@@ -423,9 +423,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			derr := s.DeleteHost(hostCore.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case fail.ErrNotFound:
+				case *fail.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", hostCore.Name, derr)
-				case fail.ErrTimeout:
+				case *fail.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", hostCore.Name, derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", hostCore.Name, derr)
@@ -474,7 +474,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (xer
 		timeout,
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(retry.ErrTimeout); ok {
+		if _, ok := retryErr.(*retry.ErrTimeout); ok {
 			return abstract.ResourceTimeoutError("host", ahc.Name, timeout)
 		}
 		return retryErr
@@ -814,7 +814,7 @@ func (s *Stack) DeleteHost(id string) (xerr fail.Error) {
 	)
 
 	if waitErr != nil {
-		logrus.Error(fail.Cause(waitErr))
+		logrus.Error(fail.RootCause(waitErr))
 	}
 
 	return xerr
