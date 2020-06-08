@@ -245,7 +245,7 @@ var networkCreate = cli.Command{
 				Sizing:  def.Sizing,
 			},
 		}
-		network, err := client.New().Network.Create(netdef, temporal.GetExecutionTimeout())
+		network, err := client.New().Network.Create(&netdef, temporal.GetExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(utils.Capitalize(client.DecorateError(err, "creation of network", true).Error())))
 		}

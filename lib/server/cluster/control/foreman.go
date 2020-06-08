@@ -80,9 +80,9 @@ var (
 // Makers ...
 type Makers struct {
 	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)   // returns masterCount, pruvateNodeCount, publicNodeCount
-	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) pb.HostDefinition // sizing of Gateway(s)
-	DefaultMasterSizing         func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of master(s)
-	DefaultNodeSizing           func(task concurrency.Task, b Foreman) pb.HostDefinition // default sizing of node(s)
+	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) *pb.HostDefinition // sizing of Gateway(s)
+	DefaultMasterSizing         func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of master(s)
+	DefaultNodeSizing           func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of node(s)
 	DefaultImage                func(task concurrency.Task, b Foreman) string            // default image of server(s)
 	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType nodetype.Enum) (string, map[string]interface{})
 	GetGlobalSystemRequirements func(task concurrency.Task, f Foreman) (string, error)
@@ -236,7 +236,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 	gatewaysDefault.ImageId = imageID
-	gatewaysDef := complementHostDefinition(req.GatewaysDef, *gatewaysDefault)
+	gatewaysDef := complementHostDefinition(req.GatewaysDef, gatewaysDefault)
 
 	// Determine master sizing
 	var mastersDefault *pb.HostDefinition
@@ -256,7 +256,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 	// Note: no way yet to define master sizing from cli...
 	mastersDefault.ImageId = imageID
-	mastersDef := complementHostDefinition(req.MastersDef, *mastersDefault)
+	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault)
 
 	// Determine node sizing
 	var nodesDefault *pb.HostDefinition
@@ -275,7 +275,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 	nodesDefault.ImageId = imageID
-	nodesDef := complementHostDefinition(req.NodesDef, *nodesDefault)
+	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault)
 
 	// Initialize service to use
 	clientInstance := client.New()
@@ -302,16 +302,16 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	logrus.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
 	req.Name = strings.ToLower(req.Name)
 	networkName := "net-" + req.Name
-	sizing := srvutils.FromPBHostDefinitionToPBGatewayDefinition(*gatewaysDef)
+	sizing := srvutils.FromPBHostDefinitionToPBGatewayDefinition(gatewaysDef)
 	def := pb.NetworkDefinition{
 		Name:     networkName,
 		Cidr:     req.CIDR,
-		Gateway:  &sizing,
+		Gateway:  sizing,
 		FailOver: !gwFailoverDisabled,
 		Domain: req.Domain,
 	}
 	clientNetwork := clientInstance.Network
-	network, err := clientNetwork.Create(def, temporal.GetExecutionTimeout())
+	network, err := clientNetwork.Create(&def, temporal.GetExecutionTimeout())
 	if err != nil {
 		return err
 	}
@@ -399,9 +399,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	err = b.cluster.UpdateMetadata(task, func() error {
 		err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
 			defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-			defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(*gatewaysDef.Sizing)
-			defaultsV2.MasterSizing = srvutils.FromPBHostSizing(*mastersDef.Sizing)
-			defaultsV2.NodeSizing = srvutils.FromPBHostSizing(*nodesDef.Sizing)
+			defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(gatewaysDef.Sizing)
+			defaultsV2.MasterSizing = srvutils.FromPBHostSizing(mastersDef.Sizing)
+			defaultsV2.NodeSizing = srvutils.FromPBHostSizing(nodesDef.Sizing)
 			defaultsV2.Image = imageID
 			return nil
 		})
@@ -775,61 +775,58 @@ func (b *foreman) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 }
 
 // complementHostDefinition complements req with default values if needed
-func complementHostDefinition(req *pb.HostDefinition, def pb.HostDefinition) *pb.HostDefinition {
-	var finalDef pb.HostDefinition
+func complementHostDefinition(req *pb.HostDefinition, def *pb.HostDefinition) *pb.HostDefinition {
 	if req == nil {
-		finalDef = def
-	} else {
-		finalDef = *req
-		if finalDef.Sizing == nil {
-			*finalDef.Sizing = *(def.Sizing)
-		} else {
-			finalDef.Sizing = &pb.HostSizing{GpuCount: -1}
-			*finalDef.Sizing = *(req.Sizing)
-
-			if def.Sizing.MinCpuCount > 0 && finalDef.Sizing.MinCpuCount == 0 {
-				finalDef.Sizing.MinCpuCount = def.Sizing.MinCpuCount
-			}
-			if def.Sizing.MaxCpuCount > 0 && finalDef.Sizing.MaxCpuCount == 0 {
-				finalDef.Sizing.MaxCpuCount = def.Sizing.MaxCpuCount
-			}
-			if def.Sizing.MinRamSize > 0.0 && finalDef.Sizing.MinRamSize == 0.0 {
-				finalDef.Sizing.MinRamSize = def.Sizing.MinRamSize
-			}
-			if def.Sizing.MaxRamSize > 0.0 && finalDef.Sizing.MaxRamSize == 0.0 {
-				finalDef.Sizing.MaxRamSize = def.Sizing.MaxRamSize
-			}
-			if def.Sizing.MinDiskSize > 0 && finalDef.Sizing.MinDiskSize == 0 {
-				finalDef.Sizing.MinDiskSize = def.Sizing.MinDiskSize
-			}
-			if finalDef.Sizing.GpuCount <= 0 && def.Sizing.GpuCount > 0 {
-				finalDef.Sizing.GpuCount = def.Sizing.GpuCount
-			}
-			if finalDef.Sizing.MinCpuFreq == 0 && def.Sizing.MinCpuFreq > 0 {
-				finalDef.Sizing.MinCpuFreq = def.Sizing.MinCpuFreq
-			}
-			if finalDef.ImageId == "" {
-				finalDef.ImageId = def.ImageId
-			}
-
-			if finalDef.Sizing.MinCpuCount <= 0 {
-				finalDef.Sizing.MinCpuCount = 2
-			}
-			if finalDef.Sizing.MaxCpuCount <= 0 {
-				finalDef.Sizing.MaxCpuCount = 4
-			}
-			if finalDef.Sizing.MinRamSize <= 0.0 {
-				finalDef.Sizing.MinRamSize = 7.0
-			}
-			if finalDef.Sizing.MaxRamSize <= 0.0 {
-				finalDef.Sizing.MaxRamSize = 16.0
-			}
-			if finalDef.Sizing.MinDiskSize <= 0 {
-				finalDef.Sizing.MinDiskSize = 50
-			}
-		}
+		return def
 	}
-	return &finalDef
+
+	finalDef := srvutils.ClonePBHostDefinition(req)
+	if finalDef.Sizing == nil {
+		finalDef.Sizing = srvutils.ClonePBHostSizing(def.Sizing)
+		return finalDef
+	}
+
+	if def.Sizing.MinCpuCount > 0 && finalDef.Sizing.MinCpuCount == 0 {
+		finalDef.Sizing.MinCpuCount = def.Sizing.MinCpuCount
+	}
+	if def.Sizing.MaxCpuCount > 0 && finalDef.Sizing.MaxCpuCount == 0 {
+		finalDef.Sizing.MaxCpuCount = def.Sizing.MaxCpuCount
+	}
+	if def.Sizing.MinRamSize > 0.0 && finalDef.Sizing.MinRamSize == 0.0 {
+		finalDef.Sizing.MinRamSize = def.Sizing.MinRamSize
+	}
+	if def.Sizing.MaxRamSize > 0.0 && finalDef.Sizing.MaxRamSize == 0.0 {
+		finalDef.Sizing.MaxRamSize = def.Sizing.MaxRamSize
+	}
+	if def.Sizing.MinDiskSize > 0 && finalDef.Sizing.MinDiskSize == 0 {
+		finalDef.Sizing.MinDiskSize = def.Sizing.MinDiskSize
+	}
+	if finalDef.Sizing.GpuCount <= 0 && def.Sizing.GpuCount > 0 {
+		finalDef.Sizing.GpuCount = def.Sizing.GpuCount
+	}
+	if finalDef.Sizing.MinCpuFreq == 0 && def.Sizing.MinCpuFreq > 0 {
+		finalDef.Sizing.MinCpuFreq = def.Sizing.MinCpuFreq
+	}
+	if finalDef.ImageId == "" {
+		finalDef.ImageId = def.ImageId
+	}
+
+	if finalDef.Sizing.MinCpuCount <= 0 {
+		finalDef.Sizing.MinCpuCount = 2
+	}
+	if finalDef.Sizing.MaxCpuCount <= 0 {
+		finalDef.Sizing.MaxCpuCount = 4
+	}
+	if finalDef.Sizing.MinRamSize <= 0.0 {
+		finalDef.Sizing.MinRamSize = 7.0
+	}
+	if finalDef.Sizing.MaxRamSize <= 0.0 {
+		finalDef.Sizing.MaxRamSize = 16.0
+	}
+	if finalDef.Sizing.MinDiskSize <= 0 {
+		finalDef.Sizing.MinDiskSize = 50
+	}
+	return finalDef
 }
 
 // GetState returns "actively" the current state of the cluster
@@ -1730,7 +1727,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		return nil, err
 	}
 
-	hostDef := *def
+	hostDef := srvutils.ClonePBHostDefinition(def)
 	hostDef.Name, err = b.buildHostname(t, "master", nodetype.Master)
 	if err != nil {
 		return nil, err
@@ -2036,7 +2033,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Create the host
-	hostDef := *def
+	hostDef := def
 	hostDef.Name, err = b.buildHostname(t, "node", nodetype.Node)
 	if err != nil {
 		return nil, err
