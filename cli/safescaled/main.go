@@ -50,7 +50,7 @@ func cleanup(onAbort bool) {
 }
 
 // *** MAIN ***
-func work() {
+func work(version string) {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -114,7 +114,6 @@ func work() {
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
 
-	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
 	if err := s.Serve(lis); err != nil {
 		logrus.Fatalf("Failed to serve: %v", err)
@@ -127,7 +126,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "safescaled"
 	app.Usage = "safescaled [OPTIONS]"
-	app.Version = Version + ", build " + Revision + " (" + BuildDate + "), compiled with "+runtime.Version()
+	app.Version = Version + ", build " + Revision + " compiled with "+runtime.Version()+ " (" + BuildDate + ")"
 
 	app.Authors = []cli.Author{
 		cli.Author{
@@ -191,7 +190,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		work()
+		work(app.Version)
 		return nil
 	}
 
