@@ -192,7 +192,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		return nil, scerr.InconsistentError(fmt.Sprintf("More than one subnet with name %s", name))
 	}
 	if len(subnets) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("No ubnet with name %s", name))
+		return nil, scerr.NotFoundError(fmt.Sprintf("No subnet with name %s", name))
 	}
 
 	return toNetwork(&res.Subnets[0]), nil
