@@ -298,7 +298,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	result["admin_login"] = "cladm"
 
 	// Add information not directly in cluster GetConfig()
-	// TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
+	// FUTURE: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
 		clientHost := client.New().Host
@@ -318,7 +318,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		}
 		result["remote_desktop"] = remoteDesktops
 	} else {
-		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale deploy platform add-feature %s remotedesktop'.", clusterName)
+		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale platform add-feature %s remotedesktop'.", clusterName)
 	}
 
 	return result, nil
@@ -511,18 +511,21 @@ var clusterCreateCommand = cli.Command{
 				mastersDef = gatewaysDef         // ... nor for masters
 			}
 		}
-		clusterInstance, err := cluster.Create(concurrency.RootTask(), control.Request{
-			Name:                    clusterName,
-			Complexity:              clusterComplexity,
-			CIDR:                    cidr,
-			Domain: domain,
-			Flavor:                  clusterFlavor,
-			KeepOnFailure:           keep,
-			GatewaysDef:             gatewaysDef,
-			MastersDef:              mastersDef,
-			NodesDef:                nodesDef,
-			DisabledDefaultFeatures: disableFeatures,
-		})
+		clusterInstance, err := cluster.Create(
+			concurrency.RootTask(),
+			control.Request{
+				Name:                    clusterName,
+				Complexity:              clusterComplexity,
+				CIDR:                    cidr,
+				Domain: domain,
+				Flavor:                  clusterFlavor,
+				KeepOnFailure:           keep,
+				GatewaysDef:             gatewaysDef,
+				MastersDef:              mastersDef,
+				NodesDef:                nodesDef,
+				DisabledDefaultFeatures: disableFeatures,
+				},
+		)
 		if err != nil {
 			if clusterInstance != nil {
 				cluDel := clusterInstance.Delete(concurrency.RootTask())

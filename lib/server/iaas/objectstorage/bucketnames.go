@@ -19,18 +19,15 @@ package objectstorage
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"hash/fnv"
 	"os"
 	"strings"
-
-	"hash/fnv"
 )
 
 const (
 	maxBucketNameLength = 63
 	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
 	bucketNamePrefix = "0.safescale"
-	storageSuffix    = ".storage"
 	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
@@ -65,24 +62,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 
 	name = strings.ToLower(name)
 
-	logrus.Infof("Using bucket named '%s'", name)
-
-	return name, nil
-}
-
-// BuildStorageBucketName builds the name of the bucket/container that will store metadata
-func BuildStorageBucketName(driver, region, domain, project string) (name string, err error) {
-	hash := fnv.New128a()
-	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-	_, err = hash.Write([]byte(sig))
-	if err != nil {
-		return "", err
-	}
-	hashed := hex.EncodeToString(hash.Sum(nil))
-	name = bucketNamePrefix + "-" + hashed + storageSuffix
-
-	// TODO-AJ : user specific storage ?
-	name = strings.ToLower(name)
+	// logrus.Infof("Using bucket named '%s'", name)
 
 	return name, nil
 }

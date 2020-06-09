@@ -516,9 +516,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 
-	// FIXME What about cleanup ?, unit test Task class
+	// FIXME: What about cleanup ?, unit test Task class
 
-	// Step 2: awaits gateway installation end and masters installation end
+	// Step 2: waits for gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
 		_ = mastersTask.Abort() // FIXME Handle aborts
@@ -951,8 +951,8 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 			return err
 		}
 	}
-	// Not finding a callback isn't an error, so return nil in this case
 	return nil
+
 }
 
 func (b *foreman) determineRequiredNodes(task concurrency.Task) (int, int, int) {

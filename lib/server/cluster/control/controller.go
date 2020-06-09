@@ -119,16 +119,20 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 
 	c.Lock(task)
 
-	// VPL: For now, always disable addition of feature proxycache-client
 	err = c.Properties.LockForWrite(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
-		clonable.(*clusterpropsv1.Features).Disabled["proxycache"] = struct{}{}
+		featuresV1 := clonable.(*clusterpropsv1.Features)
+		// VPL: For now, always disable addition of feature proxycache
+		featuresV1.Disabled["proxycache"] = struct{}{}
+		// ENDVPL
+		for k := range req.DisabledDefaultFeatures {
+			featuresV1.Disabled[k] = struct{}{}
+		}
 		return nil
 	})
 	if err != nil {
-		log.Errorf("failed to disable feature 'proxycache': %v", err)
+		log.Errorf("failed to store disabled feature: %v", err)
 		return err
 	}
-	// ENDVPL
 
 	c.foreman = f.(*foreman)
 	c.Unlock(task)
