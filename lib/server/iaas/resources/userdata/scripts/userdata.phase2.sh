@@ -229,10 +229,10 @@ substring_diff() {
 collect_original_packages() {
   case $LINUX_KIND in
 		debian|ubuntu)
-			dpkg-query -l > ${SF_VARDIR}/log/user_data.phase1.packages.log
+			dpkg-query -l > ${SF_VARDIR}/log/packages_installed_before.phase2.list
 			;;
 	  redhat|centos)
-	    rpm -qa | sort > ${SF_VARDIR}/log/user_data.phase1.packages.log
+	    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_before.phase2.list
 	    ;;
 	  *)
 	    ;;
@@ -242,10 +242,10 @@ collect_original_packages() {
 collect_installed_packages() {
 	case $LINUX_KIND in
 		debian|ubuntu)
-			dpkg-query -l > ${SF_VARDIR}/log/user_data.phase2.packages.log
+			dpkg-query -l > ${SF_VARDIR}/log/packages_installed_after.phase2.list
 			;;
 	  redhat|centos)
-	    rpm -qa | sort > ${SF_VARDIR}/log/user_data.phase2.packages.log
+	    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_after.phase2.list
 	    ;;
 	  *)
 	    ;;
