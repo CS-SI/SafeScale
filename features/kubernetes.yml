@@ -511,6 +511,10 @@ feature:
                             oidc-username-claim: "{{ .OIDCUserName }}"
                             oidc-groups-claim: "{{ .OIDCGroupName }}"
                             {{ end }}
+                            ---
+                            apiVersion: kubeproxy.config.k8s.io/v1alpha1
+                            kind: KubeProxyConfiguration
+                            metricsBindAddress: 0.0.0.0:10249
                             EOF
 
                             sfRetry {{.TemplatePullImagesTimeout}} {{.TemplateOperationDelay}} kubeadm config images pull || sfFail 202
