@@ -67,13 +67,13 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 	// Updates owner and access rights if asked for
 	cmd := ""
 	if rfc.RemoteOwner != "" {
-		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
+		cmd += "sudo chown " + rfc.RemoteOwner + " " + rfc.Remote
 	}
 	if rfc.RemoteRights != "" {
 		if cmd != "" {
 			cmd += " && "
 		}
-		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
+		cmd += "sudo chmod " + rfc.RemoteRights + " " + rfc.Remote
 	}
 	retcode, _, _, err = SSHClient.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil {
@@ -89,7 +89,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 // RemoveRemote deletes the remote file from host
 func (rfc RemoteFileItem) RemoveRemote(hostname string) error {
 	SSHClient := client.New().SSH
-	cmd := "rm -rf " + rfc.Remote
+	cmd := "sudo rm -rf " + rfc.Remote
 	retcode, _, _, err := SSHClient.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if err != nil || retcode != 0 {
 		return fmt.Errorf("failed to remove file '%s:%s'", hostname, rfc.Remote)
