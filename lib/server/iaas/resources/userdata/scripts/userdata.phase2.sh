@@ -239,6 +239,22 @@ collect_original_packages() {
 	esac
 }
 
+ensure_curl_is_installed() {
+  case $LINUX_KIND in
+    ubuntu|debian)
+        apt-get update || fail 213
+        apt-get install -y curl || fail 214
+        ;;
+    redhat|centos)
+        yum install --enablerepo=epel -y -q curl &>/dev/null || fail 215
+        ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 216
+        ;;
+  esac
+}
+
 collect_installed_packages() {
 	case $LINUX_KIND in
 		debian|ubuntu)
@@ -269,7 +285,7 @@ ensure_network_connectivity() {
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
     [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 
-    [ $op -ne 0 ] && fail 220
+    [ $op -ne 0 ] && fail 220 || true
 }
 
 configure_dns() {
@@ -351,7 +367,6 @@ configure_network() {
 
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
-        fail 196
     }
 }
 
@@ -647,7 +662,18 @@ EOF
 }
 
 check_for_ip() {
+    case $LINUX_KIND in
+        debian)
+          lsb_release -rs | grep "8." && return 0
+          ;;
+        *)
+          ;;
+    esac
+
+    allip=$(ip -f inet -o addr show)
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
+    echo $allip
+
     [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
 }
@@ -675,6 +701,7 @@ check_for_network() {
     for i in ${PR_IFs}; do
         check_for_ip ${i} || return 1
     done
+
     return 0
 }
 
@@ -1140,6 +1167,8 @@ EOF
 # ---- Main
 
 collect_original_packages
+
+ensure_curl_is_installed
 
 configure_locale
 configure_dns
