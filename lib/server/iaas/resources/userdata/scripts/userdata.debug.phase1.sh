@@ -26,7 +26,8 @@ trap print_error ERR
 
 fail() {
   echo "PROVISIONING_ERROR: $1"
-	echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+	echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+	set +x
 	exit $1
 }
 
@@ -206,26 +207,28 @@ function fail_fast_unsupported_distros() {
 		debian)
 			lsb_release -rs | grep "8." && {
 			  echo "PROVISIONING_ERROR: Unsupported Linux distribution 'Debian 8'!"
-			  fail 201
-			}
+			  fail 199
+			} || true
 			;;
 	  ubuntu)
 	    ;;
 	  redhat|centos)
 	    lsb_release -rs | grep "7." || {
 			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 201
+			  fail 199
 			}
 	    ;;
 	  *)
 	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-      fail 201
+      fail 199
 	esac
 }
 
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
+
+fail_fast_unsupported_distros
 
 put_hostname_in_hosts
 disable_cloudinit_network_autoconf

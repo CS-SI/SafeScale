@@ -795,7 +795,7 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 			if strings.HasPrefix(line, "An error occurred in line") {
 				warnings = append(warnings, line)
 			}
-			if strings.HasPrefix(line, "PROVISIONING_ERROR") {
+			if strings.HasPrefix(line, "PROVISIONING_ERROR:") {
 				errs = append(errs, line)
 			}
 		}
@@ -810,7 +810,7 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 	}
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
+		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase1"))
 		etcDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/etcdata.tar.gz", host.Name))
 		textDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/textdata.tar.gz", host.Name))
 
@@ -821,6 +821,10 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/textdumps.tar.gz", textDumpName)
 
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase1.sh", dumpName+"sh")
+		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase1.log", dumpName+"log")
+
+		dumpName = utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase2.sh", dumpName+"sh")
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.log", dumpName+"log")
 		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/packages_installed_before.phase2.list", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages_installed_before.%s.list", host.Name, "phase2")))

@@ -108,9 +108,23 @@ reset_fw() {
     # Attach lo interface to zone trusted
     # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
     firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
+
     # Allow service ssh on public zone
     # sfFirewallAdd --zone=public --add-service=ssh || return 1
-    firewall-offline-cmd --zone=public --add-service=ssh || return 1
+    op=-1
+    SSHEC=$(firewall-offline-cmd --zone=public --add-service=ssh) && op=$? || true
+    if [[ $op -eq 11 ]] || [[ $op -eq 12 ]] || [[ $op -eq 16 ]]; then
+      op=0
+    fi
+
+    if [[ $(echo $SSHEC | grep "ALREADY_ENABLED") ]]; then
+      op=0
+    fi
+
+    if [[ $op -ne 0 ]]; then
+      return 1
+    fi
+
     # Save current fw settings as permanent
     # sfFirewallReload
     sfService enable firewalld
@@ -1170,7 +1184,7 @@ function fail_fast_unsupported_distros() {
 			lsb_release -rs | grep "8." && {
 			  echo "PROVISIONING_ERROR: Unsupported Linux distribution 'Debian 8'!"
 			  fail 201
-			}
+			} || true
 			;;
 	  ubuntu)
 	    ;;
