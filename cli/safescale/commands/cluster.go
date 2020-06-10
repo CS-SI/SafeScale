@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -945,6 +946,7 @@ var clusterKubectlCommand = cli.Command{
 		args := c.Args().Tail()
 		var filteredArgs []string
 		ignoreNext := false
+		deleteLocalFile := ""
 		valuesOnRemote := &RemoteFilesHandler{}
 		urlRegex := regexp.MustCompile("^(http|ftp)[s]?://")
 		for idx, arg := range args {
@@ -969,35 +971,52 @@ var clusterKubectlCommand = cli.Command{
 							continue
 						}
 
-						// Check for file
-						st, err := os.Stat(localFile)
-						if err != nil {
-							return cli.NewExitError(err.Error(), 1)
-						}
-						// If it's a link, get the target of it
-						if st.Mode()&os.ModeSymlink == os.ModeSymlink {
-							link, err := filepath.EvalSymlinks(localFile)
+						if localFile == "-" {
+							// If -f - already seen, ignore this one
+							if deleteLocalFile != "" {
+								ignore = true
+								ignoreNext = true
+								continue
+							}
+
+							// data comes from the standard input, captures standard input content and but it on a local temporary file
+							localFile, err = captureStringFromPipe()
+							if err != nil {
+								return cli.NewExitError(fmt.Sprintf("failed to capture standard input: %v", err), 1)
+							}
+							deleteLocalFile = localFile
+							logrus.Infof("localFile='%s'", localFile)
+						} else {
+							// Check for file
+							st, err := os.Stat(localFile)
 							if err != nil {
 								return cli.NewExitError(err.Error(), 1)
 							}
-							_, err = os.Stat(link)
-							if err != nil {
-								return cli.NewExitError(err.Error(), 1)
+							// If it's a link, get the target of it
+							if st.Mode()&os.ModeSymlink == os.ModeSymlink {
+								link, err := filepath.EvalSymlinks(localFile)
+								if err != nil {
+									return cli.NewExitError(err.Error(), 1)
+								}
+								_, err = os.Stat(link)
+								if err != nil {
+									return cli.NewExitError(err.Error(), 1)
+								}
 							}
 						}
 
-						if localFile != "-" {
-							rfi := RemoteFileItem{
-								Local:  localFile,
-								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
-							}
-							valuesOnRemote.Add(&rfi)
-							filteredArgs = append(filteredArgs, "-f")
-							filteredArgs = append(filteredArgs, rfi.Remote)
-						} else {
-							// data comes from the standard input
-							return clitools.FailureResponse(fmt.Errorf("'-f -' is not yet supported"))
+						// Adds the file to download
+						rfi := RemoteFileItem{
+							Local:  localFile,
+							Remote: fmt.Sprintf("%s/kubectl_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
+							RemoteOwner: "cladm",
+							RemoteRights: "u+rwx,go-rwx",
 						}
+						valuesOnRemote.Add(&rfi)
+
+						// Complements the args to give to remote kubectl command
+						filteredArgs = append(filteredArgs, "-f")
+						filteredArgs = append(filteredArgs, rfi.Remote)
 						ignoreNext = true
 					}
 				}
@@ -1011,8 +1030,44 @@ var clusterKubectlCommand = cli.Command{
 		if len(filteredArgs) > 0 {
 			cmdStr += ` ` + strings.Join(filteredArgs, " ")
 		}
-		return executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
+		err = executeCommand(cmdStr, valuesOnRemote, outputs.DISPLAY)
+		if deleteLocalFile != "" {
+			derr := os.Remove(deleteLocalFile)
+			if derr != nil {
+				logrus.Errorf(fmt.Sprintf("failed to remove file '%s': %v", deleteLocalFile, derr))
+			}
+		}
+		return err
 	},
+}
+
+// captureStringFromPipe returns a string containing piped text
+func captureStringFromPipe() (string, error) {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	// Checks if we have a pipe
+	if info.Mode()&os.ModeCharDevice == os.ModeCharDevice || info.Size() <= 0 {
+		return "", scerr.InvalidRequestError("the command is intended to work with pipes")
+	}
+	out, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		return "", err
+	}
+
+	file, err := ioutil.TempFile("", "safescale.")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = file.Close() }()
+
+	_, err = file.Write(out)
+	if err != nil {
+		return "", err
+	}
+	return file.Name(), nil
 }
 
 var clusterHelmCommand = cli.Command{
@@ -1086,6 +1141,8 @@ var clusterHelmCommand = cli.Command{
 							rfc := RemoteFileItem{
 								Local:  localFile,
 								Remote: fmt.Sprintf("%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano()),
+								RemoteOwner: "cladm",
+								RemoteRights: "u+rwx,go-rwx",
 							}
 							valuesOnRemote.Add(&rfc)
 							filteredArgs = append(filteredArgs, "-f")
