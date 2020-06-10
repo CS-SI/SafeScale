@@ -158,7 +158,7 @@ disable_services() {
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity() {
+ensure_network_connectivity_with_curl() {
   op=-1
   CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
   [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
@@ -175,9 +175,55 @@ ensure_network_connectivity() {
   [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 }
 
+# If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
+ensure_network_connectivity_with_ping() {
+  op=-1
+  CONNECTED=$(ping -q -w1 -c1 google.com &>/dev/null) && op=$? || true
+  [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+
+	{{- if .AddGateway }}
+		route del -net default &>/dev/null
+		route add -net default gw {{ .DefaultRouteIP }}
+	{{- else }}
+	:
+	{{- end}}
+
+	op=-1
+  CONNECTED=$(ping -q -w1 -c1 google.com &>/dev/null) && op=$? || true
+  [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
+}
+
+ensure_network_connectivity() {
+  if [[ -n $(which curl) ]]; then
+    ensure_network_connectivity_with_curl
+  else
+    ensure_network_connectivity_with_ping
+  fi
+}
+
+function fail_fast_unsupported_distros() {
+  case $LINUX_KIND in
+		debian)
+			lsb_release -rs | grep "8." && {
+			  echo "PROVISIONING_ERROR: Unsupported Linux distribution 'Debian 8'!"
+			  fail 201
+			}
+			;;
+	  ubuntu)
+	    ;;
+	  redhat|centos)
+	    ;;
+	  *)
+	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+      fail 201
+	esac
+}
+
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
+
+fail_fast_unsupported_distros
 
 put_hostname_in_hosts
 disable_cloudinit_network_autoconf
