@@ -19,21 +19,24 @@ install_common_requirements() {
 
     export LANG=C
 
-    # Creates user cladm
-    useradd -s /bin/bash -m -d /home/cladm cladm
+    # Disable SELinux
+    setenforce 0 &>/dev/null
+    sed -i 's/^SELINUX=.*$/SELINUX=disabled/g' /etc/selinux/config &>/dev/null
+
+    # Creates user {{.ClusterAdminUsername}}
+    useradd -s /bin/bash -m -d /home/{{.ClusterAdminUsername}} {{.ClusterAdminUsername}}
     groupadd -r -f docker &>/dev/null
-    usermod -aG docker safescale
-    usermod -aG docker cladm
-    echo -e "{{ .CladmPassword }}\n{{ .CladmPassword }}" | passwd cladm
-    mkdir -p ~cladm/.ssh && chmod 0700 ~cladm/.ssh
-    echo "{{ .SSHPublicKey }}" >~cladm/.ssh/authorized_keys
-    echo "{{ .SSHPrivateKey }}" >~cladm/.ssh/id_rsa
-    chmod 0400 ~cladm/.ssh/*
-    echo "cladm ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
+    usermod -aG docker {{.ClusterAdminUsername}}
+    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
+    mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
+    echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
+    echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
+    chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
+    echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
     chmod o-rwx /etc/sudoers.d/10-admins
 
-    mkdir -p ~cladm/.local/bin && find ~cladm/.local -exec chmod 0770 {} \;
-    cat >>~cladm/.bashrc <<-'EOF'
+    mkdir -p ~{{.ClusterAdminUsername}}/.local/bin && find ~{{.ClusterAdminUsername}}/.local -exec chmod 0770 {} \;
+    cat >>~{{.ClusterAdminUsername}}/.bashrc <<-'EOF'
         pathremove() {
             local IFS=':'
             local NEWPATH
@@ -55,39 +58,50 @@ install_common_requirements() {
             export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
         }
         pathprepend $HOME/.local/bin
-        pathappend /opt/mesosphere/bin
+        pathprepend /usr/local/bin
 EOF
-    chown -R cladm:cladm ~cladm
+    chown -R {{ .ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
 
-    for i in ~cladm/.hushlogin ~cladm/.cloud-warnings.skip; do
+    for i in ~{{.ClusterAdminUsername}}/.hushlogin ~{{.ClusterAdminUsername}}/.cloud-warnings.skip; do
         touch $i
-        chown root:cladm $i
+        chown root:{{.ClusterAdminUsername}} $i
         chmod ug+r-wx,o-rwx $i
     done
+
+    # Enable overlay module
+    echo overlay >/etc/modules-load.d/10-overlay.conf
+
+    # Loads overlay module
+    modprobe overlay
+
+    echo "Common requirements successfully installed."
 }
 export -f install_common_requirements
 
-case $LINUX_KIND in
-    centos|redhat)
-        yum makecache fast
-        yum install -y curl wget time jq rclone unzip
-        ;;
+case $(sfGetFact "linux_kind") in
     debian|ubuntu)
-        sfApt update && \
-        sfApt install -y curl wget time jq unzip
+        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
-        cp rclone-*-linux-amd64/rclone /usr/bin/ && \
-        rm -rf rclone-* && \
-        chown root:root /usr/bin/rclone && \
-        chmod 755 /usr/bin/rclone && \
+        cp rclone-*-linux-amd64/rclone /usr/local/bin && \
         mkdir -p /usr/local/share/man/man1 && \
-        cp rclone.1 /usr/local/share/man/man1/ && \
+        cp rclone-*-linux-amd64/rclone.1 /usr/local/share/man/man1/ && \
+        rm -rf rclone-* && \
+        chown root:root /usr/local/bin/rclone && \
+        chmod 755 /usr/local/bin/rclone && \
         mandb
         ;;
+    redhat|centos)
+        yum makecache fast
+        yum install -y wget curl time rclone jq unzip
+        ;;
+    fedora)
+        dnf install wget curl time rclone jq unzip
+        ;;
     *)
-        echo "unmanaged Linux distribution '$LINUX_KIND'"
+        echo "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
         exit 1
+        ;;
 esac
 
-/usr/bin/time -p bash -c install_common_requirements
+/usr/bin/time -p bash -c -x install_common_requirements
