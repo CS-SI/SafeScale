@@ -1164,6 +1164,28 @@ EOF
     esac
 }
 
+function fail_fast_unsupported_distros() {
+  case $LINUX_KIND in
+		debian)
+			lsb_release -rs | grep "8." && {
+			  echo "PROVISIONING_ERROR: Unsupported Linux distribution 'Debian 8'!"
+			  fail 201
+			}
+			;;
+	  ubuntu)
+	    ;;
+	  redhat|centos)
+	    lsb_release -rs | grep "7." || {
+			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			  fail 201
+			}
+	    ;;
+	  *)
+	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+      fail 201
+	esac
+}
+
 # ---- Main
 
 collect_original_packages

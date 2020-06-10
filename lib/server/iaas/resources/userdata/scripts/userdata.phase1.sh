@@ -195,9 +195,9 @@ ensure_network_connectivity_with_ping() {
 
 ensure_network_connectivity() {
   if [[ -n $(which curl) ]]; then
-    ensure_network_connectivity_with_curl
+    ensure_network_connectivity_with_curl || fail 200
   else
-    ensure_network_connectivity_with_ping
+    ensure_network_connectivity_with_ping || fail 200
   fi
 }
 
@@ -212,6 +212,10 @@ function fail_fast_unsupported_distros() {
 	  ubuntu)
 	    ;;
 	  redhat|centos)
+	    lsb_release -rs | grep "7." || {
+			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			  fail 201
+			}
 	    ;;
 	  *)
 	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -222,8 +226,6 @@ function fail_fast_unsupported_distros() {
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
-
-fail_fast_unsupported_distros
 
 put_hostname_in_hosts
 disable_cloudinit_network_autoconf
