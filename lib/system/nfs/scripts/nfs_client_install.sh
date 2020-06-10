@@ -56,7 +56,7 @@ case $LINUX_KIND in
         ;;
 
     rhel|centos)
-        yum makecache fast
+        yum makecache
         yum install -y nfs-utils
         setsebool -P use_nfs_home_dirs 1
         sfFirewallAdd --add-service=nfs

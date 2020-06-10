@@ -29,6 +29,8 @@ fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
+    collect_installed_packages
+
     # For compatibility with previous user_data implementation (until v19.03.x)...
     mkdir -p /var/tmp || true
     ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
@@ -222,6 +224,32 @@ substring_diff() {
     read -a l1 <<<$1
     read -a l2 <<<$2
     echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
+}
+
+collect_original_packages() {
+  case $LINUX_KIND in
+		debian|ubuntu)
+			dpkg-query -l > ${SF_VARDIR}/log/packages_installed_before.phase2.list
+			;;
+	  redhat|centos)
+	    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_before.phase2.list
+	    ;;
+	  *)
+	    ;;
+	esac
+}
+
+collect_installed_packages() {
+	case $LINUX_KIND in
+		debian|ubuntu)
+			dpkg-query -l > ${SF_VARDIR}/log/packages_installed_after.phase2.list
+			;;
+	  redhat|centos)
+	    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_after.phase2.list
+	    ;;
+	  *)
+	    ;;
+	esac
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
@@ -780,7 +808,27 @@ EOF
         systemctl daemon-reload
     fi
 
-    sfService enable keepalived && sfService restart keepalived || return 1
+    sfService enable keepalived || return 1
+
+    op=-1
+    msg=$(sfService restart keepalived 2>&1) && op=$? || true
+
+    kop=-1
+    echo $msg | grep "Unit network.service not found" && kop=$? || true
+
+    if [[ op -ne 0 ]]; then
+      if [[ kop -eq 0 ]]; then
+        case $LINUX_KIND in
+          redhat|centos)
+              yum install -q -y network-scripts || return 1
+              ;;
+          *)
+              ;;
+        esac
+      fi
+    fi
+
+    sfService restart keepalived || return 1
     return 0
 }
 
@@ -995,11 +1043,17 @@ EOF
                 echo "Skipping upgrade of systemd when only 1 core is available"
               else
                 # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-                yum install -q -y systemd || fail 213
+                op=-1
+                msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                echo $msg | grep "Nothing to do" && return
+                [ $op -ne 0 ] && sfFail 213
                 ensure_network_connectivity
               fi
             else
-              yum install -q -y systemd || fail 213
+              op=-1
+              msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+              echo $msg | grep "Nothing to do" && return
+              [ $op -ne 0 ] && sfFail 213
               ensure_network_connectivity
             fi
 
@@ -1036,7 +1090,7 @@ add_common_repos() {
         redhat|centos)
             # Install EPEL repo ...
             yum install -y epel-release || fail 217
-            yum makecache fast || fail 218
+            yum makecache || fail 218
             # ... but don't enable it by default
             yum-config-manager --disablerepo=epel &>/dev/null || true
             ;;
@@ -1085,6 +1139,8 @@ EOF
 
 # ---- Main
 
+collect_original_packages
+
 configure_locale
 configure_dns
 ensure_network_connectivity
@@ -1099,6 +1155,8 @@ lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
 
 update_kernel_settings || fail 219
 configure_root_password || fail 220
+
+collect_installed_packages
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 

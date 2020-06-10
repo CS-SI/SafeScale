@@ -100,11 +100,8 @@ case $(sfGetFact "linux_kind") in
         mandb
         ;;
     redhat|centos)
-        yum makecache fast
+        yum makecache
         yum install -y wget curl time rclone jq unzip
-        ;;
-    fedora)
-        dnf install wget curl time rclone jq unzip
         ;;
     *)
         echo "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
