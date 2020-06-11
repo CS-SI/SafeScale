@@ -185,11 +185,9 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, h
 	data := map[string]interface{}{}
 
 	switch hostType {
-	case nodetype.Gateway:
-		script = "swarm_install_gateway.sh"
 	case nodetype.Master:
 		script = "swarm_install_master.sh"
-	case nodetype.Node:
+	case nodetype.Gateway, nodetype.Node:
 		script = "swarm_install_node.sh"
 	}
 	return script, data

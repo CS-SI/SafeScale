@@ -2,7 +2,6 @@ syntax = "proto3";
 
 option go_package = "lib/safescale";
 
-// import "github.com/golang/protobuf/ptypes/empty/empty.proto";
 import "google/protobuf/empty.proto";
 
 message Tenant{
@@ -18,9 +17,6 @@ service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
-//     rpc StorageList (google.protobuf.Empty) returns (TenantList){}
-//     rpc StorageSet (TenantNameList) returns (google.protobuf.Empty){}
-//     rpc StorageGet (google.protobuf.Empty) returns (TenantNameList){}
 }
 
 message Image{
