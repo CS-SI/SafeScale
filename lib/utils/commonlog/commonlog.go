@@ -17,12 +17,15 @@
 package commonlog
 
 import (
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
+
+var pidMaxLength int
 
 var (
 	// baseTimestamp time.Time
@@ -60,7 +63,10 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if f.TextFormatter.DisableLevelTruncation && f.TextFormatter.ForceColors {
 		if f.pid == "" {
 			f.pid = strconv.Itoa(os.Getpid())
-			f.pid = strings.Repeat(" ", 5-len(f.pid)) + f.pid
+			repeat := pidMaxLength-len(f.pid)
+			if repeat > 0 {
+				f.pid = strings.Repeat(" ", repeat) + f.pid
+			}
 		}
 		bc, err := f.TextFormatter.Format(entry)
 		ticket := string(bc)
@@ -72,4 +78,18 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 
 	return f.TextFormatter.Format(entry)
+}
+
+func init() {
+	pidMaxLength = 5
+
+	data, err := ioutil.ReadFile("/proc/sys/kernel/pid_max")
+	if err != nil {
+		return
+	}
+	res, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
+	if err != nil {
+		return
+	}
+	pidMaxLength = int(res)
 }
