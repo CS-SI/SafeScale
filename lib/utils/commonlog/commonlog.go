@@ -63,9 +63,12 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if f.TextFormatter.DisableLevelTruncation && f.TextFormatter.ForceColors {
 		if f.pid == "" {
 			f.pid = strconv.Itoa(os.Getpid())
-			repeat := pidMaxLength-len(f.pid)
+			repeat := pidMaxLength - len(f.pid)
 			if repeat > 0 {
 				f.pid = strings.Repeat(" ", repeat) + f.pid
+			}
+			if repeat < 0 { // In case ioutil.ReadFile fails
+				pidMaxLength = len(f.pid)
 			}
 		}
 		bc, err := f.TextFormatter.Format(entry)
@@ -87,9 +90,9 @@ func init() {
 	if err != nil {
 		return
 	}
-	res, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
-	if err != nil {
-		return
+
+	maxStr := strings.TrimSpace(string(data))
+	if len(maxStr) > pidMaxLength {
+		pidMaxLength = len(maxStr)
 	}
-	pidMaxLength = int(res)
 }
