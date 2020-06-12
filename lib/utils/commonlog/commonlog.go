@@ -89,6 +89,9 @@ func init() {
 		if err != nil {
 			return
 		}
-		pidMaxLength = len(data)
+		max := len(strings.TrimSpace(string(data)))
+		if max > pidMaxLength {
+			pidMaxLength = max
+		}
 	}
 }
