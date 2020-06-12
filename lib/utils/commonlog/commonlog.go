@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"runtime"
 
 	"github.com/sirupsen/logrus"
 )
@@ -81,15 +82,13 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func init() {
-	pidMaxLength = 5
 
-	data, err := ioutil.ReadFile("/proc/sys/kernel/pid_max")
-	if err != nil {
-		return
+	pidMaxLength = 5
+	if runtime.GOOS == "linux" {
+		data, err := ioutil.ReadFile("/proc/sys/kernel/pid_max")
+		if err != nil {
+			return
+		}
+		pidMaxLength = len(data)
 	}
-	res, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
-	if err != nil {
-		return
-	}
-	pidMaxLength = int(res)
 }
