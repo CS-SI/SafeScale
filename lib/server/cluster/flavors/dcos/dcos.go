@@ -214,7 +214,7 @@ func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, h
 	switch hostType {
 	case nodetype.Master:
 		script = "dcos_install_master.sh"
-	case nodetype.Node:
+	case nodetype.Gateway, nodetype.Node:
 		script = "dcos_install_node.sh"
 	}
 	return script, data
