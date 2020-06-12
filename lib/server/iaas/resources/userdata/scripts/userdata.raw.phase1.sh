@@ -206,11 +206,15 @@ function fail_fast_unsupported_distros() {
   case $LINUX_KIND in
 		debian)
 			lsb_release -rs | grep "8." && {
-			  echo "PROVISIONING_ERROR: Unsupported Linux distribution 'Debian 8'!"
+			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
 			  fail 199
 			} || true
 			;;
 	  ubuntu)
+	    if [[ $(lsb_release -rs) -lt 16 ]]; then
+	      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			  fail 199
+			fi
 	    ;;
 	  redhat|centos)
 	    lsb_release -rs | grep "7." || {
@@ -219,7 +223,7 @@ function fail_fast_unsupported_distros() {
 			}
 	    ;;
 	  *)
-	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
       fail 199
 	esac
 }
