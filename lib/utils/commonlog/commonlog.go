@@ -17,6 +17,7 @@
 package commonlog
 
 import (
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -26,6 +27,8 @@ import (
 )
 
 var (
+	pidMaxLength int
+
 	// baseTimestamp time.Time
 	// emptyFieldMap logrus.FieldMap
 
@@ -76,13 +79,15 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func init() {
-
 	pidMaxLength = 5
 	if runtime.GOOS == "linux" {
 		data, err := ioutil.ReadFile("/proc/sys/kernel/pid_max")
 		if err != nil {
 			return
 		}
-		pidMaxLength = len(data)
+		max := len(strings.TrimSpace(string(data)))
+		if max > pidMaxLength {
+			pidMaxLength = max
+		}
 	}
 }
