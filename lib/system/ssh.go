@@ -848,6 +848,9 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				if retcode == 255 {
 					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
+				if retcode == 1 { // File doesn't exist yet
+					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
+				}
 				return scerr.AbortedError("", fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr))
 			}
 
@@ -855,6 +858,16 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				if !strings.HasPrefix(stdout, "0,") {
 					if strings.Contains(stdout, ",") {
 						splitted := strings.Split(stdout, ",")
+						return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
+					}
+					return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", "Unknown"), nil)
+				}
+			}
+
+			if stderr != "" {
+				if !strings.HasPrefix(stderr, "0,") {
+					if strings.Contains(stderr, ",") {
+						splitted := strings.Split(stderr, ",")
 						return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
 					}
 					return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", "Unknown"), nil)
