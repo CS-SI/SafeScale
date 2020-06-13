@@ -220,22 +220,22 @@ function fail_fast_unsupported_distros() {
 			} || true
 			;;
 	  ubuntu)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 16 ]]; then
+	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 17 ]]; then
 	      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
 			  fail 199
 			fi
 	    ;;
 	  redhat|centos)
 	    if [[ -n $(which lsb_release) ]]; then
-        if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+        lsb_release -rs | grep "7." || {
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
           fail 199
-        fi
+        }
 	    else
-	      if [[ $(VERSION_ID) -lt 7 ]]; then
+	      echo $VERSION_ID | grep "7." || {
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
           fail 199
-        fi
+        }
       fi
 	    ;;
 	  *)
@@ -255,8 +255,6 @@ create_user
 ensure_network_connectivity
 
 touch /etc/cloud/cloud-init.disabled
-
-fail_fast_unsupported_distros
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x

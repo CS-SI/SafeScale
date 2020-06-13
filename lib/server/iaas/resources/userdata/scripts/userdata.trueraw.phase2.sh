@@ -67,7 +67,11 @@ reset_fw() {
             # firewalld may not be installed
             if ! systemctl is-active firewalld &>/dev/null; then
                 if ! systemctl status firewalld &>/dev/null; then
+                  if which dnf; then
+                    dnf install -q -y firewalld || return 1
+                  else
                     yum install -q -y firewalld || return 1
+                  fi
                 fi
                 # systemctl enable firewalld &>/dev/null
                 # systemctl start firewalld &>/dev/null
@@ -260,10 +264,10 @@ ensure_curl_is_installed() {
         apt-get install -y curl || fail 214
         ;;
     redhat|centos)
-        if which yum; then
-            yum install --enablerepo=epel -y -q curl &>/dev/null || fail 215
+        if which dnf; then
+            dnf install -y -q curl &>/dev/null || fail 215
         else
-            dnf install --enablerepo=epel -y -q curl &>/dev/null || fail 215
+            yum install -y -q curl &>/dev/null || fail 215
         fi
         ;;
     *)
@@ -1115,7 +1119,11 @@ install_packages() {
             sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
             ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
+            if which dnf; then
+              dnf install -y -q wget jq time zip &>/dev/null || fail 215
+            else
+              yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
+            fi
             ;;
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -1133,11 +1141,15 @@ add_common_repos() {
             echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
             ;;
         redhat|centos)
-            # Install EPEL repo ...
-            yum install -y epel-release || fail 217
-            yum makecache || fail 218
-            # ... but don't enable it by default
-            yum-config-manager --disablerepo=epel &>/dev/null || true
+            if which dnf; then
+              dnf install -y epel-release || fail 217
+            else
+              # Install EPEL repo ...
+              yum install -y epel-release || fail 217
+              yum makecache || fail 218
+              # ... but don't enable it by default
+              yum-config-manager --disablerepo=epel &>/dev/null || true
+            fi
             ;;
     esac
 }
@@ -1211,8 +1223,6 @@ function fail_fast_unsupported_distros() {
 # ---- Main
 
 collect_original_packages
-
-fail_fast_unsupported_distros
 
 ensure_curl_is_installed
 

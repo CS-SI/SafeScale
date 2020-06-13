@@ -21,6 +21,7 @@
 print_error() {
 	read line file <<<$(caller)
 	echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
+	echo -n "2,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 }
 trap print_error ERR
 
@@ -58,11 +59,19 @@ sfDetectFacts() {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+				case $(VERSION_ID) in
+          ''|*[!0-9]*)
+            VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+            ;;
+          *)
+            ;;
+        esac
 			}
 		}
 	}
 }
 sfDetectFacts
+
 
 create_user() {
 	echo "Creating user {{.User}}..."
@@ -211,16 +220,23 @@ function fail_fast_unsupported_distros() {
 			} || true
 			;;
 	  ubuntu)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 16 ]]; then
+	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 17 ]]; then
 	      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
 			  fail 199
 			fi
 	    ;;
 	  redhat|centos)
-	    lsb_release -rs | grep "7." || {
-			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 199
-			}
+	    if [[ -n $(which lsb_release) ]]; then
+        lsb_release -rs | grep "7." || {
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+          fail 199
+        }
+	    else
+	      echo $VERSION_ID | grep "7." || {
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+          fail 199
+        }
+      fi
 	    ;;
 	  *)
 	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
@@ -239,6 +255,8 @@ create_user
 ensure_network_connectivity
 
 touch /etc/cloud/cloud-init.disabled
+
+fail_fast_unsupported_distros
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x
