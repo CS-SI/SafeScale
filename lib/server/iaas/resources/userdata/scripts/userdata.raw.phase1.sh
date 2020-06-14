@@ -59,7 +59,7 @@ sfDetectFacts() {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-				case $(VERSION_ID) in
+				case $VERSION_ID in
           ''|*[!0-9]*)
             VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
             ;;

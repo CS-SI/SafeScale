@@ -1146,7 +1146,7 @@ install_packages() {
             ;;
         redhat|centos)
             if which dnf; then
-              dnf install -y -q wget jq time zip &>/dev/null || fail 215
+              dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             else
               yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             fi
@@ -1237,10 +1237,17 @@ function fail_fast_unsupported_distros() {
 			fi
 	    ;;
 	  redhat|centos)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
-			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 201
-			fi
+	    if [[ -n $(which lsb_release) ]]; then
+        if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+          fail 201
+        fi
+	    else
+	      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+          fail 201
+        fi
+      fi
 	    ;;
 	  *)
 	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
