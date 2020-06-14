@@ -780,7 +780,11 @@ install_keepalived() {
             ;;
 
         redhat|centos)
-            yum install -q -y keepalived || return 1
+            if which dnf; then
+              dnf install -q -y keepalived || return 1
+            else
+              yum install -q -y keepalived || return 1
+            fi
             ;;
         *)
             echo "Unsupported Linux distribution '$LINUX_KIND'!"
@@ -869,7 +873,11 @@ EOF
       if [[ kop -eq 0 ]]; then
         case $LINUX_KIND in
           redhat|centos)
-              yum install -q -y network-scripts || return 1
+              if which dnf; then
+                dnf install -q -y network-scripts || return 1
+              else
+                yum install -q -y network-scripts || return 1
+              fi
               ;;
           *)
               ;;
@@ -1085,24 +1093,42 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -q -y pciutils yum-utils || fail 213
+            if which dnf; then
+              dnf install -q -y pciutils yum-utils || fail 213
+            else
+              yum install -q -y pciutils yum-utils || fail 213
+            fi
 
             if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
               if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
                 echo "Skipping upgrade of systemd when only 1 core is available"
               else
                 # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+                if which dnf; then
+                  op=-1
+                  msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                  echo $msg | grep "Nothing to do" && return
+                  [ $op -ne 0 ] && sfFail 213
+                else
+                  op=-1
+                  msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                  echo $msg | grep "Nothing to do" && return
+                  [ $op -ne 0 ] && sfFail 213
+                fi
+                ensure_network_connectivity
+              fi
+            else
+              if which dnf; then
+                op=-1
+                msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                echo $msg | grep "Nothing to do" && return
+                [ $op -ne 0 ] && sfFail 213
+              else
                 op=-1
                 msg=$(yum install -q -y systemd 2>&1) && op=$? || true
                 echo $msg | grep "Nothing to do" && return
                 [ $op -ne 0 ] && sfFail 213
-                ensure_network_connectivity
               fi
-            else
-              op=-1
-              msg=$(yum install -q -y systemd 2>&1) && op=$? || true
-              echo $msg | grep "Nothing to do" && return
-              [ $op -ne 0 ] && sfFail 213
               ensure_network_connectivity
             fi
 
@@ -1120,7 +1146,7 @@ install_packages() {
             ;;
         redhat|centos)
             if which dnf; then
-              dnf install -y -q wget jq time zip &>/dev/null || fail 215
+              dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             else
               yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             fi
@@ -1143,6 +1169,8 @@ add_common_repos() {
         redhat|centos)
             if which dnf; then
               dnf install -y epel-release || fail 217
+              dnf makecache || fail 218
+              dnf config-manager --set-disabled epel &>/dev/null || true
             else
               # Install EPEL repo ...
               yum install -y epel-release || fail 217
@@ -1209,10 +1237,17 @@ function fail_fast_unsupported_distros() {
 			fi
 	    ;;
 	  redhat|centos)
-	    lsb_release -rs | grep "7." || {
-			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 201
-			}
+	    if [[ -n $(which lsb_release) ]]; then
+        if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+          fail 201
+        fi
+	    else
+	      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+          fail 201
+        fi
+      fi
 	    ;;
 	  *)
 	    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"

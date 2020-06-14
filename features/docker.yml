@@ -70,7 +70,8 @@ feature:
                                 centos|rhel)
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
-                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce || sfFail 194
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce --nobest || sfFail 194
+                                    cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

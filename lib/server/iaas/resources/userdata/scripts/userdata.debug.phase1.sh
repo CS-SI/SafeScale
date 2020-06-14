@@ -59,7 +59,7 @@ sfDetectFacts() {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-				case $(VERSION_ID) in
+				case $VERSION_ID in
           ''|*[!0-9]*)
             VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
             ;;
@@ -232,8 +232,8 @@ function fail_fast_unsupported_distros() {
           fail 199
         fi
 	    else
-	      if [[ $(VERSION_ID) -lt 7 ]]; then
-          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+	      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
           fail 199
         fi
       fi

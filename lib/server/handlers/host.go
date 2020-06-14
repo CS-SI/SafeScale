@@ -659,6 +659,7 @@ func (handler *HostHandler) Create(
 
 		if client.IsProvisioningError(derr) {
 			logrus.Errorf("%+v", derr)
+			retrieveForensicsData(ctx, sshHandler, host)
 			return nil, fmt.Errorf("failed to provision host '%s', please check safescaled logs", host.Name)
 		}
 
