@@ -19,16 +19,17 @@ package commonlog
 import (
 	"io/ioutil"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
-	"runtime"
 
 	"github.com/sirupsen/logrus"
 )
 
-var pidMaxLength int
 
 var (
+	pidMaxLength int
+
 	// baseTimestamp time.Time
 	// emptyFieldMap logrus.FieldMap
 
