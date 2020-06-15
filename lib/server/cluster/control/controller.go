@@ -21,6 +21,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
@@ -1083,6 +1086,26 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	// Don't remove a node with volume(s) attached
+	mh, err := metadata.LoadHost(c.GetService(task), node.ID)
+	if err != nil {
+		return err
+	}
+	host, err := mh.Get()
+	if err != nil {
+		return err
+	}
+	err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
+		nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
+		if nAttached > 0 {
+			return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+		}
+		return nil
+	})
+	if err != nil {
+		return scerr.InvalidRequestError(fmt.Sprintf("cannot delete node '%s' because of attached volumes: %v", host.Name, err))
+	}
+
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
 	err = c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
@@ -1118,7 +1141,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 		}
 	}()
 
-	// Leave node from cluster (ie leave Docker swarm), if selectedMaster isn't empty
+	// Leave node from cluster (for example leave Docker SWARM), if selectedMaster isn't empty
 	if selectedMaster != "" {
 		err = c.foreman.leaveNodesFromList(task, []string{node.ID}, selectedMaster)
 		if err != nil {
@@ -1131,6 +1154,8 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			return err
 		}
 	}
+
+	// Host may have mounted volume, we must detach it before being able to remove the host
 
 	// Finally delete host
 	err = client.New().Host.Delete([]string{node.ID}, temporal.GetLongOperationTimeout())
