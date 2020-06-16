@@ -1274,7 +1274,7 @@ function fail_fast_unsupported_distros() {
 			} || true
 			;;
 	  ubuntu)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 17 ]]; then
 	      if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
 	        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
 			    fail 201
