@@ -265,7 +265,7 @@ func (handler *NetworkHandler) Create(
 
 	domain = strings.Trim(domain, ".")
 	if domain != "" {
-		domain = "."+domain
+		domain = "." + domain
 	}
 
 	gwRequest := resources.GatewayRequest{
@@ -647,6 +647,11 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 			return nil, err
 		}
 		if client.IsProvisioningError(err) {
+			host, err := handler.service.GetHostByName(gw.Name)
+			if err != nil {
+				retrieveForensicsData(task.GetContext(), sshHandler, host)
+			}
+
 			return nil, fmt.Errorf("error creating network: Failure waiting for gateway '%s' to finish provisioning and being accessible through SSH: [%+v]", gw.Name, err)
 		}
 		return nil, err

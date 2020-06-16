@@ -883,7 +883,7 @@ sfDetectFacts() {
 
     # Some facts about system
     case ${FACTS["linux_kind"]} in
-        redhat|centos)
+        redhat|rhel|centos)
             FACTS["redhat_like"]=1
             FACTS["debian_like"]=0
 			      FACTS["docker_version"]=$(yum info docker-ce || true)

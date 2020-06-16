@@ -225,7 +225,7 @@ function fail_fast_unsupported_distros() {
 			  fail 199
 			fi
 	    ;;
-	  redhat|centos)
+	  redhat|rhel|centos)
 	    if [[ -n $(which lsb_release) ]]; then
         lsb_release -rs | grep "7." || {
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
@@ -236,6 +236,19 @@ function fail_fast_unsupported_distros() {
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
           fail 199
         }
+      fi
+	    ;;
+	  fedora)
+	    if [[ -n $(which lsb_release) ]]; then
+        if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+          fail 199
+        fi
+	    else
+	      if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+          fail 199
+        fi
       fi
 	    ;;
 	  *)

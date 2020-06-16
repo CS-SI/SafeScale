@@ -46,7 +46,7 @@ feature:
                                 nodes: all
                         run: |
                             case $LINUX_KIND in
-                                redhat|centos)
+                                redhat|rhel|centos)
                                     yum makecache fast
                                     yum groupinstall -y "Development Tools"
                                     yum install -y wget

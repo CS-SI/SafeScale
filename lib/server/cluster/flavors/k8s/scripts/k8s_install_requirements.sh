@@ -91,7 +91,7 @@ case $(sfGetFact "linux_kind") in
         chmod 755 /usr/local/bin/rclone && \
         mandb
         ;;
-    redhat|centos)
+    redhat|rhel|centos)
         yum makecache
         yum install -y wget curl time rclone jq unzip
         ;;

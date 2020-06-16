@@ -210,6 +210,49 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 	return retCode, stdOut, stdErr, err
 }
 
+// Run tries to execute command 'cmd' on the host
+func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd string, outs outputs.Enum, timeout time.Duration) (retCode int, stdOut string, stdErr string, err error) {
+	if handler == nil {
+		return -1, "", "", scerr.InvalidInstanceError()
+	}
+	// FIXME: validate parameters
+
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
+
+	hostSvc := NewHostHandler(handler.service)
+	host, err := hostSvc.ForceInspect(ctx, hostName)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	// retrieve ssh config to perform some commands
+	ssh, err := handler.GetConfig(ctx, host)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+		func() error {
+			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, outs, timeout)
+			return err
+		},
+		temporal.GetHostTimeout(),
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
+				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)
+			}
+		},
+	)
+	if retryErr != nil {
+		return retCode, stdOut, stdErr, retryErr
+	}
+
+	return retCode, stdOut, stdErr, err
+}
+
 // // run executes command on the host
 // func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
 // 	// Create the command
