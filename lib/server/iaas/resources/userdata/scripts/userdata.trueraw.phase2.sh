@@ -63,7 +63,7 @@ reset_fw() {
             sfApt purge -q -y ufw &>/dev/null || return 1
             ;;
 
-        rhel|centos)
+        rhel|centos|fedora)
             # firewalld may not be installed
             if ! systemctl is-active firewalld &>/dev/null; then
                 if ! systemctl status firewalld &>/dev/null; then
@@ -249,7 +249,7 @@ collect_original_packages() {
 		debian|ubuntu)
 			dpkg-query -l > ${SF_VARDIR}/log/packages_installed_before.phase2.list
 			;;
-	  redhat|centos)
+	  redhat|rhel|centos|fedora)
 	    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_before.phase2.list
 	    ;;
 	  *)
@@ -263,7 +263,7 @@ ensure_curl_is_installed() {
         apt-get update || fail 213
         apt-get install -y curl || fail 214
         ;;
-    redhat|centos)
+    redhat|rhel|centos|fedora)
         if which dnf; then
             dnf install -y -q curl &>/dev/null || fail 215
         else
@@ -282,7 +282,7 @@ collect_installed_packages() {
 		debian|ubuntu)
 			dpkg-query -l > ${SF_VARDIR}/log/packages_installed_after.phase2.list
 			;;
-	  redhat|centos)
+	  redhat|rhel|centos|fedora)
 	    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_after.phase2.list
 	    ;;
 	  *)
@@ -365,7 +365,7 @@ configure_network() {
             fi
             ;;
 
-        redhat|centos)
+        redhat|rhel|centos|fedora)
             # Network configuration
             if systemctl status systemd-networkd &>/dev/null; then
                 configure_network_systemd_networkd
@@ -779,7 +779,7 @@ install_keepalived() {
             sfApt update && sfApt -y install keepalived || return 1
             ;;
 
-        redhat|centos)
+        redhat|rhel|centos|fedora)
             if which dnf; then
               dnf install -q -y keepalived || return 1
             else
@@ -872,7 +872,7 @@ EOF
     if [[ op -ne 0 ]]; then
       if [[ kop -eq 0 ]]; then
         case $LINUX_KIND in
-          redhat|centos)
+          redhat|rhel|centos|fedora)
               if which dnf; then
                 dnf install -q -y network-scripts || return 1
               else
@@ -1022,7 +1022,7 @@ install_drivers_nvidia() {
             bash NVIDIA-Linux-x86_64-410.78.run -s || fail 205
             ;;
 
-        redhat|centos)
+        redhat|rhel|centos|fedora)
             if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
                 echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
                 dracut --force
@@ -1088,7 +1088,7 @@ EOF
             # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
             ;;
 
-        redhat|centos)
+        redhat|rhel|centos|fedora)
             # # Force use of IPv4 addresses when installing packages
             # echo "ip_resolve=4" >>/etc/yum.conf
 
@@ -1144,12 +1144,15 @@ install_packages() {
         ubuntu|debian)
             sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
             ;;
-        redhat|centos)
+        redhat|rhel|centos)
             if which dnf; then
               dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             else
               yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             fi
+            ;;
+        fedora)
+            dnf install -y -q wget jq time zip &>/dev/null || fail 215
             ;;
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -1166,7 +1169,7 @@ add_common_repos() {
             codename=$(sfGetFact "linux_codename")
             echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
             ;;
-        redhat|centos)
+        redhat|rhel|centos)
             if which dnf; then
               dnf install -y epel-release || fail 217
               dnf makecache || fail 218
@@ -1178,6 +1181,9 @@ add_common_repos() {
               # ... but don't enable it by default
               yum-config-manager --disablerepo=epel &>/dev/null || true
             fi
+            ;;
+        fedora)
+            dnf makecache || fail 218
             ;;
     esac
 }
@@ -1206,7 +1212,7 @@ force_dbus_restart() {
 # considered a security risk. Especially when set after SSH and Firewall configuration applied.
 configure_root_password() {
     case ${LINUX_KIND} in
-        redhat|centos)
+        redhat|rhel|centos|fedora)
             echo "root:{{.Password}}" | chpasswd
             ;;
     esac
@@ -1236,7 +1242,7 @@ function fail_fast_unsupported_distros() {
 			  fail 201
 			fi
 	    ;;
-	  redhat|centos)
+	  redhat|rhel|centos)
 	    if [[ -n $(which lsb_release) ]]; then
         if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
@@ -1244,6 +1250,19 @@ function fail_fast_unsupported_distros() {
         fi
 	    else
 	      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+          fail 201
+        fi
+      fi
+	    ;;
+	  fedora)
+	    if [[ -n $(which lsb_release) ]]; then
+        if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+          fail 201
+        fi
+	    else
+	      if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
           fail 201
         fi

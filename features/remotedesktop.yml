@@ -69,7 +69,7 @@ feature:
                             # Install xfce + tigervnc                                 #
                             ###########################################################
                             case $LINUX_KIND in
-                                centos|redhat)
+                                centos|redhat|rhel)
                                     yum install -y epel-release && \
                                     yum makecache fast && \
                                     yum groupinstall -y -t "X Window system" --skip-broken && \

@@ -736,6 +736,7 @@ func (handler *HostHandler) Create(
 		// Setting err will trigger defers
 		err = fmt.Errorf("failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode, stdout, stderr)
 		if client.IsProvisioningError(err) {
+			retrieveForensicsData(ctx, sshHandler, host)
 			logrus.Error(err)
 		}
 
@@ -763,6 +764,7 @@ func (handler *HostHandler) Create(
 		}
 
 		if client.IsProvisioningError(err) {
+			retrieveForensicsData(ctx, sshHandler, host)
 			return nil, fmt.Errorf("error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name)
 		}
 
@@ -815,21 +817,25 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 		etcDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/etcdata.tar.gz", host.Name))
 		textDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/textdata.tar.gz", host.Name))
 
-		_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
-		_, _, _, _ = sshHandler.Run(ctx, host.Name, "systemd-resolve --status > /tmp/systemd-resolve.txt", outputs.COLLECT)
-		_, _, _, _ = sshHandler.Run(ctx, host.Name, "netplan ip leases eth0 > /tmp/netplan.txt", outputs.COLLECT)
-		_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf textdumps.tar.gz /tmp/*.txt", outputs.COLLECT)
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/textdumps.tar.gz", textDumpName)
+		_, _, _, err := sshHandler.RunWithTimeout(ctx, host.Name, "whoami", outputs.COLLECT, 10*time.Second)
+		if err == nil { // If there's no ssh connection, no need to wait
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "systemd-resolve --status > /tmp/systemd-resolve.txt", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "netplan ip leases eth0 > /tmp/netplan.txt", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf textdumps.tar.gz /tmp/*.txt", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/textdumps.tar.gz", textDumpName)
 
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase1.sh", dumpName+"sh")
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase1.log", dumpName+"log")
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase1.sh", dumpName+"sh")
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase1.log", dumpName+"log")
 
-		dumpName = utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase2.sh", dumpName+"sh")
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.log", dumpName+"log")
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/packages_installed_before.phase2.list", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages_installed_before.%s.list", host.Name, "phase2")))
-		_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/packages_installed_after.phase2.list", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages_installed_after.%s.list", host.Name, "phase2")))
+			dumpName = utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase2"))
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase2.sh", dumpName+"sh")
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase2.log", dumpName+"log")
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/packages_installed_before.phase2.list", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages_installed_before.%s.list", host.Name, "phase2")))
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/packages_installed_after.phase2.list", utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages_installed_after.%s.list", host.Name, "phase2")))
+		}
 	}
 }
 
