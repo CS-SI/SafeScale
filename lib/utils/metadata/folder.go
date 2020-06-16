@@ -189,6 +189,11 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		return err
 	}
 
+	// Special case where there is only an empty folder...
+	if len(list) == 1 && list[0] == f.absolutePath(path) {
+		return nil
+	}
+
 	for _, i := range list {
 		var buffer bytes.Buffer
 		_, err = f.service.GetMetadataBucket().ReadObject(i, &buffer, 0, 0)

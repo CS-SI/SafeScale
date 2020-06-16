@@ -44,6 +44,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	providermetadata "github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -675,17 +677,31 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 
 	var cleaningErrors []error
 
-	// Deletes the nodes
-	list := cluster.ListNodeIDs(task)
-	length := len(list)
-	if length > 0 {
+	// check if nodes and/or masters have volumes attached (which would forbid the deletion)
+	nodeList := cluster.ListNodeIDs(task)
+	nodeLength := len(nodeList)
+	if nodeLength > 0 {
+		if err := checkForAttachedVolumes(task, cluster, nodeList, "node"); err != nil {
+			return err
+		}
+	}
+	masterList := cluster.ListMasterIDs(task)
+	masterLength := len(masterList)
+	if masterLength > 0 {
+		if err := checkForAttachedVolumes(task, cluster, masterList, "master"); err != nil {
+			return err
+		}
+	}
+
+	// No volumes attached, delete nodes
+	if nodeLength > 0 {
 		var subtasks []concurrency.Task
-		for i := 0; i < length; i++ {
+		for i := 0; i < nodeLength; i++ {
 			subtask, err := task.New()
 			if err != nil {
 				return err
 			}
-			subtask, err = subtask.Start(b.taskDeleteNode, list[i])
+			subtask, err = subtask.Start(b.taskDeleteNode, nodeList[i])
 			if err != nil {
 				return err
 			}
@@ -699,18 +715,16 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		}
 	}
 
-	// Delete the Masters
-	list = cluster.ListMasterIDs(task)
-	length = len(list)
-	if len(list) > 0 {
+	// delete the Masters
+	if masterLength > 0 {
 		var subtasks []concurrency.Task
-		for i := 0; i < length; i++ {
+		for i := 0; i < masterLength; i++ {
 			subtask, err := task.New()
 			if err != nil {
 				return err
 			}
 
-			subtask, err = subtask.Start(deleteMasterFunc, list[i])
+			subtask, err = subtask.Start(deleteMasterFunc, masterList[i])
 			if err != nil {
 				return err
 			}
@@ -767,6 +781,34 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 	cluster.service = nil
 
 	return scerr.ErrListError(cleaningErrors)
+}
+
+func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []string, what string) error {
+	// Check first if there are volumes attached to nodes
+	length := len(list)
+	svc := cluster.GetService(task)
+
+	for i := 0; i < length; i++ {
+		mh, err := providermetadata.LoadHost(svc, list[i])
+		if err != nil {
+			return err
+		}
+		host, err := mh.Get()
+		if err != nil {
+			return err
+		}
+		err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
+			nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
+			if nAttached > 0 {
+				return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+			}
+			return nil
+		})
+		if err != nil {
+			return scerr.InvalidRequestError(fmt.Sprintf("cannot delete %s '%s' because of attached volumes: %v", what, host.Name, err))
+		}
+	}
+	return nil
 }
 
 func (b *foreman) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {

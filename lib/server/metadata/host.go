@@ -316,7 +316,6 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
-	// Second deletes host metadata
 	mh, err := NewHost(svc)
 	if err != nil {
 		return err
