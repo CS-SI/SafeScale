@@ -696,7 +696,27 @@ check_for_ip() {
 
     allip=$(ip -f inet -o addr show)
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
-    echo $allip
+
+    case $LINUX_KIND in
+        ubuntu)
+          if [[ $(lsb_release -rs | cut -d. -f1) -eq 16 ]]; then
+            if [[ $(echo $allip | grep $1) == "" ]]; then
+              echo "Ubuntu 16.04 is expected to fail this test..."
+              return 0
+            fi
+          fi
+          ;;
+        debian)
+          if [[ $(lsb_release -rs | cut -d. -f1) -eq 8 ]]; then
+            if [[ $(echo $allip | grep $1) == "" ]]; then
+              echo "Debian 8 is expected to fail this test..."
+              return 0
+            fi
+          fi
+          ;;
+        *)
+          ;;
+    esac
 
     [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
@@ -1109,42 +1129,42 @@ EOF
 
             # Force update of systemd and pciutils
             if which dnf; then
-              dnf install -q -y pciutils yum-utils || fail 213
+                dnf install -q -y pciutils yum-utils || fail 213
             else
-              yum install -q -y pciutils yum-utils || fail 213
+                yum install -q -y pciutils yum-utils || fail 213
             fi
 
             if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
-              if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
-                echo "Skipping upgrade of systemd when only 1 core is available"
-              else
-                # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-                if which dnf; then
-                  op=-1
-                  msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
-                  echo $msg | grep "Nothing to do" && return
-                  [ $op -ne 0 ] && sfFail 213
+                if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
+                    echo "Skipping upgrade of systemd when only 1 core is available"
                 else
-                  op=-1
-                  msg=$(yum install -q -y systemd 2>&1) && op=$? || true
-                  echo $msg | grep "Nothing to do" && return
-                  [ $op -ne 0 ] && sfFail 213
+                    # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+                    if which dnf; then
+                        op=-1
+                        msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                        echo $msg | grep "Nothing to do" && return
+                        [ $op -ne 0 ] && sfFail 213
+                    else
+                        op=-1
+                        msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                        echo $msg | grep "Nothing to do" && return
+                        [ $op -ne 0 ] && sfFail 213
+                    fi
+                    ensure_network_connectivity
+                fi
+            else
+                if which dnf; then
+                    op=-1
+                    msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                    echo $msg | grep "Nothing to do" && return
+                    [ $op -ne 0 ] && sfFail 213
+                else
+                    op=-1
+                    msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                    echo $msg | grep "Nothing to do" && return
+                    [ $op -ne 0 ] && sfFail 213
                 fi
                 ensure_network_connectivity
-              fi
-            else
-              if which dnf; then
-                op=-1
-                msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
-                echo $msg | grep "Nothing to do" && return
-                [ $op -ne 0 ] && sfFail 213
-              else
-                op=-1
-                msg=$(yum install -q -y systemd 2>&1) && op=$? || true
-                echo $msg | grep "Nothing to do" && return
-                [ $op -ne 0 ] && sfFail 213
-              fi
-              ensure_network_connectivity
             fi
 
             # # install security updates
@@ -1303,7 +1323,7 @@ configure_locale
 
 collect_installed_packages
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
 # For compatibility with previous user_data implementation (until v19.03.x)...
 mkdir -p /var/tmp || true

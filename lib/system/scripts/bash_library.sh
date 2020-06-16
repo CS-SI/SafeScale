@@ -24,6 +24,7 @@ declare -x SF_SERIALIZED_FACTS=$(mktemp)
 declare -A FACTS
 export LINUX_KIND=
 export VERSION_ID=
+export FULL_VERSION_ID=
 
 sfFail() {
     if [ $# -eq 1 ]; then
@@ -864,17 +865,28 @@ sfDetectFacts() {
         LINUX_KIND=${ID,,}
         FACTS["linux_version"]=$VERSION_ID
         VERSION_ID=$VERSION_ID
+        FULL_VERSION_ID=$VERSION_ID
         [ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
     else
         if which lsb_release &>/dev/null; then
             LINUX_KIND=$(lsb_release -is)
             LINUX_KIND=${LINUX_KIND,,}
             VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+            FULL_VERSION_ID=$(lsb_release -rs)
         else
             [ -f /etc/redhat-release ] && {
                 LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
                 LINUX_KIND=${LINUX_KIND,,}
                 VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+                FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
+                case $VERSION_ID in
+                  ''|*[!0-9]*)
+                    VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+                    FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
+                    ;;
+                  *)
+                    ;;
+                esac
             }
         fi
         FACTS["linux_kind"]=${LINUX_KIND,,}
