@@ -21,13 +21,13 @@
 print_error() {
 	read line file <<<$(caller)
 	echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
-	echo -n "2,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+	echo -n "2,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 }
 trap print_error ERR
 
 fail() {
   echo "PROVISIONING_ERROR: $1"
-	echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+	echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 	set +x
 	exit $1
 }
@@ -44,6 +44,7 @@ set -x
 
 LINUX_KIND=
 VERSION_ID=
+FULL_VERSION_ID=
 
 sfDetectFacts() {
 	[[ -f /etc/os-release ]] && {
@@ -54,14 +55,17 @@ sfDetectFacts() {
 			LINUX_KIND=$(lsb_release -is)
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+			FULL_VERSION_ID=$(lsb_release -rs)
 		} || {
 			[[ -f /etc/redhat-release ]] && {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+				FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
 				case $VERSION_ID in
           ''|*[!0-9]*)
             VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+            FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
             ;;
           *)
             ;;
@@ -273,6 +277,6 @@ touch /etc/cloud/cloud-init.disabled
 
 fail_fast_unsupported_distros
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x
 exit 0
