@@ -215,27 +215,29 @@ function fail_fast_unsupported_distros() {
   case $LINUX_KIND in
 		debian)
 			lsb_release -rs | grep "8." && {
-			  echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			  echo "PROVISIONING_ERROR: Unsupported Linux distribution (docker) '$LINUX_KIND $(lsb_release -rs)'!"
 			  fail 199
 			} || true
 			;;
 	  ubuntu)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 17 ]]; then
-	      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 199
+	    if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+	      if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
+	        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			    fail 199
+	      fi
 			fi
 	    ;;
 	  redhat|rhel|centos)
 	    if [[ -n $(which lsb_release) ]]; then
-        lsb_release -rs | grep "7." || {
-          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+        if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $(lsb_release -rs)'!"
           fail 199
-        }
+        fi
 	    else
-	      echo $VERSION_ID | grep "7." || {
-          echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+	      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+          echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $VERSION_ID'!"
           fail 199
-        }
+        fi
       fi
 	    ;;
 	  fedora)

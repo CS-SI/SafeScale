@@ -239,7 +239,7 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, outs, timeout)
 			return err
 		},
-		temporal.GetHostTimeout(),
+		2*timeout,
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...\n", hostName)

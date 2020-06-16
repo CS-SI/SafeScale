@@ -365,7 +365,7 @@ configure_network() {
             fi
             ;;
 
-        redhat|rhel|centos|fedora)
+        redhat|rhel|centos)
             # Network configuration
             if systemctl status systemd-networkd &>/dev/null; then
                 configure_network_systemd_networkd
@@ -373,7 +373,9 @@ configure_network() {
                 configure_network_redhat
             fi
             ;;
-
+        fedora)
+            configure_network_redhat
+            ;;
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
             fail 193
@@ -774,6 +776,19 @@ EOF
 }
 
 install_keepalived() {
+    # Try installing network-scripts if available
+    case $LINUX_KIND in
+        redhat|rhel|centos|fedora)
+            if which dnf; then
+              dnf install -q -y network-scripts || true
+            else
+              yum install -q -y network-scripts || true
+            fi
+            ;;
+        *)
+            ;;
+    esac
+
     case $LINUX_KIND in
         ubuntu|debian)
             sfApt update && sfApt -y install keepalived || return 1
@@ -1171,8 +1186,10 @@ add_common_repos() {
             ;;
         redhat|rhel|centos)
             if which dnf; then
+              # Install EPEL repo ...
               dnf install -y epel-release || fail 217
               dnf makecache || fail 218
+              # ... but don't enable it by default
               dnf config-manager --set-disabled epel &>/dev/null || true
             else
               # Install EPEL repo ...
@@ -1237,13 +1254,15 @@ function fail_fast_unsupported_distros() {
 			} || true
 			;;
 	  ubuntu)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 17 ]]; then
-	      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 201
+	    if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+	      if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
+	        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			    fail 201
+	      fi
 			fi
 	    ;;
 	  redhat|rhel|centos)
-	   if [[ -n $(which lsb_release) ]]; then
+	    if [[ -n $(which lsb_release) ]]; then
         if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
           echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
           fail 201
