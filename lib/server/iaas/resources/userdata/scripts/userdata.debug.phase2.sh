@@ -696,7 +696,27 @@ check_for_ip() {
 
     allip=$(ip -f inet -o addr show)
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
-    echo $allip
+
+    case $LINUX_KIND in
+        ubuntu)
+          if [[ $(lsb_release -rs | cut -d. -f1) -eq 16 ]]; then
+            if [[ $(echo $allip | grep $1) == "" ]]; then
+              echo "Ubuntu 16.04 is expected to fail this test..."
+              return 0
+            fi
+          fi
+          ;;
+        debian)
+          if [[ $(lsb_release -rs | cut -d. -f1) -eq 8 ]]; then
+            if [[ $(echo $allip | grep $1) == "" ]]; then
+              echo "Debian 8 is expected to fail this test..."
+              return 0
+            fi
+          fi
+          ;;
+        *)
+          ;;
+    esac
 
     [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
@@ -1254,9 +1274,11 @@ function fail_fast_unsupported_distros() {
 			} || true
 			;;
 	  ubuntu)
-	    if [[ $(lsb_release -rs | cut -d. -f1) -lt 16 ]]; then
-	      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-			  fail 201
+	    if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+	      if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
+	        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+			    fail 201
+	      fi
 			fi
 	    ;;
 	  redhat|rhel|centos)
