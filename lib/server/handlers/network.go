@@ -536,7 +536,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	primary := inputs["primary"].(bool)
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
-	gw, userData, err := handler.service.CreateGateway(request)
+	gw, userData, err := handler.service.CreateGateway(request, &sizing)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrTimeout:

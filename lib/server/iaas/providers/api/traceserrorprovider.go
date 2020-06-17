@@ -214,13 +214,13 @@ func (w ErrorTraceProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w ErrorTraceProvider) CreateGateway(req resources.GatewayRequest) (host *resources.Host, content *userdata.Content, err error) {
+func (w ErrorTraceProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, content *userdata.Content, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateGateway", w.Name))
-	return w.InnerProvider.CreateGateway(req)
+	return w.InnerProvider.CreateGateway(req, sizing)
 }
 
 // DeleteGateway ...

@@ -229,7 +229,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 	var gateway *resources.Host
 
 	if withGW {
-		gateway, _, err = tester.Service.CreateGateway(gwRequest)
+		gateway, _, err = tester.Service.CreateGateway(gwRequest, nil)
 		require.Nil(t, err)
 		network.GatewayID = gateway.ID
 	}
@@ -274,7 +274,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *resources.Network) 
 		TemplateID: tpls[0].ID,
 		Network:    network,
 	}
-	gw, _, err := tester.Service.CreateGateway(gwRequest)
+	gw, _, err := tester.Service.CreateGateway(gwRequest, nil)
 	if err != nil {
 		return err
 	}

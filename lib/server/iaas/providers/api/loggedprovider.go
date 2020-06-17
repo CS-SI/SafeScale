@@ -156,9 +156,9 @@ func (w LoggedProvider) DeleteNetwork(id string) error {
 }
 
 // CreateGateway ...
-func (w LoggedProvider) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+func (w LoggedProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
 	defer w.prepare(w.trace("CreateGateway"))
-	return w.InnerProvider.CreateGateway(req)
+	return w.InnerProvider.CreateGateway(req, sizing)
 }
 
 // DeleteGateway ...
