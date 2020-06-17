@@ -260,8 +260,8 @@ collect_original_packages() {
 ensure_curl_is_installed() {
   case $LINUX_KIND in
     ubuntu|debian)
-        apt-get update || fail 213
-        apt-get install -y curl || fail 214
+        DEBIAN_FRONTEND=noninteractive apt-get update || fail 213
+        DEBIAN_FRONTEND=noninteractive apt-get install -y curl || fail 214
         ;;
     redhat|rhel|centos|fedora)
         if which dnf; then
