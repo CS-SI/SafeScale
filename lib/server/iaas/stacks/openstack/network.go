@@ -310,7 +310,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, userData *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -341,6 +341,9 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest) (host *resources.Hos
 		Networks:     []*resources.Network{req.Network},
 		PublicIP:     true,
 		Password:     password,
+	}
+	if sizing != nil && sizing.MinDiskSize > 0 {
+		hostReq.DiskSize = sizing.MinDiskSize
 	}
 	host, userData, err = s.CreateHost(hostReq)
 	if err != nil {

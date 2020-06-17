@@ -86,8 +86,8 @@ func (sp StackProxy) DeleteNetwork(id string) error {
 	return errorTranslator(err)
 }
 
-func (sp StackProxy) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
-	rv, rv2, err := sp.InnerStack.CreateGateway(req)
+func (sp StackProxy) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
+	rv, rv2, err := sp.InnerStack.CreateGateway(req, sizing)
 	return rv, rv2, errorTranslator(err)
 }
 

@@ -106,7 +106,7 @@ func (provider *provider) ListNetworks() ([]*resources.Network, error) {
 func (provider *provider) DeleteNetwork(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error) {
+func (provider *provider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteGateway(string) error {

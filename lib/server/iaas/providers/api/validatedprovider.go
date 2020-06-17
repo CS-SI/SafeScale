@@ -218,8 +218,8 @@ func (w ValidatedProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w ValidatedProvider) CreateGateway(req resources.GatewayRequest) (res *resources.Host, data *userdata.Content, err error) {
-	res, data, err = w.InnerProvider.CreateGateway(req)
+func (w ValidatedProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (res *resources.Host, data *userdata.Content, err error) {
+	res, data, err = w.InnerProvider.CreateGateway(req, sizing)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {

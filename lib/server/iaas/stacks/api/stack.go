@@ -59,7 +59,7 @@ type Stack interface {
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) error
 	// CreateGateway creates a public Gateway for a private network
-	CreateGateway(req resources.GatewayRequest) (*resources.Host, *userdata.Content, error)
+	CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error)
 	// DeleteGateway delete the public gateway of a private network
 	DeleteGateway(networkID string) error
 

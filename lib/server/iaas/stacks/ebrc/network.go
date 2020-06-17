@@ -744,7 +744,7 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources.Host, content *userdata.Content, err error) {
+func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, content *userdata.Content, err error) {
 	logrus.Debug("ebrc.Client.CreateGateway() called")
 	defer logrus.Debug("ebrc.Client.CreateGateway() done")
 
@@ -768,6 +768,9 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest) (host *resources
 		TemplateID:   req.TemplateID,
 		Networks:     []*resources.Network{req.Network},
 		PublicIP:     true,
+	}
+	if sizing != nil && sizing.MinDiskSize > 0 {
+		hostReq.DiskSize = sizing.MinDiskSize
 	}
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
