@@ -26,10 +26,10 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -43,16 +43,28 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
+
+                    config:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            [[ ! -d ${SF_ETCDIR}/ansible ]] && sfFail 1
+                            [[ ! -d ${SF_ETCDIR}/ansible/ansible.cfg ]] && sfFail 2
+                            sfExit
 
             add:
-                pace: ansible
+                pace: ansible,config
                 steps:
                     ansible:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 ubuntu)
@@ -82,8 +94,62 @@ feature:
                             esac
                             sfExit
 
+                    config:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/ansible
+
+                            cat >${SF_ETCDIR}/ansible/ansible.cfg <<-EOF
+                            [defaults]
+                            inventory = ${SF_ETCDIR}/ansible/inventory.cfg
+                            host_key_checking = False
+                            remote_tmp = ${SF_TMPDIR}/ansible-\${USER}
+                            log_path = ${SF_LOGDIR}/ansible.log
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/pathes.cfg <<-EOF
+                            sf_base_dir: "/opt/safescale"
+                            sf_etc_dir: "{{ "{{ sf_base_dir }}/etc" }}"
+                            sf_var_dir: "{{ "{{ sf_base_dir }}/var" }}"
+                            sf_tmp_dir: "{{ "{{ sf_var_dir }}/tmp" }}"
+                            sf_log_dir: "{{ "{{ sf_var_dir }}/log" }}"
+                            sf_state_dir: "{{ "{{ sf_var_dir }}/state" }}"
+                            EOF
+
+                            cat >${SF_ETCDIR}/host.cfg <<-EOF
+                            host_private_ip: "{{ .HostIP }}"
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/network.cfg <<-EOF
+                            cidr: "{{ .CIDR }}"
+                            primary_gateway_private_ip: "{{ .PrimaryGatewayIP }}"
+                            primary_gateway_public_ip: "{{ .PrimaryPublicIP }}"
+                            endpoint_ip: "{{ .EndpointIP }}"
+                            default_route_ip: "{{ .DefaultRouteIP }}"
+                            secondary_gateway_private_ip: "{{ .SecondaryGatewayIP }}"
+                            secondary_gateway_public_ip: "{{ .SecondaryPublicIP }}"
+                            EOF
+
+                            cat >${SF_ETCDIR}/cluster.cfg <<-EOF
+                            cluster_name: "{{ .ClusterName }}"
+                            cluster_flavor: "{{ .ClusterFlavor }}"
+                            cluster_complexity: "{{ .ClusterComplexity }}"
+                            controlplane_uses_vip: {{ .ControlplaneUsesVIP }}
+                            controlplane_endpoint_ip: "{{ .ControlplaneEndpointIP }}"
+                            cluster_admin_username: "{{ .ClusterAdminUsername }}"
+                            EOF
+
+                            chown -R {{ .ClusterAdminUsername }}:{{ .OperatorUsername }} ${SF_ETCDIR}/ansible
+                            chmod -R ug+rw,o-rw ${SF_ETCDIR}/ansible
+                            find ${SF_ETCDIR}/ansible -type d -exec chmod ug+x,o-x {} \;
+                            sfExit
+
             remove:
-                pace: ansible
+                pace: ansible,config
                 steps:
                     ansible:
                         targets:
@@ -106,5 +172,15 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
 
+                    config:
+                        targets:
+                            gateways: no
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            rm -rf ${SF_ETCDIR}/ansible ${SF_LOGDIR}/ansible_*
+                            sfExit
 ...

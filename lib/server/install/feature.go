@@ -533,10 +533,11 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
 		v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
 		v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
-		if networkCfg.SecondaryGatewayIP != "" {
+		v["NetworkUsesVIP"] = networkCfg.SecondaryGatewayIP != ""
+		if v["NetworkUsesVIP"].(bool) {
 			v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+			v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 		}
-		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 		v["EndpointIP"] = networkCfg.EndpointIP
 		v["PublicIP"] = v["EndpointIP"] // legacy ...
 		if _, ok := v["CIDR"]; !ok {
@@ -550,11 +551,10 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 		if err != nil {
 			return err
 		}
-		if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
-			v["ControlplaneUsesVIP"] = true
+		v["ControlplaneUsesVIP"] = controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != ""
+		if v["ControlplaneUsesVIP"].(bool) {
 			v["ControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 		} else {
-			// Don't set ControlplaneUsesVIP if there is no VIP...
 			master, err := cluster.FindAvailableMaster(f.task)
 			if err != nil {
 				return err

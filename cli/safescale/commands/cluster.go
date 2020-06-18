@@ -302,6 +302,7 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 	// FUTURE: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
 	if _, ok := result["features"].(*clusterpropsv1.Features).Disabled["remotedesktop"]; !ok {
 		remoteDesktops := map[string][]string{}
+
 		clientHost := client.New().Host
 		for _, id := range c.ListMasterIDs(concurrency.RootTask()) {
 			host, err := clientHost.Inspect(id, temporal.GetExecutionTimeout())
@@ -361,7 +362,7 @@ var clusterCreateCommand = cli.Command{
 			Name: "disable",
 			Usage: `Allows to disable addition of default features (must be used several times to disable several features)
 	Accepted features are:
-		remotedesktop (all flavors), reverseproxy (all flavors),
+		ansible (all flavors), remotedesktop (all flavors), reverseproxy (all flavors),
 		gateway-failover (all flavors with Normal or Large complexity),
 		hardening (flavor K8S), helm (flavor K8S)`,
 		},
