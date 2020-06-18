@@ -986,6 +986,14 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 		}
 	}
 
+	// Installs ansible feature on cluster (all masters)
+	if _, ok := req.DisabledDefaultFeatures["ansible"]; !ok {
+		err = b.installAnsible(task)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Installs remotedesktop feature on cluster (all masters)
 	if _, ok := req.DisabledDefaultFeatures["remotedesktop"]; !ok {
 		err = b.installRemoteDesktop(task)
@@ -2357,6 +2365,39 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 		"Username": "cladm",
 		"Password": adminPassword,
 	}, install.Settings{})
+	if err != nil {
+		return err
+	}
+	if !results.Successful() {
+		msg := results.AllErrorMessages()
+		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+	}
+	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
+	return nil
+}
+
+// installAnsible installs feature ansible on all masters of the cluster
+func (b *foreman) installAnsible(task concurrency.Task) (err error) {
+	identity := b.cluster.GetIdentity(task)
+	clusterName := identity.Name
+
+	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	logrus.Debugf("[cluster %s] adding feature 'ansible'", clusterName)
+
+	target, err := install.NewClusterTarget(task, b.cluster)
+	if err != nil {
+		return err
+	}
+
+	// Adds ansible
+	feat, err := install.NewEmbeddedFeature(task, "ansible")
+	if err != nil {
+		return err
+	}
+	results, err := feat.Add(target, install.Variables{}, install.Settings{})
 	if err != nil {
 		return err
 	}
