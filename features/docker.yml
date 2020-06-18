@@ -70,7 +70,19 @@ feature:
                                 centos|rhel)
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
-                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce --nobest || sfFail 194
+                                    kop=0
+                                    op=-1
+                                    yum install -y curl --nobest &>/dev/null && op=$? || true
+                                    if [ $op -ne 0 ]; then
+                                        yum install -y curl &>/dev/null && op=$? || true
+                                        if [ $op -ne 0 ]; then
+                                            sfFail 194
+                                        else
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce || sfFail 194
+                                        fi
+                                    else
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce --nobest || sfFail 194
+                                    fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
                                 *)
