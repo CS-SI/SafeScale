@@ -248,10 +248,14 @@ feature:
                             gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
                             exclude=kube*
                             EOF
+
+                            # VPL: used as workaround for current google repo issue preventing installation of packages
+                            SUPPLEMENTAL_OPTIONS="--setopt=obsoletes=0"
+                            # ENDVPL
                             {{ if .KubeVersion }}
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
+                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes $SUPPLEMENTAL_OPTIONS || sfFail 199
                             {{ else }}
-                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 199
+                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes $SUPPLEMENTAL_OPTIONS || sfFail 199
                             {{ end }}
                                     ;;
 
