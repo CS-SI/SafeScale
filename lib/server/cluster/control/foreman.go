@@ -822,7 +822,8 @@ func complementHostDefinition(req *pb.HostDefinition, def *pb.HostDefinition) *p
 		return def
 	}
 
-	finalDef := srvutils.ClonePBHostDefinition(req)
+	//finalDef := srvutils.ClonePBHostDefinition(req)
+	finalDef := req.Clone()
 	if finalDef.Sizing == nil {
 		finalDef.Sizing = srvutils.ClonePBHostSizing(def.Sizing)
 		return finalDef
@@ -1777,7 +1778,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		return nil, err
 	}
 
-	hostDef := srvutils.ClonePBHostDefinition(def)
+	//hostDef := srvutils.ClonePBHostDefinition(def)
+	hostDef := def.Clone()
 	hostDef.Name, err = b.buildHostname(t, "master", nodetype.Master)
 	if err != nil {
 		return nil, err
@@ -2083,7 +2085,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Create the host
-	hostDef := def
+	//hostDef := srvutils.ClonePBHostDefinition(def)
+	hostDef := def.Clone()
 	hostDef.Name, err = b.buildHostname(t, "node", nodetype.Node)
 	if err != nil {
 		return nil, err
