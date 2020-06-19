@@ -120,7 +120,7 @@ feature:
                             sf_state_dir: "{{ "{{ sf_var_dir }}/state" }}"
                             EOF
 
-                            cat >${SF_ETCDIR}/host.cfg <<-EOF
+                            cat >${SF_ETCDIR}/ansible/host.cfg <<-EOF
                             host_private_ip: "{{ .HostIP }}"
                             EOF
 
@@ -130,11 +130,11 @@ feature:
                             primary_gateway_public_ip: "{{ .PrimaryPublicIP }}"
                             endpoint_ip: "{{ .EndpointIP }}"
                             default_route_ip: "{{ .DefaultRouteIP }}"
-                            secondary_gateway_private_ip: "{{ .SecondaryGatewayIP }}"
-                            secondary_gateway_public_ip: "{{ .SecondaryPublicIP }}"
+                            {{ if .SecondaryGatewayIP }}secondary_gateway_private_ip: "{{ .SecondaryGatewayIP }}"{{ end }}
+                            {{ if .SecondaryPublicIP }}secondary_gateway_public_ip: "{{ .SecondaryPublicIP }}"{{ end }}
                             EOF
 
-                            cat >${SF_ETCDIR}/cluster.cfg <<-EOF
+                            cat >${SF_ETCDIR}/ansible/cluster.cfg <<-EOF
                             cluster_name: "{{ .ClusterName }}"
                             cluster_flavor: "{{ .ClusterFlavor }}"
                             cluster_complexity: "{{ .ClusterComplexity }}"
