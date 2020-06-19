@@ -143,7 +143,7 @@ feature:
                             cluster_admin_username: "{{ .ClusterAdminUsername }}"
                             EOF
 
-                            chown -R {{ .ClusterAdminUsername }}:{{ .OperatorUsername }} ${SF_ETCDIR}/ansible
+                            chown -R {{ .ClusterAdminUsername }}:{{ .Username }} ${SF_ETCDIR}/ansible
                             chmod -R ug+rw,o-rw ${SF_ETCDIR}/ansible
                             find ${SF_ETCDIR}/ansible -type d -exec chmod ug+x,o-x {} \;
                             sfExit
