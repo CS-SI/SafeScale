@@ -25,11 +25,11 @@ func (x *HostSizing) Clone() *HostSizing {
 	return &HostSizing{
 		MinCpuCount: x.MinCpuCount,
 		MaxCpuCount: x.MaxCpuCount,
-		MinRamSize: x.MinRamSize,
-		MaxRamSize: x.MaxRamSize,
+		MinRamSize:  x.MinRamSize,
+		MaxRamSize:  x.MaxRamSize,
 		MinDiskSize: x.MinDiskSize,
-		GpuCount: x.GpuCount,
-		MinCpuFreq: x.MinCpuFreq,
+		GpuCount:    x.GpuCount,
+		MinCpuFreq:  x.MinCpuFreq,
 	}
 }
 
@@ -39,17 +39,18 @@ func (x *HostDefinition) Clone() *HostDefinition {
 		return &HostDefinition{}
 	}
 	return &HostDefinition{
-		Name:     x.Name,
-		Network:  x.Network,
-		CpuCount: x.CpuCount,
-		Ram:      x.Ram,
-		Disk:     x.Disk,
-		ImageId:  x.ImageId,
-		Public:   x.Public,
-		GpuCount: x.GpuCount,
-		CpuFreq:  x.CpuFreq,
-		Force:    x.Force,
-		Sizing:   x.Sizing.Clone(),
-		Domain:   x.Domain,
+		Name:          x.Name,
+		Network:       x.Network,
+		CpuCount:      x.CpuCount,
+		Ram:           x.Ram,
+		Disk:          x.Disk,
+		ImageId:       x.ImageId,
+		Public:        x.Public,
+		GpuCount:      x.GpuCount,
+		CpuFreq:       x.CpuFreq,
+		Force:         x.Force,
+		Sizing:        x.Sizing.Clone(),
+		Domain:        x.Domain,
+		KeepOnFailure: x.KeepOnFailure,
 	}
 }

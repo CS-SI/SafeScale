@@ -55,7 +55,7 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool, domain string) (*resources.Host, error)
+	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (*resources.Host, error)
 	List(ctx context.Context, all bool) ([]*resources.Host, error)
 	ForceInspect(ctx context.Context, ref string) (*resources.Host, error)
 	Inspect(ctx context.Context, ref string) (*resources.Host, error)
@@ -297,8 +297,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string,
-) (newHost *resources.Host, err error) {
+	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (newHost *resources.Host, err error) {
 
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -484,6 +483,9 @@ func (handler *HostHandler) Create(
 	}
 	defer func() {
 		if err != nil {
+			if keeponfailure {
+				return
+			}
 			derr := handler.service.DeleteHost(host.ID)
 			if derr != nil {
 				switch derr.(type) {
@@ -526,6 +528,9 @@ func (handler *HostHandler) Create(
 	// Starting from here, remove metadata if exiting with error
 	defer func() {
 		if err != nil {
+			if keeponfailure {
+				return
+			}
 			derr := mh.Delete()
 			if derr != nil {
 				logrus.Errorf("failed to remove host metadata after host creation failure")
@@ -716,7 +721,11 @@ func (handler *HostHandler) Create(
 	retryErr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			var inErr error
-			retcode, _, _, inErr = sshCmd.RunWithTimeout(nil, outputs.COLLECT, 0)
+			retcode, stdout, stderr, inErr = sshCmd.RunWithTimeout(nil, outputs.COLLECT, 0)
+			if stdout != "" || stderr != "" {
+				logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
+			}
+
 			return inErr
 		},
 		temporal.GetHostTimeout(),
@@ -1140,7 +1149,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 						MaxRAMSize:  hostSizingV1.AllocatedSize.RAMSize,
 						MinDiskSize: hostSizingV1.AllocatedSize.DiskSize,
 					}
-					hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true, hostDescriptionV1.Domain)
+					hostBis, err3 = handler.Create(context.Background(), host.Name, hostNetworkV1.DefaultNetworkID, "ubuntu 18.04", (len(hostNetworkV1.PublicIPv4)+len(hostNetworkV1.PublicIPv6)) != 0, &sizing, true, hostDescriptionV1.Domain, false)
 					if err3 != nil {
 						return fmt.Errorf("failed to stop host deletion : %s", err3.Error())
 					}
