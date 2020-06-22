@@ -19,8 +19,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"os/user"
+	"reflect"
 	"strings"
 	"time"
 
@@ -99,27 +102,22 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	}
 
 	id := mhm.ID
-	err = handler.service.StartHost(id)
+	err = retryOnCommunicationFailure(
+		func() error {
+			return handler.service.StartHost(id)
+		},
+		0,
+	)
 	if err != nil {
-		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
-			return err
-		default:
-			return err
-		}
+		return err
 	}
 
-	err = handler.service.WaitHostState(id, hoststate.STARTED, temporal.GetHostTimeout())
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrNotFound, scerr.ErrTimeout:
-			return err
-		default:
-			return err
-		}
-	}
-
-	return err
+	return retryOnCommunicationFailure(
+		func() error {
+			return handler.service.WaitHostState(id, hoststate.STARTED, temporal.GetHostTimeout())
+		},
+		0,
+	)
 }
 
 // Stop stops a host
@@ -240,7 +238,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 		MinGPU:      gpuNumber,
 	}
 
-	// TODO RESIZE 1st check new requirements vs old requirements
+	// TODO: RESIZE 1st check new requirements vs old requirements
 	host, err := mh.Get()
 	if err != nil {
 		return nil, err
@@ -433,7 +431,7 @@ func (handler *HostHandler) Create(
 	}
 
 	var img *resources.Image
-	retryErr := retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retryOnCommunicationFailure(
 		func() error {
 			var innerErr error
 			img, innerErr = handler.service.SearchImage(los)
@@ -470,7 +468,14 @@ func (handler *HostHandler) Create(
 	}
 
 	var userData *userdata.Content
-	host, userData, err = handler.service.CreateHost(hostRequest)
+	retryErr = retryOnCommunicationFailure(
+		func() error {
+			var innerErr error
+			host, userData, innerErr = handler.service.CreateHost(hostRequest)
+			return innerErr
+		},
+		0,
+	)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrInvalidRequest:
@@ -486,18 +491,23 @@ func (handler *HostHandler) Create(
 			if keeponfailure {
 				return
 			}
-			derr := handler.service.DeleteHost(host.ID)
-			if derr != nil {
-				switch derr.(type) {
+			retryErr := retryOnCommunicationFailure(
+				func() error {
+					return handler.service.DeleteHost(host.ID)
+				},
+				0,
+			)
+			if retryErr != nil {
+				switch retryErr.(type) {
 				case scerr.ErrNotFound:
-					logrus.Errorf("failed to delete host '%s', resource not found: %v", host.Name, derr)
+					logrus.Errorf("failed to delete host '%s', resource not found: %v", host.Name, retryErr)
 				case scerr.ErrTimeout:
-					logrus.Errorf("failed to delete host '%s', timeout: %v", host.Name, derr)
+					logrus.Errorf("failed to delete host '%s', timeout: %v", host.Name, retryErr)
 				default:
-					logrus.Errorf("failed to delete host '%s', other reason: %v", host.Name, derr)
+					logrus.Errorf("failed to delete host '%s', other reason: %v", host.Name, retryErr)
 				}
 			}
-			err = scerr.AddConsequence(err, derr)
+			err = scerr.AddConsequence(err, retryErr)
 		}
 	}()
 
@@ -851,9 +861,16 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 // getOrCreateDefaultNetwork gets network resources.SingleHostNetworkName or create it if necessary
 // We don't want metadata on this network, so we use directly provider api instead of services
 func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Network, err error) {
-	network, err = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
-	if err != nil {
-		switch err.(type) {
+	retryErr := retryOnCommunicationFailure(
+		func() error {
+			var innerErr error
+			network, innerErr = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
+			return innerErr
+		},
+		0,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
 		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
@@ -870,9 +887,16 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 		CIDR:      "10.0.0.0/8",
 	}
 
-	network, err = handler.service.CreateNetwork(request)
-	if err != nil {
-		switch err.(type) {
+	retryErr = retryOnCommunicationFailure(
+		func() error {
+			var innerErr error
+			network, innerErr = handler.service.CreateNetwork(request)
+			return innerErr
+		},
+		0,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
 		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err
 		default:
@@ -911,7 +935,7 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 	return hosts, nil
 }
 
-// ForceInspect ...
+// Force 	 ...
 // If not found, return (nil, err)
 func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *resources.Host, err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -945,16 +969,18 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	if err != nil {
 		return nil, err
 	}
-	host, err = handler.service.InspectHost(host)
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
-			return nil, err
-		default:
-			return nil, err
-		}
-	}
 
+	err = retryOnCommunicationFailure(
+		func() error {
+			var innerErr error
+			host, innerErr = handler.service.InspectHost(host)
+			return innerErr
+		},
+		0,
+	)
+	if err != nil {
+		return nil, err
+	}
 	if host == nil {
 		return nil, fmt.Errorf("failure inspecting host [%s]", ref)
 	}
@@ -962,6 +988,56 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	return host, nil
 }
 
+// retryOnCommunicationFailure executes fn inside a retry loop with tolerance for communication errors (relative to net package)
+func retryOnCommunicationFailure(fn func() error, duration time.Duration) error {
+	// default duration is 10 seconds
+	if duration <= 0 {
+		duration = 10*time.Second
+	}
+
+	err := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			return normalizeError(fn())
+		},
+		duration,
+	)
+	switch realErr := err.(type) {
+	case retry.ErrAborted:
+		err = realErr.Cause()
+	}
+	return err
+}
+
+// normalizeError analyzes the error passed as parameter and rewrite it to be more explicit
+// If the error is not a communication error, do not let a chance to retry by returning a *retry.ErrAborted error
+// containing the causing error in it
+func normalizeError(in error) (err error) {
+	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
+	defer func() {
+		if err != nil {
+			switch err.(type) {
+			case scerr.ErrInvalidRequest:
+				logrus.Warning(err.Error())
+			}
+		}
+	}()
+
+	if in != nil {
+		switch realErr := in.(type) {
+		case *url.Error:
+			switch commErr := realErr.Err.(type) {
+			case *net.DNSError:
+				return scerr.InvalidRequestError(fmt.Sprintf("failed to resolve by DNS: %v", commErr))
+			default:
+				return scerr.InvalidRequestError(fmt.Sprintf("failed to communicate (error type: %s): %v", reflect.TypeOf(realErr).String(), realErr.Error()))
+			}
+		default:
+			// In any other case, the error should explain the potential retry has to stop
+			return scerr.AbortedError("", in)
+		}
+	}
+	return nil
+}
 // Delete deletes host referenced by ref
 func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -1091,9 +1167,16 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	// Conditions are met, delete host
-	var deleteMetadataOnly bool
-	var moreTimeNeeded bool
-	err = handler.service.DeleteHost(host.ID)
+	var (
+		deleteMetadataOnly bool
+		moreTimeNeeded bool
+	)
+	err = retryOnCommunicationFailure(
+		func() error {
+			return handler.service.DeleteHost(host.ID)
+		},
+		0,
+	)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound:
@@ -1105,9 +1188,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		}
 	}
 
-	// FIXME Add GetHostState verification
+	// FIXME: Add GetHostState verification
 	if moreTimeNeeded {
-		if state, ok := handler.service.GetHostState(host.ID); ok == nil { // FIXME Unhandled timeout
+		if state, ok := handler.service.GetHostState(host.ID); ok == nil { // FIXME: Unhandled timeout
 			logrus.Warnf("While deleting the status was [%s]", state)
 			if state != hoststate.ERROR {
 				deleteMetadataOnly = true

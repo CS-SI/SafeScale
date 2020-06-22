@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -183,9 +183,9 @@ func (f *Folder) Write(path string, name string, content []byte) error {
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
-	list, err := f.service.GetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
+ 	list, err := f.service.GetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
 	if err != nil {
-		log.Errorf("Error browsing metadata: listing objects: %+v", err)
+		logrus.Errorf("Error browsing metadata: listing objects: %+v", err)
 		return err
 	}
 
@@ -198,7 +198,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		var buffer bytes.Buffer
 		_, err = f.service.GetMetadataBucket().ReadObject(i, &buffer, 0, 0)
 		if err != nil {
-			log.Errorf("Error browsing metadata: reading from buffer: %+v", err)
+			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", err)
 			return err
 		}
 		data := buffer.Bytes()
@@ -213,7 +213,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 			if _, ok := err.(*json.SyntaxError); ok && strings.Contains(err.Error(), "invalid character") {
 				err = scerr.SyntaxError(fmt.Sprintf("seems metadata '%s' is encrypted but not encryption key provided", i))
 			}
-			log.Errorf("Error browsing metadata: running callback: %+v", err)
+			logrus.Errorf("Error browsing metadata: running callback: %+v", err)
 			return err
 		}
 	}
