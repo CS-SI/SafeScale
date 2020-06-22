@@ -19,8 +19,9 @@ package metadata
 import (
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -128,6 +129,11 @@ func (i *Item) ReadFrom(path string, name string, callback ItemDecoderCallback) 
 	err := i.folder.Read(path, name, func(buf []byte) error {
 		var err error
 		data, err = callback(buf)
+		// VPL: Trace error message to try to locate where message "unexpected end of JSON input" occurs...
+		if err != nil {
+			logrus.Infof("Item.ReadFrom(): %v", err)
+		}
+		// ENDVPL
 		return err
 	})
 	if err != nil {

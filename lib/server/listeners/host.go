@@ -268,7 +268,6 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	}
 	log.Infof("Host '%s' created", name)
 	return srvutils.ToPBHost(host), nil
-
 }
 
 // Resize an host
