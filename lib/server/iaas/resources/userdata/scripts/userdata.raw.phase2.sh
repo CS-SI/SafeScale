@@ -1120,6 +1120,7 @@ EOF
     # Force update of systemd, pciutils
     sfApt install -q -y systemd pciutils || fail 210
     # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+    ensure_network_connectivity
     check_network_reachable
     ;;
 
@@ -1137,6 +1138,7 @@ EOF
       sfApt install -y systemd pciutils || fail 212
     fi
     # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+    ensure_network_connectivity
     check_network_reachable
 
     # # Security updates ...
