@@ -1384,12 +1384,12 @@ configure_dns
 is_network_reachable
 in_reach_after_dns=$?
 
-if [[ $(in_reach_after_dns) -eq 1 ]]; then
-  if [[ $(in_reach_before_dns) -eq 0 ]]; then
+if [[ ${in_reach_after_dns} -eq 1 ]]; then
+  if [[ ${in_reach_before_dns} -eq 0 ]]; then
     echo "Changing DNS messed up connectivity" && fail 191
   fi
 
-  if [[ $(in_reach_before_dns) -eq 1 ]]; then
+  if [[ ${in_reach_before_dns} -eq 1 ]]; then
     echo "Offline machine ??" && fail 192
   fi
 fi
