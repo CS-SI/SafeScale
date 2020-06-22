@@ -50,6 +50,7 @@ sfDetectFacts() {
   [[ -f /etc/os-release ]] && {
     . /etc/os-release
     LINUX_KIND=$ID
+    FULL_HOSTNAME=$VERSION_ID
   } || {
     which lsb_release &>/dev/null && {
       LINUX_KIND=$(lsb_release -is)
