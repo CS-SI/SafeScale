@@ -160,6 +160,7 @@ message HostDefinition{
     bool force = 13;
     HostSizing sizing = 14;
     string domain = 15;
+    bool keep_on_failure = 16;
 }
 
 enum HostState {

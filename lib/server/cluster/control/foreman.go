@@ -81,11 +81,11 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)   // returns masterCount, pruvateNodeCount, publicNodeCount
+	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)    // returns masterCount, pruvateNodeCount, publicNodeCount
 	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) *pb.HostDefinition // sizing of Gateway(s)
 	DefaultMasterSizing         func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of master(s)
 	DefaultNodeSizing           func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of node(s)
-	DefaultImage                func(task concurrency.Task, b Foreman) string            // default image of server(s)
+	DefaultImage                func(task concurrency.Task, b Foreman) string             // default image of server(s)
 	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType nodetype.Enum) (string, map[string]interface{})
 	GetGlobalSystemRequirements func(task concurrency.Task, f Foreman) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
@@ -310,7 +310,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		Cidr:     req.CIDR,
 		Gateway:  sizing,
 		FailOver: !gwFailoverDisabled,
-		Domain: req.Domain,
+		Domain:   req.Domain,
 	}
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(&def, temporal.GetExecutionTimeout())
@@ -1713,6 +1713,8 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	def.KeepOnFailure = !nokeep
+
 	clusterName := b.cluster.GetIdentity(t).Name
 
 	if count <= 0 {
@@ -1769,6 +1771,8 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	def.KeepOnFailure = !nokeep
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
@@ -1992,6 +1996,8 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	def.KeepOnFailure = !nokeep
+
 	clusterName := b.cluster.GetIdentity(t).Name
 
 	if count <= 0 {
@@ -2075,6 +2081,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	def.KeepOnFailure = !nokeep
 
 	hostLabel := fmt.Sprintf("node #%d", index)
 	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
