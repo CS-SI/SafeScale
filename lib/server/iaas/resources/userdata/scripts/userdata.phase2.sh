@@ -742,6 +742,10 @@ check_for_network() {
   REACHED=0
 
   for i in $(seq ${NETROUNDS}); do
+    if which curl; then
+      curl -I www.google.com -m 5 | grep "200 OK" && REACHED=1 && break
+    fi
+
     if which wget; then
       wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
     else
@@ -1389,13 +1393,15 @@ ensure_curl_is_installed
 
 configure_locale
 
-is_network_reachable
-in_reach_before_dns=$?
+op=1
+is_network_reachable && op=$? || true
+in_reach_before_dns=$op
 
 configure_dns
 
-is_network_reachable
-in_reach_after_dns=$?
+op=1
+is_network_reachable && op=$? || true
+in_reach_after_dns=$op
 
 if [[ ${in_reach_after_dns} -eq 1 ]]; then
   if [[ ${in_reach_before_dns} -eq 0 ]]; then
