@@ -260,14 +260,20 @@ collect_original_packages() {
 ensure_curl_is_installed() {
   case $LINUX_KIND in
   ubuntu | debian)
-    DEBIAN_FRONTEND=noninteractive apt-get update || fail 213
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || fail 214
+    if [[ -n $(which curl) ]]; then
+      return 0
+    fi
+    DEBIAN_FRONTEND=noninteractive apt-get update || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
     ;;
   redhat | rhel | centos | fedora)
+    if [[ -n $(which curl) ]]; then
+      return 0
+    fi
     if which dnf; then
-      dnf install -y -q curl &>/dev/null || fail 215
+      dnf install -y -q curl &>/dev/null || return 1
     else
-      yum install -y -q curl &>/dev/null || fail 215
+      yum install -y -q curl &>/dev/null || return 1
     fi
     ;;
   *)
@@ -275,6 +281,8 @@ ensure_curl_is_installed() {
     fail 216
     ;;
   esac
+
+  return 0
 }
 
 collect_installed_packages() {
@@ -292,16 +300,9 @@ collect_installed_packages() {
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-  NETROUNDS=24
-  REACHED=0
-
-  for i in $(seq ${NETROUNDS}); do
-    op=-1
-    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-    [ $op -eq 0 ] && REACHED=1 && break || true
-  done
-
-  [ $REACHED -ne 1 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+  op=1
+  is_network_reachable && op=$? || true
+  [ $op -ne 1 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
 
   {{- if .AddGateway }}
   route del -net default &>/dev/null
@@ -310,16 +311,12 @@ ensure_network_connectivity() {
   :
   {{- end}}
 
-  REACHED=0
-  for i in $(seq ${NETROUNDS}); do
-    op=-1
-    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-    [ $op -eq 0 ] && REACHED=1 && break || true
-  done
+  op=1
+  is_network_reachable && op=$? || true
+  [ $op -ne 1 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 
-  [ $REACHED -ne 1 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
-
-  [ $REACHED -ne 1 ] && fail 220 || true
+  [ $op -ne 1 ] && return 1
+  return 0
 }
 
 configure_dns() {
@@ -456,7 +453,7 @@ EOF
     fail 196
   }
 
-  reset_fw || fail 197
+  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 197)
 
   echo done
 }
@@ -613,7 +610,7 @@ EOF
     }
   fi
 
-  reset_fw || fail 199
+  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 199)
 
   echo done
 }
@@ -692,7 +689,7 @@ EOF
 
   echo "exclude=NetworkManager" >>/etc/yum.conf
 
-  reset_fw || fail 200
+  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 200)
 
   echo done
 }
@@ -1120,6 +1117,7 @@ EOF
     # Force update of systemd, pciutils
     sfApt install -q -y systemd pciutils || fail 210
     # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+    ensure_network_connectivity
     check_network_reachable
     ;;
 
@@ -1137,6 +1135,7 @@ EOF
       sfApt install -y systemd pciutils || fail 212
     fi
     # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+    ensure_network_connectivity
     check_network_reachable
 
     # # Security updates ...
@@ -1170,6 +1169,7 @@ EOF
           echo $msg | grep "Nothing to do" && return
           [ $op -ne 0 ] && sfFail 213
         fi
+        ensure_network_connectivity
         check_network_reachable
       fi
     else
@@ -1184,6 +1184,7 @@ EOF
         echo $msg | grep "Nothing to do" && return
         [ $op -ne 0 ] && sfFail 213
       fi
+      ensure_network_connectivity
       check_network_reachable
     fi
 
@@ -1352,7 +1353,7 @@ check_network_reachable() {
   done
 
   if [[ ${REACHED} -eq 0 ]]; then
-    echo "Unable to reach network"
+    echo "PROVISIONING_ERROR: Unable to reach network"
     fail 221
   fi
 

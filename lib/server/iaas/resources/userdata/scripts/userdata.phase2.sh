@@ -260,14 +260,20 @@ collect_original_packages() {
 ensure_curl_is_installed() {
   case $LINUX_KIND in
   ubuntu | debian)
-    DEBIAN_FRONTEND=noninteractive apt-get update || fail 213
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || fail 214
+    if [[ -n $(which curl) ]]; then
+      return 0
+    fi
+    DEBIAN_FRONTEND=noninteractive apt-get update || return 1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
     ;;
   redhat | rhel | centos | fedora)
+    if [[ -n $(which curl) ]]; then
+      return 0
+    fi
     if which dnf; then
-      dnf install -y -q curl &>/dev/null || fail 215
+      dnf install -y -q curl &>/dev/null || return 1
     else
-      yum install -y -q curl &>/dev/null || fail 215
+      yum install -y -q curl &>/dev/null || return 1
     fi
     ;;
   *)
@@ -275,6 +281,8 @@ ensure_curl_is_installed() {
     fail 216
     ;;
   esac
+
+  return 0
 }
 
 collect_installed_packages() {
@@ -292,16 +300,9 @@ collect_installed_packages() {
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-  NETROUNDS=24
-  REACHED=0
-
-  for i in $(seq ${NETROUNDS}); do
-    op=-1
-    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-    [ $op -eq 0 ] && REACHED=1 && break || true
-  done
-
-  [ $REACHED -ne 1 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+  op=1
+  is_network_reachable && op=$? || true
+  [ $op -ne 1 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
 
   {{- if .AddGateway }}
   route del -net default &>/dev/null
@@ -310,16 +311,12 @@ ensure_network_connectivity() {
   :
   {{- end}}
 
-  REACHED=0
-  for i in $(seq ${NETROUNDS}); do
-    op=-1
-    CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-    [ $op -eq 0 ] && REACHED=1 && break || true
-  done
+  op=1
+  is_network_reachable && op=$? || true
+  [ $op -ne 1 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 
-  [ $REACHED -ne 1 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
-
-  [ $REACHED -ne 1 ] && fail 220 || true
+  [ $op -ne 1 ] && return 1
+  return 0
 }
 
 configure_dns() {
@@ -456,7 +453,7 @@ EOF
     fail 196
   }
 
-  reset_fw || fail 197
+  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 197)
 
   echo done
 }
@@ -613,7 +610,7 @@ EOF
     }
   fi
 
-  reset_fw || fail 199
+  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 199)
 
   echo done
 }
@@ -692,7 +689,7 @@ EOF
 
   echo "exclude=NetworkManager" >>/etc/yum.conf
 
-  reset_fw || fail 200
+  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 200)
 
   echo done
 }
@@ -1172,6 +1169,7 @@ EOF
           echo $msg | grep "Nothing to do" && return
           [ $op -ne 0 ] && sfFail 213
         fi
+        ensure_network_connectivity
         check_network_reachable
       fi
     else
@@ -1186,6 +1184,7 @@ EOF
         echo $msg | grep "Nothing to do" && return
         [ $op -ne 0 ] && sfFail 213
       fi
+      ensure_network_connectivity
       check_network_reachable
     fi
 
@@ -1354,7 +1353,7 @@ check_network_reachable() {
   done
 
   if [[ ${REACHED} -eq 0 ]]; then
-    echo "Unable to reach network"
+    echo "PROVISIONING_ERROR: Unable to reach network"
     fail 221
   fi
 
@@ -1391,9 +1390,15 @@ collect_original_packages
 
 fail_fast_unsupported_distros
 
-ensure_curl_is_installed
-
 configure_locale
+
+op=1
+ensure_curl_is_installed && op=$? || true
+if [[ ${op} -ne 0 ]]; then
+  echo "Curl not available yet"
+else
+  echo "Curl installed"
+fi
 
 op=1
 is_network_reachable && op=$? || true
@@ -1407,15 +1412,24 @@ in_reach_after_dns=$op
 
 if [[ ${in_reach_after_dns} -eq 1 ]]; then
   if [[ ${in_reach_before_dns} -eq 0 ]]; then
-    echo "Changing DNS messed up connectivity" && fail 191
-  fi
-
-  if [[ ${in_reach_before_dns} -eq 1 ]]; then
-    echo "Offline machine ??" && fail 192
+    echo "PROVISIONING_ERROR: Changing DNS messed up connectivity" && fail 191
   fi
 fi
 
-ensure_network_connectivity
+op=1
+ensure_network_connectivity && op=$? || true
+network_connectivity_ok=$op
+
+op=1
+is_network_reachable && op=$? || true
+in_reach_after_gateway_setup=$op
+
+if [[ ${in_reach_after_gateway_setup} -eq 1 ]]; then
+  if [[ ${in_reach_after_dns} -eq 0 ]]; then
+    echo "PROVISIONING_ERROR: Changing Gateway messed up connectivity" && fail 192
+  fi
+fi
+
 add_common_repos
 early_packages_update
 
