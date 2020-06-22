@@ -192,6 +192,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
 					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
+					logrus.Tracef(fmt.Sprintf("this error occured, considered as an unrecoverable network error: %v", err))
 					networkError = true
 					return nil
 				}
