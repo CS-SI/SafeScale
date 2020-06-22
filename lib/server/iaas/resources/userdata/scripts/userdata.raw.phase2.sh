@@ -1336,6 +1336,10 @@ check_network_reachable() {
   REACHED=0
 
   for i in $(seq ${NETROUNDS}); do
+    if which curl; then
+      curl -I www.google.com -m 5 | grep "200 OK" && REACHED=1 && break
+    fi
+
     if which wget; then
       wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
     else
