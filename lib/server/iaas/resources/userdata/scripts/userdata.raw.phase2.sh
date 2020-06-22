@@ -1343,7 +1343,12 @@ check_network_reachable() {
     fi
   done
 
-  [ ${REACHED} -eq 0 ] && echo "Unable to reach network" && fail 221
+  if [[ ${REACHED} -eq 0 ]]; then
+    echo "Unable to reach network"
+    fail 221
+  fi
+
+  return 0
 }
 
 is_network_reachable() {
@@ -1362,7 +1367,11 @@ is_network_reachable() {
     fi
   done
 
-  [ ${REACHED} -eq 0 ] && echo "Unable to reach network" && return 1
+  if [[ ${REACHED} -eq 0 ]]; then
+    echo "Unable to reach network"
+    return 1
+  fi
+
   return 0
 }
 
