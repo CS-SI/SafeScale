@@ -115,7 +115,7 @@ func (tm *taskedLock) Lock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
 	defer tracer.OnExitTrace()()
 
-	tid, _ := task.GetID() // FIXME Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
 	tm.lock.Lock()
 
