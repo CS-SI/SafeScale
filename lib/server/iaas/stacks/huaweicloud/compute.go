@@ -611,7 +611,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, err
 	}
 
-	if serverState == hoststate.STARTED || serverState == hoststate.STOPPED {
+	switch serverState {
+	case hoststate.STARTED, hoststate.STOPPED:
 		server, err := s.waitHostState(host.ID, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay())
 		if err != nil {
 			return nil, err
@@ -625,7 +626,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		if !host.OK() {
 			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 		}
-	} else {
+	default:
 		host.LastState = serverState
 	}
 
@@ -648,9 +649,14 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	host.LastState = toHostState(server.Status)
-	if host.LastState != hoststate.STARTED {
-		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
-	}
+	// VPL: I don't get the point of this...
+	//switch host.LastState {
+	//case hoststate.STARTED, hoststate.STOPPED:
+	//	// continue
+	//default:
+	//	logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
+	//}
+	// ENDVPL
 
 	// Updates Host Property propsv1.HostDescription
 	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
@@ -824,43 +830,42 @@ func (s *Stack) DeleteHost(id string) error {
 		return scerr.InvalidInstanceError()
 	}
 
-	_, err := s.InspectHost(id)
-	if err != nil {
-		return err
-	}
-
+	// Delete floating IP address if there is one
 	if s.cfgOpts.UseFloatingIP {
 		fip, err := s.getFloatingIPOfHost(id)
-		if err == nil {
-			if fip != nil {
-				err = floatingips.DisassociateInstance(s.Stack.ComputeClient, id, floatingips.DisassociateOpts{
-					FloatingIP: fip.IP,
-				}).ExtractErr()
-				if err != nil {
-					return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
-				}
-				err = floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
-				if err != nil {
-					return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
-				}
+		if err != nil {
+			switch err.(type) {
+			case scerr.ErrNotFound:
+				// Continue
+			default:
+				return scerr.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
+			}
+		} else if fip != nil {
+			err = floatingips.DisassociateInstance(s.Stack.ComputeClient, id, floatingips.DisassociateOpts{FloatingIP: fip.IP}).ExtractErr()
+			if err != nil {
+				return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
+			}
+			err = floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
+			if err != nil {
+				return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
 			}
 		}
 	}
 
 	// Try to remove host for 3 minutes
-	outerRetryErr := retry.WhileUnsuccessful(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			resourcePresent := true
 			// 1st, send delete host order
-			err = servers.Delete(s.Stack.ComputeClient, id).ExtractErr()
-			if err != nil {
-				switch err.(type) { // FIXME Is a mistake, all 40x errors should be considered
+			innerErr := servers.Delete(s.Stack.ComputeClient, id).ExtractErr()
+			if innerErr != nil {
+				switch innerErr.(type) { // FIXME: Is a mistake, all 40x errors should be considered
 				case gc.ErrDefault404:
 					// Resource not found, consider deletion succeeded (if the entry doesn't exist at all,
 					// metadata deletion will return an error)
 					return nil
 				default:
-					return scerr.Errorf(fmt.Sprintf("failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(err)), err)
+					return scerr.Errorf(fmt.Sprintf("failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(innerErr)), innerErr)
 				}
 			}
 			// 2nd, check host status every 5 seconds until check failed.
@@ -869,20 +874,20 @@ func (s *Stack) DeleteHost(id string) error {
 			var host *servers.Server
 			innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
 				func() error {
-					host, err = servers.Get(s.Stack.ComputeClient, id).Extract()
-					if err == nil {
+					host, innerErr = servers.Get(s.Stack.ComputeClient, id).Extract()
+					if innerErr == nil {
 						if toHostState(host.Status) == hoststate.ERROR {
 							return nil
 						}
-						return scerr.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), err)
+						return scerr.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), innerErr)
 					}
 
-					switch err.(type) { // nolint
+					switch innerErr.(type) { // nolint
 					case gc.ErrDefault404: // FIXME Is a mistake, all 40x errors should be considered
 						resourcePresent = false
 						return nil
 					}
-					return err
+					return innerErr
 				},
 				temporal.GetContextTimeout(),
 			)
@@ -898,12 +903,12 @@ func (s *Stack) DeleteHost(id string) error {
 			}
 			return scerr.Errorf(fmt.Sprintf("host '%s' in state 'ERROR', retrying to delete", id), nil)
 		},
-		0,
+		5*time.Second,
 		temporal.GetHostCleanupTimeout(),
 	)
-	if outerRetryErr != nil {
-		logrus.Errorf("failed to remove host '%s': %s", id, outerRetryErr.Error())
-		return err
+	if retryErr != nil {
+		logrus.Errorf("failed to remove host '%s': %s", id, retryErr.Error())
+		return retryErr
 	}
 	return nil
 }
@@ -911,9 +916,13 @@ func (s *Stack) DeleteHost(id string) error {
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, error) {
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
+
 	pager := floatingips.List(s.Stack.ComputeClient)
 	var fips []floatingips.FloatingIP
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+	retryErr := pager.EachPage(func(page pagination.Page) (bool, error) {
 		list, err := floatingips.ExtractFloatingIPs(page)
 		if err != nil {
 			return false, err
@@ -927,10 +936,10 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 		return true, nil
 	})
 	if len(fips) == 0 {
-		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("no floating IP found for host '%s': %s", hostID, openstack.ProviderErrorToString(err)), err)
+		if retryErr != nil {
+			return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s': %s", hostID, openstack.ProviderErrorToString(retryErr)))
 		}
-		return nil, scerr.Errorf(fmt.Sprintf("no floating IP found for host '%s'", hostID), nil)
+		return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s'", hostID))
 	}
 	if len(fips) > 1 {
 		return nil, scerr.Errorf(fmt.Sprintf("configuration error, more than one Floating IP associated to host '%s'", hostID), nil)
