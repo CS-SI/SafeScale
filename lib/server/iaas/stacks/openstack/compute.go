@@ -439,7 +439,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		return nil, err
 	}
 
-	if serverState == hoststate.STARTED || serverState == hoststate.STOPPED {
+	switch serverState {
+	case hoststate.STARTED, hoststate.STOPPED:
 		server, err := s.waitHostState(host.ID, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay())
 		if err != nil {
 			return nil, err
@@ -453,7 +454,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		if !host.OK() {
 			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 		}
-	} else {
+	default:
 		host.LastState = serverState
 	}
 
@@ -520,9 +521,14 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 	}
 
 	host.LastState = toHostState(server.Status)
-	if host.LastState != hoststate.STARTED {
-		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
-	}
+	// VPL: I don't get the point of this...
+	//switch host.LastState {
+	//case hoststate.STARTED, hoststate.STOPPED:
+	//	// Continue
+	//default:
+	//	logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
+	//}
+	// ENDVPL
 
 	// Updates Host Property propsv1.HostDescription
 	err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
@@ -1282,18 +1288,15 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 		},
 		temporal.GetDefaultDelay()*2,
 	)
-
-	if retryErr != nil {
-		return nil, scerr.Wrap(retryErr, fmt.Sprintf("No floating IP found for host '%s': %s", hostID, ProviderErrorToString(retryErr)))
-	}
-
 	if len(fips) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("No floating IP found for host '%s'", hostID))
+		if retryErr != nil {
+			return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s': %s", hostID, ProviderErrorToString(retryErr)))
+		}
+		return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s'", hostID))
 	}
 	if len(fips) > 1 {
 		return nil, scerr.InconsistentError(fmt.Sprintf("Configuration error, more than one Floating IP associated to host '%s'", hostID))
 	}
-
 	return &fips[0], nil
 }
 
@@ -1308,23 +1311,25 @@ func (s *Stack) DeleteHost(id string) error {
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
+	// Delete floating IP address if there is one
 	if s.cfgOpts.UseFloatingIP {
 		fip, err := s.getFloatingIP(id)
-		if err == nil {
-			if fip != nil {
-				err = floatingips.DisassociateInstance(s.ComputeClient, id, floatingips.DisassociateOpts{
-					FloatingIP: fip.IP,
-				}).ExtractErr()
-				if err != nil {
-					return scerr.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
-				}
-				err = floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
-				if err != nil {
-					return scerr.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
-				}
+		if err != nil {
+			switch err.(type) {
+			case scerr.ErrNotFound:
+				// Continue
+			default:
+				return scerr.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
 			}
-		} else {
-			return scerr.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
+		} else if fip != nil {
+			err = floatingips.DisassociateInstance(s.ComputeClient, id, floatingips.DisassociateOpts{FloatingIP: fip.IP}).ExtractErr()
+			if err != nil {
+					return scerr.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+				}
+			err = floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
+			if err != nil {
+					return scerr.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+				}
 		}
 	}
 
