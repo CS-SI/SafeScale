@@ -19,12 +19,15 @@ package utils
 import (
 	"math"
 
+	"github.com/sirupsen/logrus"
+
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ToPBSshConfig converts a system.SSHConfig into a SshConfig
@@ -44,6 +47,9 @@ func ToPBSshConfig(from *system.SSHConfig) *pb.SshConfig {
 
 // ToSystemSSHConfig converts a pb.SshConfig into a system.SSHConfig
 func ToSystemSSHConfig(from *pb.SshConfig) *system.SSHConfig {
+	if from.Host == "" {
+		logrus.Error(scerr.DecorateWithCallTrace("invalid parameter content:", "from.Host", "cannot be empty string"))
+	}
 	var gw *system.SSHConfig
 	if from.Gateway != nil {
 		gw = ToSystemSSHConfig(from.Gateway)

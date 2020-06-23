@@ -722,7 +722,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 		return nil, err
 	}
 	if returnCode != 0 {
-		logrus.Warnf("Unexpected problem rebooting...")
+		logrus.Warnf("Unexpected problem rebooting (retcode=%d)", returnCode)
 	}
 
 	ssh, err := sshHandler.GetConfig(task.GetContext(), gw.ID)
