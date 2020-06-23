@@ -519,7 +519,7 @@ func (e ErrNotImplemented) AddConsequence(err error) error {
 func NotImplementedError(what string) ErrNotImplemented {
 	return ErrNotImplemented{
 		ErrCore: ErrCore{
-			message:      decorateWithCallTrace("not implemented yet", "", ""),
+			message:      DecorateWithCallTrace("not implemented yet", "", ""),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -585,7 +585,7 @@ func (e ErrInvalidInstance) AddConsequence(err error) error {
 func InvalidInstanceError() ErrInvalidInstance {
 	return ErrInvalidInstance{
 		ErrCore: ErrCore{
-			message:      decorateWithCallTrace("invalid instance", "", "calling method from a nil pointer"),
+			message:      DecorateWithCallTrace("invalid instance", "", "calling method from a nil pointer"),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -607,14 +607,15 @@ func (e ErrInvalidParameter) AddConsequence(err error) error {
 func InvalidParameterError(what, why string) ErrInvalidParameter {
 	return ErrInvalidParameter{
 		ErrCore: ErrCore{
-			message:      decorateWithCallTrace("invalid parameter", what, why),
+			message:      DecorateWithCallTrace("invalid parameter", what, why),
 			cause:        nil,
 			consequences: []error{},
 		},
 	}
 }
 
-func decorateWithCallTrace(prefix, what, why string) string {
+// DecorateWithCallTrace adds call trace to message
+func DecorateWithCallTrace(prefix, what, why string) string {
 	const missingPrefixMessage = "uncategorized error occurred"
 
 	msg := prefix
@@ -660,7 +661,7 @@ func (e ErrInvalidInstanceContent) AddConsequence(err error) error {
 func InvalidInstanceContentError(what, why string) ErrInvalidInstanceContent {
 	return ErrInvalidInstanceContent{
 		ErrCore: ErrCore{
-			message:      decorateWithCallTrace("invalid instance content", what, why),
+			message:      DecorateWithCallTrace("invalid instance content", what, why),
 			cause:        nil,
 			consequences: []error{},
 		},
@@ -682,7 +683,7 @@ func (e ErrInconsistent) AddConsequence(err error) error {
 func InconsistentError(msg string) ErrInconsistent {
 	return ErrInconsistent{
 		ErrCore: ErrCore{
-			message:      decorateWithCallTrace(msg, "", ""),
+			message:      DecorateWithCallTrace(msg, "", ""),
 			cause:        nil,
 			consequences: []error{},
 		},
