@@ -1058,15 +1058,24 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
 		return err
 	}
 
+	// search for an available master if cluster is running
 	if selectedMaster == "" {
-		selectedMaster, err = c.FindAvailableMaster(task)
+		state, err := c.GetState(task)
 		if err != nil {
-			errDelNode := c.deleteNode(task, node, "")
-			err = scerr.AddConsequence(err, errDelNode)
 			return err
+		}
+		switch state {
+		case clusterstate.Created, clusterstate.Degraded, clusterstate.Nominal, clusterstate.Starting:
+			selectedMaster, err = c.FindAvailableMaster(task)
+			if err != nil {
+				errDelNode := c.deleteNode(task, node, "")
+				err = scerr.AddConsequence(err, errDelNode)
+				return err
+			}
 		}
 	}
 
+	// Delete node
 	return c.deleteNode(task, node, selectedMaster)
 }
 
@@ -1086,24 +1095,33 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	// Don't remove a node with volume(s) attached
+	hostExist := true
+
+	// Do not remove a node with volume(s) attached
 	mh, err := metadata.LoadHost(c.GetService(task), node.ID)
 	if err != nil {
-		return err
-	}
-	host, err := mh.Get()
-	if err != nil {
-		return err
-	}
-	err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
-		nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
-		if nAttached > 0 {
-			return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+		switch err.(type) {
+		case scerr.ErrNotFound:
+			// If host is not found, deletion is considered a success, but we continue to update metadata
+			hostExist = false
+		default:
+			return err
 		}
-		return nil
-	})
-	if err != nil {
-		return scerr.InvalidRequestError(fmt.Sprintf("cannot delete node '%s' because of attached volumes: %v", host.Name, err))
+	} else {
+		host, err := mh.Get()
+		if err != nil {
+			return err
+		}
+		err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
+			nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
+			if nAttached > 0 {
+				return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+			}
+			return nil
+		})
+		if err != nil {
+			return scerr.InvalidRequestError(fmt.Sprintf("cannot delete node '%s' because of attached volumes: %v", host.Name, err))
+		}
 	}
 
 	// Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
@@ -1126,7 +1144,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 
 	// Starting from here, restore node in cluster metadata if exiting with error
 	defer func() {
-		if err != nil {
+		if err != nil && hostExist {
 			derr := c.UpdateMetadata(task, func() error {
 				return c.Properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
 					nodesV1 := clonable.(*clusterpropsv1.Nodes)
@@ -1142,7 +1160,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}()
 
 	// Leave node from cluster (for example leave Docker SWARM), if selectedMaster isn't empty
-	if selectedMaster != "" {
+	if hostExist && selectedMaster != "" {
 		err = c.foreman.leaveNodesFromList(task, []string{node.ID}, selectedMaster)
 		if err != nil {
 			return err
@@ -1158,13 +1176,15 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	// Host may have mounted volume, we must detach it before being able to remove the host
 
 	// Finally delete host
-	err = client.New().Host.Delete([]string{node.ID}, temporal.GetLongOperationTimeout())
-	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			// host seems already deleted, so it's a success :-)
-			return nil
+	if hostExist {
+		err = client.New().Host.Delete([]string{node.ID}, temporal.GetLongOperationTimeout())
+		if err != nil {
+			if _, ok := err.(scerr.ErrNotFound); ok {
+				// host seems already deleted, so it's a success :-)
+				return nil
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -1200,11 +1220,12 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	state, _ := c.ForceGetState(task)
-	if state == clusterstate.Stopped {
+	switch state {
+	case clusterstate.Stopped:
 		return nil
-	}
-
-	if state != clusterstate.Nominal && state != clusterstate.Degraded {
+	case clusterstate.Created, clusterstate.Nominal, clusterstate.Degraded:
+		// continue
+	default:
 		return fmt.Errorf("failed to stop Cluster because of it's current state: %s", state.String())
 	}
 
@@ -1259,7 +1280,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 		return err
 	}
 
-	// FIXME Log errors and introduce status
+	// FIXME: Log errors and introduce status
 
 	for _, n := range nodes {
 		_, _ = taskGroup.Start(c.asyncStopHost, n.ID)
@@ -1283,7 +1304,6 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	return c.UpdateMetadata(task, func() error {
 		return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
 			clonable.(*clusterpropsv1.State).State = clusterstate.Stopped
-			state = clusterstate.Stopped
 			return nil
 		})
 	})
@@ -1310,10 +1330,12 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	if err != nil {
 		return err
 	}
-	if state == clusterstate.Nominal || state == clusterstate.Degraded || state == clusterstate.Starting {
+	switch state {
+	case clusterstate.Nominal, clusterstate.Degraded, clusterstate.Starting, clusterstate.Created:
 		return nil
-	}
-	if state != clusterstate.Stopped {
+	case clusterstate.Stopped:
+		// Continue
+	default:
 		return fmt.Errorf("failed to start Cluster because of it's current state: %s", state.String())
 	}
 

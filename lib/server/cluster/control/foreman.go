@@ -183,7 +183,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil {
 			state = clusterstate.Error
 		} else {
-			state = clusterstate.Created
+			state = clusterstate.Nominal
 		}
 
 		metaErr := b.cluster.UpdateMetadata(task, func() error {
@@ -791,7 +791,12 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
 	for i := 0; i < length; i++ {
 		mh, err := providermetadata.LoadHost(svc, list[i])
 		if err != nil {
-			return err
+			switch err.(type) {
+			case scerr.ErrNotFound:
+				continue
+			default:
+				return err
+			}
 		}
 		host, err := mh.Get()
 		if err != nil {
@@ -872,12 +877,21 @@ func complementHostDefinition(req *pb.HostDefinition, def *pb.HostDefinition) *p
 	return finalDef
 }
 
-// GetState returns "actively" the current state of the cluster
+// GetState returns "actively" (if active state is proposed by maker) the current state of the cluster
 func (b *foreman) getState(task concurrency.Task) (clusterstate.Enum, error) {
 	if b.makers.GetState != nil {
 		return b.makers.GetState(task, b)
 	}
-	return clusterstate.Unknown, fmt.Errorf("no maker defined for 'GetState'")
+
+	var stateV1 clusterstate.Enum
+	err := b.cluster.GetProperties(task).LockForRead(property.StateV1).ThenUse(func(clonable data.Clonable) error {
+		stateV1 = clonable.(*clusterpropsv1.State).State
+		return nil
+	})
+	if err != nil{
+		return clusterstate.Unknown, err
+	}
+	return stateV1, nil
 }
 
 // configureNode ...
