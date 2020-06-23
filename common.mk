@@ -1,4 +1,4 @@
-VERSION=20.06.0-beta2
+VERSION=20.06.0-beta3
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
