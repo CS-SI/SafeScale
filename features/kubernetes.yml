@@ -52,8 +52,8 @@ feature:
         - CNI=calico
         - Dashboard=true
         - Hardening=true
-        - KubeVersion=1.14.1
-        - HelmVersion=2.14.1
+        - KubeVersion=1.14.10
+        - HelmVersion=2.15.2
         - DisableHelm=false
         - HelmDefaultNamespace=default
         - ExternalLoadBalancerHostname=
@@ -249,13 +249,10 @@ feature:
                             exclude=kube*
                             EOF
 
-                            # VPL: used as workaround for current google repo issue preventing installation of packages
-                            SUPPLEMENTAL_OPTIONS="--setopt=obsoletes=0"
-                            # ENDVPL
                             {{ if .KubeVersion }}
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes $SUPPLEMENTAL_OPTIONS || sfFail 199
+                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
                             {{ else }}
-                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes $SUPPLEMENTAL_OPTIONS || sfFail 199
+                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 199
                             {{ end }}
                                     ;;
 
