@@ -139,11 +139,36 @@ feature:
                             cluster_flavor: "{{ .ClusterFlavor }}"
                             cluster_complexity: "{{ .ClusterComplexity }}"
                             controlplane_uses_vip: {{ .ControlplaneUsesVIP }}
-                            controlplane_endpoint_ip: "{{ .ControlplaneEndpointIP }}"
+                            controlplane_endpoint_ip: "{{ .Control  planeEndpointIP }}"
                             cluster_admin_username: "{{ .ClusterAdminUsername }}"
                             EOF
 
-                            chown -R {{ .ClusterAdminUsername }}:{{ .Username }} ${SF_ETCDIR}/ansible
+                            cat >${SF_ETCDIR}/ansible/inventory.cfg <<-EOF
+                            [gateways]
+                            {{ .PrimaryGateway }} ansible_host={{ .PrimaryGatewayIP }}
+                            {{ if .SecondaryGatewayIP }}{{ .SecondaryGateway }} ansible_host={{ .SecondaryGatewayIP }}{{ end }}
+
+                            [masters]
+                            {{- range .ClusterMasters }}
+                            {{ .Name }} ansible_host={{ .PrivateIP }}
+                            {{ end }}
+
+                            [nodes]
+                            {{- range .ClusterNodes }}
+                            {{ .Name }} ansible_host={{ .PrivateIP }}
+                            {{ end }}
+
+                            [{{ .ClusterName }}:hosts]
+                            gateway
+                            masters
+                            nodes
+
+                            [{{ .ClusterName }}:vars]
+                            ansible_user={{ .ClusterAdminUsername }}
+                            ansible_python_interpreter=/usr/bin/python3
+                            EOF
+
+                            chown -R {{ .ClusterAdminUsername }} ${SF_ETCDIR}/ansible
                             chmod -R ug+rw,o-rw ${SF_ETCDIR}/ansible
                             find ${SF_ETCDIR}/ansible -type d -exec chmod ug+x,o-x {} \;
                             sfExit
