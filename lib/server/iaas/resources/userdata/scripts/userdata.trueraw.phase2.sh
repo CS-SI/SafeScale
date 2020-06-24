@@ -302,7 +302,11 @@ collect_installed_packages() {
 ensure_network_connectivity() {
   op=1
   is_network_reachable && op=$? || true
-  [ $op -ne 1 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+  if [[ $op -ne 0 ]]; then
+    echo "ensure_network_connectivity started WITHOUT network..."
+  else
+    echo "ensure_network_connectivity started WITH network..."
+  fi
 
   {{- if .AddGateway }}
   route del -net default &>/dev/null
@@ -313,9 +317,16 @@ ensure_network_connectivity() {
 
   op=1
   is_network_reachable && op=$? || true
-  [ $op -ne 1 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
+  if [[ $op -ne 0 ]]; then
+    echo "ensure_network_connectivity finished WITHOUT network..."
+  else
+    echo "ensure_network_connectivity finished WITH network..."
+  fi
 
-  [ $op -ne 1 ] && return 1
+  if [[ $op -ne 0 ]]; then
+    return 1
+  fi
+
   return 0
 }
 
@@ -646,6 +657,18 @@ configure_network_redhat() {
       systemctl restart $1
     }
   fi
+
+  # Try installing network-scripts if available
+  case $LINUX_KIND in
+  redhat | rhel | centos | fedora)
+    if which dnf; then
+      dnf install -q -y network-scripts || true
+    else
+      yum install -q -y network-scripts || true
+    fi
+    ;;
+  *) ;;
+  esac
 
   # We don't want NetworkManager
   stop_svc NetworkManager &>/dev/null
