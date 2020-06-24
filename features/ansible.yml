@@ -139,32 +139,32 @@ feature:
                             cluster_flavor: "{{ .ClusterFlavor }}"
                             cluster_complexity: "{{ .ClusterComplexity }}"
                             controlplane_uses_vip: {{ .ControlplaneUsesVIP }}
-                            controlplane_endpoint_ip: "{{ .Control  planeEndpointIP }}"
+                            controlplane_endpoint_ip: "{{ .ControlplaneEndpointIP }}"
                             cluster_admin_username: "{{ .ClusterAdminUsername }}"
                             EOF
 
                             cat >${SF_ETCDIR}/ansible/inventory.cfg <<-EOF
                             [gateways]
-                            {{ .PrimaryGateway }} ansible_host={{ .PrimaryGatewayIP }}
-                            {{ if .SecondaryGatewayIP }}{{ .SecondaryGateway }} ansible_host={{ .SecondaryGatewayIP }}{{ end }}
+                            primary_gateway ansible_host={{ .PrimaryGatewayIP }}
+                            {{ if .SecondaryGatewayIP }}secondary_gateway ansible_host={{ .SecondaryGatewayIP }}{{ end }}
 
                             [masters]
                             {{- range .ClusterMasters }}
                             {{ .Name }} ansible_host={{ .PrivateIP }}
-                            {{ end }}
+                            {{- end }}
 
                             [nodes]
                             {{- range .ClusterNodes }}
                             {{ .Name }} ansible_host={{ .PrivateIP }}
-                            {{ end }}
+                            {{- end }}
 
                             [{{ .ClusterName }}:hosts]
-                            gateway
+                            gateways
                             masters
                             nodes
 
                             [{{ .ClusterName }}:vars]
-                            ansible_user={{ .ClusterAdminUsername }}
+                            ansible_user={{ .ClusterAdminUsername }}
                             ansible_python_interpreter=/usr/bin/python3
                             EOF
 
