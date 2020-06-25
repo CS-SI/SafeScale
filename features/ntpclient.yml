@@ -102,12 +102,13 @@ feature:
                                     {{ end }}
                                     ;;
                                 centos|fedora|rhel)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} chronyc -a makestep || sfFail 194
                                     if [[ -n $(which dnf) ]]; then
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} chronyc -a makestep || sfFail 194
                                         {{ if .Peers }}
                                         sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/chrony.conf || sfFail 196
                                         {{ end }}
                                     else
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} ntpdate -u pool.ntp.org || sfFail 194
                                         yum install -y ntp || sfFail 195
                                         {{ if .Peers }}
                                         sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 196
