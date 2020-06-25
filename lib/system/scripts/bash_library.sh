@@ -267,8 +267,12 @@ sfInstall() {
             sfApt install $1 -y || exit 194
             which $1 || exit 194
             ;;
-        centos|rhel)
-            yum install -y $1 || exit 194
+        centos|fedora|rhel)
+            if [[ -n $(which dnf) ]]; then
+                dnf install -y $1 || exit 194
+            else
+                yum install -y $1 || exit 194
+            fi
             which $1 || exit 194
             ;;
         *)
