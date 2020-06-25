@@ -35,8 +35,12 @@ feature:
                                 debian|ubuntu)
                                     dpkg -l | grep ntp &>/dev/null || sfFail 192
                                     ;;
-                                centos|rhel)
-                                    rpm -qa | grep ntp &>/dev/null || sfFail 192
+                                centos|fedora|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        rpm -qa | grep chrony &>/dev/null || sfFail 192
+                                    else
+                                        rpm -qa | grep ntp &>/dev/null || sfFail 192
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -60,8 +64,12 @@ feature:
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update && sfApt install -y ntp" || sfFail 192
                                     ;;
-                                centos|rhel)
-                                    yum install -y ntp || sfFail 192
+                                centos|fedora|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf install -y chrony || sfFail 192
+                                    else
+                                        yum install -y ntp || sfFail 192
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -99,12 +107,24 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 197
                                     ;;
-                                centos|rhel)
-                                    sfService enable ntpd || sfFail 195
-                                    sfService restart ntpd || sfFail 196
-                                    op=-1
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntpd &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && sfFail 197
+                                centos|fedora|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfService enable chronyd || sfFail 195
+                                        sfService restart chronyd || sfFail 196
+                                    else
+                                        sfService enable ntpd || sfFail 195
+                                        sfService restart ntpd || sfFail 196
+                                    fi
+
+                                    if [[ -n $(which dnf) ]]; then
+                                        op=-1
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status chronyd &>/dev/null && op=$? || true
+                                        [ $op -ne 0 ] && sfFail 197
+                                    else
+                                        op=-1
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntpd &>/dev/null && op=$? || true
+                                        [ $op -ne 0 ] && sfFail 197
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -130,10 +150,15 @@ feature:
                                     sfWaitForApt && apt-get purge -y ntp*
                                     apt-get autoremove -y
                                     ;;
-                                centos|rhel)
-                                    sfService disable ntpd
-                                    sfService stop ntpd
-                                    yum remove -y ntp*
+                                centos|fedora|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfService disable chronyd
+                                        sfService stop chronyd
+                                    else
+                                        sfService disable ntpd
+                                        sfService stop ntpd
+                                        yum remove -y ntp*
+                                    fi
                                     yum autoremove -y
                                     ;;
                                 *)
