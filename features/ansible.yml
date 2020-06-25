@@ -35,7 +35,7 @@ feature:
                                 debian|ubuntu)
                                     dpkg -l | grep ansible &>/dev/null || sfFail 1
                                     ;;
-                                centos|rhel)
+                                centos|fedora|rhel)
                                     rpm -qa | grep ansible &>/dev/null || sfFail 1
                                     ;;
                                 *)
@@ -84,8 +84,12 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
                                     ;;
-                                centos|rhel)
-                                    yum install -y ansible || sfFail 192
+                                centos|fedora|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf install --enablerepo=epel -y ansible || sfFail 192
+                                    else
+                                        yum install -y ansible || sfFail 192
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -188,9 +192,14 @@ feature:
                                     sfWaitForApt && apt-get purge -y ansible*
                                     apt-get autoremove -y
                                     ;;
-                                centos|rhel)
-                                    yum remove -y ansible*
-                                    yum autoremove -y
+                                centos|fedora|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf remove -y ansible*
+                                        dnf autoremove -y
+                                    else
+                                        yum remove -y ansible*
+                                        yum autoremove -y
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
