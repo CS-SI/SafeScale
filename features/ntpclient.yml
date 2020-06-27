@@ -123,6 +123,7 @@ feature:
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
+                                    echo "Configuring ntpclient..."
                                     {{ if .Peers }}
                                     cat >>/etc/ntp.conf <<EOF
 
@@ -134,6 +135,7 @@ feature:
                                     ;;
                                 centos|fedora|rhel)
                                     if [[ -n $(which dnf) ]]; then
+                                        echo "Configuring ntpclient..."
                                         {{ if .Peers }}
                                         cat >>/etc/chrony.conf <<EOF
 
@@ -143,6 +145,7 @@ feature:
                                         EOF
                                         {{ end }}
                                     else
+                                        echo "Configuring ntpclient..."
                                         {{ if .Peers }}
                                         cat >>/etc/ntp.conf <<EOF
 
