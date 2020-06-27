@@ -22,7 +22,7 @@ feature:
         bash:
             check: |
                 case $LINUX_KIND in
-                    redhat|rhel|centos)
+                    redhat|rhel|fedora|centos)
                         rpm -qa | grep apache-ignite &>/dev/null
                         ;;
                     debian|ubuntu)
@@ -36,7 +36,7 @@ feature:
 
             add: |
                 case $LINUX_KIND in
-                    redhat|rhel|centos)
+                    redhat|rhel|fedora|centos)
                         cat >/etc/yum.repos.d/ignite.repo <<-'EOF'
                 name=Apache Ignite
                 baseurl=https://apache.org/dist/ignite/rpm/
@@ -68,7 +68,7 @@ feature:
                 systemctl stop pache-ignite
                 systemctl disable apache-ignite
                 case $LINUX_KIND in
-                    redhat|rhel|centos)
+                    redhat|rhel|fedora|centos)
                         yum remove -y apache-ignite
                         rm -f /etc/yum.repos.d/ignite.repo
                         ;;

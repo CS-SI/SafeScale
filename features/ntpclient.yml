@@ -39,7 +39,7 @@ feature:
                                 debian|ubuntu)
                                     dpkg -l | grep ntpdate &>/dev/null || sfFail 192
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf -y install ntpstat &>/dev/null || sfFail 192
                                     else
@@ -68,7 +68,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ntpdate" || sfFail 192
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf install -y ntpstat || sfFail 192
                                     else
@@ -101,7 +101,7 @@ feature:
                                     sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf || sfFail 197
                                     {{ end }}
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} chronyc -a makestep || sfFail 194
                                         {{ if .Peers }}
@@ -133,7 +133,7 @@ feature:
                                     EOF
                                     {{ end }}
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         echo "Configuring ntpclient..."
                                         {{ if .Peers }}
@@ -175,7 +175,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 201
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         sfService enable chronyd || sfFail 202
                                         sfService restart chronyd || sfFail 203
@@ -216,7 +216,7 @@ feature:
                                     sfWaitForApt && apt-get purge -y ntp ntpstat ntpdate*
                                     apt-get autoremove -y
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         sfService disable chronyd
                                         sfService stop chronyd

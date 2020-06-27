@@ -48,7 +48,7 @@ feature:
                             masters: one
                         run: |
                             case $LINUX_KIND in
-                                centos|redhat|rhel)
+                                centos|fedora|redhat|rhel)
                                     yum install -y openssl || sfFail 192 "Unable to install openssl"
                                     ;;
                                 debian|ubuntu)

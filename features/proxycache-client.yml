@@ -55,7 +55,7 @@ feature:
                                 debian|ubuntu)
                                     echo "Acquire::http::Proxy http://{{.DefaultRouteIP}}:3128/;" >/etc/apt/02proxy
                                     ;;
-                                redhat|rhel|centos)
+                                redhat|rhel|fedora|centos)
                                     echo "proxy=http://{{.DefaultRouteIP}}:3128/" >>/etc/yum.conf
                                     ;;
                                 *)
@@ -85,7 +85,7 @@ feature:
                                 debian|ubuntu)
                                     rm -f /etc/apt/02proxy
                                     ;;
-                                redhat|rhel|centos)
+                                redhat|rhel|centos|fedora)
                                     cat /etc/yum.conf | grep -v "^proxy=" >/etc/yum.conf.new
                                     mv -f /etc/yum.conf.new /etc/yum.conf
                                     ;;

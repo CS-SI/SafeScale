@@ -69,7 +69,7 @@ feature:
                             # Install xfce + tigervnc                                 #
                             ###########################################################
                             case $LINUX_KIND in
-                                centos|redhat|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf install -y epel-release && \
                                         dnf makecache -y || sfFail 192
