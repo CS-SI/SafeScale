@@ -1252,7 +1252,7 @@ add_common_repos() {
     if which dnf; then
       # Install EPEL repo ...
       dnf install -y epel-release || fail 217
-      dnf makecache || fail 218
+      dnf makecache -y || fail 218
       # ... but don't enable it by default
       dnf config-manager --set-disabled epel &>/dev/null || true
     else
@@ -1264,7 +1264,7 @@ add_common_repos() {
     fi
     ;;
   fedora)
-    dnf makecache || fail 218
+    dnf makecache -y || fail 218
     ;;
   esac
 }
