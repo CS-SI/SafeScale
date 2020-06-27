@@ -36,7 +36,7 @@ feature:
                                     dpkg -l | grep docker-ce &>/dev/null || sfFail 1
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
-                                centos|rhel)
+                                centos|fedora|redhat|rhel)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 1
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
@@ -67,7 +67,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -qqy docker-ce" || sfFail 194
                                     ;;
-                                centos|rhel)
+                                centos|fedora|redhat|rhel)
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
                                     kop=0
@@ -209,7 +209,7 @@ feature:
                                 debian|ubuntu)
                                     sfApt purge -y docker-ce*
                                     ;;
-                                centos|rhel)
+                                centos|fedora|redhat|rhel)
                                     yum remove -y docker-ce*
                                     ;;
                                 *)

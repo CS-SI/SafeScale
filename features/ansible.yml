@@ -35,7 +35,7 @@ feature:
                                 debian|ubuntu)
                                     dpkg -l | grep ansible &>/dev/null || sfFail 1
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     rpm -qa | grep ansible &>/dev/null || sfFail 1
                                     ;;
                                 *)
@@ -84,7 +84,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf install --enablerepo=epel -y ansible || sfFail 192
                                     else
@@ -192,7 +192,7 @@ feature:
                                     sfWaitForApt && apt-get purge -y ansible*
                                     apt-get autoremove -y
                                     ;;
-                                centos|fedora|rhel)
+                                centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf remove -y ansible*
                                         dnf autoremove -y
