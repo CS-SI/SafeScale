@@ -92,8 +92,13 @@ case $(sfGetFact "linux_kind") in
         mandb
         ;;
     redhat|rhel|centos)
-        yum makecache fast
-        yum install -y wget curl time rclone jq unzip
+        if [[ -n $(which dnf) ]]; then
+            dnf makecache -y
+            dnf install -y wget curl time rclone jq unzip
+        else
+            yum makecache fast
+            yum install -y wget curl time rclone jq unzip
+        fi
         ;;
     fedora)
         dnf install wget curl time rclone jq unzip

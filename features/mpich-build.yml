@@ -47,7 +47,11 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 redhat|rhel|centos)
-                                    yum makecache fast
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf makecache -y
+                                    else
+                                        yum makecache fast
+                                    fi
                                     yum groupinstall -y "Development Tools"
                                     yum install -y wget
                                     ;;
