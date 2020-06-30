@@ -170,47 +170,69 @@ disable_services() {
   esac
 }
 
-# If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity_with_curl() {
-  op=-1
-  CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-  [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
+is_network_reachable() {
+  NETROUNDS=24
+  REACHED=0
 
-  {{- if .AddGateway }}
-  route del -net default &>/dev/null
-  route add -net default gw {{ .DefaultRouteIP }}
-  {{- else }}
-  :
-  {{- end}}
+  for i in $(seq ${NETROUNDS}); do
+    if which curl; then
+      curl -I www.google.com -m 5 | grep "200 OK" && REACHED=1 && break
+    fi
 
-  op=-1
-  CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
-  [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
+    if which wget; then
+      wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+    else
+      ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+    fi
+
+    sleep 1
+  done
+
+  if [[ ${REACHED} -eq 0 ]]; then
+    echo "Unable to reach network"
+    return 1
+  fi
+
+  return 0
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity_with_ping() {
-  op=-1
-  CONNECTED=$(ping -q -w1 -c1 google.com &>/dev/null) && op=$? || true
-  [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
-
-  {{- if .AddGateway }}
-  route del -net default &>/dev/null
-  route add -net default gw {{ .DefaultRouteIP }}
-  {{- else }}
-  :
-  {{- end}}
-
-  op=-1
-  CONNECTED=$(ping -q -w1 -c1 google.com &>/dev/null) && op=$? || true
-  [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
-}
-
 ensure_network_connectivity() {
-  if [[ -n $(which curl) ]]; then
-    ensure_network_connectivity_with_curl || fail 200
+  op=-1
+  is_network_reachable && op=$? || true
+  if [[ ${op} -eq 0 ]]; then
+    echo "ensure_network_connectivity started WITH network..."
   else
-    ensure_network_connectivity_with_ping || fail 200
+    echo "ensure_network_connectivity started WITHOUT network..."
+  fi
+
+  {{- if .AddGateway }}
+  route del -net default &>/dev/null
+  route add -net default gw {{ .DefaultRouteIP }}
+  {{- else }}
+  :
+  {{- end}}
+
+  op=-1
+  is_network_reachable && op=$? || true
+  if [[ ${op} -eq 0 ]]; then
+    echo "ensure_network_connectivity finished WITH network..."
+    return 0
+  else
+    echo "ensure_network_connectivity finished WITHOUT network..."
+  fi
+
+  echo "" >> /etc/resolv.conf
+  echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+
+  op=-1
+  is_network_reachable && op=$? || true
+  if [[ ${op} -eq 0 ]]; then
+    echo "ensure_network_connectivity finished WITH network AFTER putting custom DNS..."
+    return 0
+  else
+    echo "ensure_network_connectivity finished WITHOUT network, not even custom DNS was enough..."
+    return 1
   fi
 }
 
@@ -263,6 +285,20 @@ function fail_fast_unsupported_distros() {
   esac
 }
 
+function compatible_network() {
+  # Try installing network-scripts if available
+  case $LINUX_KIND in
+  redhat | rhel | centos | fedora)
+    if which dnf; then
+      dnf install -q -y network-scripts || true
+    else
+      yum install -q -y network-scripts || true
+    fi
+    ;;
+  *) ;;
+  esac
+}
+
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
@@ -271,7 +307,12 @@ put_hostname_in_hosts
 disable_cloudinit_network_autoconf
 disable_services
 create_user
-ensure_network_connectivity
+
+compatible_network
+
+ensure_network_connectivity || true
+
+compatible_network
 
 touch /etc/cloud/cloud-init.disabled
 

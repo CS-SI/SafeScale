@@ -274,7 +274,7 @@ feature:
                                 ubuntu|debian)
                                     sfApt update && sfApt -y install keepalived haproxy || sfFail 202
                                     ;;
-                                redhat|rhel|centos)
+                                redhat|rhel|centos|fedora)
                                     yum install -q -y keepalived haproxy || sfFail 202
                                     ;;
                                 *)

@@ -267,7 +267,7 @@ sfInstall() {
             sfApt install $1 -y || exit 194
             which $1 || exit 194
             ;;
-        centos|fedora|rhel)
+        centos|fedora|rhel|redhat)
             if [[ -n $(which dnf) ]]; then
                 dnf install -y $1 || exit 194
             else
@@ -899,7 +899,7 @@ sfDetectFacts() {
 
     # Some facts about system
     case ${FACTS["linux_kind"]} in
-        redhat|rhel|centos)
+        redhat|rhel|centos|fedora)
             FACTS["redhat_like"]=1
             FACTS["debian_like"]=0
 			      FACTS["docker_version"]=$(yum info docker-ce || true)

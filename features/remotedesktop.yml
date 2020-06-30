@@ -69,7 +69,7 @@ feature:
                             # Install xfce + tigervnc                                 #
                             ###########################################################
                             case $LINUX_KIND in
-                                centos|fedora|redhat|rhel)
+                                centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf install -y epel-release && \
                                         dnf makecache -y || sfFail 192
@@ -82,6 +82,11 @@ feature:
                                         yum groupinstall -y -t Xfce --skip-broken && \
                                         yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     fi
+                                    ;;
+                                fedora)
+                                    dnf makecache -y || sfFail 192
+                                    dnf install -y --skip-broken xfce4* && \
+                                    dnf install -y --skip-broken xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     ;;
                                 debian|ubuntu)
                                     sfApt update && apt-mark hold xscreensaver

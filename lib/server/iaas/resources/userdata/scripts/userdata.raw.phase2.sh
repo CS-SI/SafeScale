@@ -698,6 +698,10 @@ EOF
         echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
       fi
       {{- end }}
+
+      {{- if .AddGateway }}
+      echo "GATEWAY={{ .DefaultRouteIP }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+      {{- end}}
     fi
   done
 
@@ -1310,6 +1314,26 @@ EOF
   esac
 }
 
+use_cgroups_v1_if_needed() {
+  case $LINUX_KIND in
+  fedora)
+    if [[ -n $(which lsb_release) ]]; then
+      if [[ $(lsb_release -rs | cut -d. -f1) -gt 30 ]]; then
+        dnf install -y grubby || return 1
+        grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
+      fi
+    else
+      if [[ $(echo ${VERSION_ID}) -gt 30 ]]; then
+        dnf install -y grubby || return 1
+        grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
+      fi
+    fi
+    ;;
+  esac
+
+  return 0
+}
+
 function fail_fast_unsupported_distros() {
   case $LINUX_KIND in
   debian)
@@ -1397,6 +1421,8 @@ is_network_reachable() {
     else
       ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
     fi
+
+    sleep 1
   done
 
   if [[ ${REACHED} -eq 0 ]]; then

@@ -91,7 +91,7 @@ case $(sfGetFact "linux_kind") in
         chmod 755 /usr/local/bin/rclone && \
         mandb
         ;;
-    redhat|rhel|centos)
+    redhat|rhel|centos|fedora)
         if [[ -n $(which dnf) ]]; then
             dnf makecache -y
             dnf install -y wget curl time rclone jq unzip
