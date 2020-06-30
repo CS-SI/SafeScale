@@ -28,15 +28,15 @@ import (
 //       Create a new version instead with needed supplemental fields
 type HostNetwork struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
-	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the Default Gateway
+	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the GetID of the Default getGateway
 	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // DEPRECATED: contains the private IP of the default gateway
-	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Network
-	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network binded to the host (indexed by ID)
-	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the ID of each network binded to the host (indexed by Name)
+	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the GetID of the default Network
+	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network binded to the host (indexed by GetID)
+	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the GetID of each network binded to the host (indexed by GetName)
 	PublicIPv4              string            `json:"public_ip_v4,omitempty"`
 	PublicIPv6              string            `json:"public_ip_v6,omitempty"`
-	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
-	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network GetID) allocated to the host
+	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network GetID) allocated to the host
 }
 
 // NewHostNetwork ...

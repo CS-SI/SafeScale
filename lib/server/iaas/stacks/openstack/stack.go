@@ -99,14 +99,21 @@ func TranslateProviderError(err error) fail.Error {
 }
 
 // ParseNeutronError parses neutron json error and returns fields
-func ParseNeutronError(neutronError string) map[string]string {
+// Returns (nil, fail.ErrSyntax) if json syntax error occured (and maybe operation should be retried...)
+// Returns (nil, fail.Error) if any other error occurs
+// Returns (<retval>, nil) if everything is understood
+func ParseNeutronError(neutronError string) (map[string]string, fail.Error) {
 	startIdx := strings.Index(neutronError, "{\"NeutronError\":")
 	jsonError := strings.Trim(neutronError[startIdx:], " ")
 	unjsoned := map[string]map[string]interface{}{}
-	err := json.Unmarshal([]byte(jsonError), &unjsoned)
-	if err != nil {
-		logrus.Debugf(err.Error())
-		return nil
+	if err := json.Unmarshal([]byte(jsonError), &unjsoned); err != nil {
+		switch err.(type) {
+		case *json.SyntaxError:
+			return nil, fail.SyntaxError(err.Error())
+		default:
+			logrus.Debugf(err.Error())
+			return nil, fail.ToError(err)
+		}
 	}
 	if content, ok := unjsoned["NeutronError"]; ok {
 		retval := map[string]string{
@@ -128,9 +135,9 @@ func ParseNeutronError(neutronError string) map[string]string {
 			retval["detail"] = field
 		}
 
-		return retval
+		return retval, nil
 	}
-	return nil
+	return nil, nil
 }
 
 // Stack contains the needs to operate on stack OpenStack

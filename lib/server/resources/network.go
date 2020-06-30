@@ -33,15 +33,12 @@ type Network interface {
 
 	Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error                                           // ...
 	Create(task concurrency.Task, req abstract.NetworkRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a network
-	AttachHost(task concurrency.Task, host Host) fail.Error                                                                         // links host ID to the network
-	DetachHost(task concurrency.Task, hostID string) fail.Error                                                                     // unlinks host ID from network
+	AttachHost(task concurrency.Task, host Host) fail.Error                                                                         // links host GetID to the network
+	DetachHost(task concurrency.Task, hostID string) fail.Error                                                                     // unlinks host GetID from network
 	ListHosts(task concurrency.Task) ([]Host, fail.Error)                                                                           // returns the list of Host attached to the network (excluding gateway)
 	GetGateway(task concurrency.Task, primary bool) (Host, fail.Error)                                                              // returns the gateway related to network
 	GetDefaultRouteIP(task concurrency.Task) (string, fail.Error)                                                                   // returns the IP of the default route of the network
 	GetEndpointIP(task concurrency.Task) (string, fail.Error)                                                                       // returns the IP address corresponding to the default route
-	SafeGetGateway(task concurrency.Task, primary bool) Host                                                                        // returns the gateway related to network
-	SafeGetDefaultRouteIP(task concurrency.Task) string                                                                             // returns the IP of the default route of the network
-	SafeGetEndpointIP(task concurrency.Task) string                                                                                 // returns the IP address corresponding to the default route
 	HasVirtualIP(task concurrency.Task) bool                                                                                        // tells if the network is using a VIP a default route
 	ToProtocol(task concurrency.Task) (*protocol.Network, fail.Error)
 }

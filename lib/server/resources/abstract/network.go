@@ -26,19 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// // GatewayRequest to create a Gateway into a network
-// type GatewayRequest struct {
-// 	Network *Network
-// 	CIDR    string
-// 	// TemplateID the UUID of the template used to size the host (see SelectTemplates)
-// 	TemplateID string
-// 	// ImageID is the UUID of the image that contains the server's OS and initial state.
-// 	ImageID string
-// 	KeyPair *KeyPair
-// 	// Name is the name to give to the gateway
-// 	Name string
-// }
-
 // NetworkRequest represents network requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type NetworkRequest struct {
@@ -67,8 +54,8 @@ type SubNetwork struct {
 
 // Network represents a virtual network
 type Network struct {
-	ID                 string            `json:"id,omitempty"`                   // ID for the network (from provider)
-	Name               string            `json:"name,omitempty"`                 // Name of the network
+	ID                 string            `json:"id,omitempty"`                   // GetID for the network (from provider)
+	Name               string            `json:"name,omitempty"`                 // GetName of the network
 	CIDR               string            `json:"mask,omitempty"`                 // network in CIDR notation
 	Domain             string            `json:"domain,omitempty"`               // contains the domain used to define host FQDN
 	GatewayID          string            `json:"gateway_id,omitempty"`           // contains the id of the host acting as primary gateway for the network
@@ -109,7 +96,7 @@ func (n *Network) OK() bool {
 
 	result = result && (n.ID != "")
 	if n.ID == "" {
-		logrus.Debug("Network without ID")
+		logrus.Debug("Network without GetID")
 	}
 	result = result && (n.Name != "")
 	if n.Name == "" {
@@ -121,7 +108,7 @@ func (n *Network) OK() bool {
 	}
 	result = result && (n.GatewayID != "")
 	if n.GatewayID == "" {
-		logrus.Debug("Network without Gateway")
+		logrus.Debug("Network without getGateway")
 	}
 
 	return result
@@ -145,18 +132,18 @@ func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
 	return fail.ToError(json.Unmarshal(buf, n))
 }
 
-// SafeGetName ...
+// GetName ...
 // satisfies interface data.Identifiable
-func (n *Network) SafeGetName() string {
+func (n *Network) GetName() string {
 	if n == nil {
 		return ""
 	}
 	return n.Name
 }
 
-// SafeGetID ...
+// GetID ...
 // satisfies interface data.Identifiable
-func (n *Network) SafeGetID() string {
+func (n *Network) GetID() string {
 	if n == nil {
 		return ""
 	}

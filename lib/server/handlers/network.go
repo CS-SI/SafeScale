@@ -70,7 +70,7 @@ func (handler *networkHandler) Create(
 		return nil, fail.InvalidParameterError("gwname", "cannot be set if failover is set")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(
 		task,
 		debug.ShouldTrace("handlers.network"),
@@ -80,7 +80,7 @@ func (handler *networkHandler) Create(
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	objn, xerr := networkfactory.New(handler.job.SafeGetService())
+	objn, xerr := networkfactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -108,13 +108,13 @@ func (handler *networkHandler) List(all bool) (netList []*abstract.Network, xerr
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	objn, xerr := networkfactory.New(handler.job.SafeGetService())
+	objn, xerr := networkfactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -138,13 +138,13 @@ func (handler *networkHandler) Inspect(ref string) (network resources.Network, x
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	return networkfactory.Load(task, handler.job.SafeGetService(), ref)
+	return networkfactory.Load(task, handler.job.GetService(), ref)
 }
 
 // Delete deletes network referenced by ref
@@ -159,13 +159,13 @@ func (handler *networkHandler) Delete(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.network"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	objn, xerr := networkfactory.Load(task, handler.job.SafeGetService(), ref)
+	objn, xerr := networkfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		return xerr
 	}

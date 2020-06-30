@@ -28,8 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
@@ -39,6 +37,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -75,12 +75,12 @@ func NewHost(svc iaas.Service) (resources.Host, fail.Error) {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	core, xerr := NewCore(svc, "host", hostsFolderName, &abstract.HostCore{})
+	coreInstance, xerr := newCore(svc, "host", hostsFolderName, &abstract.HostCore{})
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return &host{core: core}, nil
+	return &host{core: coreInstance}, nil
 }
 
 // nullHost returns a *host corresponding to NullValue
@@ -124,7 +124,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 }
 
 func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
-	svc := rh.SafeGetService()
+	svc := rh.GetService()
 
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
@@ -173,7 +173,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-					ip := objgw.SafeGetAccessIP(task)
+					ip := objgw.(*host).getAccessIP(task)
 					primaryGatewayConfig = &system.SSHConfig{
 						PrivateKey: gwahc.PrivateKey,
 						Port:       22,
@@ -201,7 +201,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       22,
-							Host:       objgw.SafeGetAccessIP(task),
+							Host:       objgw.(*host).getAccessIP(task),
 							User:       abstract.DefaultUser,
 						}
 						return nil
@@ -234,7 +234,7 @@ func (rh *host) IsNull() bool {
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (rh *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
+func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -254,42 +254,43 @@ func (rh *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) 
 	})
 }
 
-// GetState returns the current state of the provider host
-func (rh *host) GetState(task concurrency.Task) (hoststate.Enum, fail.Error) {
+// ForceGetState returns the current state of the provider host
+func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, _ fail.Error) {
+	state = hoststate.UNKNOWN
 	if rh.IsNull() {
-		return hoststate.UNKNOWN, fail.InvalidInstanceError()
+		return state, fail.InvalidInstanceError()
 	}
-	if rh.IsNull() {
-		return hoststate.UNKNOWN, fail.NotAvailableError("cannot use GetState() on NullHost")
+	if task == nil {
+		return state, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	state := hoststate.UNKNOWN
 	if xerr := rh.Reload(task); xerr != nil {
 		return state, xerr
 	}
 	xerr := rh.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		core, ok := clonable.(*abstract.HostCore)
+		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		state = core.LastState
+		state = ahc.LastState
 		return nil
 	})
 	return state, xerr
 }
 
-// SafeGetState returns the last state of the host, without forced inspect
-func (rh *host) SafeGetState(task concurrency.Task) (state hoststate.Enum) {
-	if rh.IsNull() {
-		return hoststate.UNKNOWN
-	}
+// GetState returns the last known state of the host, without forced inspect
+func (rh host) GetState(task concurrency.Task) (state hoststate.Enum) {
 	state = hoststate.UNKNOWN
+	if rh.IsNull() || task == nil {
+		return state
+	}
+
 	_ = rh.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		core, ok := clonable.(*abstract.HostCore)
+		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		state = core.LastState
+		state = ahc.LastState
 		return nil
 	})
 	return state
@@ -301,13 +302,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if rh.IsNull() {
-		return nil, fail.NotAvailableError("cannot use Create() on NullHost")
-	}
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	hostname := rh.SafeGetName()
+	hostname := rh.GetName()
 	if hostname != "" {
 		return nil, fail.NotAvailableError("already carrying host '%s'", hostname)
 	}
@@ -317,7 +315,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	defer fail.OnExitLogError("failed to create host", &xerr)
 	defer fail.OnPanic(&xerr)
 
-	svc := rh.SafeGetService()
+	svc := rh.GetService()
 
 	// Check if host exists and is managed bySafeScale
 	if _, xerr = LoadHost(task, svc, hostReq.ResourceName); xerr != nil {
@@ -375,7 +373,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return nil, xerr
 		}
 		if hostReq.DefaultRouteIP == "" {
-			hostReq.DefaultRouteIP = rn.SafeGetDefaultRouteIP(task)
+			hostReq.DefaultRouteIP = rn.(*network).getDefaultRouteIP(task)
 		}
 	} else {
 		if rn, _, xerr = getOrCreateDefaultNetwork(task, svc); xerr != nil {
@@ -394,7 +392,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}
 
-	// If hostReq.ImageID is not explicitely defined, find an image ID corresponding to the content of hostDef.Image
+	// If hostReq.ImageID is not explicitely defined, find an image GetID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
 		if hostDef.Image == "" {
 			cfg, xerr := svc.GetConfigurationOptions()
@@ -502,8 +500,8 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Network))
-			hostNetworkV1.DefaultNetworkID = rn.SafeGetID()
-			hostNetworkV1.IsGateway = hostReq.IsGateway // hostReq.DefaultRouteIP == "" && rn.SafeGetName() != abstract.SingleHostNetworkName
+			hostNetworkV1.DefaultNetworkID = rn.GetID()
+			hostNetworkV1.IsGateway = hostReq.IsGateway // hostReq.getDefaultRouteIP == "" && rn.GetName() != abstract.SingleHostNetworkName
 			return nil
 		})
 	})
@@ -515,12 +513,12 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return nil, xerr
 	}
 
-	logrus.Infof("Compute resource created: '%s'", rh.SafeGetName())
+	logrus.Infof("Compute resource created: '%s'", rh.GetName())
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-	logrus.Infof("Waiting start of SSH service on remote host '%s' ...", rh.SafeGetName())
+	logrus.Infof("Waiting start of SSH service on remote host '%s' ...", rh.GetName())
 
 	// TODO: configurable timeout here
 	status, xerr := rh.waitInstallPhase(task, userdata.PHASE1_INIT)
@@ -530,7 +528,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 		if abstract.IsProvisioningError(xerr) {
 			logrus.Errorf("%+v", xerr)
-			return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.SafeGetName())
+			return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
 		}
 		return nil, xerr
 	}
@@ -598,7 +596,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			}
 			if abstract.IsProvisioningError(xerr) {
 				logrus.Errorf("%+v", xerr)
-				return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.SafeGetName())
+				return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
 			}
 			return nil, xerr
 		}
@@ -610,18 +608,18 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			}
 			if abstract.IsProvisioningError(xerr) {
 				logrus.Errorf("%+v", xerr)
-				return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.SafeGetName())
+				return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
 			}
 			return nil, xerr
 		}
 	}
 
-	logrus.Infof("host '%s' created successfully", rh.SafeGetName())
+	logrus.Infof("host '%s' created successfully", rh.GetName())
 	return userdataContent, nil
 }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
-func (rh *host) runInstallPhase(task concurrency.Task, phase userdata.Phase, userdataContent *userdata.Content) fail.Error {
+func (rh host) runInstallPhase(task concurrency.Task, phase userdata.Phase, userdataContent *userdata.Content) fail.Error {
 	// execute userdata 'final' (phase4) script to final install/configure of the host (no need to reboot)
 	content, xerr := userdataContent.Generate(phase)
 	if xerr != nil {
@@ -639,9 +637,9 @@ func (rh *host) runInstallPhase(task concurrency.Task, phase userdata.Phase, use
 	}
 	if retcode != 0 {
 		if retcode == 255 {
-			return fail.NewError("failed to execute install phase '%s' on host '%s': SSH connection failed", phase, rh.SafeGetName())
+			return fail.NewError("failed to execute install phase '%s' on host '%s': SSH connection failed", phase, rh.GetName())
 		}
-		return fail.NewError("failed to execute install phase '%s' on host '%s': %s", phase, rh.SafeGetName(), stderr)
+		return fail.NewError("failed to execute install phase '%s' on host '%s': %s", phase, rh.GetName(), stderr)
 	}
 	return nil
 }
@@ -655,10 +653,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase) (s
 			sshDefaultTimeout = num
 		}
 	}
-	sshCfg, xerr := rh.GetSSHConfig(task)
-	if xerr != nil {
-		return "", xerr
-	}
+	sshCfg := rh.getSSHConfig(task)
 
 	// TODO: configurable timeout here
 	status, xerr := sshCfg.WaitServerReady(task, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
@@ -668,7 +663,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase) (s
 		}
 		if abstract.IsProvisioningError(xerr) {
 			logrus.Errorf("%+v", xerr)
-			return status, fail.Wrap(xerr, "error creating host '%s': error provisioning the new host, please check safescaled logs", rh.SafeGetName())
+			return status, fail.Wrap(xerr, "error creating host '%s': error provisioning the new host, please check safescaled logs", rh.GetName())
 		}
 		return status, xerr
 	}
@@ -676,7 +671,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase) (s
 }
 
 func (rh *host) updateNetwork(task concurrency.Task, networkID string) fail.Error {
-	objn, xerr := LoadNetwork(task, rh.core.SafeGetService(), networkID)
+	objn, xerr := LoadNetwork(task, rh.core.GetService(), networkID)
 	if xerr != nil {
 		return xerr
 	}
@@ -686,8 +681,8 @@ func (rh *host) updateNetwork(task concurrency.Task, networkID string) fail.Erro
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			id := rh.SafeGetID()
-			name := rh.SafeGetName()
+			id := rh.GetID()
+			name := rh.GetName()
 			networkHostsV1.ByName[name] = id
 			networkHostsV1.ByID[id] = name
 			return nil
@@ -760,9 +755,9 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 	// rh.SafeLock(task)
 	// defer rh.SafeUnlock(task)
 
-	svc := rh.SafeGetService()
+	svc := rh.GetService()
 
-	hostID := rh.SafeGetID()
+	hostID := rh.GetID()
 	xerr := rh.Alter(task, func(_ data.Clonable, properties *serialize.JSONProperties) fail.Error {
 		// Don't remove a host having shares that are currently remotely mounted
 		var shares map[string]*propertiesv1.HostShare
@@ -890,8 +885,8 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			hostID := rh.SafeGetID()
-			hostName := rh.SafeGetName()
+			hostID := rh.GetID()
+			hostName := rh.GetName()
 			var errors []error
 			for k := range hostNetworkV1.NetworksByID {
 				rn, loopErr := LoadNetwork(task, svc, k)
@@ -948,7 +943,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 			innerXErr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 				func() error {
 					// FIXME: need to remove retry from svc.GetHostState!
-					if state, stateErr := svc.GetHostState(rh.SafeGetID()); stateErr == nil {
+					if state, stateErr := svc.GetHostState(rh.GetID()); stateErr == nil {
 						logrus.Warnf("While deleting the status was [%s]", state)
 						if state == hoststate.ERROR {
 							return fail.NotAvailableError("host is in state ERROR")
@@ -986,9 +981,9 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 
 // GetSSHConfig loads SSH configuration for host from metadata
 //
-// FIXME: system.SSHConfig should be able to carry data about secondary Gateway
+// FIXME: system.SSHConfig should be able to carry data about secondary getGateway
 //        Currently, if primary gateway is down, ssh to a host in the network will fail
-func (rh *host) GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Error) {
+func (rh host) GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Error) {
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -996,13 +991,22 @@ func (rh *host) GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Err
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
+	return rh.getSSHConfig(task), nil
+}
+
+// getSSHConfig loads SSH configuration for host from metadata, for internal use
+func (rh host) getSSHConfig(task concurrency.Task) *system.SSHConfig {
+	if rh.IsNull() || task == nil {
+		return &system.SSHConfig{}
+	}
+
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
-	return rh.sshProfile, nil
+	return rh.sshProfile
 }
 
 // Run tries to execute command 'cmd' on the host
-func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
 	if rh.IsNull() {
 		return 0, "", "", fail.InvalidInstanceError()
 	}
@@ -1034,7 +1038,7 @@ func (rh *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connec
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	hostName := rh.SafeGetName()
+	hostName := rh.GetName()
 	xerr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
 			var innerXErr fail.Error
@@ -1078,7 +1082,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 }
 
 // Pull downloads a file from host
-func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error) {
+func (rh host) Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error) {
 	if rh.IsNull() {
 		return 0, "", "", fail.InvalidInstanceError()
 	}
@@ -1103,7 +1107,7 @@ func (rh *host) Pull(task concurrency.Task, target, source string, timeout time.
 }
 
 // Push uploads a file to host
-func (rh *host) Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error) {
+func (rh host) Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error) {
 	if rh.IsNull() {
 		return 0, "", "", fail.InvalidInstanceError()
 	}
@@ -1143,7 +1147,7 @@ func (rh *host) Push(task concurrency.Task, source, target, owner, mode string, 
 }
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, fail.Error) {
+func (rh host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, fail.Error) {
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1179,7 +1183,7 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 				hostShare = sharesV1.ByID[sharesV1.ByName[shareRef]].Clone().(*propertiesv1.HostShare)
 				return nil
 			}
-			return fail.NotFoundError("share '%s' not found in server '%s' metadata", shareRef, rh.SafeGetName())
+			return fail.NotFoundError("share '%s' not found in server '%s' metadata", shareRef, rh.GetName())
 		})
 	})
 	if err != nil {
@@ -1190,7 +1194,7 @@ func (rh *host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.
 }
 
 // GetVolumes returns information about volumes attached to the host
-func (rh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error) {
+func (rh host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error) {
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1204,7 +1208,7 @@ func (rh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fa
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.Volumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.getVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			return nil
 		})
@@ -1215,8 +1219,8 @@ func (rh *host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fa
 	return hvV1, nil
 }
 
-// SafeGetVolumes returns information about volumes attached to the host
-func (rh *host) SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes {
+// getVolumes returns information about volumes attached to the host
+func (rh host) getVolumes(task concurrency.Task) *propertiesv1.HostVolumes {
 	out, _ := rh.GetVolumes(task)
 	return out
 }
@@ -1248,7 +1252,7 @@ func (rh *host) SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes 
 // 				hostVolume, ok = vaV1.VolumesByID[ref]
 // 			}
 // 			if !ok {
-// 				return fail.NotFoundError("failed to find a volume referenced by '%s' attached to host '%s'", volumeRef, objh.SafeGetName())
+// 				return fail.NotFoundError("failed to find a volume referenced by '%s' attached to host '%s'", volumeRef, objh.GetName())
 // 			}
 // 			return nil
 // 		})
@@ -1272,7 +1276,7 @@ func (rh *host) SafeGetVolumes(task concurrency.Task) *propertiesv1.HostVolumes 
 // }
 
 // Start starts the host
-func (rh *host) Start(task concurrency.Task) (xerr fail.Error) {
+func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1281,10 +1285,10 @@ func (rh *host) Start(task concurrency.Task) (xerr fail.Error) {
 	}
 	fail.OnPanic(&xerr)
 
-	hostName := rh.SafeGetName()
-	hostID := rh.SafeGetID()
+	hostName := rh.GetName()
+	hostID := rh.GetID()
 
-	svc := rh.SafeGetService()
+	svc := rh.GetService()
 	if xerr = svc.StartHost(hostID); xerr != nil {
 		return xerr
 	}
@@ -1302,7 +1306,7 @@ func (rh *host) Start(task concurrency.Task) (xerr fail.Error) {
 }
 
 // Stop stops the host
-func (rh *host) Stop(task concurrency.Task) (xerr fail.Error) {
+func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1310,10 +1314,10 @@ func (rh *host) Stop(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	hostName := rh.SafeGetName()
-	hostID := rh.SafeGetID()
+	hostName := rh.GetName()
+	hostID := rh.GetID()
 
-	svc := rh.SafeGetService()
+	svc := rh.GetService()
 	if xerr = svc.StopHost(hostID); xerr != nil {
 		return xerr
 	}
@@ -1332,7 +1336,7 @@ func (rh *host) Stop(task concurrency.Task) (xerr fail.Error) {
 }
 
 // Reboot reboots the host
-func (rh *host) Reboot(task concurrency.Task) fail.Error {
+func (rh host) Reboot(task concurrency.Task) fail.Error {
 	if xerr := rh.Stop(task); xerr != nil {
 		return xerr
 	}
@@ -1398,7 +1402,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 }
 
 // CheckFeature ...
-func (rh *host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1427,7 +1431,7 @@ func (rh *host) CheckFeature(task concurrency.Task, name string, vars data.Map, 
 	// 	return srvutils.ThrowErr(err)
 	// }
 
-	return feat.Check(rh, vars, settings)
+	return feat.Check(&rh, vars, settings)
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
@@ -1463,10 +1467,10 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		outcomes, innerXErr := feat.Remove(rh, vars, settings)
 		if innerXErr != nil {
-			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, rh.SafeGetName())
+			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, rh.GetName())
 		}
 		if !outcomes.Successful() {
-			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, rh.SafeGetName())
+			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, rh.GetName())
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
@@ -1484,10 +1488,9 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	return nil, xerr
 }
 
-// GetTargetType returns the type of the target.
-// To be used when rh is notoriously not nil.
+// TargetType returns the type of the target.
 // satisfies install.Targetable interface.
-func (rh *host) SafeGetTargetType() featuretargettype.Enum {
+func (rh host) TargetType() featuretargettype.Enum {
 	if rh.IsNull() {
 		return featuretargettype.UNKNOWN
 	}
@@ -1495,7 +1498,7 @@ func (rh *host) SafeGetTargetType() featuretargettype.Enum {
 }
 
 // GetPublicIP returns the public IP address of the host
-func (rh *host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
 	ip = ""
 	if rh.IsNull() {
 		return "", fail.InvalidInstanceError()
@@ -1503,38 +1506,49 @@ func (rh *host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) 
 	if task == nil {
 		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
-	defer fail.OnPanic(&xerr)
+
+	return rh.getPublicIP(task), nil
+}
+
+// getPublicIP returns the public IP address of the host
+// To be used when rh is notoriously not nil
+func (rh host) getPublicIP(task concurrency.Task) string {
+	if rh.IsNull() || task == nil {
+		return ""
+	}
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
-	return rh.publicIP, nil
-}
-
-// SafeGetPublicIP returns the public IP address of the host
-// To be used when rh is notoriously not nil
-func (rh *host) SafeGetPublicIP(task concurrency.Task) string {
-	ip, _ := rh.GetPublicIP(task)
-	return ip
+	return rh.publicIP
 }
 
 // GetPrivateIP returns the private IP of the host on its default Network
-func (rh *host) GetPrivateIP(task concurrency.Task) (ip string, _ fail.Error) {
+func (rh host) GetPrivateIP(task concurrency.Task) (ip string, _ fail.Error) {
 	ip = ""
+	if rh.IsNull() {
+		return ip, fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return ip, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	return rh.getPrivateIP(task), nil
+}
+
+// getPrivateIP returns the private IP of the host on its default Network
+// To be used when rh is notoriously not nil
+func (rh host) getPrivateIP(task concurrency.Task) string {
+	if rh.IsNull() || task == nil {
+		return ""
+	}
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
-	return rh.privateIP, nil
-}
-
-// SafeGetPrivateIP returns the private IP of the host on its default Network
-// To be used when rh is notoriously not nil
-func (rh *host) SafeGetPrivateIP(task concurrency.Task) string {
-	ip, _ := rh.GetPrivateIP(task)
-	return ip
+	return rh.privateIP
 }
 
 // GetPrivateIPOnNetwork returns the private IP of the host on its default Network
-func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, xerr fail.Error) {
+func (rh host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, xerr fail.Error) {
 	ip = ""
 	if rh.IsNull() {
 		return ip, fail.InvalidInstanceError()
@@ -1546,8 +1560,6 @@ func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (
 		return ip, fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	defer fail.OnPanic(&xerr)
-
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
@@ -1555,7 +1567,7 @@ func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (
 				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if ip, ok = hostNetworkV1.IPv4Addresses[networkID]; !ok {
-				return fail.InvalidRequestError("host '%s' does not have an IP address on network '%s'", rh.SafeGetName(), networkID)
+				return fail.InvalidRequestError("host '%s' does not have an IP address on network '%s'", rh.GetName(), networkID)
 			}
 			return nil
 		})
@@ -1563,9 +1575,9 @@ func (rh *host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (
 	return ip, xerr
 }
 
-// SafeGetPrivateIPOnNetwork returns the private IP of the host on its default Network
+// getPrivateIPOnNetwork returns the private IP of the host on its default Network
 // To be used when rh is notoriously not nil
-func (rh *host) SafeGetPrivateIPOnNetwork(task concurrency.Task, networkID string) string {
+func (rh *host) getPrivateIPOnNetwork(task concurrency.Task, networkID string) string {
 	ip, _ := rh.GetPrivateIPOnNetwork(task, networkID)
 	return ip
 }
@@ -1580,22 +1592,25 @@ func (rh *host) GetAccessIP(task concurrency.Task) (ip string, _ fail.Error) {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
+	return rh.getAccessIP(task), nil
+}
+
+// getAccessIP returns the IP to reach the host
+// To be used when rh is notoriously not nil
+func (rh *host) getAccessIP(task concurrency.Task) string {
+	if rh.IsNull() {
+		return ""
+	}
+
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
-	return rh.accessIP, nil
+	return rh.accessIP
 }
 
-// SafeGetAccessIP returns the IP to reach the host
-// To be used when rh is notoriously not nil
-func (rh *host) SafeGetAccessIP(task concurrency.Task) string {
-	ip, _ := rh.GetAccessIP(task)
-	return ip
-}
-
-// SafeGetInstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 //
 // satisfies interface install.Targetable
-func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	if rh.IsNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
@@ -1626,9 +1641,7 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 				}
 				if systemV1.Type == "linux" {
 					switch systemV1.Flavor {
-					case "centos":
-						fallthrough
-					case "redhat":
+					case "centos", "redhat":
 						index++
 						rh.installMethods[index] = installmethod.Yum
 					case "debian":
@@ -1636,7 +1649,7 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 					case "ubuntu":
 						index++
 						rh.installMethods[index] = installmethod.Apt
-					case "fedora":
+					case "fedora", "rhel":
 						index++
 						rh.installMethods[index] = installmethod.Dnf
 					}
@@ -1652,8 +1665,8 @@ func (rh *host) SafeGetInstallMethods(task concurrency.Task) map[uint8]installme
 }
 
 // GetShares returns the information about the shares hosted by the host
-func (rh *host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, xerr fail.Error) {
-	shares = nil
+func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, xerr fail.Error) {
+	shares = &propertiesv1.HostShares{}
 	if rh.IsNull() {
 		return shares, fail.InvalidInstanceError()
 	}
@@ -1674,15 +1687,15 @@ func (rh *host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShare
 	return shares, xerr
 }
 
-// SafeGetShares returns the information about the shares of the host
+// Shares returns the information about the shares of the host
 // Intented to be used when objn is notoriously not nil (because previously checked)
-func (rh *host) SafeGetShares(task concurrency.Task) *propertiesv1.HostShares {
+func (rh host) getShares(task concurrency.Task) *propertiesv1.HostShares {
 	shares, _ := rh.GetShares(task)
 	return shares
 }
 
 // GetMounts returns the information abouts the mounts of the host
-func (rh *host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, xerr fail.Error) {
+func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, xerr fail.Error) {
 	mounts = nil
 	if rh.IsNull() {
 		return mounts, fail.InvalidInstanceError()
@@ -1704,25 +1717,24 @@ func (rh *host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMount
 	return mounts, xerr
 }
 
-// SafeGetMounts returns the information about the mounts of the host
+// getMounts returns the information about the mounts of the host
 // Intended to be used when objh is notoriously not nil (because previously checked)
-func (rh *host) SafeGetMounts(task concurrency.Task) *propertiesv1.HostMounts {
+func (rh host) getMounts(task concurrency.Task) *propertiesv1.HostMounts {
 	mounts, _ := rh.GetMounts(task)
 	return mounts
 }
 
-// SafeGetInstalledFeatures returns a list of installed features
+// InstalledFeatures returns a list of installed features
 //
 // satisfies interface install.Targetable
-func (rh *host) SafeGetInstalledFeatures(task concurrency.Task) []string {
+func (rh host) InstalledFeatures(task concurrency.Task) []string {
 	var list []string
 	return list
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
-//
 // satisfies interface install.Targetable
-func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
+func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1733,7 +1745,7 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 		return fail.InvalidParameterError("v", "cannot be nil")
 	}
 
-	v["ShortHostname"] = rh.SafeGetName()
+	v["ShortHostname"] = rh.GetName()
 	domain := ""
 	xerr := rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
@@ -1753,10 +1765,10 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 		return xerr
 	}
 
-	v["Hostname"] = rh.SafeGetName() + domain
+	v["Hostname"] = rh.GetName() + domain
 
-	v["HostIP"] = rh.SafeGetPrivateIP(task)
-	v["PublicIP"] = rh.SafeGetPublicIP(task)
+	v["HostIP"] = rh.getPrivateIP(task)
+	v["getPublicIP"] = rh.getPublicIP(task)
 
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
@@ -1771,7 +1783,7 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 				return fail.InconsistentError("'*propertiesv1.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			var innerXErr fail.Error
-			rn, innerXErr = LoadNetwork(task, rh.SafeGetService(), networkV1.DefaultNetworkID)
+			rn, innerXErr = LoadNetwork(task, rh.GetService(), networkV1.DefaultNetworkID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1786,9 +1798,10 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 	if xerr != nil {
 		return xerr
 	}
-	v["PrimaryGatewayIP"] = rgw.SafeGetPrivateIP(task)
+	rgwi := rgw.(*host)
+	v["PrimaryGatewayIP"] = rgwi.getPrivateIP(task)
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	v["PrimaryPublicIP"] = rgw.SafeGetPublicIP(task)
+	v["PrimaryPublicIP"] = rgwi.getPublicIP(task)
 
 	rgw, xerr = rn.GetGateway(task, false)
 	if xerr != nil {
@@ -1796,22 +1809,23 @@ func (rh *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) f
 			return xerr
 		}
 	} else {
-		v["SecondaryGatewayIP"] = rgw.SafeGetPrivateIP(task)
-		v["SecondaryPublicIP"] = rgw.SafeGetPublicIP(task)
+		rgwi = rgw.(*host)
+		v["SecondaryGatewayIP"] = rgwi.getPrivateIP(task)
+		v["SecondaryPublicIP"] = rgwi.getPublicIP(task)
 	}
 
-	if v["EndpointIP"], xerr = rn.GetEndpointIP(task); xerr != nil {
+	if v["getEndpointIP"], xerr = rn.GetEndpointIP(task); xerr != nil {
 		return xerr
 	}
-	v["PublicIP"] = v["EndpointIP"]
-	if v["DefaultRouteIP"], xerr = rn.GetDefaultRouteIP(task); xerr != nil {
+	v["getPublicIP"] = v["getEndpointIP"]
+	if v["getDefaultRouteIP"], xerr = rn.GetDefaultRouteIP(task); xerr != nil {
 		return xerr
 	}
 	return nil
 }
 
 // IsClusterMember returns true if the host is member of a cluster
-func (rh *host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error) {
+func (rh host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error) {
 	yes = false
 	if rh.IsNull() {
 		return yes, fail.InvalidInstanceError()
@@ -1826,7 +1840,7 @@ func (rh *host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Erro
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostClusterMembership' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			yes = (hostClusterMembershipV1.Cluster != "")
+			yes = hostClusterMembershipV1.Cluster != ""
 			return nil
 		})
 	})
@@ -1834,7 +1848,7 @@ func (rh *host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Erro
 }
 
 // PushStringToFile creates a file 'filename' on remote 'host' with the content 'content'
-func (rh *host) PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) (xerr fail.Error) {
+func (rh host) PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1848,7 +1862,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
-	hostName := rh.SafeGetName()
+	hostName := rh.GetName()
 	f, xerr := system.CreateTempFileFromString(content, 0600)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
@@ -1929,7 +1943,7 @@ func (rh *host) PushStringToFile(task concurrency.Task, content string, filename
 }
 
 // GetDefaultNetwork returns the Network instance corresponding to host default network
-func (rh *host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network, xerr fail.Error) {
+func (rh host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network, xerr fail.Error) {
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1945,7 +1959,7 @@ func (rh *host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network
 			}
 			if networkV1.DefaultNetworkID != "" {
 				var innerXErr fail.Error
-				objn, innerXErr = LoadNetwork(task, rh.SafeGetService(), networkV1.DefaultNetworkID)
+				objn, innerXErr = LoadNetwork(task, rh.GetService(), networkV1.DefaultNetworkID)
 				return innerXErr
 			}
 			return fail.NotFoundError("no default network associated with host")
@@ -1958,8 +1972,8 @@ func (rh *host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network
 }
 
 // ToProtocol convert an resources.Host to protocol.Host
-func (rh *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.Error) {
-	if rh == nil {
+func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.Error) {
+	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1976,8 +1990,8 @@ func (rh *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.
 		volumes       []string
 	)
 
-	publicIP := rh.SafeGetPublicIP(task)
-	privateIP := rh.SafeGetPrivateIP(task)
+	publicIP := rh.getPublicIP(task)
+	privateIP := rh.getPrivateIP(task)
 
 	xerr = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool

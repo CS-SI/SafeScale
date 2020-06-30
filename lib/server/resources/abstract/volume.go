@@ -92,7 +92,7 @@ func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
 	return fail.ToError(json.Unmarshal(buf, v))
 }
 
-// SafeGetName returns the name of the volume
+// GetName returns the name of the volume
 // Satisfies interface data.Identifiable
 func (v *Volume) SafeGetName() string {
 	if v == nil {
@@ -101,7 +101,7 @@ func (v *Volume) SafeGetName() string {
 	return v.Name
 }
 
-// SafeGetID returns the ID of the volume
+// GetID returns the GetID of the volume
 // Satisfies interface data.Identifiable
 func (v *Volume) SafeGetID() string {
 	if v == nil {

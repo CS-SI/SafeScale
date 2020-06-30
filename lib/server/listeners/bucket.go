@@ -66,7 +66,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -109,7 +109,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 	defer job.Close()
 
 	bucketName := in.GetName()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -151,7 +151,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 	defer job.Close()
 
 	bucketName := in.GetName()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -192,7 +192,8 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	defer job.Close()
 
 	bucketName := in.GetName()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	task := job.GetTask()
+	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -205,7 +206,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	if resp == nil {
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
-	return converters.BucketMountPointFromResourceToProtocol(resp)
+	return converters.BucketMountPointFromResourceToProtocol(task, resp)
 }
 
 // Mount a bucket on the filesystem of the host
@@ -239,7 +240,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().Name
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -281,7 +282,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 
 	bucketName := in.GetBucket()
 	hostName := in.GetHost().Name
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

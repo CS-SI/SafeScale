@@ -23,7 +23,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	txttmpl "text/template"
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -45,7 +44,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -88,7 +86,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 	}
 	defer fail.OnPanic(&xerr)
 
-	core, xerr := NewCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
+	core, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
@@ -178,18 +176,21 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) fail.Error
 }
 
 // IsNull tells if the instance represents a null value of cluster
+// Satisfies interface data.NullValue
 func (c *cluster) IsNull() bool {
 	return c == nil || c.core.IsNull()
 }
 
-// SafeGetName returns the name if the cluster
-func (c *cluster) SafeGetName() string {
-	return c.core.SafeGetName()
+// GetName returns the name if the cluster
+// Satisfies interface data.Identifiable
+func (c *cluster) GetName() string {
+	return c.core.GetName()
 }
 
-// SafeGetID returns the name of the cluster (there is no ID, but data.Identityable wants ID()
-func (c *cluster) SafeGetID() string {
-	return c.core.SafeGetName()
+// GetID returns the name of the cluster
+// Satisfies interface data.Identifiable
+func (c *cluster) GetID() string {
+	return c.core.GetName()
 }
 
 // Create creates the necessary infrastructure of the Cluster
@@ -333,13 +334,16 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 	// FIXME: validate parameters
 
 	xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// VPL: For now, always disable addition of feature proxycache-client
 		innerXErr := props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			// VPL: For now, always disable addition of feature proxycache
 			featuresV1.Disabled["proxycache"] = struct{}{}
+			for k := range req.DisabledDefaultFeatures {
+				featuresV1.Disabled[k] = struct{}{}
+			}
 			return nil
 		})
 		if innerXErr != nil {
@@ -351,7 +355,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		innerXErr = props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.GetState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			stateV1.State = clusterstate.Creating
 			return nil
@@ -443,7 +447,7 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
 		imageID = "Ubuntu 18.04"
 	}
 
-	// Determine Gateway sizing
+	// Determine getGateway sizing
 	if c.makers.DefaultGatewaySizing != nil {
 		gatewaysDefault = complementSizingRequirements(nil, c.makers.DefaultGatewaySizing(task, c))
 	} else {
@@ -519,7 +523,7 @@ func (c *cluster) createNetwork(
 	req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements,
 ) (_ resources.Network, xerr fail.Error) {
 
-	// Determine if Gateway Failover must be set
+	// Determine if getGateway Failover must be set
 	caps := c.service.GetCapabilities()
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
@@ -578,9 +582,9 @@ func (c *cluster) createNetwork(
 					}
 				}
 			}
-			networkV2.NetworkID = network.SafeGetID()
+			networkV2.NetworkID = network.GetID()
 			networkV2.CIDR = req.CIDR
-			networkV2.GatewayID = primaryGateway.SafeGetID()
+			networkV2.GatewayID = primaryGateway.GetID()
 			if networkV2.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(task); innerXErr != nil {
 				return innerXErr
 			}
@@ -594,7 +598,7 @@ func (c *cluster) createNetwork(
 				return innerXErr
 			}
 			if !gwFailoverDisabled {
-				networkV2.SecondaryGatewayID = secondaryGateway.SafeGetID()
+				networkV2.SecondaryGatewayID = secondaryGateway.GetID()
 				if networkV2.SecondaryGatewayIP, innerXErr = secondaryGateway.GetPrivateIP(task); innerXErr != nil {
 					return innerXErr
 				}
@@ -741,7 +745,7 @@ func (c *cluster) createHosts(
 	}
 
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
-	// Configure Gateway(s) and waits for the result
+	// Configure getGateway(s) and waits for the result
 	if primaryGatewayTask, xerr = task.StartInSubtask(c.taskConfigureGateway, primaryGateway); xerr != nil {
 		return xerr
 	}
@@ -957,9 +961,9 @@ func (c *cluster) GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, 
 	return c.ClusterIdentity, nil
 }
 
-// SafeGetIdentity returns the identity of the cluster
+// Identity returns the identity of the cluster
 // Intended to be used when c, task are notiously not nil (because previously checked)
-func (c *cluster) SafeGetIdentity(task concurrency.Task) abstract.ClusterIdentity {
+func (c *cluster) Identity(task concurrency.Task) abstract.ClusterIdentity {
 	identity, _ := c.GetIdentity(task)
 	return identity
 }
@@ -985,10 +989,10 @@ func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, x
 	return c.ClusterIdentity.Flavor, nil
 }
 
-// SafeGetFlavor returns the flavor of the cluster
+// Flavor returns the flavor of the cluster
 // Intended to be used when c, task are notoriously not nil (because previously checked)
 // satisfies interface cluster.Controller
-func (c *cluster) SafeGetFlavor(task concurrency.Task) (flavor clusterflavor.Enum) {
+func (c *cluster) Flavor(task concurrency.Task) (flavor clusterflavor.Enum) {
 	flavor, _ = c.GetFlavor(task)
 	return flavor
 }
@@ -1013,10 +1017,10 @@ func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomple
 	return c.ClusterIdentity.Complexity, nil
 }
 
-// SafeGetComplexity returns the complexity of the cluster
+// Complexity returns the complexity of the cluster
 // Intended to be used when c, task are notoriously not nim (because previously checked)
 // satisfies interface cluster.Controller
-func (c *cluster) SafeGetComplexity(task concurrency.Task) (complexity clustercomplexity.Enum) {
+func (c *cluster) Complexity(task concurrency.Task) (complexity clustercomplexity.Enum) {
 	complexity, _ = c.GetComplexity(task)
 	return complexity
 }
@@ -1041,10 +1045,10 @@ func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string,
 	return c.ClusterIdentity.AdminPassword, nil
 }
 
-// SafeGetAdminPassword returns the password of the cluster admin account
+// AdminPassword returns the password of the cluster admin account
 // Intended to be used when c, task are notoriously not nil
 // satisfies interface resources.Cluster
-func (c *cluster) SafeGetAdminPassword(task concurrency.Task) (adminPassword string) {
+func (c *cluster) AdminPassword(task concurrency.Task) (adminPassword string) {
 	adminPassword, _ = c.GetAdminPassword(task)
 	return adminPassword
 }
@@ -1066,10 +1070,10 @@ func (c *cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, x
 	return *c.ClusterIdentity.Keypair, nil
 }
 
-// GetKeyPair returns the key pair used in the cluster
+// KeyPair returns the key pair used in the cluster
 // Intended to be used when c, task are notoriously not nil (because previously checked)
 // satisfies interface cluster.Controller
-func (c *cluster) SafeGetKeyPair(task concurrency.Task) abstract.KeyPair {
+func (c *cluster) KeyPair(task concurrency.Task) abstract.KeyPair {
 	keyPair, _ := c.GetKeyPair(task)
 	return keyPair
 }
@@ -1128,10 +1132,10 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 	return config, xerr
 }
 
-// SafeGetNetworkConfig returns network configuration of the cluster
+// NetworkConfig returns network configuration of the cluster
 // Intended to be used when c, task are notoriously not nil (because previously checked)
 // satisfies interface resources.Cluster
-func (c *cluster) SafeGetNetworkConfig(task concurrency.Task) (config *propertiesv2.ClusterNetwork) {
+func (c *cluster) NetworkConfig(task concurrency.Task) (config *propertiesv2.ClusterNetwork) {
 	config, _ = c.GetNetworkConfig(task)
 	return config
 }
@@ -1253,7 +1257,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.GetState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			stateV1.State = clusterstate.Starting
 			return nil
@@ -1296,7 +1300,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.GetState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			stateV1.State = clusterstate.Nominal
 			return nil
@@ -1361,7 +1365,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.GetState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			stateV1.State = clusterstate.Stopping
 			return nil
@@ -1449,7 +1453,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.State' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.GetState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			stateV1.State = clusterstate.Stopped
 			return nil
@@ -1457,8 +1461,8 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 	})
 }
 
-// State returns the current state of the Cluster
-// Uses the "maker" GetState from Foreman
+// GetState returns the current state of the Cluster
+// Uses the "maker" ForceGetState from Foreman
 func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, xerr fail.Error) {
 	state = clusterstate.Unknown
 	if c == nil {
@@ -1477,7 +1481,7 @@ func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, xerr fa
 		state, xerr = c.makers.GetState(task, c)
 	} else {
 		state = clusterstate.Unknown
-		xerr = fail.NotImplementedError("cluster maker does not define 'GetState'")
+		xerr = fail.NotImplementedError("cluster maker does not define 'ForceGetState'")
 	}
 	if xerr != nil {
 		return clusterstate.Unknown, xerr
@@ -1754,7 +1758,7 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv2.Clus
 		if innerErr != nil {
 			return innerErr
 		}
-		return c.DeleteSpecificNode(task, node.ID, selectedMaster.SafeGetID())
+		return c.DeleteSpecificNode(task, node.ID, selectedMaster.GetID())
 	})
 	if xerr != nil {
 		return nil, xerr
@@ -1762,7 +1766,7 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv2.Clus
 	return node, nil
 }
 
-// DeleteSpecificNode deletes a node identified by its ID
+// DeleteSpecificNode deletes a node identified by its GetID
 func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selectedMasterID string) (xerr fail.Error) {
 	if c == nil {
 		return fail.InvalidInstanceError()
@@ -1977,7 +1981,7 @@ func (c *cluster) ListMasterIPs(task concurrency.Task) (list data.IndexedListOfS
 	return list, xerr
 }
 
-// FindAvailableMaster returns ID of the first master available to execute order
+// FindAvailableMaster returns GetID of the first master available to execute order
 // satisfies interface cluster.cluster.Controller
 func (c *cluster) FindAvailableMaster(task concurrency.Task) (master resources.Host, xerr fail.Error) {
 	master = nil
@@ -1999,9 +2003,9 @@ func (c *cluster) FindAvailableMaster(task concurrency.Task) (master resources.H
 	}
 
 	var lastError error
-	svc := c.SafeGetService()
+	svc := c.GetService()
 	for _, v := range masters {
-		master, err = LoadHost(task, svc, v.SafeGetID())
+		master, err = LoadHost(task, svc, v.GetID())
 		if err != nil {
 			return nil, err
 		}
@@ -2186,7 +2190,7 @@ func (c *cluster) FindAvailableNode(task concurrency.Task) (node resources.Host,
 	return node, nil
 }
 
-// LookupNode tells if the ID of the host passed as parameter is a node
+// LookupNode tells if the GetID of the host passed as parameter is a node
 // satisfies interface cluster.cluster.Controller
 func (c *cluster) LookupNode(task concurrency.Task, ref string) (found bool, xerr fail.Error) {
 	if c == nil {
@@ -2204,7 +2208,7 @@ func (c *cluster) LookupNode(task concurrency.Task, ref string) (found bool, xer
 	if host, xerr = LoadHost(task, c.service, ref); xerr != nil {
 		return false, xerr
 	}
-	hostID := host.SafeGetID()
+	hostID := host.GetID()
 
 	found = false
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2249,7 +2253,7 @@ func (c *cluster) CountNodes(task concurrency.Task) (count uint, xerr fail.Error
 	return count, nil
 }
 
-// Node returns a node based on its ID
+// Node returns a node based on its GetID
 func (c *cluster) Node(task concurrency.Task, hostID string) (host resources.Host, xerr fail.Error) {
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
@@ -2281,12 +2285,12 @@ func (c *cluster) Node(task concurrency.Task, hostID string) (host resources.Hos
 		return nil, xerr
 	}
 	if !found {
-		return nil, fail.NotFoundError("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
+		return nil, fail.NotFoundError("failed to find node '%s' in Cluster '%s'", hostID, c.GetName)
 	}
-	return LoadHost(task, c.SafeGetService(), hostID)
+	return LoadHost(task, c.GetService(), hostID)
 }
 
-// deleteMaster deletes the master specified by its ID
+// deleteMaster deletes the master specified by its GetID
 func (c *cluster) deleteMaster(task concurrency.Task, hostID string) fail.Error {
 	if c == nil {
 		return fail.InvalidInstanceError()
@@ -2394,7 +2398,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			for i := uint(0); i < length; i++ {
 				subtask, innerErr := task.StartInSubtask(taskDeleteNode, list[i])
 				if innerErr != nil {
-					cleaningErrors = append(cleaningErrors, fail.Wrap(innerErr, "failed to start deletion of node '%s'", list[i].SafeGetName()))
+					cleaningErrors = append(cleaningErrors, fail.Wrap(innerErr, "failed to start deletion of node '%s'", list[i].GetName()))
 					break
 				}
 				subtasks = append(subtasks, subtask)
@@ -2419,7 +2423,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			for i := uint(0); i < length; i++ {
 				subtask, innerErr := task.StartInSubtask(taskDeleteMaster, list[i])
 				if innerErr != nil {
-					cleaningErrors = append(cleaningErrors, fail.Wrap(innerErr, "failed to start deletion of master '%s'", list[i].SafeGetName()))
+					cleaningErrors = append(cleaningErrors, fail.Wrap(innerErr, "failed to start deletion of master '%s'", list[i].GetName()))
 					break
 				}
 				subtasks = append(subtasks, subtask)
@@ -2458,7 +2462,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			return innerErr
 		}
 
-		network, innerErr := LoadNetwork(task, c.SafeGetService(), networkID)
+		network, innerErr := LoadNetwork(task, c.GetService(), networkID)
 		if innerErr != nil {
 			cleaningErrors = append(cleaningErrors, innerErr)
 			return innerErr
@@ -2477,12 +2481,12 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 	return c.core.Delete(task)
 }
 
-// func deleteNodes(task concurrency.Task, svc iaas.Service, nodes []*propertiesv2.ClusterNode) {
+// func deleteNodes(task concurrency.Task, svc iaas.GetService, nodes []*propertiesv2.ClusterNode) {
 // 	length := len(nodes)
 // 	if length > 0 {
 // 		subtasks := make([]concurrency.Task, 0, length)
 // 		for i := 0; i < length; i++ {
-// 			host, err := LoadHost(task, svc, nodes[i].ID)
+// 			host, err := LoadHost(task, svc, nodes[i].GetID)
 // 			if err != nil {
 // 				subtasks[i] = nil
 // 				logrus.Errorf(err.Error())
@@ -2508,7 +2512,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 // 					logrus.Errorf(err.Error())
 // 				}
 // 				if state != nil {
-// 					logrus.Errorf("after failure, cleanup failed to delete node '%s': %v", nodes[i].Name, state)
+// 					logrus.Errorf("after failure, cleanup failed to delete node '%s': %v", nodes[i].GetName, state)
 // 				}
 // 			}
 // 		}
@@ -2538,24 +2542,26 @@ func (c *cluster) unconfigureMaster(task concurrency.Task, host resources.Host) 
 }
 
 // configureCluster ...
-// params contains a data.Map with primary and secondary Gateway hosts
+// params contains a data.Map with primary and secondary getGateway hosts
 func (c *cluster) configureCluster(task concurrency.Task, params concurrency.TaskParameters) (xerr fail.Error) {
 	tracer := concurrency.NewTracer(task, true, "").Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	logrus.Infof("[cluster %s] configuring cluster...", c.SafeGetName())
+	logrus.Infof("[cluster %s] configuring cluster...", c.GetName())
 	defer func() {
 		if xerr == nil {
-			logrus.Infof("[cluster %s] configuration successful.", c.SafeGetName())
+			logrus.Infof("[cluster %s] configuration successful.", c.GetName())
 		} else {
-			logrus.Errorf("[cluster %s] configuration failed: %s", c.SafeGetName(), xerr.Error())
+			logrus.Errorf("[cluster %s] configuration failed: %s", c.GetName(), xerr.Error())
 		}
 	}()
 
-	if xerr = c.createSwarm(task, params); xerr != nil {
-		return xerr
-	}
+	// VPL: not used anymore, flavor SWARM has to disappear
+	// if xerr = c.createSwarm(task, params); xerr != nil {
+	// 	return xerr
+	// }
+	// ENDVPL
 
 	// Installs reverseproxy feature on cluster (gateways)
 	if xerr = c.installReverseProxy(task); xerr != nil {
@@ -2586,148 +2592,145 @@ func (c *cluster) determineRequiredNodes(task concurrency.Task) (uint, uint, uin
 	return 0, 0, 0, nil
 }
 
-// createSwarm configures cluster
-func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (xerr fail.Error) {
-	var (
-		p                                data.Map
-		ok                               bool
-		primaryGateway, secondaryGateway resources.Host
-	)
-
-	if params == nil {
-		return fail.InvalidParameterError("params", "cannot be nil")
-	}
-
-	if p, ok = params.(data.Map); !ok {
-		return fail.InvalidParameterError("params", "must be a data.Map")
-	}
-	if primaryGateway, ok = p["PrimaryGateway"].(resources.Host); !ok || primaryGateway == nil {
-		return fail.InvalidParameterError("params", "params['PrimaryGateway'] must be defined and cannot be nil")
-	}
-	secondaryGateway, ok = p["SecondaryGateway"].(resources.Host)
-	if !ok {
-		logrus.Debugf("secondary gateway not configured")
-	}
-
-	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
-
-	// Join masters in Docker Swarm as managers
-	joinCmd := ""
-	masters, err := c.ListMasters(task)
-	if err != nil {
-		return err
-	}
-	for _, master := range masters {
-		if joinCmd == "" {
-			retcode, _, _, err := master.Run(task, "docker swarm init && docker node update "+master.SafeGetName()+" --label-add safescale.host.role=master",
-				outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-			if err != nil || retcode != 0 {
-				return fail.NewError("failed to init docker swarm")
-			}
-			retcode, token, stderr, err := master.Run(task, "docker swarm join-token manager -q", outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-			if err != nil || retcode != 0 {
-				return fail.NewError("failed to generate token to join swarm as manager: %s", stderr)
-			}
-			token = strings.Trim(token, "\n")
-			ip, err := master.GetPrivateIP(task)
-			if err != nil {
-				return err
-			}
-			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, ip)
-		} else {
-			masterJoinCmd := joinCmd + " && docker node update " + master.SafeGetName() + " --label-add safescale.host.role=master"
-			retcode, _, stderr, err := master.Run(task, masterJoinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-			if err != nil || retcode != 0 {
-				return fail.NewError("failed to join host '%s' to swarm as manager: %s", master.SafeGetName(), stderr)
-			}
-		}
-	}
-
-	master, xerr := c.FindAvailableMaster(task)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to find an available docker manager")
-	}
-
-	// build command to join Docker Swarm as workers
-	joinCmd, xerr = c.getSwarmJoinCommand(task, master, true)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Join private node in Docker Swarm as workers
-	nodes, xerr := c.ListNodes(task)
-	if xerr != nil {
-		return xerr
-	}
-	for _, node := range nodes {
-		retcode, _, stderr, xerr := node.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if xerr != nil || retcode != 0 {
-			return fail.NewError("failed to join host '%s' to swarm as worker: %s", node.SafeGetName(), stderr)
-		}
-		labelCmd := "docker node update " + node.SafeGetName() + " --label-add safescale.host.role=node"
-		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if xerr != nil || retcode != 0 {
-			return fail.NewError("failed to label swarm worker '%s' as node: %s", node.SafeGetName(), stderr)
-		}
-	}
-
-	// Join gateways in Docker Swarm as workers
-	retcode, _, stderr, xerr := primaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil || retcode != 0 {
-		return fail.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.SafeGetName(), stderr)
-	}
-	labelCmd := "docker node update " + primaryGateway.SafeGetName() + " --label-add safescale.host.role=gateway"
-	retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil || retcode != 0 {
-		return fail.NewError("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.SafeGetName(), stderr)
-	}
-
-	if secondaryGateway != nil {
-		retcode, _, stderr, xerr := secondaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if xerr != nil || retcode != 0 {
-			return fail.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.SafeGetName(), stderr)
-		}
-		labelCmd := "docker node update " + secondaryGateway.SafeGetName() + " --label-add safescale.host.role=gateway"
-		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if xerr != nil || retcode != 0 {
-			return fail.NewError("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.SafeGetName(), stderr)
-		}
-	}
-
-	return nil
-}
-
-// getSwarmJoinCommand builds the command to obtain swarm token
-func (c *cluster) getSwarmJoinCommand(task concurrency.Task, selectedMaster resources.Host, worker bool) (string, fail.Error) {
-	var memberType string
-	if worker {
-		memberType = "worker"
-	} else {
-		memberType = "manager"
-	}
-
-	masterIP, xerr := selectedMaster.GetPrivateIP(task)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-	retcode, token, stderr, xerr := selectedMaster.Run(task, tokenCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil || retcode != 0 {
-		return "", fail.NewError("failed to generate token to join swarm as worker: %s", stderr)
-	}
-	token = strings.Trim(token, "\n")
-	return fmt.Sprintf("docker swarm join --token %s %s", token, masterIP), nil
-}
+// VPL: not used anymore, flavor SWARM has to disappear
+// // createSwarm configures cluster
+// func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (xerr fail.Error) {
+// 	var (
+// 		p                                data.Map
+// 		ok                               bool
+// 		primaryGateway, secondaryGateway resources.Host
+// 	)
+//
+// 	if params == nil {
+// 		return fail.InvalidParameterError("params", "cannot be nil")
+// 	}
+//
+// 	if p, ok = params.(data.Map); !ok {
+// 		return fail.InvalidParameterError("params", "must be a data.Map")
+// 	}
+// 	if primaryGateway, ok = p["PrimaryGateway"].(resources.Host); !ok || primaryGateway == nil {
+// 		return fail.InvalidParameterError("params", "params['PrimaryGateway'] must be defined and cannot be nil")
+// 	}
+// 	secondaryGateway, ok = p["SecondaryGateway"].(resources.Host)
+// 	if !ok {
+// 		logrus.Debugf("secondary gateway not configured")
+// 	}
+//
+// 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
+// 	defer tracer.OnExitTrace()
+// 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+//
+// 	// Join masters in Docker Swarm as managers
+// 	joinCmd := ""
+// 	masters, err := c.ListMasters(task)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for _, master := range masters {
+// 		if joinCmd == "" {
+// 			retcode, _, _, err := master.Run(task, "docker swarm init && docker node update "+master.GetName()+" --label-add safescale.host.role=master",
+// 				outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 			if err != nil || retcode != 0 {
+// 				return fail.NewError("failed to init docker swarm")
+// 			}
+// 			retcode, token, stderr, err := master.Run(task, "docker swarm join-token manager -q", outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 			if err != nil || retcode != 0 {
+// 				return fail.NewError("failed to generate token to join swarm as manager: %s", stderr)
+// 			}
+// 			token = strings.Trim(token, "\n")
+// 			ip, err := master.GetPrivateIP(task)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, ip)
+// 		} else {
+// 			masterJoinCmd := joinCmd + " && docker node update " + master.GetName() + " --label-add safescale.host.role=master"
+// 			retcode, _, stderr, err := master.Run(task, masterJoinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 			if err != nil || retcode != 0 {
+// 				return fail.NewError("failed to join host '%s' to swarm as manager: %s", master.GetName(), stderr)
+// 			}
+// 		}
+// 	}
+//
+// 	master, xerr := c.FindAvailableMaster(task)
+// 	if xerr != nil {
+// 		return fail.Wrap(xerr, "failed to find an available docker manager")
+// 	}
+//
+// 	// build command to join Docker Swarm as workers
+// 	joinCmd, xerr = c.getSwarmJoinCommand(task, master, true)
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+//
+// 	// Join private node in Docker Swarm as workers
+// 	nodes, xerr := c.ListNodes(task)
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+// 	for _, node := range nodes {
+// 		retcode, _, stderr, xerr := node.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 		if xerr != nil || retcode != 0 {
+// 			return fail.NewError("failed to join host '%s' to swarm as worker: %s", node.GetName(), stderr)
+// 		}
+// 		labelCmd := "docker node update " + node.GetName() + " --label-add safescale.host.role=node"
+// 		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 		if xerr != nil || retcode != 0 {
+// 			return fail.NewError("failed to label swarm worker '%s' as node: %s", node.GetName(), stderr)
+// 		}
+// 	}
+//
+// 	// Join gateways in Docker Swarm as workers
+// 	retcode, _, stderr, xerr := primaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 	if xerr != nil || retcode != 0 {
+// 		return fail.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.GetName(), stderr)
+// 	}
+// 	labelCmd := "docker node update " + primaryGateway.GetName() + " --label-add safescale.host.role=gateway"
+// 	retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 	if xerr != nil || retcode != 0 {
+// 		return fail.NewError("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.GetName(), stderr)
+// 	}
+//
+// 	if secondaryGateway != nil {
+// 		retcode, _, stderr, xerr := secondaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 		if xerr != nil || retcode != 0 {
+// 			return fail.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.GetName(), stderr)
+// 		}
+// 		labelCmd := "docker node update " + secondaryGateway.GetName() + " --label-add safescale.host.role=gateway"
+// 		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 		if xerr != nil || retcode != 0 {
+// 			return fail.NewError("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.GetName(), stderr)
+// 		}
+// 	}
+//
+// 	return nil
+// }
+//
+// // getSwarmJoinCommand builds the command to obtain swarm token
+// func (c *cluster) getSwarmJoinCommand(task concurrency.Task, selectedMaster resources.Host, worker bool) (string, fail.Error) {
+// 	var memberType string
+// 	if worker {
+// 		memberType = "worker"
+// 	} else {
+// 		memberType = "manager"
+// 	}
+//
+// 	masterIP, xerr := selectedMaster.GetPrivateIP(task)
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
+//
+// 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
+// 	retcode, token, stderr, xerr := selectedMaster.Run(task, tokenCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 	if xerr != nil || retcode != 0 {
+// 		return "", fail.NewError("failed to generate token to join swarm as worker: %s", stderr)
+// 	}
+// 	token = strings.Trim(token, "\n")
+// 	return fmt.Sprintf("docker swarm join --token %s %s", token, masterIP), nil
+// }
 
 // uploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
-func realizeTemplate(
-	box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
-	fileName string,
-) (string, string, fail.Error) {
-
+func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}, fileName string) (string, string, fail.Error) {
 	if box == nil {
 		return "", "", fail.InvalidParameterError("box", "cannot be nil!")
 	}
@@ -2735,7 +2738,7 @@ func realizeTemplate(
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to load template")
 	}
-	tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
+	tmplCmd, err := template.Parse(fileName, tmplString)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to parse template")
 	}
@@ -2801,30 +2804,33 @@ func (c *cluster) joinNodesFromList(task concurrency.Task, hosts []resources.Hos
 
 	logrus.Debugf("Joining nodes to cluster...")
 
-	master, xerr := c.FindAvailableMaster(task)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to join workers to Docker Swarm")
-	}
-	joinCmd, xerr := c.getSwarmJoinCommand(task, master, true)
-	if xerr != nil {
-		return xerr
-	}
+	// VPL: not used anymore, flavor SWARM has to disappear
+	// master, xerr := c.FindAvailableMaster(task)
+	// if xerr != nil {
+	// 	return fail.Wrap(xerr, "failed to join workers to Docker Swarm")
+	// }
+	// joinCmd, xerr := c.getSwarmJoinCommand(task, master, true)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// ENDVPL
 
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
-	for _, host := range hosts {
-		retcode, _, stderr, xerr := host.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if xerr != nil || retcode != 0 {
-			return fail.NewError("failed to join host '%s' to swarm as worker: %s", host.SafeGetName(), stderr)
-		}
-		nodeLabel := "docker node update " + host.SafeGetName() + " --label-add safescale.host.role=node"
-		retcode, _, stderr, xerr = master.Run(task, nodeLabel, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-		if xerr != nil || retcode != 0 {
-			return fail.NewError("failed to add label to docker Swarm worker '%s': %s", host.SafeGetName(), stderr)
-		}
-
-		if c.makers.JoinMasterToCluster != nil {
-			if xerr = c.makers.JoinNodeToCluster(task, c, host); xerr != nil {
+	if c.makers.JoinMasterToCluster != nil {
+		for _, host := range hosts {
+			// VPL: not used anymore, flavor SWARM has to disappear
+			// retcode, _, stderr, xerr := host.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+			// if xerr != nil || retcode != 0 {
+			// 	return fail.NewError("failed to join host '%s' to swarm as worker: %s", host.GetName(), stderr)
+			// }
+			// nodeLabel := "docker node update " + host.GetName() + " --label-add safescale.host.role=node"
+			// retcode, _, stderr, xerr = master.Run(task, nodeLabel, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+			// if xerr != nil || retcode != 0 {
+			// 	return fail.NewError("failed to add label to docker Swarm worker '%s': %s", host.GetName(), stderr)
+			// }
+			// ENDVPL
+			if xerr := c.makers.JoinNodeToCluster(task, c, host); xerr != nil {
 				return xerr
 			}
 		}
@@ -2866,8 +2872,6 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 		}
 	}
 
-	clusterFlavor := c.SafeGetFlavor(task)
-
 	// Unjoins from cluster are done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
@@ -2885,81 +2889,77 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 				return xerr
 			}
 		}
-
-		if clusterFlavor != clusterflavor.K8S {
-			if xerr = c.leaveNodeFromSwarm(task, host, selectedMaster); xerr != nil {
-				return xerr
-			}
-		}
 	}
 
 	return nil
 }
 
-// leaveNodeFromSwarm unregisters properly a node from docker Swarm
-func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.Host) (xerr fail.Error) {
-	if selectedMaster == nil {
-		selectedMaster, xerr = c.FindAvailableMaster(task)
-		if xerr != nil {
-			return xerr
-		}
-	}
-
-	// Check worker is member of the Swarm
-	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", host.SafeGetName(), host.SafeGetName())
-	retcode, _, _, xerr := selectedMaster.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	if retcode != 0 {
-		// node is already expelled from Docker Swarm
-		return nil
-	}
-	// node is a worker in the Swarm: 1st ask worker to leave Swarm
-	cmd = "docker swarm leave"
-	retcode, _, stderr, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to make node '%s' leave swarm: %s", host.SafeGetName(), stderr)
-	}
-
-	// 2nd: wait the Swarm worker to appear as down from Swarm master
-	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", host.SafeGetName())
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-		func() error {
-			retcode, _, _, xerr := selectedMaster.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-			if xerr != nil {
-				return xerr
-			}
-			if retcode != 0 {
-				return fail.NotAvailableError("'%s' not in Down state", host.SafeGetName())
-			}
-			return nil
-		},
-		temporal.GetHostTimeout(),
-	)
-	if retryErr != nil {
-		switch retryErr.(type) {
-		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr, "SWARM worker '%s' didn't reach 'Down' state after %v", host.SafeGetName(), temporal.GetHostTimeout())
-		default:
-			return fail.Wrap(retryErr, "SWARM worker '%s' didn't reach 'Down' state", host.SafeGetName())
-		}
-	}
-
-	// 3rd, ask master to remove node from Swarm
-	cmd = fmt.Sprintf("docker node rm %s", host.SafeGetName())
-	retcode, _, stderr, xerr = selectedMaster.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to remove worker '%s' from Swarm on master '%s': %s", host.SafeGetName(), selectedMaster.SafeGetName(), stderr)
-	}
-	return nil
-}
+// VPL: not used anymore, flavor SWARM has to disappear
+// // leaveNodeFromSwarm unregisters properly a node from docker Swarm
+// func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.Host) (xerr fail.Error) {
+// 	if selectedMaster == nil {
+// 		selectedMaster, xerr = c.FindAvailableMaster(task)
+// 		if xerr != nil {
+// 			return xerr
+// 		}
+// 	}
+//
+// 	// Check worker is member of the Swarm
+// 	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", host.GetName(), host.GetName())
+// 	retcode, _, _, xerr := selectedMaster.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+// 	if retcode != 0 {
+// 		// node is already expelled from Docker Swarm
+// 		return nil
+// 	}
+// 	// node is a worker in the Swarm: 1st ask worker to leave Swarm
+// 	cmd = "docker swarm leave"
+// 	retcode, _, stderr, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+// 	if retcode != 0 {
+// 		return fail.NewError("failed to make node '%s' leave swarm: %s", host.GetName(), stderr)
+// 	}
+//
+// 	// 2nd: wait the Swarm worker to appear as down from Swarm master
+// 	cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", host.GetName())
+// 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+// 		func() error {
+// 			retcode, _, _, xerr := selectedMaster.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+// 			if retcode != 0 {
+// 				return fail.NotAvailableError("'%s' not in Down state", host.GetName())
+// 			}
+// 			return nil
+// 		},
+// 		temporal.GetHostTimeout(),
+// 	)
+// 	if retryErr != nil {
+// 		switch retryErr.(type) {
+// 		case *retry.ErrTimeout:
+// 			return fail.Wrap(retryErr, "SWARM worker '%s' didn't reach 'Down' state after %v", host.GetName(), temporal.GetHostTimeout())
+// 		default:
+// 			return fail.Wrap(retryErr, "SWARM worker '%s' didn't reach 'Down' state", host.GetName())
+// 		}
+// 	}
+//
+// 	// 3rd, ask master to remove node from Swarm
+// 	cmd = fmt.Sprintf("docker node rm %s", host.GetName())
+// 	retcode, _, stderr, xerr = selectedMaster.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+// 	if retcode != 0 {
+// 		return fail.NewError("failed to remove worker '%s' from Swarm on master '%s': %s", host.GetName(), selectedMaster.GetName(), stderr)
+// 	}
+// 	return nil
+// }
+// ENDVPL
 
 // getNodeInstallationScript ...
 func (c *cluster) getNodeInstallationScript(task concurrency.Task, nodeType clusternodetype.Enum) (string, map[string]interface{}) {
@@ -2997,7 +2997,7 @@ func (c *cluster) buildHostname(task concurrency.Task, core string, nodeType clu
 	if xerr != nil {
 		return "", xerr
 	}
-	return c.SafeGetName() + "-" + core + "-" + strconv.Itoa(index), nil
+	return c.GetName() + "-" + core + "-" + strconv.Itoa(index), nil
 }
 
 func (c *cluster) deleteHosts(task concurrency.Task, hosts []resources.Host) fail.Error {

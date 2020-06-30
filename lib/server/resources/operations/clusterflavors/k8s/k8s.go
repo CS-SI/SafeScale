@@ -17,13 +17,8 @@
 package k8s
 
 import (
-	"bytes"
 	"fmt"
-	"sync/atomic"
 
-	txttmpl "text/template"
-
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -36,23 +31,18 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate rice embed-go
-
 var (
-	templateBox                     atomic.Value
-	globalSystemRequirementsContent atomic.Value
 
 	// Makers initializes a control.Makers struct to construct a BOH Cluster
 	Makers = flavors.Makers{
-		MinimumRequiredServers:      minimumRequiredServers,
-		DefaultGatewaySizing:        gatewaySizing,
-		DefaultMasterSizing:         nodeSizing,
-		DefaultNodeSizing:           nodeSizing,
-		DefaultImage:                defaultImage,
-		GetTemplateBox:              getTemplateBox,
-		GetGlobalSystemRequirements: getGlobalSystemRequirements,
-		GetNodeInstallationScript:   getNodeInstallationScript,
-		ConfigureCluster:            configureCluster,
+		MinimumRequiredServers: minimumRequiredServers,
+		DefaultGatewaySizing:   gatewaySizing,
+		DefaultMasterSizing:    nodeSizing,
+		DefaultNodeSizing:      nodeSizing,
+		DefaultImage:           defaultImage,
+		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
+		GetNodeInstallationScript: getNodeInstallationScript,
+		ConfigureCluster:          configureCluster,
 	}
 )
 
@@ -106,10 +96,10 @@ func defaultImage(task concurrency.Task, _ resources.Cluster) string {
 }
 
 func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
-	clusterName := c.SafeGetName()
+	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	// feat, err := featurefactory.New(task, c.Service(), "kubernetes")
+	// feat, err := featurefactory.New(task, c.GetService(), "kubernetes")
 	// if err != nil {
 	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error()
 	// }
@@ -127,6 +117,7 @@ func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
 	return nil
 }
 
+// VPL: eventually this part will be removed (some things have to be included in node_install_requirements
 func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
 	script := ""
 	data := data.Map{}
@@ -141,63 +132,4 @@ func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeT
 	return script, data
 }
 
-func getTemplateBox() (*rice.Box, fail.Error) {
-	anon := templateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err := rice.FindBox("../k8s/scripts")
-		if err != nil {
-			return nil, fail.ToError(err)
-		}
-		templateBox.Store(b)
-		anon = templateBox.Load()
-	}
-	return anon.(*rice.Box), nil
-}
-
-func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, fail.Error) {
-	anon := globalSystemRequirementsContent.Load()
-	if anon == nil {
-		// find the rice.Box
-		box, xerr := getTemplateBox()
-		if xerr != nil {
-			return "", xerr
-		}
-
-		// We will need information from cluster network
-		netCfg, xerr := c.GetNetworkConfig(task)
-		if xerr != nil {
-			return "", xerr
-		}
-		identity, xerr := c.GetIdentity(task)
-		if xerr != nil {
-			return "", xerr
-		}
-
-		// get file contents as string
-		tmplString, err := box.String("k8s_install_requirements.sh")
-		if err != nil {
-			return "", fail.Wrap(err, "error loading script template")
-		}
-
-		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Parse(tmplString)
-		if err != nil {
-			return "", fail.Wrap(err, "error parsing script template")
-		}
-		dataBuffer := bytes.NewBufferString("")
-		err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"Username":      "cladm",
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
-		})
-		if err != nil {
-			return "", fail.Wrap(err, "error realizing script template")
-		}
-		globalSystemRequirementsContent.Store(dataBuffer.String())
-		anon = globalSystemRequirementsContent.Load()
-	}
-	return anon.(string), nil
-}
+// ENDVPL

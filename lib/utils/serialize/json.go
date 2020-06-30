@@ -242,6 +242,7 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 }
 
 // Deserialize ...
+// Returns fail.SyntaxError if an JSON syntax error happens
 // satisfies interface data.Serializable
 func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
 	if x == nil {
@@ -259,8 +260,13 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fa
 	// Decode JSON data
 	var unjsoned = map[string]string{}
 	if jserr := json.Unmarshal(buf, &unjsoned); jserr != nil {
-		logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
-		return fail.NewError(jserr.Error())
+		switch jserr.(type) {
+		case *json.SyntaxError:
+			return fail.SyntaxError(jserr.Error())
+		default:
+			logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
+			return fail.NewError(jserr.Error())
+		}
 	}
 
 	var (

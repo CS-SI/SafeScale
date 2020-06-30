@@ -26,13 +26,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -50,7 +50,7 @@ const (
 	volumesFolderName = "volumes"
 )
 
-// Volume links Object Storage folder and Volumes
+// Volume links Object Storage folder and getVolumes
 type volume struct {
 	*core
 }
@@ -67,11 +67,11 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 		return nullVolume(), fail.InvalidParameterError("svc", "can't be nil")
 	}
 
-	c, err := NewCore(svc, "volume", volumesFolderName, &abstract.Volume{})
+	coreInstance, err := newCore(svc, "volume", volumesFolderName, &abstract.Volume{})
 	if err != nil {
 		return nullVolume(), err
 	}
-	return &volume{core: c}, nil
+	return &volume{core: coreInstance}, nil
 }
 
 // LoadVolume loads the metadata of a network
@@ -113,7 +113,7 @@ func (objv *volume) IsNull() bool {
 }
 
 // GetSpeed ...
-func (objv *volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) {
+func (objv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) {
 	if objv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -136,15 +136,15 @@ func (objv *volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Erro
 	return speed, nil
 }
 
-// SafeGetSpeed ...
+// getSpeed ...
 // Intended to be used when objv is notoriously not nil
-func (objv *volume) SafeGetSpeed(task concurrency.Task) volumespeed.Enum {
+func (objv volume) getSpeed(task concurrency.Task) volumespeed.Enum {
 	speed, _ := objv.GetSpeed(task)
 	return speed
 }
 
 // GetSize ...
-func (objv *volume) GetSize(task concurrency.Task) (int, fail.Error) {
+func (objv volume) GetSize(task concurrency.Task) (int, fail.Error) {
 	if objv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -167,15 +167,15 @@ func (objv *volume) GetSize(task concurrency.Task) (int, fail.Error) {
 	return size, nil
 }
 
-// SafeGetSize ...
+// getSize ...
 // Intended to be used when objv is notoriously not nil
-func (objv *volume) SafeGetSize(task concurrency.Task) int {
+func (objv volume) getSize(task concurrency.Task) int {
 	size, _ := objv.GetSize(task)
 	return size
 }
 
 // GetAttachments ...
-func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error) {
+func (objv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error) {
 	if objv.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -201,7 +201,7 @@ func (objv *volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeA
 }
 
 // Browse walks through volume folder and executes a callback for each entry
-func (objv *volume) Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error {
+func (objv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error {
 	if objv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -241,6 +241,10 @@ func (objv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 			if nbAttach > 0 {
 				list := make([]string, len(volumeAttachmentsV1.Hosts))
 				for _, v := range volumeAttachmentsV1.Hosts {
+					// Abort if asked for
+					if task.Aborted() {
+						return fail.AbortedError(fmt.Errorf("aborted"))
+					}
 					list = append(list, v)
 				}
 				return fail.NotAvailableError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
@@ -251,8 +255,8 @@ func (objv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 			return innerXErr
 		}
 
-		svc := objv.SafeGetService()
-		innerXErr = svc.DeleteVolume(objv.SafeGetID())
+		svc := objv.GetService()
+		innerXErr = svc.DeleteVolume(objv.GetID())
 		if innerXErr != nil {
 			if _, ok := innerXErr.(*fail.ErrNotFound); !ok {
 				return fail.Wrap(innerXErr, "cannot delete volume")
@@ -268,7 +272,7 @@ func (objv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 	// select {
 	// case <-ctx.Done():
 	// 	logrus.Warnf("Volume deletion cancelled by user")
-	// 	volumeBis, err := handler.Create(context.Background(), volume.Name, volume.Size, volume.Speed)
+	// 	volumeBis, err := handler.Create(context.Background(), volume.GetName, volume.getSize, volume.getSpeed)
 	// 	if err != nil {
 	// 		return fail.NewError("failed to stop volume deletion")
 	// 	}
@@ -292,13 +296,13 @@ func (objv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (x
 		return fail.InvalidParameterError("task", "can't be nil")
 	}
 	if req.Name == "" {
-		return fail.InvalidParameterError("req.Name", "cannot be empty string")
+		return fail.InvalidParameterError("req.GetName", "cannot be empty string")
 	}
 	if req.Size <= 0 {
-		return fail.InvalidParameterError("req.Size", "must be an integer > 0")
+		return fail.InvalidParameterError("req.getSize", "must be an integer > 0")
 	}
 
-	svc := objv.SafeGetService()
+	svc := objv.GetService()
 	rv, xerr := svc.CreateVolume(req)
 	if xerr != nil {
 		return xerr
@@ -353,12 +357,12 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		server     *nfs.Server
 	)
 
-	svc := objv.SafeGetService()
+	svc := objv.GetService()
 
-	volumeID := objv.SafeGetID()
-	volumeName := objv.SafeGetName()
-	targetID := host.SafeGetID()
-	targetName := host.SafeGetName()
+	volumeID := objv.GetID()
+	volumeName := objv.GetName()
+	targetID := host.GetID()
+	targetName := host.GetName()
 
 	// -- proceed some checks on volume --
 	xerr = objv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -389,6 +393,10 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		return xerr
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(fmt.Errorf("aborted"))
+	}
+
 	// -- proceed some checks on target server --
 	xerr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -417,11 +425,19 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 
 				// Check if there is no other device mounted in the path (or in subpath)
 				for _, i := range hostMountsV1.LocalMountsByPath {
+					if task.Aborted() {
+						return fail.AbortedError(fmt.Errorf("aborted"))
+					}
+
 					if strings.Index(i.Path, mountPoint) == 0 {
 						return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
 					}
 				}
 				for _, i := range hostMountsV1.RemoteMountsByPath {
+					if task.Aborted() {
+						return fail.AbortedError(fmt.Errorf("aborted"))
+					}
+
 					if strings.Index(i.Path, mountPoint) == 0 {
 						return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
 					}
@@ -437,9 +453,13 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 	// -- Get list of disks before attachment --
 	// Note: some providers are not able to tell the real device name the volume
 	//       will have on the host, so we have to use a way that can work everywhere
-	oldDiskSet, xerr := objv.listAttachedDevices(task, host)
+	oldDiskSet, xerr := listAttachedDevices(task, host)
 	if xerr != nil {
 		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(fmt.Errorf("aborted"))
 	}
 
 	// -- creates volume attachment --
@@ -463,11 +483,15 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		}
 	}()
 
+	if task.Aborted() {
+		return fail.AbortedError(fmt.Errorf("aborted"))
+	}
+
 	// -- acknowledge the volume is really attached to host --
 	var newDisk mapset.Set
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			newDiskSet, xerr := objv.listAttachedDevices(task, host)
+			newDiskSet, xerr := listAttachedDevices(task, host)
 			if xerr != nil {
 				return xerr
 			}
@@ -485,6 +509,10 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 			return retryErr
 		}
 		return fail.Wrap(retryErr, fmt.Sprintf("failed to confirm the disk attachment after %s", 2*time.Minute))
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(fmt.Errorf("aborted"))
 	}
 
 	// -- updates target properties --
@@ -593,6 +621,11 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 		}
 	}()
 
+	// last chance to abort ...
+	if task.Aborted() {
+		return fail.AbortedError(fmt.Errorf("aborted"))
+	}
+
 	xerr = objv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
@@ -620,16 +653,19 @@ func (objv *volume) Attach(task concurrency.Task, host resources.Host, path, for
 	return nil
 }
 
-func (objv *volume) listAttachedDevices(task concurrency.Task, host resources.Host) (_ mapset.Set, xerr fail.Error) {
+func listAttachedDevices(task concurrency.Task, host resources.Host) (_ mapset.Set, xerr fail.Error) {
 	var (
 		retcode        int
 		stdout, stderr string
 	)
 
-	hostName := host.SafeGetName()
+	hostName := host.GetName()
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
+			if task.Aborted() {
+				return retry.StopRetryError(fmt.Errorf("aborted"))
+			}
 			retcode, stdout, stderr, xerr = host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 			if xerr != nil {
 				return xerr
@@ -689,9 +725,9 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fai
 	}
 
 	// -- retrieve host data --
-	svc := objv.SafeGetService()
-	targetID := host.SafeGetID()
-	targetName := host.SafeGetName()
+	svc := objv.GetService()
+	targetID := host.GetID()
+	targetName := host.GetName()
 
 	// -- Update target attachments --
 	xerr = host.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -813,7 +849,7 @@ func (objv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fai
 }
 
 // ToProtocol converts the volume to protocol message VolumeInspectResponse
-func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, fail.Error) {
+func (objv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, fail.Error) {
 	if objv.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -821,11 +857,13 @@ func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRe
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
+	volumeID := objv.GetID()
+	volumeName := objv.GetName()
 	out := &protocol.VolumeInspectResponse{
-		Id:          objv.SafeGetID(),
-		Name:        objv.SafeGetName(),
-		Speed:       converters.VolumeSpeedFromAbstractToProtocol(objv.SafeGetSpeed(task)),
-		Size:        int32(objv.SafeGetSize(task)),
+		Id:          volumeID,
+		Name:        volumeName,
+		Speed:       converters.VolumeSpeedFromAbstractToProtocol(objv.getSpeed(task)),
+		Size:        int32(objv.getSize(task)),
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 
@@ -834,29 +872,30 @@ func (objv *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRe
 		return nil, xerr
 	}
 
+	svc := objv.GetService()
 	for k := range attachments.Hosts {
-		rh, xerr := LoadHost(task, objv.SafeGetService(), k)
+		rh, xerr := LoadHost(task, svc, k)
 		if xerr != nil {
 			return nil, xerr
 		}
-		vols := rh.SafeGetVolumes(task)
-		device, ok := vols.DevicesByID[objv.SafeGetID()]
+		vols := rh.(*host).getVolumes(task)
+		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
-			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
-		mnts := rh.SafeGetMounts(task)
+		mnts := rh.(*host).getMounts(task)
 		path, ok := mnts.LocalMountsByDevice[device]
 		if !ok {
-			return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+			return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
 		}
 		m, ok := mnts.LocalMountsByPath[path]
 		if !ok {
-			return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", objv.SafeGetName(), k)
+			return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
 		}
 		a := &protocol.VolumeAttachmentResponse{
 			Host: &protocol.Reference{
 				Name: k,
-				Id:   rh.SafeGetID(),
+				Id:   rh.GetID(),
 			},
 			MountPath: path,
 			Format:    m.FileSystem,

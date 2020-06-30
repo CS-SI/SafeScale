@@ -65,7 +65,7 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 // // VolumeAttachmentFromPropertyToProtocol converts an api.Volume to a *VolumeInfo
 // func VolumeAttachmentFromPropertyToProtocol(hostRef string, va propertiesv1.HostLocalMount) *protocol.VolumeAttachmentResponse {
 // 	out := &protocol.VolumeAttachmentResponse{
-// 		Host:      &protocol.Reference{Name: hostRef},
+// 		Host:      &protocol.Reference{GetName: hostRef},
 // 		MountPath: va.Path,
 // 		Device:    va.Device,
 // 		Format:    va.FileSystem,

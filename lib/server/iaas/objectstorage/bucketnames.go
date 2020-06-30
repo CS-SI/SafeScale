@@ -19,10 +19,9 @@ package objectstorage
 import (
 	"encoding/hex"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"strings"
-
-	"hash/fnv"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -34,7 +33,7 @@ const (
 	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
-// BuildMetadataBucketName builds the name of the bucket/container that will store metadata
+// BuildMetadataBucketName builds the name of the bucket/stowContainer that will store metadata
 func BuildMetadataBucketName(driver, region, domain, project string) (name string, xerr fail.Error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))

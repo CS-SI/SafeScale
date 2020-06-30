@@ -76,7 +76,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	}
 	defer job.Close()
 
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -149,7 +149,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -201,12 +201,12 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	}
 	defer job.Close()
 
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	network, xerr := networkfactory.Load(task, job.SafeGetService(), ref)
+	network, xerr := networkfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -247,12 +247,12 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
-	_, xerr = job.SafeGetTask().Run(
+	_, xerr = job.GetTask().Run(
 		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 			return nil, handler.Delete(ref)
 		},

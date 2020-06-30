@@ -17,8 +17,6 @@
 package resources
 
 import (
-	"github.com/spf13/viper"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -30,12 +28,12 @@ import (
 type Targetable interface {
 	data.Identifiable
 
-	// GetTargetType returns the type of the target
-	SafeGetTargetType() featuretargettype.Enum
-	// GetInstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-	SafeGetInstallMethods(concurrency.Task) map[uint8]installmethod.Enum
+	// TargetType returns the type of the target
+	TargetType() featuretargettype.Enum
+	// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+	InstallMethods(concurrency.Task) map[uint8]installmethod.Enum
 	// GetInstalledFatures returns a list of installed features
-	SafeGetInstalledFeatures(concurrency.Task) []string
+	InstalledFeatures(concurrency.Task) []string
 	// ComplementFeatureParameters adds parameters corresponding to the target in preparation of feature installation
 	ComplementFeatureParameters(t concurrency.Task, v data.Map) fail.Error
 }
@@ -43,22 +41,14 @@ type Targetable interface {
 // Feature defines the interface of feature
 type Feature interface {
 	data.Clonable
+	data.Identifiable
+	data.NullValue
 
-	// GetName returns the name of the feature
-	GetName() (string, fail.Error)
 	// GetFilename returns the filename of the feature
-	GetFilename() (string, fail.Error)
+	GetFilename() string
 	// GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetDisplayFilename() (string, fail.Error)
-	// SafeGetName returns the name of the feature
-	SafeGetName() string
-	// SafeGetFilename returns the filename of the feature
-	SafeGetFilename() string
-	// GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	SafeGetDisplayFilename() string
-	// GetSpecs returns the feature specs
-	SafeGetSpecs() *viper.Viper
-	// Requirements returns the other features needed as requirements
+	GetDisplayFilename() string
+	// GetRequirements returns the other features needed as requirements
 	GetRequirements() ([]string, fail.Error)
 	// Applyable tells if the feature is installable on the target
 	Applyable(Targetable) bool

@@ -29,7 +29,7 @@ import (
 type HostSystem struct {
 	Type     string `json:"type,omitempty"`     // Type of operating system (ie linux, windows, ... Not normalized yet...)
 	Flavor   string `json:"flavor,omitempty"`   // Flavor of operating system (ie 'ubuntu server', 'windows server 2016', ... Not normalized yet...)
-	Image    string `json:"image,omitempty"`    // Name of the provider's image used
+	Image    string `json:"image,omitempty"`    // GetName of the provider's image used
 	HostName string `json:"hostname,omitempty"` // Hostname on the system
 }
 

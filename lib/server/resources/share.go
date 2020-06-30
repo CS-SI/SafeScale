@@ -33,7 +33,6 @@ type Share interface {
 	Browse(task concurrency.Task, callback func(hostName string, shareID string) fail.Error) fail.Error
 	Create(task concurrency.Task, shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host
 	GetServer(task concurrency.Task) (Host, fail.Error)                                                                                                                                                       // returns the *Host acting as share server, with error handling
-	SafeGetServer(task concurrency.Task) Host                                                                                                                                                                 // returns the *Host acting as share server, with error handling (may return nil)
 	Mount(task concurrency.Task, host Host, path string, withCache bool) (*propertiesv1.HostRemoteMount, fail.Error)                                                                                          // mounts a share on a local directory of an host
 	Unmount(task concurrency.Task, host Host) fail.Error                                                                                                                                                      // unmounts a share from local directory of an host
 	ToProtocol(task concurrency.Task) (*protocol.ShareMountList, fail.Error)

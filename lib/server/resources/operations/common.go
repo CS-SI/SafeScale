@@ -21,8 +21,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -36,7 +36,7 @@ func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 		return
 	}
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		hostName := host.SafeGetName()
+		hostName := host.GetName()
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", hostName)), 0777)
 
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", hostName, userdata.PHASE1_INIT))

@@ -77,7 +77,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	}
 	defer job.Close()
 
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -86,7 +86,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	if in.OptionsAsString == "" && in.Options != nil {
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
-	svc := job.SafeGetService()
+	svc := job.GetService()
 	rh, xerr := hostfactory.Load(task, svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
@@ -153,15 +153,15 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", shareName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := sharefactory.Load(job.SafeGetTask(), job.SafeGetService(), shareName)
+	rs, xerr := sharefactory.Load(job.GetTask(), job.GetService(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.Delete(job.SafeGetTask()); xerr != nil {
+	if xerr = rs.Delete(job.GetTask()); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -192,7 +192,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -244,7 +244,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -289,7 +289,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 	shareRef := srvutils.GetReference(in.GetShare())
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -329,7 +329,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	defer job.Close()
 
 	shareRef := srvutils.GetReference(in)
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())

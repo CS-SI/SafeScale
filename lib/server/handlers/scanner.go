@@ -153,11 +153,11 @@ func (handler *scannerHandler) Scan() (xerr fail.Error) {
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(handler.job.GetTask(), debug.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	svc := handler.job.SafeGetService()
+	svc := handler.job.GetService()
 
 	// FIXME: Check if tenant is scannable
 
@@ -179,14 +179,14 @@ func (handler *scannerHandler) Scan() (xerr fail.Error) {
 		return err
 	}
 	if err := handler.collect(); err != nil {
-		return fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.SafeGetName())
+		return fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
 	}
 	return nil
 }
 
 func (handler *scannerHandler) analyze() (xerr fail.Error) {
-	svc := handler.job.SafeGetService()
-	tenantName := svc.SafeGetName()
+	svc := handler.job.GetService()
+	tenantName := svc.GetName()
 
 	if xerr = handler.dumpImages(); xerr != nil {
 		return xerr
@@ -207,7 +207,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	}
 
 	// Prepare network if needed
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	netName := "net-safescale" // FIXME: Hardcoded string
 	network, xerr := networkfactory.Load(task, svc, netName)
 	if xerr != nil {
@@ -230,7 +230,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		defer func() {
 			derr := network.Delete(task)
 			if derr != nil {
-				logrus.Warnf("Error deleting network '%s'", network.SafeGetID())
+				logrus.Warnf("Error deleting network '%s'", network.GetID())
 			}
 			_ = xerr.AddConsequence(derr)
 		}()
@@ -302,7 +302,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 			}
 
 			defer func() {
-				logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.SafeGetID())
+				logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.GetID())
 				derr := host.Delete(task)
 				if derr != nil {
 					logrus.Warnf("Error deleting host '%s'", hostName)
@@ -310,25 +310,25 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 			}()
 
 			// sshSvc := handlers.NewSSHHandler(job)
-			// ssh, err := sshSvc.GetConfig(host.SafeGetID())
+			// ssh, err := sshSvc.GetConfig(host.GetID())
 			// if err != nil {
-			// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v", template.Name, hostName, err.Error())
+			// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v", template.GetName, hostName, err.Error())
 			// 	return err
 			// }
-			// _, nerr := ssh.WaitServerReady(job.SafeGetTask(), "ready", time.Duration(6+concurrency-1)*time.Minute)
+			// _, nerr := ssh.WaitServerReady(job.GetTask(), "ready", time.Duration(6+concurrency-1)*time.Minute)
 			// if nerr != nil {
-			// 	logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
+			// 	logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.GetName, nerr)
 			// 	return nerr
 			// }
 
-			// c, err := ssh.Command(job.SafeGetTask(), cmd)
+			// c, err := ssh.Command(job.GetTask(), cmd)
 			// if err != nil {
-			// 	logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
+			// 	logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.GetName, err)
 			// 	return err
 			// }
 			// _, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
 			// if err != nil {
-			// 	logrus.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
+			// 	logrus.Warnf("template [%s]: Problem running ssh command: %v", template.GetName, err)
 			// 	return err
 			// }
 			_, cout, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
@@ -399,7 +399,7 @@ func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 		Templates []abstract.HostTemplate `json:"templates,omitempty"`
 	}
 
-	svc := handler.job.SafeGetService()
+	svc := handler.job.GetService()
 	templates, xerr := svc.ListTemplates(false)
 	if xerr != nil {
 		return xerr
@@ -412,7 +412,7 @@ func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 		return fail.ToError(err)
 	}
 
-	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svc.SafeGetName())
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svc.GetName())
 	f = utils.AbsPathify(f)
 
 	if err = ioutil.WriteFile(f, content, 0666); err != nil {
@@ -431,7 +431,7 @@ func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
 		Images []abstract.Image `json:"images,omitempty"`
 	}
 
-	svc := handler.job.SafeGetService()
+	svc := handler.job.GetService()
 	images, xerr := svc.ListImages(false)
 	if xerr != nil {
 		return xerr
@@ -444,7 +444,7 @@ func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
 		return fail.ToError(err)
 	}
 
-	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svc.SafeGetName())
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svc.GetName())
 	f = utils.AbsPathify(f)
 
 	if err := ioutil.WriteFile(f, content, 0666); err != nil {
@@ -535,7 +535,7 @@ func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
 }
 
 func (handler *scannerHandler) collect() (xerr fail.Error) {
-	svc := handler.job.SafeGetService()
+	svc := handler.job.GetService()
 
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {
@@ -546,7 +546,7 @@ func (handler *scannerHandler) collect() (xerr fail.Error) {
 		return fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
 	}
 
-	folder := fmt.Sprintf("images/%s/%s", svc.SafeGetName(), region)
+	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
 
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ToError(err)
@@ -565,7 +565,7 @@ func (handler *scannerHandler) collect() (xerr fail.Error) {
 	for _, file := range files {
 		acpu := StoredCPUInfo{}
 		theFile := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name()))
-		if strings.Contains(file.Name(), svc.SafeGetName()+"#") {
+		if strings.Contains(file.Name(), svc.GetName()+"#") {
 			logrus.Infof("Storing: %s", file.Name())
 
 			byteValue, err := ioutil.ReadFile(theFile)

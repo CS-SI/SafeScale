@@ -19,6 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"regexp"
 	"strconv"
 	"strings"
@@ -73,7 +74,7 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
-		return nullService(), err
+		return NullService(), err
 	}
 
 	var (
@@ -147,11 +148,11 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 		// Initializes Provider
 		providerInstance, err := svc.Build( /*tenantClient*/ tenant)
 		if err != nil {
-			return nullService(), fail.Wrap(err, "error creating tenant '%s' on provider '%s'", tenantName, provider)
+			return NullService(), fail.Wrap(err, "error creating tenant '%s' on provider '%s'", tenantName, provider)
 		}
 		serviceCfg, err := providerInstance.GetConfigurationOptions()
 		if err != nil {
-			return nullService(), err
+			return NullService(), err
 		}
 
 		// Initializes Object Storage
@@ -162,15 +163,15 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 		if tenantObjectStorageFound {
 			authOpts, err = providerInstance.GetAuthenticationOptions()
 			if err != nil {
-				return nullService(), err
+				return NullService(), err
 			}
 			objectStorageConfig, err := initObjectStorageLocationConfig(authOpts, tenant)
 			if err != nil {
-				return nullService(), err
+				return NullService(), err
 			}
 			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
 			if err != nil {
-				return nullService(), fail.Wrap(err, "error connecting to Object Storage Location")
+				return NullService(), fail.Wrap(err, "error connecting to Object Storage location")
 			}
 		} else {
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
@@ -178,54 +179,55 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 
 		// Initializes Metadata Object Storage (may be different than the Object Storage)
 		var (
-			metadataBucket   objectstorage.Bucket
+//			metadataBucket   objectstorage.GetBucket
+			metadataBucket   abstract.ObjectStorageBucket
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
 			// FIXME: This requires tuning too
 			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
 			if err != nil {
-				return nullService(), err
+				return NullService(), err
 			}
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
-				return nullService(), fail.Wrap(err, "error connecting to Object Storage Location to store metadata")
+				return NullService(), fail.Wrap(err, "error connecting to Object Storage location to store metadata")
 			}
 			anon, found := serviceCfg.Get("MetadataBucketName")
 			if !found {
-				return nullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
+				return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
 			}
 			bucketName, ok := anon.(string)
 			if !ok {
-				return nullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
+				return NullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
 			}
 			found, err = metadataLocation.FindBucket(bucketName)
 			if err != nil {
-				return nullService(), fail.Wrap(err, "error accessing metadata location: %s")
+				return NullService(), fail.Wrap(err, "error accessing metadata location: %s")
 			}
 			if found {
 				metadataBucket, err = metadataLocation.InspectBucket(bucketName)
 				if err != nil {
-					return nullService(), err
+					return NullService(), err
 				}
 			} else {
 				metadataBucket, err = metadataLocation.CreateBucket(bucketName)
 				if err != nil {
-					return nullService(), err
+					return NullService(), err
 				}
 			}
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
 				ek, err := crypt.NewEncryptionKey([]byte(metadataConfig["CryptKey"].(string)))
 				if err != nil {
-					return nullService(), fail.ToError(err)
+					return NullService(), fail.ToError(err)
 				}
 				metadataCryptKey = ek
 			}
 		} else {
-			return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
 
-		// Service is ready
+		// GetService is ready
 		newS := &service{
 			Provider:       providerInstance,
 			Location:       objectStorageLocation,
@@ -236,9 +238,9 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 	}
 
 	if !tenantInCfg {
-		return nullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
+		return NullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
 	}
-	return nullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
+	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 
 // validatRegexps validates regexp values from tenants file

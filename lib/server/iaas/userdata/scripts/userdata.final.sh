@@ -45,6 +45,8 @@ set -x
 {{ .BashLibrary }}
 
 install_drivers_nvidia() {
+    lspci | grep -i nvidia &>/dev/null || return
+
     case $LINUX_KIND in
         ubuntu)
             sfFinishPreviousInstall
@@ -90,9 +92,27 @@ install_drivers_nvidia() {
     esac
 }
 
+install_python3() {
+        case $LINUX_KIND in
+        debian|ubuntu)
+            sfFinishPreviousInstall
+            sfApt update || fail 201
+            sfApt -y install python3 &>/dev/null|| fail 210
+            ;;
+        redhat|rhel|centos)
+            yum install -y python3
+            ;;
+        *)
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+            fail 209
+            ;;
+    esac
+}
+
 # ---- Main
 
-lspci | grep -i nvidia &>/dev/null && install_drivers_nvidia
+install_drivers_nvidia
+install_python3
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
 # For compatibility with previous user_data implementation (until v19.03.x)...

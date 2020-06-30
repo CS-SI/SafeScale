@@ -72,12 +72,12 @@ func (handler *hostHandler) Start(ref string) (xerr fail.Error) {
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -96,12 +96,12 @@ func (handler *hostHandler) Stop(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -120,12 +120,12 @@ func (handler *hostHandler) Reboot(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -144,13 +144,13 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -196,14 +196,14 @@ func (handler *hostHandler) Create(
 		return nil, fail.InvalidParameterError("req.Name", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 
 	var networkName string
 	if !req.PublicIP {
 		if len(req.Networks) > 0 {
 			networkName = req.Networks[0].Name
 		} else {
-			return nil, fail.InvalidParameterError("req.Networks", "must contain at least on network if req.PublicIP is false")
+			return nil, fail.InvalidParameterError("req.Networks", "must contain at least on network if req.getPublicIP is false")
 		}
 	} else {
 		networkName = abstract.SingleHostNetworkName
@@ -217,7 +217,7 @@ func (handler *hostHandler) Create(
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objh, xerr := hostfactory.New(handler.job.SafeGetService())
+	objh, xerr := hostfactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -236,16 +236,16 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.E
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	if all {
-		return handler.job.SafeGetService().ListHosts(true)
+		return handler.job.GetService().ListHosts(true)
 	}
 
-	objh, xerr := hostfactory.New(handler.job.SafeGetService())
+	objh, xerr := hostfactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -270,12 +270,12 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("host", ref)
@@ -297,13 +297,13 @@ func (handler *hostHandler) Delete(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -322,7 +322,7 @@ func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, xerr f
 		return nil, fail.InvalidParameterError("ref", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(handler.job.GetTask(), debug.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 

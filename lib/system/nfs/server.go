@@ -22,15 +22,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Server structure
+// getServer structure
 type Server struct {
 	SSHConfig *system.SSHConfig
 }
 
-// NewServer instantiates a new nfs.Server struct
+// NewServer instantiates a new nfs.getServer struct
 func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
-	if sshconfig == nil {
-		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
+	if sshconfig.IsNull() {
+		return nil, fail.InvalidParameterError("sshconfig", "cannot be null value")
 	}
 
 	server := Server{
@@ -39,7 +39,7 @@ func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
 	return &server, nil
 }
 
-// GetHost returns the hostname or IP address of the nfs.Server
+// GetHost returns the hostname or IP address of the nfs.getServer
 func (s *Server) GetHost() string {
 	return s.SSHConfig.Host
 }

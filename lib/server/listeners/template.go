@@ -56,7 +56,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 
 	all := in.GetAll()
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()

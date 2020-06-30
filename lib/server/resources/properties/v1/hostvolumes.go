@@ -27,7 +27,7 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostVolume struct {
-	AttachID string `json:"attach_id"` // contains the ID of the volume attachment
+	AttachID string `json:"attach_id"` // contains the GetID of the volume attachment
 	Device   string `json:"device"`    // contains the device on the host
 }
 
@@ -46,10 +46,10 @@ func (p *HostVolume) Reset() {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostVolumes struct {
-	VolumesByID     map[string]*HostVolume `json:"volumes_by_id"`     // contains the information of the attached volume, indexed by volume ID
-	VolumesByName   map[string]string      `json:"volumes_by_name"`   // contains the ID of attached volume, indexed by volume name
-	VolumesByDevice map[string]string      `json:"volumes_by_device"` // contains the ID of attached volume, indexed by device
-	DevicesByID     map[string]string      `json:"devices_by_id"`     // contains the device of attached volume, indexed by ID
+	VolumesByID     map[string]*HostVolume `json:"volumes_by_id"`     // contains the information of the attached volume, indexed by volume GetID
+	VolumesByName   map[string]string      `json:"volumes_by_name"`   // contains the GetID of attached volume, indexed by volume name
+	VolumesByDevice map[string]string      `json:"volumes_by_device"` // contains the GetID of attached volume, indexed by device
+	DevicesByID     map[string]string      `json:"devices_by_id"`     // contains the device of attached volume, indexed by GetID
 }
 
 // NewHostVolumes ...

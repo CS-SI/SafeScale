@@ -17,7 +17,9 @@
 package commonlog
 
 import (
+	"io/ioutil"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -25,6 +27,8 @@ import (
 )
 
 var (
+	pidMaxLength int
+
 	// baseTimestamp time.Time
 	// emptyFieldMap logrus.FieldMap
 
@@ -60,7 +64,10 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	if f.TextFormatter.DisableLevelTruncation && f.TextFormatter.ForceColors {
 		if f.pid == "" {
 			f.pid = strconv.Itoa(os.Getpid())
-			f.pid = strings.Repeat(" ", 5-len(f.pid)) + f.pid
+			repeat := pidMaxLength - len(f.pid)
+			if repeat > 0 {
+				f.pid = strings.Repeat(" ", repeat) + f.pid
+			}
 		}
 		bc, err := f.TextFormatter.Format(entry)
 		ticket := string(bc)
@@ -72,4 +79,22 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 
 	return f.TextFormatter.Format(entry)
+}
+
+func init() {
+	switch runtime.GOOS {
+	case "linux":
+		data, err := ioutil.ReadFile("/proc/sys/kernel/pid_max")
+		if err != nil {
+			return
+		}
+		max := len(strings.TrimSpace(string(data)))
+		if max > pidMaxLength {
+			pidMaxLength = max
+		}
+	case "windows":
+		panic("pid max value for Windows systems not managed currently, please fix the code in lib/utils/commonlog/commonlog.go")
+	default:
+		pidMaxLength = 5
+	}
 }

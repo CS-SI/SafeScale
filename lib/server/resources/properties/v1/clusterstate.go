@@ -27,7 +27,7 @@ import (
 
 // ClusterState contains the bare minimum information about a cluster
 type ClusterState struct {
-	// State of the cluster
+	// getState of the cluster
 	State clusterstate.Enum
 	// StateCollectInterval in seconds
 	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`

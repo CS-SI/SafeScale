@@ -99,11 +99,11 @@ type HostRequest struct {
 	HostName string
 	// Networks lists the networks the host must be connected to
 	Networks []*Network
-	// DefaultRouteIP is the IP used as default route
+	// defaultRouteIP is the IP used as default route
 	DefaultRouteIP string
 	// // DefaultGateway is the host used as default gateway
 	// DefaultGateway *HostCore
-	// PublicIP a flag telling if the host must have a public IP
+	// getPublicIP a flag telling if the host must have a public IP
 	PublicIP bool
 	// TemplateID is the UUID of the template used to size the host (see SelectTemplates)
 	TemplateID string
@@ -235,23 +235,28 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 
 	jserr := json.Unmarshal(buf, hc)
 	if jserr != nil {
-		return fail.NewError(jserr.Error())
+		switch jserr.(type) {
+		case *json.SyntaxError:
+			return fail.SyntaxError(jserr.Error())
+		default:
+			return fail.NewError(jserr.Error())
+		}
 	}
 	return nil
 }
 
-// SafeGetName returns the name of the host
+// GetName returns the name of the host
 // Satisfies interface data.Identifiable
-func (hc *HostCore) SafeGetName() string {
+func (hc *HostCore) GetName() string {
 	if hc == nil {
 		return ""
 	}
 	return hc.Name
 }
 
-// SafeGetID returns the ID of the host
+// GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (hc *HostCore) SafeGetID() string {
+func (hc *HostCore) GetID() string {
 	if hc == nil {
 		return ""
 	}
@@ -261,15 +266,15 @@ func (hc *HostCore) SafeGetID() string {
 // HostNetwork contains network information related to Host
 type HostNetwork struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
-	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the Default Gateway
+	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the GetID of the Default getGateway
 	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // DEPRECATED: contains the private IP of the default gateway
-	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Network
-	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network binded to the host (indexed by ID)
-	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the ID of each network binded to the host (indexed by Name)
+	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the GetID of the default Network
+	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network binded to the host (indexed by GetID)
+	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the GetID of each network binded to the host (indexed by GetName)
 	PublicIPv4              string            `json:"public_ip_v4,omitempty"`
 	PublicIPv6              string            `json:"public_ip_v6,omitempty"`
-	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
-	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network GetID) allocated to the host
+	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network GetID) allocated to the host
 }
 
 // NewHostNetwork creates a new instance of HostNetwork

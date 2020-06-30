@@ -78,7 +78,7 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 		return result, fail.InvalidParameterError("params", "cannot be nil")
 	}
 
-	hostLabel := gateway.SafeGetName()
+	hostLabel := gateway.GetName()
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
 	if _, xerr = gateway.WaitSSHReady(task, temporal.GetHostTimeout()); xerr != nil {
@@ -175,7 +175,7 @@ func (c *cluster) taskCreateMasters(task concurrency.Task, params concurrency.Ta
 		nokeep = true
 	}
 
-	clusterName := c.SafeGetName()
+	clusterName := c.GetName()
 
 	if count == 0 {
 		logrus.Debugf("[cluster %s] no masters to create.", clusterName)
@@ -328,9 +328,9 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 				return innerErr
 			}
 			node := &propertiesv2.ClusterNode{
-				ID:          objh.SafeGetID(),
+				ID:          objh.GetID(),
 				NumericalID: nodesV2.GlobalLastIndex,
-				Name:        objh.SafeGetName(),
+				Name:        objh.GetName(),
 				PrivateIP:   privIP,
 				PublicIP:    pubIP,
 			}
@@ -348,7 +348,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, fail.Wrap(xerr, "[%s] objh resource creation failed")
 	}
 
-	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, objh.SafeGetName())
+	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, objh.GetName())
 	logrus.Debugf("[%s] objh resource creation successful", hostLabel)
 
 	if xerr = c.installProxyCacheClient(task, objh, hostLabel); xerr != nil {
@@ -379,7 +379,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, params concurrency
 		return nil, nil
 	}
 
-	logrus.Debugf("[cluster %s] Configuring masters...", c.SafeGetName())
+	logrus.Debugf("[cluster %s] Configuring masters...", c.GetName())
 	started := time.Now()
 
 	var subtasks []concurrency.Task
@@ -391,7 +391,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, params concurrency
 	var errors []error
 
 	for i, hostID := range masters {
-		host, xerr := LoadHost(task, c.SafeGetService(), hostID)
+		host, xerr := LoadHost(task, c.GetService(), hostID)
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of host: %s", xerr.Error())
 			errors = append(errors, xerr)
@@ -417,7 +417,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, params concurrency
 		return nil, fail.NewErrorList(errors)
 	}
 
-	logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", c.SafeGetName(), temporal.FormatDuration(time.Since(started)))
+	logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", c.GetName(), temporal.FormatDuration(time.Since(started)))
 	return nil, nil
 }
 
@@ -459,7 +459,7 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 
 	started := time.Now()
 
-	hostLabel := fmt.Sprintf("master #%d (%s)", index, host.SafeGetName())
+	hostLabel := fmt.Sprintf("master #%d (%s)", index, host.GetName())
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// install docker feature (including docker-compose)
@@ -522,7 +522,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	clusterName := c.SafeGetName()
+	clusterName := c.GetName()
 
 	if count == 0 {
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -643,7 +643,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	// 	timeout = temporal.GetLongOperationTimeout()
 	// }
 
-	host, xerr := NewHost(c.SafeGetService())
+	host, xerr := NewHost(c.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -681,9 +681,9 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 				return innerErr
 			}
 			node = &propertiesv2.ClusterNode{
-				ID:          host.SafeGetID(),
+				ID:          host.GetID(),
 				NumericalID: nodesV2.GlobalLastIndex,
-				Name:        host.SafeGetName(),
+				Name:        host.GetName(),
 				PrivateIP:   privIP,
 				PublicIP:    pubIP,
 			}
@@ -701,7 +701,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
 
-	hostLabel = fmt.Sprintf("node #%d (%s)", index, host.SafeGetName())
+	hostLabel = fmt.Sprintf("node #%d (%s)", index, host.GetName())
 	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
 
 	if xerr = c.installProxyCacheClient(task, host, hostLabel); xerr != nil {
@@ -721,7 +721,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	// FIXME: validate parameters
 
-	clusterName := c.SafeGetName()
+	clusterName := c.GetName()
 
 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
@@ -745,7 +745,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 		errs   []error
 	)
 
-	svc := c.SafeGetService()
+	svc := c.GetService()
 	var subtasks []concurrency.Task
 	for _, hostID = range list {
 		i++
@@ -805,11 +805,11 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 		return nil, fail.InvalidParameterError("params[host]", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(task, true, "(%d, %s)", index, host.SafeGetName()).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, true, "(%d, %s)", index, host.GetName()).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	hostLabel := fmt.Sprintf("node #%d (%s)", index, host.SafeGetName())
+	hostLabel := fmt.Sprintf("node #%d (%s)", index, host.GetName())
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// Docker and docker-compose installation is mandatory on all nodes

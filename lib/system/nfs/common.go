@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
@@ -32,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -97,7 +97,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	}
 
 	// Prepare the template for execution
-	tmplPrepared, err := template.New(name).Parse(tmplContent)
+	tmplPrepared, err := template.Parse(name, tmplContent)
 	if err != nil {
 		// return 255, "", "", fail.ToError(err)
 		xerr = fail.ExecutionError(err)

@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"text/template"
+	txttmpl "text/template"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
@@ -36,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -60,7 +61,7 @@ type Content struct {
 	ConfIF bool
 	// IsGateway, if set to true, activate IP forwarding
 	IsGateway bool
-	// PublicIP contains a public IP binded to the host
+	// getPublicIP contains a public IP binded to the host
 	PublicIP string
 	// AddGateway, if set to true, configure default gateway
 	AddGateway bool
@@ -69,9 +70,9 @@ type Content struct {
 	DNSServers []string
 	// CIDR contains the cidr of the network
 	CIDR string
-	// DefaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
+	// defaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
 	DefaultRouteIP string
-	// EndpointIP is the IP of the gateway or the VIP if gateway HA is enabled
+	// getEndpointIP is the IP of the gateway or the VIP if gateway HA is enabled
 	EndpointIP string
 	// PrimaryGatewayPrivateIP is the private IP of the primary gateway
 	PrimaryGatewayPrivateIP string
@@ -90,9 +91,9 @@ type Content struct {
 	// IsPrimaryGateway tells if the host is a primary gateway
 	IsPrimaryGateway bool
 	// // PrivateVIP contains the private IP of the VIP instance if it exists
-	// PublicVIP string // VPL: change to EndpointIP
+	// PublicVIP string // VPL: change to getEndpointIP
 	// // PrivateVIP contains the private IP of the VIP instance if it exists
-	// PrivateVIP string // VPL: change to DefaultRouteIP
+	// PrivateVIP string // VPL: change to defaultRouteIP
 
 	ProviderName     string
 	BuildSubnetworks bool
@@ -136,6 +137,10 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		operatorUsername    string
 		useNATService       bool
 	)
+	// VPL: if environment variable SAFESCALE_UNSAFE_PASSWORD is set, uses its content as OperatorUsername password
+	if request.Password == "" {
+		request.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
+	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
@@ -248,9 +253,9 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	if !ok {
 		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
 	}
-	var tmpl *template.Template
+	var tmpl *txttmpl.Template
 	if anon != nil {
-		tmpl = anon.Load().(*template.Template)
+		tmpl = anon.Load().(*txttmpl.Template)
 	} else {
 		userdataPhaseTemplatesLock.Lock()
 		defer userdataPhaseTemplatesLock.Unlock()
@@ -263,7 +268,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 		if err != nil {
 			return nil, fail.Wrap(err, "error loading script template for phase 'init'")
 		}
-		tmpl, err = template.New("userdata." + string(phase)).Parse(tmplString)
+		tmpl, err = template.Parse("userdata." + string(phase), tmplString)
 		if err != nil {
 			return nil, fail.Wrap(err, "error parsing script template for phase 'init'")
 		}

@@ -26,7 +26,7 @@ import (
 // !!! FROZEN !!!
 // !!! DEPRECATED !!! superseded by propertiesv2.ClusterNetwork
 type ClusterNetwork struct {
-	NetworkID string `json:"network_id"` // contains the ID of the network
+	NetworkID string `json:"network_id"` // contains the GetID of the network
 	GatewayID string `json:"gateway_id"` // DEPRECATED
 	GatewayIP string `json:"gateway_ip"` // DEPRECATED
 	PublicIP  string `json:"public_ip"`  // DEPRECATED

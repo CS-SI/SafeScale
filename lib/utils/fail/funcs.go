@@ -18,7 +18,6 @@ package fail
 
 import (
 	"fmt"
-
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"

@@ -60,7 +60,7 @@ func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostRemoteMount struct {
-	ShareID    string `json:"share_id"`          // contains the ID of the share mounted
+	ShareID    string `json:"share_id"`          // contains the GetID of the share mounted
 	Export     string `json:"export"`            // contains the path of the export (ie: <host>:/data/shared)
 	Path       string `json:"mountpoint"`        // Path is the mount point of the device
 	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
@@ -96,7 +96,7 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
 type HostMounts struct {
 	LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device"`  // contains local mount path, indexed by devices
 	LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path"`    // contains HostLocalMount structs, indexed by path
-	RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device"` // contains local mount path, indexed by Share ID
+	RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device"` // contains local mount path, indexed by Share GetID
 	RemoteMountsByExport  map[string]string           `json:"remote_mounts_by_export"` // contains local mount path, indexed by export
 	RemoteMountsByPath    map[string]*HostRemoteMount `json:"remote_mounts_by_path"`   // contains HostRemoteMount, indexed by path
 }

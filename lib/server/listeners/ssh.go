@@ -77,13 +77,13 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}
 	defer job.Close()
 
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.SafeGetService(), hostRef)
+	rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -125,7 +125,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 
 	source := in.Source
 	dest := in.Destination
@@ -166,7 +166,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		localPath = dest
 	}
 
-	rh, xerr := hostfactory.Load(task, job.SafeGetService(), hostRef)
+	rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}

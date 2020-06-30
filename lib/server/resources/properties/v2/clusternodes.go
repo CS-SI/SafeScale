@@ -25,9 +25,9 @@ import (
 // ClusterNode describes a Node in the cluster
 // !!! FROZEN !!!
 type ClusterNode struct {
-	ID          string `json:"id"`         // ID of the node
-	NumericalID uint   `json:"intid"`      // Numerical (unsigned integer) ID of the node
-	Name        string `json:"name"`       // Name of the node
+	ID          string `json:"id"`         // GetID of the node
+	NumericalID uint   `json:"intid"`      // Numerical (unsigned integer) GetID of the node
+	Name        string `json:"name"`       // GetName of the node
 	PublicIP    string `json:"public_ip"`  // public ip of the node
 	PrivateIP   string `json:"private_ip"` // private ip of the node
 }
@@ -35,7 +35,7 @@ type ClusterNode struct {
 // ClusterNodes contains all the nodes created in the cluster
 // !!! FROZEN !!!
 type ClusterNodes struct {
-	Masters          []*ClusterNode `json:"masters"`                 // Masters contains the ID of the masters
+	Masters          []*ClusterNode `json:"masters"`                 // Masters contains the GetID of the masters
 	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
 	PrivateNodes     []*ClusterNode `json:"private_nodes,omitempty"` // PrivateNodes is a slice of IDs of the private cluster nodes
 	MasterLastIndex  int            `json:"master_last_index"`       // MasterLastIndex

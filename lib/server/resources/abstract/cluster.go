@@ -24,7 +24,7 @@ import (
 
 // ClusterRequest defines what kind of Cluster is wanted
 type ClusterRequest struct {
-	// Name is the name of the cluster wanted
+	// GetName is the name of the cluster wanted
 	Name string
 	// CIDR defines the network to create
 	CIDR string
@@ -32,7 +32,7 @@ type ClusterRequest struct {
 	Complexity clustercomplexity.Enum
 	// Flavor tells what kind of cluster to create
 	Flavor clusterflavor.Enum
-	// NetworkID is the ID of the network to use
+	// NetworkID is the GetID of the network to use
 	NetworkID string
 	// Tenant contains the name of the tenant
 	Tenant string
@@ -50,7 +50,7 @@ type ClusterRequest struct {
 
 // ClusterIdentity contains the bare minimum information about a cluster
 type ClusterIdentity struct {
-	Name       string                 `json:"name"`       // Name is the name of the cluster
+	Name       string                 `json:"name"`       // GetName is the name of the cluster
 	Flavor     clusterflavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
 	Complexity clustercomplexity.Enum `json:"complexity"` // Complexity is the mode of cluster
 	Keypair    *KeyPair               `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
@@ -80,19 +80,19 @@ func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 	return i
 }
 
-// SafeGetName returns the name of the cluster
+// GetName returns the name of the cluster
 // Satisfies interface data.Identifiable
-func (i *ClusterIdentity) SafeGetName() string {
+func (i *ClusterIdentity) GetName() string {
 	if i == nil {
 		return ""
 	}
 	return i.Name
 }
 
-// SafeGetID returns the ID of the cluster (== Name)
+// GetID returns the GetID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
-func (i *ClusterIdentity) SafeGetID() string {
-	return i.SafeGetName()
+func (i *ClusterIdentity) GetID() string {
+	return i.GetName()
 }
 
 // OK ...

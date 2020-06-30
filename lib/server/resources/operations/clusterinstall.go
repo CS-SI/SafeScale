@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
@@ -35,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -47,16 +49,40 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// SafeGetTargetType returns the type of the target
+var (
+	// templateBox is the rice box to use in this package
+	clusterTemplateBox atomic.Value
+)
+
+// getTemplateBox
+func getTemplateBox() (*rice.Box, error) {
+	var (
+		b   *rice.Box
+		err error
+	)
+	anon := clusterTemplateBox.Load()
+	if anon == nil {
+		// Note: path MUST be literal for rice to work
+		b, err = rice.FindBox("../operations/clusterflavors/scripts")
+		if err != nil {
+			return nil, err
+		}
+		clusterTemplateBox.Store(b)
+		anon = clusterTemplateBox.Load()
+	}
+	return anon.(*rice.Box), nil
+}
+
+// TargetType returns the type of the target
 //
 // satisfies resources.Targetable interface
-func (c *cluster) SafeGetTargetType() featuretargettype.Enum {
+func (c *cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.CLUSTER
 }
 
-// SafeGetInstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies feature.Targetable interface
-func (c *cluster) SafeGetInstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	if c == nil {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
@@ -83,8 +109,8 @@ func (c *cluster) SafeGetInstallMethods(task concurrency.Task) map[uint8]install
 	return c.installMethods
 }
 
-// SafeGetInstalledFeatures returns a list of installed features
-func (c *cluster) SafeGetInstalledFeatures(task concurrency.Task) []string {
+// InstalledFeatures returns a list of installed features
+func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
 	var list []string
 	return list
 }
@@ -109,7 +135,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		return xerr
 	}
 	v["ClusterFlavor"] = strings.ToLower(clusterFlavor.String())
-	v["ClusterName"] = c.SafeGetName()
+	v["ClusterName"] = c.GetName()
 	v["ClusterAdminUsername"] = "cladm"
 	if v["ClusterAdminPassword"], xerr = c.GetAdminPassword(task); xerr != nil {
 		return xerr
@@ -123,15 +149,15 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		return xerr
 	}
 	v["PrimaryGatewayIP"] = networkCfg.GatewayIP
-	v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
-	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
+	v["getDefaultRouteIP"] = networkCfg.DefaultRouteIP
+	v["GatewayIP"] = v["getDefaultRouteIP"] // legacy ...
 	v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
 	if networkCfg.SecondaryGatewayIP != "" {
 		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
 		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 	}
-	v["EndpointIP"] = networkCfg.EndpointIP
-	v["PublicIP"] = v["EndpointIP"] // legacy ...
+	v["getEndpointIP"] = networkCfg.EndpointIP
+	v["getPublicIP"] = v["getEndpointIP"] // legacy ...
 	if _, ok := v["CIDR"]; !ok {
 		v["CIDR"] = networkCfg.CIDR
 	}
@@ -258,16 +284,21 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 
 // ExecuteScript executes the script template with the parameters on target Host
 func (c *cluster) ExecuteScript(
-	task concurrency.Task, box *rice.Box, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
+	task concurrency.Task, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	host resources.Host,
 ) (_ int, _ string, _ string, xerr fail.Error) {
 	// ) (errCode int, stdOut string, stdErr string, xerr fail.Error) {
-	tracer := concurrency.NewTracer(nil, true, "("+host.SafeGetName()+")").Entering()
+	tracer := concurrency.NewTracer(nil, true, "("+host.GetName()+")").Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
 	if c == nil {
 		return -1, "", "", fail.InvalidInstanceError()
+	}
+
+	box, err := getTemplateBox()
+	if err != nil {
+		return 0, "", "", fail.ToError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
@@ -277,7 +308,7 @@ func (c *cluster) ExecuteScript(
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
-	script, path, xerr := realizeTemplate(box, funcMap, tmplName, data, tmplName)
+	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -312,35 +343,30 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	if c.makers.GetTemplateBox == nil {
-		return fail.InvalidParameterError("c.makers.GetTemplateBox", "cannot be nil")
-	}
+	// VPL: integrate what is found in <flavor>_install__<nodetype>.sh in node_install_requirements.sh and this part will
+	// be removed
+	//if c.makers.GetTemplateBox == nil {
+	//	return fail.InvalidParameterError("c.makers.GetTemplateBox", "cannot be nil")
+	// }
+	// ENDVPL
 
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
 
+	// VPL: this part also will be removed
 	// Get installation script based on node type; if == "", do nothing
 	script, params := c.getNodeInstallationScript(task, nodeType)
 	if script == "" {
 		return nil
 	}
+	// ENDVPL
 
-	box, xerr := c.makers.GetTemplateBox()
+	params["reserved_CommonRequirements"], xerr = flavors.GetGlobalSystemRequirements(task, c)
 	if xerr != nil {
 		return xerr
 	}
-
-	globalSystemRequirements := ""
-	if c.makers.GetGlobalSystemRequirements != nil {
-		result, xerr := c.makers.GetGlobalSystemRequirements(task, c)
-		if xerr != nil {
-			return xerr
-		}
-		globalSystemRequirements = result
-	}
-	params["reserved_CommonRequirements"] = globalSystemRequirements
 
 	if nodeType == clusternodetype.Master {
 		tp := c.service.GetTenantParameters()
@@ -386,7 +412,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			} else if stderr != "" {
 				output = stderr
 			}
-			return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
+			return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
 		}
 
 		// Uploads safescaled binary
@@ -402,7 +428,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		}
 		retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout())
 		if xerr != nil {
-			return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.SafeGetName())
+			return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
 		}
 		if retcode != 0 {
 			output := stdout
@@ -411,7 +437,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			} else if stderr != "" {
 				output = stderr
 			}
-			return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.SafeGetName(), retcode, output)
+			return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
 		}
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
@@ -420,7 +446,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 			if xerr != nil {
-				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s'", host.SafeGetName())
+				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s'", host.GetName())
 			}
 			if retcode != 0 {
 				output := stdout
@@ -429,7 +455,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 				} else if stderr != "" {
 					output = stderr
 				}
-				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", host.SafeGetName(), output)
+				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", host.GetName(), output)
 				return fail.NewError(strprocess.Capitalize(msg))
 			}
 		}
@@ -451,11 +477,12 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		return xerr
 	}
 	params["MasterIPs"] = list
-	params["CladmPassword"] = identity.AdminPassword
-	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
-	params["EndpointIP"] = netCfg.EndpointIP
+	params["ClusterAdminUsername"] = "cladm"
+	params["ClusterAdminPassword"] = identity.AdminPassword
+	params["getDefaultRouteIP"] = netCfg.DefaultRouteIP
+	params["getEndpointIP"] = netCfg.EndpointIP
 
-	_, _, _, xerr = c.ExecuteScript(task, box, nil, script, params, host)
+	_, _, _, xerr = c.ExecuteScript(task, nil, script, params, host)
 	if xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
 	}
@@ -504,9 +531,9 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fail.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.SafeGetName(), msg)
+			return fail.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
 		}
-		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.SafeGetName())
+		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
 	}
 	return nil
 }
@@ -677,7 +704,7 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	if !r.Successful() {
 		msg := r.AllErrorMessages()
 		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return fail.NewError("failed to add feature 'docker' on host '%s': %s", host.SafeGetName(), msg)
+		return fail.NewError("failed to add feature 'docker' on host '%s': %s", host.GetName(), msg)
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil
