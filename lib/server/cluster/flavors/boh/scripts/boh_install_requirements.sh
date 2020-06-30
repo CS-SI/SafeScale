@@ -93,10 +93,10 @@ case $(sfGetFact "linux_kind") in
         ;;
     redhat|rhel|centos|fedora)
         if [[ -n $(which dnf) ]]; then
-            dnf makecache -y
+            sfRetry 3m 5 "dnf makecache -y"
             dnf install -y wget curl time rclone jq unzip
         else
-            yum makecache fast
+            sfRetry 3m 5 "yum makecache fast"
             yum install -y wget curl time rclone jq unzip
         fi
         ;;

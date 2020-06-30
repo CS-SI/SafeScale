@@ -86,8 +86,8 @@ EOF
     yum versionlock exclude python-docker-py || exit 193
 
     # Installs PIP
-    yum install -y epel-release && \
-    yum makecache && \
+    sfRetry 3m 5 "yum install -y epel-release" || exit 194
+    sfRetry 3m 5 "yum makecache" || exit 194
     yum install -y python-pip || yum install -y python2-pip || exit 194
 
     # Installs docker-python with pip
@@ -114,6 +114,6 @@ EOF
 }
 export -f install_common_requirements
 
-yum makecache
+sfRetry 3m 5 "yum makecache"
 yum install -y time
 /usr/bin/time -p bash -c install_common_requirements

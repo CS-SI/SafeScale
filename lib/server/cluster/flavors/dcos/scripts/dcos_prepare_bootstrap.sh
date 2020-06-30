@@ -78,9 +78,10 @@ download_nginx_image() {
 }
 export -f download_nginx_image
 
+sfRetry 3m 5 "yum makecache" || exit 204
+
 mkdir -p ${SF_VARDIR}/dcos/genconf/serve/docker && \
 cd ${SF_VARDIR}/dcos && \
-yum makecache && \
 yum install -y wget curl time jq unzip || exit 204
 
 # Launch downloads in parallel

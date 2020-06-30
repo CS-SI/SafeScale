@@ -71,20 +71,20 @@ feature:
                             case $LINUX_KIND in
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf install -y epel-release && \
-                                        dnf makecache -y || sfFail 192
+                                        sfRetry 3m 5 "dnf install -y epel-release" || sfFail 192
+                                        sfRetry 3m 5 "dnf makecache -y" || sfFail 192
                                         dnf install --enablerepo=epel -y --skip-broken xfce4* && \
                                         dnf install --enablerepo=epel -y --skip-broken xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     else
-                                        yum install -y epel-release && \
-                                        yum makecache fast || sfFail 192
+                                        sfRetry 3m 5 "yum install -y epel-release" || sfFail 192
+                                        sfRetry 3m 5 "yum makecache fast" || sfFail 192
                                         yum groupinstall -y -t "X Window system" --skip-broken && \
                                         yum groupinstall -y -t Xfce --skip-broken && \
                                         yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     fi
                                     ;;
                                 fedora)
-                                    dnf makecache -y || sfFail 192
+                                    sfRetry 3m 5 "dnf makecache -y" || sfFail 192
                                     dnf install -y --skip-broken xfce4* && \
                                     dnf install -y --skip-broken xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     ;;
