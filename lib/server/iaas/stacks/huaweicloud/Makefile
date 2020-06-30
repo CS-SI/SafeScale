@@ -1,6 +1,6 @@
 GO?=go
 
-.PHONY:	clean generate test vet
+.PHONY:	test vet
 
 vet:
 	@$(GO) vet ./...

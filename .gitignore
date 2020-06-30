@@ -50,7 +50,7 @@ cli/perform/version.go
 cli/safescale/version.go
 cli/safescaled/version.go
 cli/scanner/version.go
-lib/server/iaas/userdata/version.go
+lib/server/resources/operations/iaas/userdata/version.go
 
 vendor
 Gopkg.lock
@@ -107,6 +107,6 @@ cli/safescaled/__debug_bin
 lib/security/gateway/client/safe-security
 go.sum
 
-lib/server/iaas/.DS_Store
+lib/server/resources/operations/iaas/.DS_Store
 
 .atom/
