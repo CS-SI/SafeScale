@@ -48,9 +48,9 @@ feature:
                             case $LINUX_KIND in
                                 redhat|rhel|fedora|centos)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf makecache -y
+                                        sfRetry 3m 5 "dnf makecache -y"
                                     else
-                                        yum makecache fast
+                                        sfRetry 3m 5 "yum makecache fast"
                                     fi
                                     yum groupinstall -y "Development Tools"
                                     yum install -y wget
