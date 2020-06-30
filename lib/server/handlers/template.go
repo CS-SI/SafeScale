@@ -53,9 +53,9 @@ func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, x
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(handler.job.SafeGetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(handler.job.GetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	return handler.job.SafeGetService().ListTemplates(all)
+	return handler.job.GetService().ListTemplates(all)
 }

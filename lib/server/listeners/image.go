@@ -62,7 +62,7 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

@@ -24,8 +24,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // VMInfo represents the useful informations package send from each new local vm

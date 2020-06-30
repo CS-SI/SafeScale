@@ -21,49 +21,32 @@ package boh
  */
 
 import (
-	"bytes"
-	"sync/atomic"
-	txttmpl "text/template"
-
-	rice "github.com/GeertJohan/go.rice"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
-//go:generate rice embed-go
-
 var (
-	// templateBox is the rice box to use in this package
-	templateBox atomic.Value
-
-	// funcMap defines the custome functions to be used in templates
-	funcMap = txttmpl.FuncMap{
-		// The name "inc" is what the function will be called in the template text.
-		"inc": func(i int) int {
-			return i + 1
-		},
-	}
-
-	globalSystemRequirementsContent atomic.Value
+	// // funcMap defines the custome functions to be used in templates
+	// funcMap = txttmpl.FuncMap{
+	// 	// The name "inc" is what the function will be called in the template text.
+	// 	"inc": func(i int) int {
+	// 		return i + 1
+	// 	},
+	// }
 
 	// Makers returns a configured Makers to construct a BOH Cluster
 	Makers = flavors.Makers{
-		MinimumRequiredServers:      minimumRequiredServers,
-		DefaultGatewaySizing:        gatewaySizing,
-		DefaultMasterSizing:         nodeSizing,
-		DefaultNodeSizing:           nodeSizing,
-		DefaultImage:                defaultImage,
-		GetNodeInstallationScript:   getNodeInstallationScript,
-		GetTemplateBox:              getTemplateBox,
-		GetGlobalSystemRequirements: getGlobalSystemRequirements,
+		MinimumRequiredServers: minimumRequiredServers,
+		DefaultGatewaySizing:   gatewaySizing,
+		DefaultMasterSizing:    nodeSizing,
+		DefaultNodeSizing:      nodeSizing,
+		DefaultImage:           defaultImage,
+		// GetNodeInstallationScript:   makers.GetNodeInstallationScript,
+		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
 	}
 )
 
@@ -116,81 +99,17 @@ func defaultImage(task concurrency.Task, _ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 
-// getTemplateBox
-func getTemplateBox() (*rice.Box, fail.Error) {
-	var b *rice.Box
-	var err error
-	anon := templateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err = rice.FindBox("../boh/scripts")
-		if err != nil {
-			return nil, fail.ToError(err)
-		}
-		templateBox.Store(b)
-		anon = templateBox.Load()
-	}
-	return anon.(*rice.Box), nil
-}
-
-// getGlobalSystemRequirements returns the string corresponding to the script boh_install_requirements.sh
-// which installs common features (docker in particular)
-func getGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, fail.Error) {
-	anon := globalSystemRequirementsContent.Load()
-	if anon == nil {
-		// find the rice.Box
-		b, xerr := getTemplateBox()
-		if xerr != nil {
-			return "", xerr
-		}
-
-		// We will need information about cluster network
-		netCfg, xerr := c.GetNetworkConfig(task)
-		if xerr != nil {
-			return "", xerr
-		}
-
-		// get file contents as string
-		tmplString, err := b.String("boh_install_requirements.sh")
-		if err != nil {
-			return "", fail.Wrap(err, "error loading script template: %s")
-		}
-
-		// parse then execute the template
-		tmplPrepared, err := txttmpl.New("install_requirements").Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
-		if err != nil {
-			return "", fail.Wrap(err, "error parsing script template")
-		}
-		dataBuffer := bytes.NewBufferString("")
-		identity, xerr := c.GetIdentity(task)
-		if xerr != nil {
-			return "", xerr
-		}
-		data := map[string]interface{}{
-			"CIDR":          netCfg.CIDR,
-			"CladmPassword": identity.AdminPassword,
-			"SSHPublicKey":  identity.Keypair.PublicKey,
-			"SSHPrivateKey": identity.Keypair.PrivateKey,
-		}
-		err = tmplPrepared.Execute(dataBuffer, data)
-		if err != nil {
-			return "", fail.Wrap(err, "error realizing script template")
-		}
-		globalSystemRequirementsContent.Store(dataBuffer.String())
-		anon = globalSystemRequirementsContent.Load()
-	}
-	return anon.(string), nil
-}
-
-func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
-	data := data.Map{}
-	script := ""
-
-	switch nodeType {
-	case clusternodetype.Master:
-		script = "boh_install_master.sh"
-	case clusternodetype.Node:
-		script = "boh_install_node.sh"
-	}
-	return script, data
-}
+// VPL: eventually this part will be removed (some things have to be included in node_install_requirements
+// func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
+// 	data := data.Map{}
+// 	script := ""
+//
+// 	switch nodeType {
+// 	case clusternodetype.Master:
+// 		script = "boh_install_master.sh"
+// 	case clusternodetype.getGateway, clusternodetype.Node:
+// 		script = "boh_install_node.sh"
+// 	}
+// 	return script, data
+// }
+// ENDVPL

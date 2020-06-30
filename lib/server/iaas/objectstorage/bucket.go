@@ -18,6 +18,7 @@ package objectstorage
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"io"
 	"strings"
 
@@ -28,24 +29,63 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// bucket describes a Bucket
-type bucket struct {
-	location  stow.Location
-	container stow.Container
+//go:generate mockgen -destination=../mocks/mock_bucket.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage Bucket
 
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
-	// Host       string `json:"host,omitempty"`
-	// MountPoint string `json:"mountPoint,omitempty"`
-	// NbItems int `json:"nbitems,omitempty"`
+const (
+	// RootPath defines the path corresponding of the root of a Bucket
+	RootPath = ""
+	// NoPrefix corresponds to ... no prefix...
+	NoPrefix = ""
+)
+
+// Bucket interface
+type Bucket interface {
+//	data.Identifiable
+
+	// ListObjects list object names in a GetBucket
+	ListObjects(string, string) ([]string, fail.Error)
+	// Browse browses inside the GetBucket and execute a callback on each Object found
+	Browse(string, string, func(Object) fail.Error) fail.Error
+	// Clear deletes all the objects in path inside a bucket
+	Clear(path, prefix string) fail.Error
+	// CreateObject creates a new object in the bucket
+	CreateObject(string) (Object, fail.Error)
+	// InspectObject returns Object instance of an object in the GetBucket
+	InspectObject(string) (Object, fail.Error)
+	// DeleteObject delete an object from a stowContainer
+	DeleteObject(string) fail.Error
+	// ReadObject reads the content of an object
+	ReadObject(string, io.Writer, int64, int64) (Object, fail.Error)
+	// WriteObject writes into an object
+	WriteObject(string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
+	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
+	WriteMultiPartObject(string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
+	// // CopyObject copies an object
+	// CopyObject(string, string) fail.Error
+
+	// GetName returns the name of the bucket
+	GetName() (string, fail.Error)
+	// GetCount returns the number of objects in the GetBucket
+	GetCount(string, string) (int64, fail.Error)
+	// GetSize returns the total size of all objects in the bucket
+	GetSize(string, string) (int64, string, fail.Error)
+}
+
+// bucket describes a GetBucket
+type bucket struct {
+	stowLocation  stow.Location
+	stowContainer stow.Container
+
+	name string
+	//// NbItems int `json:"nbitems,omitempty"`
 }
 
 // newBucket ...
-func newBucket(location stow.Location, bucketName string) (*bucket, fail.Error) {
-	return &bucket{
-		location: location,
-		Name:     bucketName,
-	}, nil
+func newBucket(location stow.Location) (bucket, fail.Error) {
+	if location == nil {
+		return bucket{}, fail.InvalidParameterError("location", "cannot be nil")
+	}
+	return bucket{stowLocation: location}, nil
 }
 
 // NullBucket returns a bucket instance corresponding to null value
@@ -55,33 +95,45 @@ func NullBucket() Bucket {
 
 // IsNull tells if the bucket corresponds to its null value
 func (b *bucket) IsNull() bool {
-	return b == nil || b.location == nil
+	return b == nil || b.stowLocation == nil
 }
 
 // CreateObject ...
-func (b *bucket) CreateObject(objectName string) (Object, fail.Error) {
+func (b bucket) CreateObject(objectName string) (Object, fail.Error) {
+	if b.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().OnExitTrace()
 
-	return newObject(b, objectName)
+	o, err := newObject(&b, objectName)
+	if err != nil {
+		return nil, err
+	}
+	return &o, nil
 }
 
 // InspectObject ...
-func (b *bucket) InspectObject(objectName string) (Object, fail.Error) {
+func (b bucket) InspectObject(objectName string) (Object, fail.Error) {
+	if b.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().OnExitTrace()
 
-	o, err := newObject(b, objectName)
+	o, err := newObject(&b, objectName)
 	if err != nil {
 		return nil, err
 	}
 	if o.item == nil {
 		return nil, fail.NotFoundError("not found")
 	}
-	return o, nil
+	return &o, nil
 }
 
-// ListObjects list objects of a Bucket
-func (b *bucket) List(path, prefix string) ([]string, fail.Error) {
-	if b == nil {
+// ListObjects list objects of a GetBucket
+func (b bucket) ListObjects(path, prefix string) ([]string, fail.Error) {
+	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -91,8 +143,8 @@ func (b *bucket) List(path, prefix string) ([]string, fail.Error) {
 
 	fullPath := buildFullPath(path, prefix)
 
-	// log.Println("Location.Container => : ", c.Name()
-	err := stow.Walk(b.container, path, 100,
+	// log.Println("location.Container => : ", c.GetName()
+	err := stow.Walk(b.stowContainer, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -109,9 +161,9 @@ func (b *bucket) List(path, prefix string) ([]string, fail.Error) {
 	return list, nil
 }
 
-// Browse walks through the objects in the Bucket and executes callback on each Object found
-func (b *bucket) Browse(path, prefix string, callback func(Object) fail.Error) fail.Error {
-	if b == nil {
+// Browse walks through the objects in the GetBucket and executes callback on each Object found
+func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) fail.Error {
+	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -119,14 +171,14 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) fail.Error) f
 
 	fullPath := buildFullPath(path, prefix)
 
-	err := stow.Walk(b.container, path, 100,
+	err := stow.Walk(b.stowContainer, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
-
-				return callback(newObjectFromStow(b, item))
+				o := newObjectFromStow(&b, item)
+				return callback(&o)
 			}
 			return nil
 		},
@@ -135,8 +187,8 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) fail.Error) f
 }
 
 // Clear empties a bucket
-func (b *bucket) Clear(path, prefix string) fail.Error {
-	if b == nil {
+func (b bucket) Clear(path, prefix string) fail.Error {
+	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -144,13 +196,13 @@ func (b *bucket) Clear(path, prefix string) fail.Error {
 
 	fullPath := buildFullPath(path, prefix)
 
-	err := stow.Walk(b.container, path, 100,
+	err := stow.Walk(b.stowContainer, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
-				err = b.container.RemoveItem(item.Name())
+				err = b.stowContainer.RemoveItem(item.Name())
 				if err != nil {
 					// log.Println("erreur RemoveItem => : ", err)
 					return err
@@ -164,8 +216,8 @@ func (b *bucket) Clear(path, prefix string) fail.Error {
 }
 
 // DeleteObject deletes an object from a bucket
-func (b *bucket) DeleteObject(objectName string) fail.Error {
-	if b == nil {
+func (b bucket) DeleteObject(objectName string) fail.Error {
+	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if objectName == "" {
@@ -174,7 +226,7 @@ func (b *bucket) DeleteObject(objectName string) fail.Error {
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().OnExitTrace()
 
-	o, err := newObject(b, objectName)
+	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err
 	}
@@ -182,14 +234,14 @@ func (b *bucket) DeleteObject(objectName string) fail.Error {
 }
 
 // ReadObject ...
-func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, fail.Error) {
-	if b == nil {
+func (b bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, fail.Error) {
+	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().OnExitTrace()
 
-	o, err := newObject(b, objectName)
+	o, err := newObject(&b, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -197,18 +249,18 @@ func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to 
 	if err != nil {
 		return nil, err
 	}
-	return o, nil
+	return &o, nil
 }
 
 // WriteObject ...
-func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata ObjectMetadata) (Object, fail.Error) {
-	if b == nil {
+func (b bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (Object, fail.Error) {
+	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().OnExitTrace()
 
-	o, err := newObject(b, objectName)
+	o, err := newObject(&b, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -220,24 +272,24 @@ func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int
 	if err != nil {
 		return nil, err
 	}
-	return o, nil
+	return &o, nil
 }
 
 // WriteMultiPartObject ...
-func (b *bucket) WriteMultiPartObject(
+func (b bucket) WriteMultiPartObject(
 	objectName string,
 	source io.Reader, sourceSize int64,
 	chunkSize int,
-	metadata ObjectMetadata,
+	metadata abstract.ObjectStorageItemMetadata,
 ) (Object, fail.Error) {
 
-	if b == nil {
+	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().OnExitTrace()
 
-	o, err := newObject(b, objectName)
+	o, err := newObject(&b, objectName)
 	if err != nil {
 		return nil, err
 	}
@@ -249,27 +301,21 @@ func (b *bucket) WriteMultiPartObject(
 	if err != nil {
 		return nil, err
 	}
-	return o, nil
+	return &o, nil
 }
 
-// GetName returns the name of the Bucket
-func (b *bucket) GetName() (string, fail.Error) {
-	if b == nil {
+// GetName returns the name of the GetBucket
+func (b bucket) GetName() (string, fail.Error) {
+	if b.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	return b.Name, nil
+	return b.name, nil
 }
 
-// SafeGetName returns the name of the Bucket
-func (b *bucket) SafeGetName() string {
-	n, _ := b.GetName()
-	return n
-}
-
-// GetCount returns the count of objects in the Bucket
+// GetCount returns the count of objects in the GetBucket
 // 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
-func (b *bucket) GetCount(path, prefix string) (int64, fail.Error) {
-	if b == nil {
+func (b bucket) GetCount(path, prefix string) (int64, fail.Error) {
+	if b.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
 
@@ -278,7 +324,7 @@ func (b *bucket) GetCount(path, prefix string) (int64, fail.Error) {
 	var count int64
 	fullPath := buildFullPath(path, prefix)
 
-	err := stow.Walk(b.container, path, 100,
+	err := stow.Walk(b.stowContainer, path, 100,
 		func(c stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -295,9 +341,9 @@ func (b *bucket) GetCount(path, prefix string) (int64, fail.Error) {
 	return count, nil
 }
 
-// GetSize returns the total size of the Objects inside the Bucket
-func (b *bucket) GetSize(path, prefix string) (int64, string, fail.Error) {
-	if b == nil {
+// GetSize returns the total size of the Objects inside the GetBucket
+func (b bucket) GetSize(path, prefix string) (int64, string, fail.Error) {
+	if b.IsNull() {
 		return 0, "", fail.InvalidInstanceError()
 	}
 
@@ -306,7 +352,7 @@ func (b *bucket) GetSize(path, prefix string) (int64, string, fail.Error) {
 	fullPath := buildFullPath(path, prefix)
 
 	var totalSize int64
-	err := stow.Walk(b.container, path, 100,
+	err := stow.Walk(b.stowContainer, path, 100,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err

@@ -551,7 +551,7 @@ func monitoring4platformFeature() *feature {
 // 				if n > 0 {
 // 					line += ", "
 // 				}
-// 				line += i.Name()
+// 				line += i.GetName()
 // 			}
 // 			line += "]"
 // 		}

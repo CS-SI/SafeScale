@@ -143,7 +143,7 @@ func (s *Share) Add(task concurrency.Task) fail.Error {
 		"Options": s.Options,
 	}
 
-	// retcode, stdout, stderr, err := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
+	// retcode, stdout, stderr, err := executeScript(task, *s.getServer.SSHConfig, "nfs_server_path_export.sh", data)
 	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to export a shared directory")
 	_, xerr := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data)
 	if xerr != nil {

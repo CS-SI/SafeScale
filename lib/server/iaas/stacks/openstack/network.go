@@ -19,6 +19,7 @@ package openstack
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -309,90 +311,6 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 	return nil
 }
 
-// // CreateGateway creates a public Gateway for a private network
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (host *abstract.HostFull, userData *userdata.Content, err fail.Error) {
-// 	if s == nil {
-// 		return nil, nil, fail.InvalidInstanceError()
-// 	}
-//
-// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering().OnExitTrace()
-// 	defer fail.OnPanic(&err)
-//
-// 	userData = userdata.NewContent()
-//
-// 	// Ensure network exists
-// 	if req.Network == nil {
-// 		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
-// 	}
-// 	gwname := req.Name
-// 	if gwname == "" {
-// 		gwname = "gw-" + req.Network.Name
-// 	}
-//
-// 	password, err := utils.GeneratePassword(16)
-// 	if err != nil {
-// 		return nil, userData, fail.Wrap(err, "failed to generate password")
-// 	}
-// 	hostReq := abstract.HostRequest{
-// 		ImageID:      req.ImageID,
-// 		KeyPair:      req.KeyPair,
-// 		ResourceName: gwname,
-// 		TemplateID:   req.TemplateID,
-// 		Networks:     []*abstract.Network{req.Network},
-// 		PublicIP:     true,
-// 		Password:     password,
-// 	}
-// 	host, userData, err = s.CreateHost(hostReq)
-// 	if err != nil {
-// 		return nil, userData, fail.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
-// 	}
-//
-// 	// delete the host when found problem starting from here
-// 	newHost := host
-// 	defer func() {
-// 		if err != nil {
-// 			derr := s.DeleteHost(newHost.Core.ID)
-// 			if derr != nil {
-// 				switch derr.(type) {
-// 				case fail.ErrNotFound:
-// 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Core.Name, derr)
-// 				case fail.ErrTimeout:
-// 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Core.Name, derr)
-// 				default:
-// 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Core.Name, derr)
-// 				}
-// 				err = fail.AddConsequence(err, derr)
-// 			}
-// 		}
-// 	}()
-//
-// 	//VPL: moved in resources.Host
-// 	// // Updates Host Property propertiesv1.HostSizing
-// 	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
-// 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
-// 	// 	hostSizingV1.Template = req.TemplateID
-// 	// 	return nil
-// 	// })
-// 	// if err != nil {
-// 	// 	return nil, userData, fail.Wrap(err, fmt.Sprintf("error creating gateway : %s", ProviderErrorToString(err)))
-// 	// }
-// 	return host, userData, nil
-// }
-
-// // DeleteGateway delete the public gateway of a private network
-// func (s *Stack) DeleteGateway(id string) error {
-// 	if s == nil {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	if id == "" {
-// 		return fail.InvalidParameterError("id", "cannot be empty string")
-// 	}
-//
-// 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
-//
-// 	return s.DeleteHost(id)
-// }
-
 // ToGopherIPversion ...
 func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
 	if v == ipversion.IPv4 {
@@ -403,16 +321,6 @@ func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
 	}
 	return -1
 }
-
-// func fromGopherIPversion(v gophercloud.IPVersion) ipversion.Enum {
-// 	if v == gophercloud.IPv4 {
-// 		return ipversion.IPv4
-// 	}
-// 	if v == gophercloud.IPv6 {
-// 		return ipversion.IPv6
-// 	}
-// 	return -1
-// }
 
 // FromIntIPversion ...
 func FromIntIPversion(v int) ipversion.Enum {
@@ -426,9 +334,9 @@ func FromIntIPversion(v int) ipversion.Enum {
 }
 
 // createSubnet creates a sub network
-// - netID ID of the parent network
+// - networkID is the ID of the parent network
 // - name is the name of the sub network
-// - mask is a network mask defined in CIDR notation
+// - cidr is a network in CIDR notation
 func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion ipversion.Enum, dnsServers []string) (subn *Subnet, xerr fail.Error) {
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
@@ -441,22 +349,6 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		EnableDHCP: &dhcp,
 	}
 
-	// // Try to reserve IP addresses as static reserve at the beginning of the CIDR, and adapt DHCP allocation pool
-	// dhcpPoolStart, dhcpPoolEnd, err := calcDhcpAllocationPool(cidr)
-	// var ok bool
-	// if err != nil {
-	// 	if _, ok = err.(utils.ErrOverflow); !ok {
-	// 		return nil, err
-	// 	}
-	// }
-	// if err == nil || ok {
-	// 	dhcpAllocationPool := subnets.AllocationPool{
-	// 		Start: dhcpPoolStart,
-	// 		End:   dhcpPoolEnd,
-	// 	}
-	// 	opts.AllocationPools = []subnets.AllocationPool{dhcpAllocationPool}
-	// }
-
 	if len(dnsServers) > 0 {
 		opts.DNSNameservers = dnsServers
 	}
@@ -466,19 +358,42 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		opts.GatewayIP = &noGateway
 	}
 
+	var subnet *subnets.Subnet
 	// Execute the operation and get back a subnets.Subnet struct
-	r := subnets.Create(s.NetworkClient, opts)
-	subnet, err := r.Extract()
-	if err != nil {
-		switch r.Err.(type) { // nolint
-		case gophercloud.ErrDefault400:
-			neutronError := ParseNeutronError(r.Err.Error())
-			if neutronError != nil {
-				return nil, fail.NewError("error creating subnet: bad request: %s", neutronError["message"])
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			r := subnets.Create(s.NetworkClient, opts)
+			subnet, innerErr = r.Extract()
+			if innerErr != nil {
+				switch r.Err.(type) { // nolint
+				case gophercloud.ErrDefault400:
+					neutronError, innerXErr := ParseNeutronError(r.Err.Error())
+					if innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrSyntax:
+							return innerXErr
+						default:
+							return retry.StopRetryError(innerXErr)
+						}
+					}
+					if neutronError != nil {
+						return retry.StopRetryError(fail.NewError("bad request: %s", neutronError["message"]), "error creating subnet:")
+					}
+				default:
+					return retry.StopRetryError(innerErr, "error creating subnet: %s", ProviderErrorToString(innerErr))
+				}
 			}
-		default:
-			return nil, fail.Wrap(err, "error creating subnet: %s", ProviderErrorToString(err))
+			return nil
+		},
+		10*time.Second,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			xerr = fail.ToError(xerr.Cause())
 		}
+		return nil, xerr
 	}
 
 	// Starting from here, delete subnet if exit with error
@@ -526,46 +441,6 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		NetworkID: subnet.NetworkID,
 	}, nil
 }
-
-// // calcDhcpAllocationPool calculates the start and the end of the DHCP allocation pool based on cidr
-// // Keeps 10 IP addresses out of the pool to allow static and VIP addresses
-// func calcDhcpAllocationPool(cidr string) (string, string, fail.Error) {
-// 	_, _, err := net.ParseCIDR(cidr)
-// 	if err != nil {
-// 		return "", "", fail.InvalidParameterError("invalid cidr '%s'", cidr)
-// 	}
-
-// 	start, end, err := utils.CIDRToLongRange(cidr)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-// 	start += 11
-// 	if start >= end {
-// 		return "", "", fail.OverflowError(start, nil, "not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr)
-// 	}
-// 	end -= 3
-// 	if end <= start {
-// 		return "", "", fail.OverflowError(end, nil, "not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr)
-// 	}
-// 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
-// }
-
-// VPL: not used
-// // getSubnet returns the sub network identified by id
-// func (s *Stack) getSubnet(id string) (*Subnet, fail.Error) {
-// 	// Execute the operation and get back a subnets.Subnet struct
-// 	subnet, err := subnets.Get(s.NetworkClient, id).Extract()
-// 	if err != nil {
-// 		return nil, fail.Wrap(err, fmt.Sprintf("error getting subnet: %s", ProviderErrorToString(err)))
-// 	}
-// 	return &Subnet{
-// 		ID:        subnet.ID,
-// 		Name:      subnet.Name,
-// 		IPVersion: FromIntIPversion(subnet.IPVersion),
-// 		Mask:      subnet.CIDR,
-// 		NetworkID: subnet.NetworkID,
-// 	}, nil
-// }
 
 // listSubnets lists available sub networks of network net
 func (s *Stack) listSubnets(netID string) ([]Subnet, fail.Error) {
@@ -633,7 +508,15 @@ func (s *Stack) deleteSubnet(id string) (xerr fail.Error) {
 				logrus.Warnf(strprocess.Capitalize(msg))
 				return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
 			case gophercloud.ErrUnexpectedResponseCode:
-				neutronError := ParseNeutronError(err.Error())
+				neutronError, innerXErr := ParseNeutronError(err.Error())
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrSyntax:
+					default:
+						return retry.StopRetryError(innerXErr)
+					}
+				}
+
 				switch neutronError["type"] {
 				case "SubnetInUse":
 					msg := "hosts or services are still attached"
@@ -686,20 +569,6 @@ func (s *Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 		NetworkID: router.GatewayInfo.NetworkID,
 	}, nil
 }
-
-// VPL: not used
-// // getRouter returns the router identified by id
-// func (s *Stack) getRouter(id string) (*Router, fail.Error) {
-// 	r, err := routers.Get(s.NetworkClient, id).Extract()
-// 	if err != nil {
-// 		return nil, fail.Wrap(err, fmt.Sprintf("error getting Router: %s", ProviderErrorToString(err)))
-// 	}
-// 	return &Router{
-// 		ID:        r.ID,
-// 		Name:      r.Name,
-// 		NetworkID: r.GatewayInfo.NetworkID,
-// 	}, nil
-// }
 
 // ListRouters lists available routers
 func (s *Stack) ListRouters() ([]Router, fail.Error) {

@@ -113,7 +113,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	// 	return empty, status.Errorf(codes.FailedPrecondition, msg)
 	// }
 
-	// handler := JobManagerHandler(tenant.Service)
+	// handler := JobManagerHandler(tenant.GetService)
 	// handler.Stop(ctx, in.Uuid)
 	// srvutils.JobCancelUUID(uuid)
 
@@ -160,7 +160,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	// 	return nil, status.Errorf(codes.FailedPrecondition, msg)
 	// }
 
-	// handler := JobManagerHandler(tenant.Service)
+	// handler := JobManagerHandler(tenant.GetService)
 	jobMap := server.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {

@@ -6,16 +6,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Bucket defines the interface to manipulate Object Storage buckets
+// GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {
-	// Metadata
+	Metadata
 	data.Identifiable
 	data.NullValue
 
-	SafeGetHost() string
-	SafeGetMountPoint() string
+	GetHost(concurrency.Task) (string, fail.Error)
+	GetMountPoint(concurrency.Task) (string, fail.Error)
 	Create(concurrency.Task, string) fail.Error
-	Delete(concurrency.Task) fail.Error
 	Mount(concurrency.Task, string, string) fail.Error
 	Unmount(concurrency.Task, string) fail.Error
 }

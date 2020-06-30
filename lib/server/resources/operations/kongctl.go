@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"text/template"
 
 	"github.com/sirupsen/logrus"
 
@@ -36,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -83,16 +83,16 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 	}
 
 	present := false
-	if anon, ok := kongProxyCheckedCache.Get(network.SafeGetName()); ok {
+	if anon, ok := kongProxyCheckedCache.Get(network.GetName()); ok {
 		present = anon.(bool)
 	} else {
-		setErr := kongProxyCheckedCache.SetBy(network.SafeGetName(), func() (interface{}, fail.Error) {
+		setErr := kongProxyCheckedCache.SetBy(network.GetName(), func() (interface{}, fail.Error) {
 			results, xerr := rp.Check(addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if xerr != nil {
-				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4network' is installed on gateway '%s'", addressedGateway.SafeGetName())
+				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4network' is installed on gateway '%s'", addressedGateway.GetName())
 			}
 			if !results.Successful() {
-				return false, fail.NotFoundError("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.SafeGetName())
+				return false, fail.NotFoundError("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.GetName())
 			}
 
 			return true, nil
@@ -103,7 +103,7 @@ func NewKongController(svc iaas.Service, network resources.Network, addressPrima
 		present = true
 	}
 	if !present {
-		return nil, fail.NotFoundError("'edgeproxy4network' feature is not installed on gateway '%s'", addressedGateway.SafeGetName())
+		return nil, fail.NotFoundError("'edgeproxy4network' feature is not installed on gateway '%s'", addressedGateway.GetName())
 	}
 
 	ctrl := &KongController{
@@ -153,13 +153,13 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if an.VIP != nil {
-			// VPL: for now, no public IP on VIP, so uses the IP of the first Gateway
-			// (*values)["EndpointIP"] = an.VIP.PublicIP
-			(*values)["EndpointIP"] = k.gatewayPublicIP
-			(*values)["DefaultRouteIP"] = an.VIP.PrivateIP
+			// VPL: for now, no public IP on VIP, so uses the IP of the first getGateway
+			// (*values)["getEndpointIP"] = an.VIP.getPublicIP
+			(*values)["getEndpointIP"] = k.gatewayPublicIP
+			(*values)["getDefaultRouteIP"] = an.VIP.PrivateIP
 		} else {
-			(*values)["EndpointIP"] = k.gatewayPublicIP
-			(*values)["DefaultRouteIP"] = k.gatewayPrivateIP
+			(*values)["getEndpointIP"] = k.gatewayPublicIP
+			(*values)["getDefaultRouteIP"] = k.gatewayPrivateIP
 		}
 		return nil
 	})
@@ -168,8 +168,8 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	}
 
 	// Legacy...
-	(*values)["PublicIP"] = (*values)["EndpointIP"]
-	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
+	(*values)["getPublicIP"] = (*values)["getEndpointIP"]
+	(*values)["GatewayIP"] = (*values)["getDefaultRouteIP"]
 
 	// Analyzes the rule...
 	switch ruleType {
@@ -264,12 +264,12 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 }
 
 func (k *KongController) realizeRuleData(content string, v data.Map) (string, fail.Error) {
-	contentTmpl, err := template.New("proxy_content").Parse(content)
-	if err != nil {
-		return "", fail.Wrap(err, "error preparing rule")
+	contentTmpl, xerr := template.Parse("proxy_content", content)
+	if xerr != nil {
+		return "", fail.Wrap(xerr, "error preparing rule")
 	}
 	dataBuffer := bytes.NewBufferString("")
-	err = contentTmpl.Execute(dataBuffer, v)
+	err := contentTmpl.Execute(dataBuffer, v)
 	if err != nil {
 		return "", fail.ToError(err)
 	}

@@ -131,6 +131,11 @@ type SSHConfig struct {
 	// cmdTpl                 string
 }
 
+// IsNull tells if the instance is a null value
+func (sc *SSHConfig) IsNull() bool {
+	return sc == nil || sc.Host == ""
+}
+
 // SSHTunnel a SSH tunnel
 type SSHTunnel struct {
 	port      int

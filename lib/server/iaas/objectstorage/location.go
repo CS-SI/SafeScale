@@ -18,24 +18,98 @@ package objectstorage
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"io"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gomodules.xyz/stow"
 
-	// necessary for connect
+	// necessary for connect()
 	// _ "gomodules.xyz/stow/azure"
 	_ "gomodules.xyz/stow/google"
 	_ "gomodules.xyz/stow/s3"
 	_ "gomodules.xyz/stow/swift"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// location ...
+//go:generate mockgen -destination=../mocks/mock_location.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage Location
+
+// FIXME: GCP Remove specific driver code
+
+// Config ...
+type Config struct {
+	Type             string
+	EnvAuth          bool
+	AuthVersion      int
+	AuthURL          string
+	EndpointType     string
+	Endpoint         string
+	TenantDomain     string
+	Tenant           string
+	Domain           string
+	User             string
+	Key              string
+	SecretKey        string
+	Region           string
+	AvailabilityZone string
+	ProjectID        string
+	Credentials      string
+}
+
+// Location ...
+type Location interface {
+	data.NullValue
+
+	// ObjectStorageProtocol returns the name of the Object Storage protocol corresponding used by the location
+	ObjectStorageProtocol() string
+
+	// ListBuckets returns all bucket prefixed by a string given as a parameter
+	ListBuckets(string) ([]string, fail.Error)
+	// FindBucket returns true of bucket exists in stowLocation
+	FindBucket(string) (bool, fail.Error)
+	// InspectBucket returns info of the GetBucket
+	InspectBucket(string) (abstract.ObjectStorageBucket, fail.Error)
+	// CreateBucket creates a bucket
+	CreateBucket(string) (abstract.ObjectStorageBucket, fail.Error)
+	// DeleteBucket removes a bucket (need to be cleared before)
+	DeleteBucket(string) fail.Error
+	// ClearBucket empties a GetBucket
+	ClearBucket(string, string, string) fail.Error
+
+	// ListObjects lists the objects in a GetBucket
+	ListObjects(string, string, string) ([]string, fail.Error)
+	// InspectObject ...
+	InspectObject(string, string) (abstract.ObjectStorageItem, fail.Error)
+	// ReadObject ...
+	ReadObject(string, string, io.Writer, int64, int64) fail.Error
+	// WriteMultiPartObject ...
+	WriteMultiPartObject(string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
+	// WriteObject ...
+	WriteObject(string, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
+	// // CopyObject copies an object
+	// CopyObject(string, string, string) fail.Error
+	// DeleteObject delete an object from a stowContainer
+	DeleteObject(string, string) fail.Error
+	// FilterItemsByMetadata(ContainerName string, key string, pattern string) (map[string][]string, fail.Error)
+
+	// // ItemSize ?
+	// ItemSize(ContainerName string, item string) (int64, fail.Error)
+	// // ItemEtag returns the Etag of an item
+	// ItemEtag(ContainerName string, item string) (string, fail.Error)
+	// // ItemLastMod returns the dagte of last update
+	// ItemLastMod(ContainerName string, item string) (time.Time, fail.Error)
+	// // ItemID returns the GetID of the item
+	// ItemID(ContainerName string, item string) (id string)
+	// // ItemMetadata returns the metadata of an Item
+	// ItemMetadata(ContainerName string, item string) (abstract.ObjectStorageItemMetadata, fail.Error)
+}
+
+// stowLocation ...
 type location struct {
 	stowLocation stow.Location
 	config       Config
@@ -48,25 +122,31 @@ type location struct {
 	Region           string
 }
 
-// NewLocation creates an Object Storage Location based on config
-func NewLocation(conf Config) (Location, fail.Error) {
-	location := &location{
+// NewLocation creates an Object Storage location based on config
+func NewLocation(conf Config) (*location, fail.Error) {
+	l := &location{
 		config: conf,
 	}
-	err := location.connect()
+	err := l.connect()
 	if err != nil {
 		return nil, err
 	}
-	return location, nil
+	return l, nil
 }
 
-// func (l *location) getStowLocation() stow.Location {
+// IsNull tells if the instance is a null value
+// satisfies interface data.NullValue
+func (l *location) IsNull() bool {
+	return l == nil || l.stowLocation == nil
+}
+
+// func (l *stowLocation) getStowLocation() stow.location {
 // 	return l.stowLocation
 // }
 
-// Connect connects to an Object Storage Location
+// Connect connects to an Object Storage location
 func (l *location) connect() fail.Error {
-	// FIXME GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
+	// FIXME: GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap
 	var config stow.ConfigMap
 
 	if l.config.Type == "google" {
@@ -90,7 +170,7 @@ func (l *location) connect() fail.Error {
 	}
 	kind := l.config.Type
 
-	// Check config location
+	// Check config stowLocation
 	err := stow.Validate(kind, config)
 	if err != nil {
 		logrus.Debugf("invalid config: %v", err)
@@ -98,23 +178,26 @@ func (l *location) connect() fail.Error {
 	}
 	l.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
-		logrus.Debugf("failed dialing location: %v", err)
+		logrus.Debugf("failed dialing stowLocation: %v", err)
 	}
 	return fail.ToError(err)
 }
 
-// SafeGetObjectStorageProtocol returns the type of ObjectStorage
-func (l location) SafeGetObjectStorageProtocol() string {
+// ObjectStorageProtocol returns the type of ObjectStorage
+func (l location) ObjectStorageProtocol() string {
+	if l.IsNull() {
+		return ""
+	}
 	return l.config.Type
 }
 
 // ListBuckets ...
-func (l *location) ListBuckets(prefix string) ([]string, fail.Error) {
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+func (l location) ListBuckets(prefix string) ([]string, fail.Error) {
+	if l.IsNull() {
+		return []string{}, fail.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s')", prefix).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s')", prefix).Entering().OnExitTrace()
 
 	var list []string
 	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
@@ -129,21 +212,21 @@ func (l *location) ListBuckets(prefix string) ([]string, fail.Error) {
 		},
 	)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return []string{}, fail.ToError(err)
 	}
 	return list, nil
 }
 
-// FindBucket returns true if a bucket with the name exists in location
-func (l *location) FindBucket(bucketName string) (bool, fail.Error) {
-	if l == nil {
+// FindBucket returns true if a bucket with the name exists in stowLocation
+func (l location) FindBucket(bucketName string) (bool, fail.Error) {
+	if l.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
 		return false, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "(%s)", bucketName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "(%s)", bucketName).Entering().OnExitTrace()
 
 	found := false
 	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
@@ -165,62 +248,84 @@ func (l *location) FindBucket(bucketName string) (bool, fail.Error) {
 	return false, fail.ToError(err)
 }
 
-// GetBucket ...
-func (l *location) InspectBucket(bucketName string) (Bucket, fail.Error) {
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+// InspectBucket ...
+func (l location) InspectBucket(bucketName string) (abstract.ObjectStorageBucket, fail.Error) {
+	if l.IsNull() {
+		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
+		return abstract.ObjectStorageBucket{}, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "(%s)", bucketName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().OnExitTrace()
 
-	b, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
-		return nil, err
+		return abstract.ObjectStorageBucket{}, err
 	}
-	var cerr error
-	b.container, cerr = l.stowLocation.Container(bucketName)
-	if cerr != nil {
+	aosb := abstract.ObjectStorageBucket{
+		ID: b.stowContainer.ID(),
+		Name: bucketName,
+	}
+	return aosb, nil
+}
+
+// inspectBucket ...
+func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
+	if l.IsNull() {
+		return bucket{}, fail.InvalidInstanceError()
+	}
+	if bucketName == "" {
+		return bucket{}, fail.InvalidParameterError("bucketName", "cannot be empty string")
+	}
+
+	b, xerr := newBucket(l.stowLocation)
+	if xerr != nil {
+		return bucket{}, xerr
+	}
+	b.name = bucketName
+	var err error
+	b.stowContainer, err = l.stowLocation.Container(bucketName)
+	if err != nil {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
-		return nil, fail.ToError(err)
+		return bucket{}, fail.ToError(err)
 	}
 	return b, nil
 }
 
 // CreateBucket ...
-func (l *location) CreateBucket(bucketName string) (Bucket, fail.Error) {
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBucket, _ fail.Error) {
+	aosb = abstract.ObjectStorageBucket{}
+	if l.IsNull() {
+		return aosb, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
+		return aosb, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s')", bucketName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().OnExitTrace()
 
 	c, err := l.stowLocation.CreateContainer(bucketName)
 	if err != nil {
-		return nil, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
+		return aosb, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
 	}
-	return &bucket{
-		location:  l.stowLocation,
-		container: c,
-		Name:      c.Name(),
-	}, nil
+	aosb = abstract.ObjectStorageBucket{
+		ID: c.ID(),
+		Name: bucketName,
+	}
+	return aosb, nil
 }
 
 // DeleteBucket removes a bucket from Object Storage
-func (l *location) DeleteBucket(bucketName string) fail.Error {
-	if l == nil {
+func (l location) DeleteBucket(bucketName string) fail.Error {
+	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
 		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s')", bucketName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().OnExitTrace()
 
 	err := l.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
@@ -230,29 +335,43 @@ func (l *location) DeleteBucket(bucketName string) fail.Error {
 }
 
 // InspectObject ...
-func (l *location) InspectObject(bucketName string, objectName string) (Object, fail.Error) {
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+func (l location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, _ fail.Error) {
+	aosi = abstract.ObjectStorageItem{}
+	if l.IsNull() {
+		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
+		return aosi, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
+		return aosi, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
 
-	bucket, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
-		return nil, err
+		return aosi, err
 	}
-	return newObject(bucket, objectName)
+	o, err := newObject(&b, objectName)
+	if err != nil {
+		return aosi, err
+	}
+	m, err := o.GetMetadata()
+	if err != nil {
+		return aosi, err
+	}
+	aosi = abstract.ObjectStorageItem{
+		BucketName: bucketName,
+		ItemName: objectName,
+		Metadata: m,
+	}
+	return aosi, nil
 }
 
 // DeleteObject ...
-func (l *location) DeleteObject(bucketName, objectName string) fail.Error {
-	if l == nil {
+func (l location) DeleteObject(bucketName, objectName string) fail.Error {
+	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -262,45 +381,45 @@ func (l *location) DeleteObject(bucketName, objectName string) fail.Error {
 		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
 
-	bucket, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
-	return bucket.DeleteObject(objectName)
+	return b.DeleteObject(objectName)
 }
 
-// ListObjects lists the objects in a Bucket
-func (l *location) ListObjects(bucketName string, path, prefix string) ([]string, fail.Error) {
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+// ListObjects lists the objects in a GetBucket
+func (l location) ListObjects(bucketName string, path, prefix string) ([]string, fail.Error) {
+	if l.IsNull() {
+		return []string{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
+		return []string{}, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
 
-	b, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
 		return nil, err
 	}
-	return b.List(path, prefix)
+	return b.ListObjects(path, prefix)
 }
 
-// Browse walks through the objects in a Bucket and apply callback to each object
-func (l *location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) fail.Error {
-	if l == nil {
+// BrowseBucket walks through the objects in a GetBucket and apply callback to each object
+func (l location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) fail.Error {
+	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
 		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
 
-	b, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -308,17 +427,17 @@ func (l *location) BrowseBucket(bucketName string, path, prefix string, callback
 }
 
 // ClearBucket ...
-func (l *location) ClearBucket(bucketName string, path, prefix string) fail.Error {
-	if l == nil {
+func (l location) ClearBucket(bucketName string, path, prefix string) fail.Error {
+	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
 		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().OnExitTrace()
 
-	b, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
@@ -326,8 +445,8 @@ func (l *location) ClearBucket(bucketName string, path, prefix string) fail.Erro
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) fail.Error {
-	if l == nil {
+func (l location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) fail.Error {
+	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
@@ -337,13 +456,13 @@ func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, f
 		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().OnExitTrace()
 
-	b, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
 		return err
 	}
-	o, err := newObject(b, objectName)
+	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err
 	}
@@ -355,58 +474,99 @@ func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, f
 }
 
 // WriteObject writes the content of reader in the Object
-func (l *location) WriteObject(
+func (l location) WriteObject(
 	bucketName string, objectName string,
 	source io.Reader, size int64,
-	metadata ObjectMetadata,
-) (Object, fail.Error) {
+	metadata abstract.ObjectStorageItemMetadata,
+) (aosi abstract.ObjectStorageItem, _ fail.Error) {
 
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+	aosi = abstract.ObjectStorageItem{}
+	if l.IsNull() {
+		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
+		return aosi, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
+		return aosi, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 	if source == nil {
-		return nil, fail.InvalidParameterError("source", "cannot be nil")
+		return aosi, fail.InvalidParameterError("source", "cannot be nil")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().OnExitTrace()
 
-	b, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
-		return nil, err
+		return aosi, err
 	}
-	return b.WriteObject(objectName, source, size, metadata)
+	o, err := b.WriteObject(objectName, source, size, metadata)
+	if err != nil {
+		return aosi, err
+	}
+	aosi, err = convertObjectToAbstract(o)
+	if err != nil {
+		return aosi, err
+	}
+	aosi.BucketName = bucketName
+	return aosi, nil
 }
 
 // WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (l *location) WriteMultiPartObject(
+func (l location) WriteMultiPartObject(
 	bucketName string, objectName string,
 	source io.Reader, sourceSize int64,
 	chunkSize int,
-	metadata ObjectMetadata,
-) (Object, fail.Error) {
+	metadata abstract.ObjectStorageItemMetadata,
+) (aosi abstract.ObjectStorageItem, _ fail.Error) {
 
-	if l == nil {
-		return nil, fail.InvalidInstanceError()
+	aosi = abstract.ObjectStorageItem{}
+	if l.IsNull() {
+		return aosi, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
+		return aosi, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
+		return aosi, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.location"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering().OnExitTrace()
 
-	bucket, err := newBucket(l.stowLocation, bucketName)
+	b, err := l.inspectBucket(bucketName)
 	if err != nil {
-		return nil, err
+		return aosi, err
 	}
-	return bucket.WriteMultiPartObject(objectName, source, sourceSize, chunkSize, metadata)
+	o, err := b.WriteMultiPartObject(objectName, source, sourceSize, chunkSize, metadata)
+	if err != nil {
+		return aosi, err
+	}
+	aosi, err = convertObjectToAbstract(o)
+	if err != nil {
+		return aosi, err
+	}
+	aosi.BucketName = bucketName
+	return aosi, nil
+}
+
+func convertObjectToAbstract(in Object) (abstract.ObjectStorageItem, fail.Error) {
+	id, err := in.GetID()
+	if err != nil {
+		return abstract.ObjectStorageItem{}, err
+	}
+	name, err := in.GetName()
+	if err != nil {
+		return abstract.ObjectStorageItem{}, err
+	}
+	m, err := in.GetMetadata()
+	if err != nil {
+		return abstract.ObjectStorageItem{}, err
+	}
+	aosi := abstract.ObjectStorageItem{
+		ItemID: id,
+		ItemName: name,
+		Metadata: m,
+	}
+	return aosi, nil
 }

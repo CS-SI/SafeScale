@@ -22,8 +22,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -62,7 +62,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 	}
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
-	svc := objn.SafeGetService()
+	svc := objn.GetService()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
 
@@ -105,9 +105,9 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		if primary {
-			an.GatewayID = rgw.SafeGetID()
+			an.GatewayID = rgw.GetID()
 		} else {
-			an.SecondaryGatewayID = rgw.SafeGetID()
+			an.SecondaryGatewayID = rgw.GetID()
 		}
 		return nil
 	})
@@ -117,7 +117,7 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
 
 	// Binds gateway to VIP if needed
 	if an := hostReq.Networks[0]; an != nil && an.VIP != nil {
-		if xerr = svc.BindHostToVIP(an.VIP, rgw.SafeGetID()); xerr != nil {
+		if xerr = svc.BindHostToVIP(an.VIP, rgw.GetID()); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -141,7 +141,7 @@ func (objn *network) taskFinalizeGatewayConfiguration(task concurrency.Task, par
 	if userData, ok = params.(data.Map)["userdata"].(*userdata.Content); !ok {
 		return nil, fail.InvalidParameterError("params['userdata']", "is missing or is not a '*userdata.Content'")
 	}
-	gwname := objgw.SafeGetName()
+	gwname := objgw.GetName()
 
 	// Executes userdata phase2 script to finalize host installation
 	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()

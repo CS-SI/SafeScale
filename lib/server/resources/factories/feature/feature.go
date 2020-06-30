@@ -38,8 +38,8 @@ import (
 // 		files, err := ioutil.ReadDir(path)
 // 		if err == nil {
 // 			for _, f := range files {
-// 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.Name()), ".yml"); isCfgFile == true {
-// 					cfgFiles.Add(strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+// 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.GetName()), ".yml"); isCfgFile == true {
+// 					cfgFiles.Add(strings.Replace(strings.ToLower(f.GetName()), ".yml", "", 1))
 // 				}
 // 			}
 // 		}
@@ -47,7 +47,7 @@ import (
 // 	for _, feat := range operations.GetAllEmbeddedFeatures() {
 // 		yamlKey := "feature.suitableFor.host"
 
-// 		if !captured.Contains(feat.Name()) {
+// 		if !captured.Contains(feat.GetName()) {
 // 			ok := false
 // 			if feat.GetSpecs().IsSet(yamlKey) {
 // 				value := strings.ToLower(feat.GetSpecs().GetString(yamlKey))

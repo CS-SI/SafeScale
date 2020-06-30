@@ -17,20 +17,21 @@
 package template
 
 import (
+	"github.com/Masterminds/sprig"
 	txttmpl "text/template"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Parse returns a text template with default funcs declared
-func Parse(title, content string, funcMap map[string]interface{}) (*txttmpl.Template, fail.Error) {
+func Parse(title, content string) (*txttmpl.Template, fail.Error) {
 	if title == "" {
 		return nil, fail.InvalidParameterError("title", "cannot be empty string")
 	}
 	if content == "" {
 		return nil, fail.InvalidParameterError("content", "cannot be empty string")
 	}
-	r, err := txttmpl.New(title).Funcs(MergeFuncs(funcMap, false)).Parse(content)
+	r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Parse(content)
 	if err != nil {
 		return nil, fail.ToError(err)
 	}

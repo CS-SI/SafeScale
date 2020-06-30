@@ -59,7 +59,7 @@ func init() {
 	}
 
 	for _, item := range allEmbeddedFeatures {
-		itemName := item.SafeGetName()
+		itemName := item.GetName()
 
 		// allEmbeddedMap[item.BaseFilename()] = item
 		allEmbeddedFeaturesMap[itemName] = item
@@ -67,8 +67,8 @@ func init() {
 		for k := range installers {
 			meth, err := installmethod.Parse(k)
 			if err != nil {
-				displayFilename, dferr := item.GetDisplayFilename()
-				if dferr != nil {
+				displayFilename := item.GetDisplayFilename()
+				if displayFilename == "" {
 					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
 				} else {
 					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s), install method '%s' is unknown", itemName, displayFilename, k))

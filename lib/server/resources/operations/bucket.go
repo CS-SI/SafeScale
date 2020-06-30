@@ -20,51 +20,76 @@ package operations
 
 import (
 	"bytes"
-	"html/template"
+	"reflect"
 	"regexp"
 
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	rice "github.com/GeertJohan/go.rice"
 )
 
-// bucket describes a bucket and satisfies interface resources.Bucket
-type bucket struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Host       string `json:"host,omitempty"`
-	MountPoint string `json:"mountPoint,omitempty"`
-	// NbItems    int    `json:"nbitems,omitempty"`
+const (
+	// bucketsFolderName is the technical name of the object storage folder used to store buckets info
+	bucketsFolderName = "buckets"
+)
 
-	svc iaas.Service
+// bucket describes a bucket and satisfies interface resources.ObjectStorageBucket
+type bucket struct {
+	*core
+
+	// GetID         string `json:"id,omitempty"`
+	// GetName       string `json:"name,omitempty"`
+	// Host       string `json:"host,omitempty"`
+	// MountPoint string `json:"mountPoint,omitempty"`
+	// // NbItems    int    `json:"nbitems,omitempty"`
+
+	svc       iaas.Service
+	location  objectstorage.Location
+	container objectstorage.Bucket
 }
 
-// NewBucket intanciantes bucket struct
+// NewObjectStorageBucket intanciaxxtes bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
+
+	coreInstance, xerr := newCore(svc, "bucket", bucketsFolderName, &abstract.ObjectStorageBucket{})
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	b := &bucket{
-		svc: svc,
+		core: coreInstance,
+		svc:  svc,
 	}
 	return b, nil
 }
 
-// LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage Bucket
-func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
-	if svc == nil {
+// LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
+func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if svc.IsNull() {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, true, "('"+name+"')").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
@@ -74,51 +99,75 @@ func LoadBucket(svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Er
 	}
 	b := anon.(*bucket)
 
-	if _, xerr = svc.InspectBucket(name); xerr != nil {
+	ab, xerr := svc.InspectBucket(name)
+	if xerr != nil {
 		if xerr.Error() == "not found" {
 			return nil, abstract.ResourceNotFoundError("bucket", name)
 		}
 		return nil, fail.NewError(xerr, nil, "failed to read bucket information")
 	}
-	b.Name = name
-	b.ID = name
-
+	xerr = b.Carry(task, &ab)
+	if xerr != nil {
+		return nil, xerr
+	}
 	return b, nil
 }
 
 // IsNull tells if the instance corresponds to null value
 func (b *bucket) IsNull() bool {
-	return b == nil || b.svc == nil
+	return b == nil || b.core.IsNull()
 }
 
-// SafeGetID returns the ID of the bucket
-func (b *bucket) SafeGetID() string {
+// GetHost ...
+func (b *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 	if b.IsNull() {
-		return ""
+		return "", fail.InvalidInstanceError()
 	}
-	return b.ID
+	var res string
+	xerr := b.core.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ab, ok := clonable.(*abstract.ObjectStorageBucket)
+		if !ok {
+			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		res = ab.Host
+		return nil
+	})
+	if xerr != nil {
+		return res, xerr
+	}
+	return res, nil
 }
 
-// SafeGetName returns the name of the bucket
-func (b *bucket) SafeGetName() string {
-	if b.IsNull() {
-		return ""
-	}
-	return b.Name
+// Host ...
+func (b *bucket) Host(task concurrency.Task) string {
+	res, _ := b.GetHost(task)
+	return res
 }
 
-func (b *bucket) SafeGetHost() string {
+// GetMountPoint ...
+func (b *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error) {
 	if b.IsNull() {
-		return ""
+		return "", fail.InvalidInstanceError()
 	}
-	return b.Host
+	var res string
+	xerr := b.core.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ab, ok := clonable.(*abstract.ObjectStorageBucket)
+		if !ok {
+			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		res = ab.MountPoint
+		return nil
+	})
+	if xerr != nil {
+		logrus.Errorf(xerr.Error())
+	}
+	return res, nil
 }
 
-func (b *bucket) SafeGetMountPoint() string {
-	if b.IsNull() {
-		return ""
-	}
-	return b.MountPoint
+// MountPoint ...
+func (b *bucket) MountPoint(task concurrency.Task) string {
+	res, _ := b.GetMountPoint(task)
+	return res
 }
 
 // Create a bucket
@@ -137,22 +186,20 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	bucket, xerr := b.svc.InspectBucket(name)
+	ab, xerr := b.svc.InspectBucket(name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}
-	if bucket != nil {
+	if !ab.IsNull() {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
-	if _, xerr = b.svc.CreateBucket(name); xerr != nil {
+	if ab, xerr = b.svc.CreateBucket(name); xerr != nil {
 		return xerr
 	}
-	b.Name = name
-	b.ID = name
 
-	return nil
+	return b.core.Carry(task, &ab)
 }
 
 // Delete a bucket
@@ -161,7 +208,7 @@ func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	return b.svc.DeleteBucket(b.SafeGetName())
+	return b.svc.DeleteBucket(b.GetName())
 }
 
 // Mount a bucket on an host on the given mount point
@@ -173,13 +220,13 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	// Get Host data
 	rh, xerr := LoadHost(task, b.svc, hostName)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to mount bucket '%s' on rh '%s'", b.SafeGetName(), hostName)
+		return fail.Wrap(xerr, "failed to mount bucket '%s' on rh '%s'", b.GetName(), hostName)
 	}
 
 	// Create mount point
 	mountPoint := path
 	if path == abstract.DefaultBucketMountPoint {
-		mountPoint = abstract.DefaultBucketMountPoint + b.SafeGetName()
+		mountPoint = abstract.DefaultBucketMountPoint + b.GetName()
 	}
 
 	authOpts, _ := b.svc.GetAuthenticationOptions()
@@ -195,7 +242,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	regionCfg, _ := authOpts.Config("Region")
 	region := regionCfg.(string)
 
-	objStorageProtocol := b.svc.SafeGetObjectStorageProtocol()
+	objStorageProtocol := b.svc.ObjectStorageProtocol()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
 	}
@@ -210,7 +257,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 		MountPoint string
 		Protocol   string
 	}{
-		Bucket:     b.SafeGetName(),
+		Bucket:     b.GetName(),
 		Tenant:     tenant,
 		Login:      login,
 		Password:   password,
@@ -232,16 +279,16 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 
 	defer func() {
 		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from rh '%s'", b.SafeGetName(), hostName)
+			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from rh '%s'", b.GetName(), hostName)
 		}
 	}()
 
 	// Check bucket existence
-	if _, xerr = b.svc.InspectBucket(b.SafeGetName()); xerr != nil {
+	if _, xerr = b.svc.InspectBucket(b.GetName()); xerr != nil {
 		return xerr
 	}
 
-	// Get Host ID
+	// Get Host GetID
 	rh, xerr := LoadHost(task, b.svc, hostName)
 	if xerr != nil {
 		return xerr
@@ -250,7 +297,7 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 	data := struct {
 		Bucket string
 	}{
-		Bucket: b.SafeGetName(),
+		Bucket: b.GetName(),
 	}
 
 	err := b.exec(task, rh, "umount_object_storage.sh", data)
@@ -268,7 +315,7 @@ func (b *bucket) exec(task concurrency.Task, host resources.Host, script string,
 	return xerr
 }
 
-// Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
+// Return the script (embedded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Error) {
 	defer fail.OnExitLogError(concurrency.NewTracer(nil, true, "").TraceMessage(""), &xerr)
 
@@ -280,7 +327,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 	if err != nil {
 		return "", fail.ToError(err)
 	}
-	tpl, err := template.New("TemplateName").Parse(scriptContent)
+	tpl, err := template.Parse("TemplateName", scriptContent)
 	if err != nil {
 		return "", fail.ToError(err)
 	}

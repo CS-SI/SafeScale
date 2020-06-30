@@ -32,7 +32,7 @@ type Metadata interface {
 	Serialize(concurrency.Task) ([]byte, fail.Error)
 	Deserialize(concurrency.Task, []byte) fail.Error
 
-	SafeGetService() iaas.Service                                                        // Service returns the iaas.Service used to create/load the persistency object
+	GetService() iaas.Service                                                            // GetService returns the iaas.Service used
 	Inspect(task concurrency.Task, callback Callback) fail.Error                         // Inspect protects the data for shared read
 	Alter(task concurrency.Task, callback Callback) fail.Error                           // Alter protects the data for exclusive write
 	Carry(task concurrency.Task, clonable data.Clonable) fail.Error                      // Carry links metadata with real data

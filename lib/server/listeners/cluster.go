@@ -57,7 +57,7 @@ func (s *ClusterListener) List(ctx context.Context, in *googleprotobuf.Empty) (h
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -90,7 +90,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	defer job.Close()
 
 	name := in.GetName()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -127,7 +127,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	}
 	defer job.Close()
 
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -165,7 +165,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	}
 	defer job.Close()
 
-	task := job.SafeGetTask()
+	task := job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -205,7 +205,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -247,7 +247,7 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -284,7 +284,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -321,7 +321,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -358,7 +358,7 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -395,7 +395,7 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -436,7 +436,7 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -475,7 +475,7 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -517,7 +517,7 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -559,7 +559,7 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -600,7 +600,7 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.host"), "('%s', '%s')", clusterName, nodeRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -637,7 +637,7 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -678,7 +678,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.cluster"), "('%s', '%s')", clusterName, masterRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s', '%s')", clusterName, masterRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

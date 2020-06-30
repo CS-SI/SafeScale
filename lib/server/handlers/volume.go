@@ -73,17 +73,17 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr f
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objv, xerr := volumefactory.New(handler.job.SafeGetService())
+	objv, xerr := volumefactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
 	xerr = objv.Browse(task, func(volume *abstract.Volume) fail.Error {
-		rv, innerXErr := volumefactory.Load(task, handler.job.SafeGetService(), volume.ID)
+		rv, innerXErr := volumefactory.Load(task, handler.job.GetService(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -108,13 +108,13 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objv, xerr := volumefactory.Load(task, handler.job.SafeGetService(), ref)
+	objv, xerr := volumefactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -161,13 +161,13 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objv, xerr := volumefactory.Load(task, handler.job.SafeGetService(), ref)
+	objv, xerr := volumefactory.Load(task, handler.job.GetService(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
@@ -175,7 +175,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 		return nil, xerr
 	}
 	return objv, nil
-	// volumeID := objv.SafeGetID()
+	// volumeID := objv.GetID()
 
 	// mounts = map[string]*propertiesv1.HostLocalMount{}
 	// err = objv.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
@@ -186,7 +186,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 	// 		}
 	// 		if len(volumeAttachedV1.Hosts) > 0 {
 	// 			for id := range volumeAttachedV1.Hosts {
-	// 				host, inErr := hostfactory.Load(task, handler.job.SafeGetService(), id)
+	// 				host, inErr := hostfactory.Load(task, handler.job.GetService(), id)
 	// 				if inErr != nil {
 	// 					logrus.Debug(inErr.Error())
 	// 					continue
@@ -204,9 +204,9 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 	// 									return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 								}
 	// 								if mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[volumeAttachment.Device]]; ok {
-	// 									mounts[host.SafeGetName()] = mount
+	// 									mounts[host.GetName()] = mount
 	// 								} else {
-	// 									mounts[host.SafeGetName()] = propertiesv1.NewHostLocalMount()
+	// 									mounts[host.GetName()] = propertiesv1.NewHostLocalMount()
 	// 								}
 	// 								return nil
 	// 							})
@@ -241,12 +241,12 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
-	objv, xerr = volumefactory.New(handler.job.SafeGetService())
+	objv, xerr = volumefactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -282,13 +282,13 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 		return fail.InvalidParameterError("format", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	svc := handler.job.SafeGetService()
+	svc := handler.job.GetService()
 	rv, xerr := volumefactory.Load(task, svc, volumeRef)
 	if xerr != nil {
 		return xerr
@@ -306,23 +306,23 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// if xerr != nil {
 	// 	return xerr
 	// }
-	// volumeName := rv.SafeGetName()
-	// volumeID := rv.SafeGetID()
+	// volumeName := rv.GetName()
+	// volumeID := rv.GetID()
 	//
 	// // Get Host data
-	// rh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), hostRef)
+	// rh, xerr := hostfactory.Load(task, handler.job.GetService(), hostRef)
 	// if xerr != nil {
 	// 	return xerr
 	// }
-	// hostName := rh.SafeGetName()
-	// hostID := rh.SafeGetID()
+	// hostName := rh.GetName()
+	// hostID := rh.GetID()
 	//
 	// var (
 	// 	deviceName string
 	// 	volumeUUID string
 	// 	mountPoint string
 	// 	// vaID       string
-	// 	server *nfs.Server
+	// 	server *nfs.getServer
 	// )
 	//
 	// xerr = rv.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -336,7 +336,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	//
 	// 		// For now, allows only one attachment...
 	// 		if len(volumeAttachedV1.Hosts) > 0 {
-	// 			hostID := rh.SafeGetID()
+	// 			hostID := rh.GetID()
 	// 			for id := range volumeAttachedV1.Hosts {
 	// 				if id != hostID {
 	// 					return abstract.ResourceNotAvailableError("volume", volumeName)
@@ -357,7 +357,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// 						return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 					}
 	// 					// Check if the volume is already mounted elsewhere
-	// 					if device, found := hostVolumesV1.DevicesByID[rv.SafeGetID()]; found {
+	// 					if device, found := hostVolumesV1.DevicesByID[rv.GetID()]; found {
 	// 						mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
 	// 						if !ok {
 	// 							return fail.InconsistentError("metadata inconsistency for volume '%s' attached to rh '%s'", volumeName, hostName)
@@ -388,10 +388,10 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// 					if innerXErr != nil {
 	// 						return innerXErr
 	// 					}
-	// 					vaID, innerXErr := handler.job.SafeGetService().CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
-	// 						Name:     fmt.Sprintf("%s-%s", volumeName, hostName),
-	// 						HostID:   rh.SafeGetID(),
-	// 						VolumeID: rv.SafeGetID(),
+	// 					vaID, innerXErr := handler.job.GetService().CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
+	// 						GetName:     fmt.Sprintf("%s-%s", volumeName, hostName),
+	// 						HostID:   rh.GetID(),
+	// 						VolumeID: rv.GetID(),
 	// 					})
 	// 					if innerXErr != nil {
 	// 						return innerXErr
@@ -400,7 +400,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// 					// Starting from here, remove volume attachment if exit with error
 	// 					defer func() {
 	// 						if innerXErr != nil {
-	// 							derr := handler.job.SafeGetService().DeleteVolumeAttachment(hostID, vaID)
+	// 							derr := handler.job.GetService().DeleteVolumeAttachment(hostID, vaID)
 	// 							if derr != nil {
 	// 								switch derr.(type) {
 	// 								case fail.ErrNotFound:
@@ -445,7 +445,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	//
 	// 					// Create mount point
 	// 					sshHandler := NewSSHHandler(handler.job)
-	// 					sshConfig, innerXErr := sshHandler.GetConfig(rh.SafeGetID())
+	// 					sshConfig, innerXErr := sshHandler.GetConfig(rh.GetID())
 	// 					if innerXErr != nil {
 	// 						return innerXErr
 	// 					}
@@ -495,7 +495,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// 	return xerr
 	// }
 	//
-	// logrus.Infof("Volume '%s' successfully attached to rh '%s' as device '%s'", rv.SafeGetName(), rh.SafeGetName(), volumeUUID)
+	// logrus.Infof("Volume '%s' successfully attached to rh '%s' as device '%s'", rv.GetName(), rh.GetName(), volumeUUID)
 	// return nil
 }
 
@@ -509,7 +509,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 // 	if host == nil {
 // 		return nil, fail.InvalidParameterError("host", "cannot be nil")
 // 	}
-// 	task := handler.job.SafeGetTask()
+// 	task := handler.job.GetTask()
 // 	defer fail.OnExitLogError(concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "").TraceMessage(""), &xerr)
 //
 // 	var (
@@ -526,7 +526,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 // 			}
 // 			if retcode != 0 {
 // 				if retcode == 255 {
-// 					return fail.NotAvailableError("failed to reach SSH service of host '%s', retrying", host.SafeGetName())
+// 					return fail.NotAvailableError("failed to reach SSH service of host '%s', retrying", host.GetName())
 // 				}
 // 				return fail.NewError(stderr)
 // 			}
@@ -560,14 +560,14 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
 	// Load volume data
-	rv, xerr := volumefactory.Load(task, handler.job.SafeGetService(), volumeRef)
+	rv, xerr := volumefactory.Load(task, handler.job.GetService(), volumeRef)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
@@ -577,18 +577,18 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// mountPath := ""
 
 	// Load rh data
-	rh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), hostRef)
+	rh, xerr := hostfactory.Load(task, handler.job.GetService(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
 	return rv.Detach(task, rh)
-	// hostName := rh.SafeGetName()
-	// hostID := rh.SafeGetID()
-	// volumeName := rv.SafeGetName()
-	// volumeID := rv.SafeGetID()
+	// hostName := rh.GetName()
+	// hostID := rh.GetID()
+	// volumeName := rv.GetName()
+	// volumeID := rv.GetID()
 	//
-	// // Obtain volume attachment ID
+	// // Obtain volume attachment GetID
 	// xerr = rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	return props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 	// 		hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
@@ -599,7 +599,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// 		// Check the volume is effectively attached
 	// 		attachment, found := hostVolumesV1.VolumesByID[volumeID]
 	// 		if !found {
-	// 			return fail.NotFoundError("cannot detach volume '%s': not attached to rh '%s'", volumeName, rh.SafeGetName())
+	// 			return fail.NotFoundError("cannot detach volume '%s': not attached to rh '%s'", volumeName, rh.GetName())
 	// 		}
 	//
 	// 		// Obtain mounts information
@@ -661,7 +661,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// 				}
 	//
 	// 				// ... then detach volume
-	// 				if innerXErr = handler.job.SafeGetService().DeleteVolumeAttachment(hostID, attachment.AttachID); innerXErr != nil {
+	// 				if innerXErr = handler.job.GetService().DeleteVolumeAttachment(hostID, attachment.AttachID); innerXErr != nil {
 	// 					return innerXErr
 	// 				}
 	//

@@ -74,7 +74,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		return nil, err
 	}
 	defer job.Close()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 
 	all := in.GetAll()
 	tracer := concurrency.NewTracer(task, true, "(%v)", all).WithStopwatch().Entering()
@@ -125,7 +125,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 
 	name := in.GetName()
 	speed := in.GetSpeed()
@@ -190,7 +190,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -238,7 +238,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -281,7 +281,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), true, "('%s')", ref).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -322,7 +322,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 
 	tracer := concurrency.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()

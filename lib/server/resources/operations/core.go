@@ -24,8 +24,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -58,8 +58,8 @@ func nullCore() *core {
 	return &core{kind: "nil"}
 }
 
-// NewCore creates an instance of core
-func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, fail.Error) {
+// newCore creates an instance of core
+func newCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, fail.Error) {
 	if svc == nil {
 		return nullCore(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -93,18 +93,18 @@ func (c *core) IsNull() bool {
 	return c == nil || c.kind == "" || c.kind == "nil"
 }
 
-// SafeGetService returns the iaas.Service used to create/load the persistent object
-func (c *core) SafeGetService() iaas.Service {
+// GetService returns the iaas.GetService used to create/load the persistent object
+func (c core) GetService() iaas.Service {
 	if !c.IsNull() && c.folder != nil {
-		return c.folder.SafeGetService()
+		return c.folder.GetService()
 	}
 	return nil
 }
 
-// SafeGetID returns the id of the data protected
+// GetID returns the id of the data protected
 //
 // satisfies interface data.Identifiable
-func (c *core) SafeGetID() string {
+func (c core) GetID() string {
 	if c.IsNull() {
 		return "<NullCore>"
 	}
@@ -114,10 +114,10 @@ func (c *core) SafeGetID() string {
 	return ""
 }
 
-// SafeGetName returns the name of the data protected
+// GetName returns the name of the data protected
 //
 // satisfies interface data.Identifiable
-func (c *core) SafeGetName() string {
+func (c core) GetName() string {
 	if c.IsNull() {
 		return "<NullCore>"
 	}
@@ -240,8 +240,8 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 			if !ok {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			c.name.Store(ident.SafeGetName())
-			c.id.Store(ident.SafeGetID())
+			c.name.Store(ident.GetName())
+			c.id.Store(ident.GetID())
 			return nil
 		})
 	}
@@ -322,7 +322,7 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 	return nil
 }
 
-// readByID reads a metadata identified by ID from Object Storage
+// readByID reads a metadata identified by GetID from Object Storage
 func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		return c.Deserialize(task, buf)
@@ -343,10 +343,10 @@ func (c *core) write(task concurrency.Task) fail.Error {
 		if xerr != nil {
 			return xerr
 		}
-		if xerr = c.folder.Write(byNameFolderName, c.SafeGetName(), jsoned); xerr != nil {
+		if xerr = c.folder.Write(byNameFolderName, c.GetName(), jsoned); xerr != nil {
 			return xerr
 		}
-		if xerr = c.folder.Write(byIDFolderName, c.SafeGetID(), jsoned); xerr != nil {
+		if xerr = c.folder.Write(byIDFolderName, c.GetID(), jsoned); xerr != nil {
 			return xerr
 		}
 		c.loaded = true
@@ -364,7 +364,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	if xerr := c.readByID(task, c.SafeGetID()); xerr != nil {
+	if xerr := c.readByID(task, c.GetID()); xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return fail.NotFoundError("the metadata of %s '%s' vanished", c.kind, c.name)
 		}
@@ -374,7 +374,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 }
 
 // BrowseFolder walks through host folder and executes a callback for each entries
-func (c *core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error {
+func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -403,8 +403,8 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 	defer c.SafeUnlock(task)
 
 	var idFound, nameFound bool
-	id := c.SafeGetID()
-	name := c.SafeGetName()
+	id := c.GetID()
+	name := c.GetName()
 
 	// Checks entries exist in Object Storage
 	if xerr := c.folder.Search(byIDFolderName, id); xerr != nil {
@@ -444,7 +444,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 
 // Serialize serializes instance into bytes (output json code)
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (c *core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
+func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -454,7 +454,7 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 
 	defer func() {
 		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to serialize %s resource '%s'", c.kind, c.SafeGetName())
+			xerr = fail.Wrap(xerr, "failed to serialize %s resource '%s'", c.kind, c.GetName())
 		}
 	}()
 
@@ -501,7 +501,7 @@ func (c *core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
+// Note: doesn't follow interface data.Serializable (task parameter not used in the interface and needed here)
 func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()

@@ -22,7 +22,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -39,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -251,7 +251,7 @@ func (st stepTargets) parse() (string, string, string, string, fail.Error) {
 type step struct {
 	// Worker is a back pointer to the caller
 	Worker *worker
-	// Name is the name of the step
+	// GetName is the name of the step
 	Name string
 	// Action is the action of the step (check, add, remove)
 	Action installaction.Enum
@@ -286,7 +286,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 	if is.Serial || s.Serialize {
 
 		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, h.SafeGetName())
+			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
@@ -294,7 +294,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 				return nil, xerr
 			}
 
-			cloneV["ShortHostname"] = h.SafeGetName()
+			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
@@ -309,7 +309,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 					return nil
 				})
 			})
-			cloneV["Hostname"] = h.SafeGetName() + domain
+			cloneV["Hostname"] = h.GetName() + domain
 
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
@@ -322,35 +322,35 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if xerr != nil {
 				return nil, xerr
 			}
-			outcomes.AddSingle(h.SafeGetName(), outcome.(resources.UnitResult))
+			outcomes.AddSingle(h.GetName(), outcome.(resources.UnitResult))
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present: %s",
-						is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, h.SafeGetName(),
+						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				} else { // other steps are expected to succeed
 					tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, h.SafeGetName(),
+						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				}
 			} else {
 				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
-					is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, h.SafeGetName(),
+					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
 	} else {
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, h.SafeGetName())
+			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
 			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
 				return nil, xerr
 			}
-			cloneV["ShortHostname"] = h.SafeGetName()
+			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
@@ -365,7 +365,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 					return nil
 				})
 			})
-			cloneV["Hostname"] = h.SafeGetName() + domain
+			cloneV["Hostname"] = h.GetName() + domain
 
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
@@ -383,13 +383,13 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 				return nil, xerr
 			}
 
-			subtasks[h.SafeGetName()] = subtask
+			subtasks[h.GetName()] = subtask
 		}
 		for k, s := range subtasks {
 			outcome, xerr := s.Wait()
 			if xerr != nil {
 				logrus.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
-					is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
+					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
 				continue
 			}
 			outcomes.AddSingle(k, outcome.(resources.UnitResult))
@@ -397,16 +397,16 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present: %s",
-						is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, k,
+						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				} else { // other steps are expected to succeed
 					tracer.Trace(": %s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, k,
+						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
 						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 				}
 			} else {
 				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
-					is.Worker.action.String(), is.Worker.feature.SafeGetName(), is.Name, k,
+					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
 			}
 		}
@@ -468,7 +468,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Uploads then executes command
-	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.SafeGetName(), strings.ToLower(is.Action.String()), is.Name)
+	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
 	// err = UploadStringToRemoteFile(command, rh, filename, "", "")
 	rfcItem := remotefile.Item{
 		Remote: filename,
@@ -533,18 +533,18 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 // 	return nil
 // }
 
-// realizeVariables replaces in every variable any template
+// realizeVariables replaces any template occuring in every variable
 func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 	cloneV := variables.Clone()
 
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok {
-			varTemplate, err := template.New("realize_var").Parse(variable)
-			if err != nil {
-				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, err.Error())
+			varTemplate, xerr := template.Parse("realize_var", variable)
+			if xerr != nil {
+				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
 			}
 			buffer := bytes.NewBufferString("")
-			err = varTemplate.Execute(buffer, variables)
+			err := varTemplate.Execute(buffer, variables)
 			if err != nil {
 				return nil, fail.ToError(err)
 			}
@@ -555,13 +555,14 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 	return cloneV, nil
 }
 
+// replaceVariablesInString ...
 func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
-	tmpl, err := template.New("text").Parse(text)
-	if err != nil {
-		return "", fail.SyntaxError("failed to parse: %s", err.Error())
+	tmpl, xerr := template.Parse("replaceVariablesInString", text)
+	if xerr != nil {
+		return "", fail.SyntaxError("failed to parse: %s", xerr.Error())
 	}
 	dataBuffer := bytes.NewBufferString("")
-	err = tmpl.Execute(dataBuffer, v)
+	err := tmpl.Execute(dataBuffer, v)
 	if err != nil {
 		return "", fail.Wrap(err, "failed to replace variables")
 	}

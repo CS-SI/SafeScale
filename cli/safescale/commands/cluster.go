@@ -966,7 +966,7 @@ var clusterRunCommand = &cli.Command{
 
 func executeCommand(task concurrency.Task, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
-	clusterName := clusterInstance.SafeGetName()
+	clusterName := clusterInstance.GetName()
 	master, err := clusterInstance.FindAvailableMaster(task)
 	if err != nil {
 		msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
@@ -975,22 +975,22 @@ func executeCommand(task concurrency.Task, command string, files *client.RemoteF
 
 	if files != nil && files.Count() > 0 {
 		if !Debug {
-			defer files.Cleanup(task, master.SafeGetID())
+			defer files.Cleanup(task, master.GetID())
 		}
-		xerr := files.Upload(task, master.SafeGetID())
+		xerr := files.Upload(task, master.GetID())
 		if xerr != nil {
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, xerr.Error())
 		}
 	}
 
 	sshClient := client.New().SSH
-	retcode, stdout, stderr, xerr := sshClient.Run(task, master.SafeGetID(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := sshClient.Run(task, master.GetID(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
-		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.SafeGetID(), clusterName, xerr.Error())
+		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetID(), clusterName, xerr.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		msg := fmt.Sprintf("command executed on master '%s' of cluster '%s' with failure: %s", master.SafeGetID(), clusterName, stdout)
+		msg := fmt.Sprintf("command executed on master '%s' of cluster '%s' with failure: %s", master.GetID(), clusterName, stdout)
 		if stderr != "" {
 			if stdout != "" {
 				msg += "\n"

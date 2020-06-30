@@ -86,17 +86,17 @@ func (handler *shareHandler) Create(
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objs, xerr := sharefactory.New(handler.job.SafeGetService())
+	objs, xerr := sharefactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
-	objh, xerr := hostfactory.Load(task, handler.job.SafeGetService(), hostName)
+	objh, xerr := hostfactory.Load(task, handler.job.GetService(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -115,13 +115,13 @@ func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objs, xerr := sharefactory.Load(task, handler.job.SafeGetService(), name)
+	objs, xerr := sharefactory.Load(task, handler.job.GetService(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -137,13 +137,13 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	svc := handler.job.SafeGetService()
+	svc := handler.job.GetService()
 	objs, xerr := sharefactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
@@ -204,14 +204,14 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
 	// Retrieve info about the share
-	objs, xerr := sharefactory.Load(task, handler.job.SafeGetService(), shareName)
+	objs, xerr := sharefactory.Load(task, handler.job.GetService(), shareName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -228,10 +228,10 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// }
 	//
 	// var target resources.Host
-	// if server.SafeGetName() == hostRef || server.SafeGetID() == hostRef {
+	// if server.GetName() == hostRef || server.GetID() == hostRef {
 	// 	target = server
 	// } else {
-	// 	if target, xerr = hostfactory.Load(task, handler.job.SafeGetService(), hostRef); xerr != nil {
+	// 	if target, xerr = hostfactory.Load(task, handler.job.GetService(), hostRef); xerr != nil {
 	// 		return nil, xerr
 	// 	}
 	// }
@@ -245,19 +245,19 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 		if !ok {
 	// 			return fail.InconsistentError("'*propertiesv1.HostsMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 		}
-	// 		if s, ok := targetMountsV1.RemoteMountsByShareID[objs.SafeGetID()]; ok {
-	// 			return fail.DuplicateError("already mounted in '%s:%s'", target.SafeGetName(), targetMountsV1.RemoteMountsByPath[s].Path)
+	// 		if s, ok := targetMountsV1.RemoteMountsByShareID[objs.GetID()]; ok {
+	// 			return fail.DuplicateError("already mounted in '%s:%s'", target.GetName(), targetMountsV1.RemoteMountsByPath[s].Path)
 	// 		}
 	// 		for _, i := range targetMountsV1.LocalMountsByPath {
 	// 			if i.Path == path {
 	// 				// Can't mount a share in place of a volume (by convention, nothing technically preventing it)
-	// 				return fail.DuplicateError("there is already a volume in path '%s:%s'", target.SafeGetName(), path)
+	// 				return fail.DuplicateError("there is already a volume in path '%s:%s'", target.GetName(), path)
 	// 			}
 	// 		}
 	// 		for _, i := range targetMountsV1.RemoteMountsByPath {
 	// 			if strings.Index(path, i.Path) == 0 {
 	// 				// Can't mount a share inside another share (at least by convention, if not technically)
-	// 				return fail.DuplicateError("there is already a share mounted in '%s:%s'", target.SafeGetName(), i.Path)
+	// 				return fail.DuplicateError("there is already a share mounted in '%s:%s'", target.GetName(), i.Path)
 	// 			}
 	// 		}
 	// 		return nil
@@ -277,7 +277,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// })
 	//
 	// var export, sharePath string
-	// shareID := objs.SafeGetID()
+	// shareID := objs.GetID()
 	// xerr = server.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	// 	var ip string
 	// 	innerXErr := props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
@@ -300,7 +300,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 			}
 	// 		}
 	// 		if ip == "" {
-	// 			return fail.NotFoundError("no IP address found on server '%s' to serve the share to host '%s'", server.SafeGetName(), target.SafeGetName())
+	// 			return fail.NotFoundError("no IP address found on server '%s' to serve the share to host '%s'", server.GetName(), target.GetName())
 	// 		}
 	// 		return nil
 	// 	})
@@ -314,7 +314,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 			return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 		}
 	//
-	// 		sharePath = hostSharesV1.ByID[objs.SafeGetID()].Path
+	// 		sharePath = hostSharesV1.ByID[objs.GetID()].Path
 	// 		export = ip + ":" + sharePath
 	// 		return nil
 	// 	})
@@ -356,8 +356,8 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 			return innerXErr
 	// 		}
 	//
-	// 		serverSharesV1.ByID[shareID].ClientsByName[target.SafeGetName()] = target.SafeGetID()
-	// 		serverSharesV1.ByID[shareID].ClientsByID[target.SafeGetID()] = target.SafeGetName()
+	// 		serverSharesV1.ByID[shareID].ClientsByName[target.GetName()] = target.GetID()
+	// 		serverSharesV1.ByID[shareID].ClientsByID[target.GetID()] = target.GetName()
 	// 		return nil
 	// 	})
 	// })
@@ -379,13 +379,13 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 			_ = xerr.AddConsequence(derr)
 	// 		}
 	//
-	// 		derr = nfsClient.Install(handler.job.SafeGetTask())
+	// 		derr = nfsClient.Install(handler.job.GetTask())
 	// 		if derr != nil {
 	// 			logrus.Warn(derr)
 	// 			_ = xerr.AddConsequence(derr)
 	// 		}
 	//
-	// 		derr = nfsClient.Unmount(handler.job.SafeGetTask(), export)
+	// 		derr = nfsClient.Unmount(handler.job.GetTask(), export)
 	// 		if derr != nil {
 	// 			logrus.Warn(derr)
 	// 			_ = xerr.AddConsequence(derr)
@@ -397,13 +397,13 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 				if !ok {
 	// 					return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 				}
-	// 				delete(serverSharesV1.ByID[shareID].ClientsByName, target.SafeGetName())
-	// 				delete(serverSharesV1.ByID[shareID].ClientsByID, target.SafeGetID())
+	// 				delete(serverSharesV1.ByID[shareID].ClientsByName, target.GetName())
+	// 				delete(serverSharesV1.ByID[shareID].ClientsByID, target.GetID())
 	// 				return nil
 	// 			})
 	// 		})
 	// 		if derr != nil {
-	// 			logrus.Warnf("failed to remove mounted share %s from host '%s' metadata", shareName, server.SafeGetName())
+	// 			logrus.Warnf("failed to remove mounted share %s from host '%s' metadata", shareName, server.GetName())
 	// 			_ = xerr.AddConsequence(derr)
 	// 		}
 	// 	}
@@ -420,7 +420,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 			targetMountsV1.Reset()
 	// 		}
 	// 		mount = propertiesv1.NewHostRemoteMount()
-	// 		mount.ShareID = objs.SafeGetID()
+	// 		mount.ShareID = objs.GetID()
 	// 		mount.Export = export
 	// 		mount.Path = mountPath
 	// 		mount.FileSystem = "nfs"
@@ -452,13 +452,13 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	objs, xerr := sharefactory.Load(task, handler.job.SafeGetService(), shareRef)
+	objs, xerr := sharefactory.Load(task, handler.job.GetService(), shareRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -472,10 +472,10 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	// Note: for the same reason, comparing target to server won't be necessary, hostfactory.Load() would return
 	//       the same instance
 	var target resources.Host
-	if server.SafeGetName() == hostRef || server.SafeGetID() == hostRef {
+	if server.GetName() == hostRef || server.GetID() == hostRef {
 		target = server
 	} else {
-		if target, xerr = hostfactory.Load(task, handler.job.SafeGetService(), hostRef); xerr != nil {
+		if target, xerr = hostfactory.Load(task, handler.job.GetService(), hostRef); xerr != nil {
 			return xerr
 		}
 	}
@@ -496,7 +496,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	// 			if !found {
 	// 				return fail.NotFoundError("failed to find data about share '%s'", shareRef)
 	// 			}
-	// 			shareID = share.ID
+	// 			shareID = share.GetID
 	// 			sharePath = share.Path
 	// 		}
 	// 		return nil
@@ -507,10 +507,10 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	// }
 	//
 	// var target resources.Host
-	// if server.SafeGetName() == hostRef || server.SafeGetID() == hostRef {
+	// if server.GetName() == hostRef || server.GetID() == hostRef {
 	// 	target = server
 	// } else {
-	// 	if target, xerr = hostfactory.Load(task, handler.job.SafeGetService(), hostRef); xerr != nil {
+	// 	if target, xerr = hostfactory.Load(task, handler.job.GetService(), hostRef); xerr != nil {
 	// 		return xerr
 	// 	}
 	// }
@@ -523,7 +523,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	// 		}
 	// 		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
 	// 		if !found {
-	// 			return fail.NotFoundError("not mounted on host '%s'", target.SafeGetName())
+	// 			return fail.NotFoundError("not mounted on host '%s'", target.GetName())
 	// 		}
 	//
 	// 		serverIP, innerXErr := server.GetAccessIP(task)
@@ -563,8 +563,8 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	// 		if !ok {
 	// 			return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 		}
-	// 		delete(serverSharesV1.ByID[shareID].ClientsByName, target.SafeGetName())
-	// 		delete(serverSharesV1.ByID[shareID].ClientsByID, target.SafeGetID())
+	// 		delete(serverSharesV1.ByID[shareID].ClientsByName, target.GetName())
+	// 		delete(serverSharesV1.ByID[shareID].ClientsByID, target.GetID())
 	// 		return nil
 	// 	})
 	// })
@@ -588,11 +588,11 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, xe
 		return nil, fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
 
-	task := handler.job.SafeGetTask()
+	task := handler.job.GetTask()
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 	defer fail.OnPanic(&xerr)
 
-	return sharefactory.Load(task, handler.job.SafeGetService(), shareRef)
+	return sharefactory.Load(task, handler.job.GetService(), shareRef)
 }

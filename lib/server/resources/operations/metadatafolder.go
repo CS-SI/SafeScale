@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -65,23 +66,43 @@ func newFolder(svc iaas.Service, path string) (*folder, fail.Error) {
 	return f, nil
 }
 
-// SafeGetService returns the service used by the folder
-func (f *folder) SafeGetService() iaas.Service {
+// IsNull ...
+// satisfies interface data.NullValue
+func (f *folder) IsNull() bool {
+	return f == nil || f.service.IsNull()
+}
+
+// GetService returns the service used by the folder
+func (f folder) GetService() iaas.Service {
+	if f.IsNull() {
+		return iaas.NullService()
+	}
 	return f.service
 }
 
-// SafeGetBucket returns the bucket used by the folder to store Object Storage
-func (f *folder) SafeGetBucket() objectstorage.Bucket {
-	return f.service.SafeGetMetadataBucket()
+// GetBucket returns the bucket used by the folder to store Object Storage
+func (f folder) GetBucket() abstract.ObjectStorageBucket {
+	if f.IsNull() {
+		return abstract.ObjectStorageBucket{}
+	}
+	return f.service.GetMetadataBucket()
 }
 
-// SafeGetPath returns the base path of the folder
-func (f *folder) SafeGetPath() string {
+// getBucket is the same than GetBucket without instance validation (for internal use)
+func (f folder) getBucket() abstract.ObjectStorageBucket {
+	return f.service.GetMetadataBucket()
+}
+
+// Path returns the base path of the folder
+func (f folder) Path() string {
+	if f.IsNull() {
+		return ""
+	}
 	return f.path
 }
 
 // absolutePath returns the fullpath to reach the 'path'+'name' starting from the folder path
-func (f *folder) absolutePath(path ...string) string {
+func (f folder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
@@ -95,9 +116,9 @@ func (f *folder) absolutePath(path ...string) string {
 }
 
 // Search tells if the object named 'name' is inside the ObjectStorage folder
-func (f *folder) Search(path string, name string) fail.Error {
+func (f folder) Search(path string, name string) fail.Error {
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, xerr := f.service.SafeGetMetadataBucket().List(absPath, objectstorage.NoPrefix)
+	list, xerr := f.service.ListObjects(f.getBucket().Name, absPath, objectstorage.NoPrefix)
 	if xerr != nil {
 		return xerr
 	}
@@ -115,7 +136,7 @@ func (f *folder) Search(path string, name string) fail.Error {
 
 // Delete removes metadata passed as parameter
 func (f *folder) Delete(path string, name string) fail.Error {
-	if xerr := f.service.SafeGetMetadataBucket().DeleteObject(f.absolutePath(path, name)); xerr != nil {
+	if xerr := f.service.DeleteObject(f.getBucket().Name, f.absolutePath(path, name)); xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
 	}
 	return nil
@@ -136,7 +157,7 @@ func (f *folder) Read(path string, name string, callback func([]byte) fail.Error
 	}
 
 	var buffer bytes.Buffer
-	_, xerr = f.service.SafeGetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
+	xerr = f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
 	if xerr != nil {
 		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
 	}
@@ -176,21 +197,28 @@ func (f *folder) Write(path string, name string, content []byte) fail.Error {
 	}
 
 	source := bytes.NewBuffer(data)
-	_, xerr := f.service.SafeGetMetadataBucket().WriteObject(f.absolutePath(path, name), source, int64(source.Len()), nil)
+	_, xerr := f.service.WriteObject(f.getBucket().Name, f.absolutePath(path, name), source, int64(source.Len()), nil)
 	return xerr
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
 func (f *folder) Browse(path string, callback folderDecoderCallback) fail.Error {
-	list, xerr := f.service.SafeGetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
+	absPath := f.absolutePath(path)
+	metadataBucket := f.getBucket()
+	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	if xerr != nil {
 		logrus.Errorf("Error browsing metadata: listing objects: %+v", xerr)
 		return xerr
 	}
 
+	// If there is a single entry equals to absolute path, then there is nothing, it's an empty folder
+	if len(list) == 1 && list[0] == absPath {
+		return nil
+	}
+
 	for _, i := range list {
 		var buffer bytes.Buffer
-		_, xerr = f.service.SafeGetMetadataBucket().ReadObject(i, &buffer, 0, 0)
+		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
 		if xerr != nil {
 			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", xerr)
 			return xerr

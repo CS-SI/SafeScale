@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"text/template"
+	txttmpl "text/template"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -44,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -129,7 +130,7 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 		action:    a,
 		commandCB: cb,
 	}
-	switch t.SafeGetTargetType() {
+	switch t.TargetType() {
 	case featuretargettype.CLUSTER:
 		w.cluster = t.(resources.Cluster)
 	case featuretargettype.NODE:
@@ -140,10 +141,10 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	}
 
 	w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
-	if !f.SafeGetSpecs().IsSet(w.rootKey) {
+	if !f.(*feature).Specs().IsSet(w.rootKey) {
 		msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.SafeGetName(), f.SafeGetDisplayFilename(), w.rootKey)
+		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
 	}
 
 	return &w, nil
@@ -156,7 +157,7 @@ func (w *worker) ConcernsCluster() bool {
 
 // CanProceed tells if the combination Feature/Target can work
 func (w *worker) CanProceed(s resources.FeatureSettings) fail.Error {
-	switch w.target.SafeGetTargetType() {
+	switch w.target.TargetType() {
 	case featuretargettype.CLUSTER:
 		xerr := w.validateContextForCluster()
 		if xerr == nil && !s.SkipSizingRequirements {
@@ -271,7 +272,7 @@ func (w *worker) identifyAllMasters() ([]resources.Host, fail.Error) {
 			return nil, xerr
 		}
 		for _, i := range masters {
-			host, xerr := LoadHost(w.feature.task, w.cluster.SafeGetService(), i)
+			host, xerr := LoadHost(w.feature.task, w.cluster.GetService(), i)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -316,7 +317,7 @@ func (w *worker) identifyAllNodes() ([]resources.Host, fail.Error) {
 			return nil, xerr
 		}
 		for _, i := range list {
-			host, xerr := LoadHost(w.feature.task, w.cluster.SafeGetService(), i)
+			host, xerr := LoadHost(w.feature.task, w.cluster.GetService(), i)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -363,7 +364,7 @@ func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 		// In cluster context
 		netCfg, xerr := w.cluster.GetNetworkConfig(w.feature.task)
 		if xerr == nil {
-			w.availableGateway, xerr = LoadHost(w.feature.task, w.cluster.SafeGetService(), netCfg.GatewayID)
+			w.availableGateway, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.GatewayID)
 		}
 		if xerr != nil {
 			return nil, xerr
@@ -415,7 +416,7 @@ func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 		if xerr != nil {
 			return nil, xerr
 		}
-		rn, xerr = LoadNetwork(w.feature.task, w.cluster.SafeGetService(), netCfg.NetworkID)
+		rn, xerr = LoadNetwork(w.feature.task, w.cluster.GetService(), netCfg.NetworkID)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -480,7 +481,7 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 		stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 		if !ok {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
-			return outcomes, fail.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey)
+			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
 		params := data.Map{
 			"stepName":  k,
@@ -576,7 +577,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	// Determine list of hosts concerned by the step
 	var hostsList []resources.Host
-	if w.target.SafeGetTargetType() == featuretargettype.NODE {
+	if w.target.TargetType() == featuretargettype.NODE {
 		hostsList, xerr = w.identifyHosts(map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = stepMap[yamlTargetsKeyword]
@@ -595,7 +596,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fail.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlTargetsKeyword)
 		}
 
 		hostsList, xerr = w.identifyHosts(stepT)
@@ -626,7 +627,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	} else {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fail.SyntaxError(msg, w.feature.SafeGetName(), w.feature.SafeGetDisplayFilename(), stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlRunKeyword)
 	}
 
 	// If there is an options file (for now specific to DCOS), upload it to the remote host
@@ -683,7 +684,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	templateCommand, xerr := normalizeScript(data.Map{
-		"reserved_Name":    w.feature.SafeGetName(),
+		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
 		"reserved_Step":    stepName,
@@ -759,7 +760,7 @@ func (w *worker) validateContextForCluster() fail.Error {
 			}
 		}
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.SafeGetName(), clusterFlavor.String())
+	msg := fmt.Sprintf("feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.GetName(), clusterFlavor.String())
 	return fail.NotAvailableError(msg)
 }
 
@@ -777,7 +778,7 @@ func (w *worker) validateContextForHost() fail.Error {
 	if ok {
 		return nil
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.SafeGetName())
+	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.GetName())
 	// logrus.Println(msg)
 	return fail.NotAvailableError(msg)
 }
@@ -853,7 +854,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 		return fail.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
-	svc := w.cluster.SafeGetService()
+	svc := w.cluster.GetService()
 	netprops, xerr := w.cluster.GetNetworkConfig(w.feature.task)
 	if xerr != nil {
 		return xerr
@@ -916,7 +917,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
 				return xerr
 			}
-			primaryGatewayVariables["ShortHostname"] = h.SafeGetName()
+			primaryGatewayVariables["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
@@ -935,7 +936,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				return xerr
 			}
 
-			primaryGatewayVariables["Hostname"] = h.SafeGetName() + domain
+			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
 			tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 				"ctrl": primaryKongController,
@@ -951,7 +952,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
 					return xerr
 				}
-				secondaryGatewayVariables["ShortHostname"] = h.SafeGetName()
+				secondaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain = ""
 				xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
@@ -969,7 +970,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				if xerr != nil {
 					return xerr
 				}
-				secondaryGatewayVariables["Hostname"] = h.SafeGetName() + domain
+				secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 
 				tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 					"ctrl": secondaryKongController,
@@ -1122,9 +1123,9 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 		// parse then execute the template
 		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
-		r, err := template.New("normalize_script").Parse(tmpl)
-		if err != nil {
-			return "", fail.SyntaxError("error parsing bash template: %s", err.Error())
+		r, xerr := template.Parse("normalize_script", tmpl)
+		if xerr != nil {
+			return "", fail.SyntaxError("error parsing bash template: %s", xerr.Error())
 		}
 		featureScriptTemplate.Store(r)
 		anon = featureScriptTemplate.Load()
@@ -1138,7 +1139,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 	params["reserved_BashLibrary"] = bashLibrary
 
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*template.Template).Execute(dataBuffer, params)
+	err = anon.(*txttmpl.Template).Execute(dataBuffer, params)
 	if err != nil {
 		return "", fail.ToError(err)
 	}

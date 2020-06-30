@@ -36,9 +36,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -218,7 +218,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)'", req.Name, req.CIDR)
 		}
 		// ... and if CIDR is inside VPC's one
-		if !utils.CIDROverlap(*vpcnetDesc, *networkDesc) {
+		if !netretry.CIDROverlap(*vpcnetDesc, *networkDesc) {
 			return nil, fail.InvalidRequestError("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR)
 		}
 		if vpcnetDesc.IP.Equal(networkDesc.IP) {
@@ -241,7 +241,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 		limit = 1 << bitShift
 
 		for i = uint(1); i < limit; i++ {
-			newIPNet, xerr = utils.NthIncludedSubnet(*vpcnetDesc, bitShift, i)
+			newIPNet, xerr = netretry.NthIncludedSubnet(*vpcnetDesc, bitShift, i)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to choose a CIDR for the subnet")
 			}
@@ -310,7 +310,7 @@ func validateNetworkName(req abstract.NetworkRequest) (bool, fail.Error) {
 func wouldOverlap(allSubnets []subnets.Subnet, subnet net.IPNet) fail.Error {
 	for _, s := range allSubnets {
 		_, sDesc, _ := net.ParseCIDR(s.CIDR)
-		if utils.CIDROverlap(subnet, *sDesc) {
+		if netretry.CIDROverlap(subnet, *sDesc) {
 			return fail.OverloadError("would intersect with '%s (%s)'", s.Name, s.CIDR)
 		}
 	}
@@ -459,8 +459,8 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
 	// }
 
 	// Calculate IP address for gateway
-	n := utils.IPv4ToUInt32(network)
-	gw := utils.UInt32ToIPv4(n + 1)
+	n := netretry.IPv4ToUInt32(network)
+	gw := netretry.UInt32ToIPv4(n + 1)
 
 	dnsList := s.cfgOpts.DNSList
 	if len(dnsList) == 0 {
@@ -675,51 +675,6 @@ func fromIntIPVersion(v int) ipversion.Enum {
 	}
 	return ipversion.IPv4
 }
-
-// // CreateGateway creates a gateway for a network.
-// // By current implementation, only one gateway can exist by Network because the object is intended
-// // to contain only one hostID
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-// 	if s == nil {
-// 		return nil, nil, fail.InvalidInstanceError()
-// 	}
-// 	if req.Network == nil {
-// 		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
-// 	}
-//
-// 	gwname := req.Name
-// 	if gwname == "" {
-// 		gwname = "gw-" + req.Network.Name
-// 	}
-//
-// 	tracer := concurrency.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
-// 	defer tracer.OnExitTrace()
-//
-// 	hostReq := abstract.HostRequest{
-// 		ImageID:      req.ImageID,
-// 		KeyPair:      req.KeyPair,
-// 		ResourceName: gwname,
-// 		TemplateID:   req.TemplateID,
-// 		Networks:     []*abstract.Network{req.Network},
-// 		PublicIP:     true,
-// 		Password:     "safescale", //VPL: for debug purposes, remove when not used anymore
-// 	}
-// 	host, userData, err := s.CreateHost(hostReq)
-// 	if err != nil {
-// 		switch err.(type) {
-// 		case fail.ErrInvalidRequest:
-// 			return nil, userData, err
-// 		default:
-// 			return nil, userData, fail.NewError("error creating gateway: %s", openstack.ProviderErrorToString(err))
-// 		}
-// 	}
-// 	return host, userData, err
-// }
-//
-// // DeleteGateway deletes the gateway associated with network identified by ID
-// func (s *Stack) DeleteGateway(id string) error {
-// 	return s.DeleteHost(id)
-// }
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,

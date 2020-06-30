@@ -33,11 +33,11 @@ import (
 
 // Job is the interface of a daemon job
 type Job interface {
-	SafeGetID() string
-	SafeGetName() string
-	SafeGetTask() concurrency.Task
-	SafeGetService() iaas.Service
-	SafeGetDuration() time.Duration
+	GetID() string
+	GetName() string
+	GetTask() concurrency.Task
+	GetService() iaas.Service
+	GetDuration() time.Duration
 	String() string
 	Abort() fail.Error
 	Aborted() bool
@@ -117,28 +117,28 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	return &nj, nil
 }
 
-// SafeGetID returns the id of the job (ie the uuid of gRPC message)
-func (j *job) SafeGetID() string {
+// GetID returns the id of the job (ie the uuid of gRPC message)
+func (j *job) GetID() string {
 	return j.uuid
 }
 
-// SafeGetName returns the name (== id) of the job
-func (j *job) SafeGetName() string {
+// GetName returns the name (== id) of the job
+func (j *job) GetName() string {
 	return j.uuid
 }
 
-// SafeGetTask returns the task instance
-func (j *job) SafeGetTask() concurrency.Task {
+// GetTask returns the task instance
+func (j *job) GetTask() concurrency.Task {
 	return j.task
 }
 
-// SafeGetService returns the service instance
-func (j *job) SafeGetService() iaas.Service {
+// GetService returns the service instance
+func (j *job) GetService() iaas.Service {
 	return j.service
 }
 
-// SafeGetDuration returns the duration of the job
-func (j *job) SafeGetDuration() time.Duration {
+// GetDuration returns the duration of the job
+func (j *job) GetDuration() time.Duration {
 	return time.Since(j.startTime)
 }
 
@@ -155,7 +155,7 @@ func (j *job) Abort() fail.Error {
 	return nil
 }
 
-// ErrAborted tells if the job has been aborted
+// Aborted tells if the job has been aborted
 func (j *job) Aborted() bool {
 	status, _ := j.task.GetStatus()
 
@@ -185,7 +185,7 @@ func register(job Job) fail.Error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
-	jobMap[job.SafeGetID()] = job
+	jobMap[job.GetID()] = job
 	return nil
 }
 
@@ -194,7 +194,7 @@ func deregister(job Job) fail.Error {
 	if job == nil {
 		return fail.InvalidParameterError("job", "cannot be nil")
 	}
-	return deregisterUUID(job.SafeGetID())
+	return deregisterUUID(job.GetID())
 }
 
 func deregisterUUID(uuid string) fail.Error {
@@ -230,7 +230,7 @@ func AbortJobByID(id string) fail.Error {
 func ListJobs() map[string]string {
 	listMap := map[string]string{}
 	for uuid, job := range jobMap {
-		listMap[uuid] = job.SafeGetName()
+		listMap[uuid] = job.GetName()
 	}
 	return listMap
 }

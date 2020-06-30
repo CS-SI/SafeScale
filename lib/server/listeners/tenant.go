@@ -89,7 +89,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.SafeGetTask()
+	task := job.GetTask()
 
 	tracer := concurrency.NewTracer(task, debug.ShouldTrace("listeners.tenant"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
@@ -136,7 +136,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 	}
 	defer job.Close()
 
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "").WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.tenant"), "").WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -175,7 +175,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	defer job.Close()
 
 	name := in.GetName()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -221,7 +221,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	defer job.Close()
 
 	name := in.GetName()
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -263,7 +263,7 @@ func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (em
 	}
 
 	name := currentTenant.name
-	tracer := concurrency.NewTracer(job.SafeGetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

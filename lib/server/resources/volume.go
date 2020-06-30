@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Volume links Object Storage folder and Volumes
+// Volume links Object Storage folder and getVolumes
 type Volume interface {
 	Metadata
 	data.Identifiable
@@ -39,7 +39,5 @@ type Volume interface {
 	GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error)        // returns the property containing where the volume is attached
 	GetSize(task concurrency.Task) (int, fail.Error)                                           // returns the size of volume in GB
 	GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error)                             // returns the speed of the volume (more or less the type of hardware)
-	SafeGetSize(task concurrency.Task) int                                                     // Same as GetSize() but without error handling (returned value is already correct but not necessarily significant)
-	SafeGetSpeed(task concurrency.Task) volumespeed.Enum                                       // Same as GetSpeed() but without error handling (returned value is already correct but not necessarily significant)
 	ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, fail.Error)            // converts volume to equivalent protocol message
 }

@@ -76,7 +76,7 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 					return retry.StopRetryError(err, "an unrecoverable network error has occurred")
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.SafeGetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+					err = fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
 					return err
 				}
 				return nil
@@ -89,9 +89,9 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
 		case *retry.ErrStopRetry:
-			return fail.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.SafeGetName())
+			return fail.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.GetName())
 		case *retry.ErrTimeout:
-			return fail.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.SafeGetName(), rfc.Remote)
+			return fail.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.GetName(), rfc.Remote)
 		}
 		return retryErr
 	}
@@ -141,7 +141,7 @@ func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) fail.Er
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil || retcode != 0 {
-		return fail.NewError("failed to remove file '%s:%s'", host.SafeGetName(), rfc.Remote)
+		return fail.NewError("failed to remove file '%s:%s'", host.GetName(), rfc.Remote)
 	}
 	return nil
 }
