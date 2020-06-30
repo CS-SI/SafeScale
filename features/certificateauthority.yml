@@ -270,7 +270,7 @@ feature:
                                     ln -s ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem /usr/local/share/ca-certificates/$CACN
                                     update-ca-certificates || sfFail 198
                                     ;;
-                                redhat|rhel|centos)
+                                redhat|rhel|centos|fedora)
                                     if [ $(sfGetFact "linux_version") = 6 ]; then
                                         TARGET=/usr/local/share/ca-certificates
                                     else

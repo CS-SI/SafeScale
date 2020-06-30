@@ -84,9 +84,16 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
                                     ;;
-                                centos|fedora|redhat|rhel)
+                                centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
                                         dnf install --enablerepo=epel -y ansible || sfFail 192
+                                    else
+                                        yum install -y ansible || sfFail 192
+                                    fi
+                                    ;;
+                                fedora)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf install -y ansible || sfFail 192
                                     else
                                         yum install -y ansible || sfFail 192
                                     fi

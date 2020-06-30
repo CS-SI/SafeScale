@@ -41,7 +41,7 @@ feature:
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf -y install ntpstat &>/dev/null || sfFail 192
+                                        dnf list installed | grep chrony &>/dev/null || sfFail 192
                                     else
                                         rpm -qa | grep ntpdate &>/dev/null || sfFail 192
                                     fi
@@ -70,9 +70,9 @@ feature:
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf install -y ntpstat || sfFail 192
+                                        dnf install -y chrony || sfFail 192
                                     else
-                                        rpm -qa | grep ntpdate || sfFail 192
+                                        yum install -y ntpdate || sfFail 192
                                     fi
                                     ;;
                                 *)
