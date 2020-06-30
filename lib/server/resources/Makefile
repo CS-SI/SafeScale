@@ -16,4 +16,3 @@ vet:
 clean:
 	@(cd enums && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))
-	@$(RM) rice-box.go

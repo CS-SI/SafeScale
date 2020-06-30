@@ -2,18 +2,18 @@ GO?=go
 
 .PHONY:	generate clean test
 
-all:	generate
+all:	#generate
 
 vet:
 	@$(GO) vet ./...
 
-generate: clean
-	@$(GO) generate
+#generate: clean
+#	@$(GO) generate
 
 test:
 	@$(GO) test
 
-clean:
-	@$(RM) rice-box.go || true
+#clean:
+#	@$(RM) rice-box.go || true
 
 

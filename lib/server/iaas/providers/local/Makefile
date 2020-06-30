@@ -1,8 +1,8 @@
 GO?=go
 
-.PHONY:	clean generate test vet
+.PHONY:	generate test vet
 
-generate: clean
+generate:
 	@$(GO) generate -tags libvirt ./...
 
 vet:
@@ -10,6 +10,3 @@ vet:
 
 test:
 	@$(GO) test
-
-clean:
-	@($(RM) rice-box.go || true)
