@@ -115,8 +115,8 @@ message NetworkDefinition{
     string cidr = 3;
     GatewayDefinition gateway = 4;
     bool fail_over = 5;
-    bool keep_on_failure = 6;
-    string domain = 7;
+    string domain = 6;
+    bool keep_on_failure = 7;
 }
 
 message GatewayDefinition{
@@ -194,8 +194,8 @@ message HostDefinition{
     bool force = 13;
     HostSizing sizing = 14; // Deprecated: replaced by sizing_as_string field
     string domain = 15;
-    string sizing_as_string = 16;
-    bool keep_on_failure = 17;
+    bool keep_on_failure = 16;
+    string sizing_as_string = 17;
 }
 
 
