@@ -187,6 +187,10 @@ var networkCreate = cli.Command{
 			Name:  "failover",
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If set, the resources are not deleted on failure (default: not set)",
+		},
 		cli.StringFlag{
 			Name: "S, sizing",
 			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
@@ -244,6 +248,7 @@ var networkCreate = cli.Command{
 				Name:    c.String("gwname"),
 				Sizing:  def.Sizing,
 			},
+			KeepOnFailure: c.Bool("keepo-on-failure"),
 		}
 		network, err := client.New().Network.Create(&netdef, temporal.GetExecutionTimeout())
 		if err != nil {

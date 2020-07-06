@@ -54,7 +54,7 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool, string) (*resources.Network, error)
+	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool, string, bool) (*resources.Network, error)
 	List(context.Context, bool) ([]*resources.Network, error)
 	Inspect(context.Context, string) (*resources.Network, error)
 	Delete(context.Context, string) error
@@ -79,7 +79,7 @@ func (handler *NetworkHandler) Create(
 	ctx context.Context,
 	name string, cidr string, ipVersion ipversion.Enum,
 	sizing resources.SizingRequirements, theos string, gwname string,
-	failover bool, domain string,
+	failover bool, domain string, keeponfailure bool,
 ) (network *resources.Network, err error) {
 
 	if handler == nil {
@@ -144,7 +144,7 @@ func (handler *NetworkHandler) Create(
 	newNetwork := network
 	// Starting from here, delete network if exiting with error
 	defer func() {
-		if err != nil {
+		if err != nil && !keeponfailure {
 			if newNetwork != nil {
 				derr := handler.service.DeleteNetwork(newNetwork.ID)
 				if derr != nil {
@@ -184,7 +184,7 @@ func (handler *NetworkHandler) Create(
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
-			if err != nil {
+			if err != nil && !keeponfailure {
 				if newNetwork != nil {
 					derr := handler.service.DeleteVIP(newNetwork.VIP)
 					if derr != nil {
@@ -204,7 +204,7 @@ func (handler *NetworkHandler) Create(
 
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
-		if err != nil {
+		if err != nil && !keeponfailure {
 			if mn != nil {
 				derr := mn.Delete()
 				if derr != nil {
@@ -346,7 +346,7 @@ func (handler *NetworkHandler) Create(
 
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
-			if err != nil {
+			if err != nil && !keeponfailure {
 				derr := handler.deleteGateway(primaryGateway)
 				if derr != nil {
 					switch derr.(type) {
@@ -384,7 +384,7 @@ func (handler *NetworkHandler) Create(
 
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
-				if err != nil {
+				if err != nil && !keeponfailure {
 					derr := handler.deleteGateway(secondaryGateway)
 					if derr != nil {
 						switch derr.(type) {

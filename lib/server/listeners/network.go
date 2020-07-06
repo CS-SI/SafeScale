@@ -105,6 +105,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		gwName,
 		in.FailOver,
 		in.Domain,
+		in.KeepOnFailure,
 	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
