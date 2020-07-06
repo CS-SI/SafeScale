@@ -579,184 +579,228 @@ network:
         use-routes: true
 {{- end}}
 EOF
+                fi
+            done
         fi
-      done
     fi
-  fi
 
-  if [[ ${AWS} -eq 1 ]]; then
-    echo "Looking for network..."
-    check_for_network || {
-      echo "PROVISIONING_ERROR: failed networkd cfg 0"
-      fail 196
-    }
-  fi
+    if [[ ${AWS} -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 0"
+            fail 196
+        }
+    fi
 
-  netplan generate && netplan apply || fail 198
+    netplan generate && netplan apply || fail 198
 
-  if [[ ${AWS} -eq 1 ]]; then
-    echo "Looking for network..."
-    check_for_network || {
-      echo "PROVISIONING_ERROR: failed networkd cfg 1"
-      fail 196
-    }
-  fi
+    if [[ ${AWS} -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 1"
+            fail 196
+        }
+    fi
 
-  configure_dhclient
+    configure_dhclient
 
-  if [[ ${AWS} -eq 1 ]]; then
-    echo "Looking for network..."
-    check_for_network || {
-      echo "PROVISIONING_ERROR: failed networkd cfg 2"
-      fail 196
-    }
-  fi
+    if [[ ${AWS} -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 2"
+            fail 196
+        }
+    fi
 
-  systemctl restart systemd-networkd
+    systemctl restart systemd-networkd
 
-  if [[ ${AWS} -eq 1 ]]; then
-    echo "Looking for network..."
-    check_for_network || {
-      echo "PROVISIONING_ERROR: failed networkd cfg 3"
-      fail 196
-    }
-  fi
+    if [[ ${AWS} -eq 1 ]]; then
+        echo "Looking for network..."
+        check_for_network || {
+            echo "PROVISIONING_ERROR: failed networkd cfg 3"
+            fail 196
+        }
+    fi
 
-  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 199)
+    reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 199)
 
-  echo done
+    echo done
 }
 
 # Configure network for redhat7-like distributions (rhel, centos, ...)
 configure_network_redhat() {
-  echo "Configuring network (redhat7-like)..."
+    echo "Configuring network (redhat7-like)..."
 
-  if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
-    disable_svc() {
-      chkconfig $1 off
-    }
-    enable_svc() {
-      chkconfig $1 on
-    }
-    stop_svc() {
-      service $1 stop
-    }
-    restart_svc() {
-      service $1 restart
-    }
-  else
-    disable_svc() {
-      systemctl disable $1
-    }
-    enable_svc() {
-      systemctl enable $1
-    }
-    stop_svc() {
-      systemctl stop $1
-    }
-    restart_svc() {
-      systemctl restart $1
-    }
-  fi
-
-  # Try installing network-scripts if available
-  case $LINUX_KIND in
-  redhat | rhel | centos | fedora)
-    if which dnf; then
-      dnf install -q -y network-scripts || true
+    if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
+        disable_svc() {
+            chkconfig $1 off
+        }
+        enable_svc() {
+            chkconfig $1 on
+        }
+        stop_svc() {
+            service $1 stop
+        }
+        restart_svc() {
+            service $1 restart
+        }
     else
-      yum install -q -y network-scripts || true
+        disable_svc() {
+            systemctl disable $1
+        }
+        enable_svc() {
+            systemctl enable $1
+        }
+        stop_svc() {
+            systemctl stop $1
+        }
+        restart_svc() {
+            systemctl restart $1
+        }
     fi
-    ;;
-  *) ;;
-  esac
 
-  # We don't want NetworkManager
-  stop_svc NetworkManager &>/dev/null
-  disable_svc NetworkManager &>/dev/null
-  yum remove -y NetworkManager &>/dev/null
+    NMCLI=$(which nmcli 2>/dev/null)
+    if [[ -z "${NMCLI}" ]]; then
+        configure_network_redhat_without_nmcli || { echo "PROVISIONING_ERROR: failed to set network without NetworkManager" && fail 200 }
+    else
+        configure_network_redhat_with_nmcli || { echo "PROVISIONING_ERROR: failed to set network with NetworkManager" && fail 200 }
+    fi
 
-  # Configure all network interfaces in dhcp
-  for IF in $NICS; do
-    if [[ $IF != "lo" ]]; then
-      cat >/etc/sysconfig/network-scripts/ifcfg-${IF} <<-EOF
+    enable_svc network
+    restart_svc network
+
+    reset_fw || { echo "PROVISIONING_ERROR: failure setting firewall" && fail 201 }
+
+    echo done
+}
+
+# Configure network for redhat 6- alike distributions (rhel, centos, ...)
+configure_network_redhat_without_nmcli() {
+    echo "Configuring network (RedHat 6- alike)..."
+
+    # We don't want NetworkManager if RedHat/CentOS < 7
+    stop_svc NetworkManager &>/dev/null
+    disable_svc NetworkManager &>/dev/null
+    yum remove -y NetworkManager &>/dev/null
+    echo "exclude=NetworkManager" >>/etc/yum.conf
+
+    if which dnf; then
+        dnf install -q -y network-scripts || true
+    else
+        yum install -q -y network-scripts || true
+    fi
+
+    # Configure all network interfaces in dhcp
+    for IF in $NICS; do
+        if [[ $IF != "lo" ]]; then
+            cat >/etc/sysconfig/network-scripts/ifcfg-${IF} <<-EOF
 DEVICE=$IF
 BOOTPROTO=dhcp
 ONBOOT=yes
 NM_CONTROLLED=no
 EOF
+          {{- if .DNSServers }}
+            i=1
+            {{- range .DNSServers }}
+            echo "DNS${i}={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+            i=$((i + 1))
+            {{- end }}
+          {{- else }}
+            EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+            if [[ -z ${EXISTING_DNS} ]]; then
+                echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+            else
+                echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+            fi
+          {{- end }}
+
+#          {{- if .AddGateway }}
+#            echo "GATEWAY={{ .DefaultRouteIP }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+#          {{- end}}
+        fi
+    done
+
+    configure_dhclient
+
+    {{- if .AddGateway }}
+    echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
+    {{- end }}
+
+    return 0
+}
+
+# Configure network for redhat7-like distributions (rhel, centos, ...)
+configure_network_redhat_with_nmcli() {
+    echo "Configuring network (RedHat 7+ alike with Network Manager)..."
+
+    # Do some cleanup inside /etc/sysconfig/network-scripts
+    CONNECTIONS=$(nmcli -f "NAME,DEVICE" -c no -t con)
+    for i in $CONNECTIONS; do
+        NAME=$(echo ${i} | cut ':' -f1)
+        DEVICE=$(echo ${i} | cut -d: -f2)
+        [[ -z "${DEVICE}" ]] && mv /etc/sysconfig/network-scripts/ifcfg-${NAME} /etc/sysconfig/network-scripts/disabled.ifcfg-${NAME}
+    done
+
+    # Configure all network interfaces in dhcp
+    for IF in $(nmcli -f 'DEVICE' -c no -t con); do
+        nmcli con mod "${IF}" ipv4.method auto || return 1
+        nmcli con mod "${IF}" connection.autoconnect yes || return 1
       {{- if .DNSServers }}
-      i=1
-      {{- range .DNSServers }}
-      echo "DNS$i={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
-      i=$((i + 1))
-      {{- end }}
+        {{- range .DNSServers }}
+        nmcli con mod "${IF}" ipv4.dns {{ . }} || return 1
+        {{- end }}
       {{- else }}
-      EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
-      if [[ -z ${EXISTING_DNS} ]]; then
-        echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
-      else
-        echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
-      fi
+        EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+        if [[ -z ${EXISTING_DNS} ]]; then
+            ${NMCLI} con mod "${IF}" ipv4.dns 1.1.1.1 || return 1
+        else
+            ${NMCLI} con mod "${IF}" ipv4.dns ${EXISTING_DNS} || return 1
+        fi
       {{- end }}
 
       {{- if .AddGateway }}
-      echo "GATEWAY={{ .DefaultRouteIP }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+        nmcli con modify ${IF} ipv4.gateway {{ .DefaultRouteIP }} || return 1
       {{- end}}
-    fi
-  done
+    done
 
-  configure_dhclient
+    configure_dhclient || return 1
 
-  {{- if .AddGateway }}
-  echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
-  {{- end }}
-
-  enable_svc network
-  restart_svc network
-
-  echo "exclude=NetworkManager" >>/etc/yum.conf
-
-  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 200)
-
-  echo done
+    return 0
 }
 
 check_for_ip() {
-  case $LINUX_KIND in
-  debian)
-    lsb_release -rs | grep "8." && return 0
-    ;;
-  *) ;;
+    case $LINUX_KIND in
+        debian)
+            lsb_release -rs | grep "8." && return 0
+            ;;
+        *) ;;
+    esac
 
-  esac
+    allip=$(ip -f inet -o addr show)
+    ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
 
-  allip=$(ip -f inet -o addr show)
-  ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
+    case $LINUX_KIND in
+        ubuntu)
+            if [[ $(lsb_release -rs | cut -d. -f1) -eq 16 ]]; then
+                if [[ $(echo $allip | grep $1) == "" ]]; then
+                    echo "Ubuntu 16.04 is expected to fail this test..."
+                    return 0
+                fi
+            fi
+            ;;
+        debian)
+            if [[ $(lsb_release -rs | cut -d. -f1) -eq 8 ]]; then
+                if [[ $(echo $allip | grep $1) == "" ]]; then
+                    echo "Debian 8 is expected to fail this test..."
+                    return 0
+                fi
+            fi
+            ;;
+        *) ;;
+    esac
 
-  case $LINUX_KIND in
-  ubuntu)
-    if [[ $(lsb_release -rs | cut -d. -f1) -eq 16 ]]; then
-      if [[ $(echo $allip | grep $1) == "" ]]; then
-        echo "Ubuntu 16.04 is expected to fail this test..."
-        return 0
-      fi
-    fi
-    ;;
-  debian)
-    if [[ $(lsb_release -rs | cut -d. -f1) -eq 8 ]]; then
-      if [[ $(echo $allip | grep $1) == "" ]]; then
-        echo "Debian 8 is expected to fail this test..."
-        return 0
-      fi
-    fi
-    ;;
-  *) ;;
-
-  esac
-
-  [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
-  return 0
+    [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
+    return 0
 }
 
 # Checks network is set correctly
@@ -1060,14 +1104,14 @@ EOF
 }
 
 configure_dns_systemd_resolved() {
-  echo "Configuring systemd-resolved..."
+    echo "Configuring systemd-resolved..."
 
   {{- if not .DefaultRouteIP }}
-  rm -f /etc/resolv.conf
-  ln -s /run/systemd/resolve/resolv.conf /etc
+    rm -f /etc/resolv.conf
+    ln -s /run/systemd/resolve/resolv.conf /etc
   {{- end }}
 
-  cat <<-'EOF' >/etc/systemd/resolved.conf
+    cat <<-'EOF' >/etc/systemd/resolved.conf
 [Resolve]
 {{- if .DNSServers }}
 DNS={{ range .DNSServers }}{{ . }} {{ end }}
@@ -1078,185 +1122,186 @@ Cache=yes
 DNSStubListener=yes
 EOF
 
-  # VPL: need to determine if it's a good idea to update resolv.conf with search domain...
-  #      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
-  #    DNSDOMAIN=$(hostname -d)
-  #    if [[ ! -z "$DNSDOMAIN" ]]; then
-  #        cat <<-EOF >>/etc/systemd/resolved.conf
-  #Domains=$DNSDOMAIN
-  #EOF
-  #    fi
+    # VPL: need to determine if it's a good idea to update resolv.conf with search domain...
+    #      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
+    #    DNSDOMAIN=$(hostname -d)
+    #    if [[ ! -z "$DNSDOMAIN" ]]; then
+    #        cat <<-EOF >>/etc/systemd/resolved.conf
+    #Domains=$DNSDOMAIN
+    #EOF
+    #    fi
 
-  systemctl restart systemd-resolved
-  echo done
+    systemctl restart systemd-resolved
+    echo done
 }
 
 install_drivers_nvidia() {
-  case $LINUX_KIND in
-  ubuntu)
-    sfFinishPreviousInstall
-    add-apt-repository -y ppa:graphics-drivers &>/dev/null
-    sfApt update || fail 201
-    sfApt -y install nvidia-410 &>/dev/null || {
-      sfApt -y install nvidia-driver-410 &>/dev/null || fail 201
-    }
-    ;;
+    case $LINUX_KIND in
+        ubuntu)
+            sfFinishPreviousInstall
+            add-apt-repository -y ppa:graphics-drivers &>/dev/null
+            sfApt update || fail 201
+            sfApt -y install nvidia-410 &>/dev/null || {
+                sfApt -y install nvidia-driver-410 &>/dev/null || fail 201
+            }
+            ;;
 
-  debian)
-    if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-      echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
-      rmmod nouveau
-    fi
-    sfWaitForApt && apt update &>/dev/null
-    sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 202
-    dpkg --add-architecture i386 &>/dev/null
-    sfWaitForApt && apt update &>/dev/null
-    sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 203
-    wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 204
-    bash NVIDIA-Linux-x86_64-410.78.run -s || fail 205
-    ;;
+        debian)
+            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+                echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
+                rmmod nouveau
+            fi
+            sfWaitForApt && apt update &>/dev/null
+            sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 202
+            dpkg --add-architecture i386 &>/dev/null
+            sfWaitForApt && apt update &>/dev/null
+            sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 203
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 204
+            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 205
+            ;;
 
-  redhat | rhel | centos | fedora)
-    if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-      echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
-      dracut --force
-      rmmod nouveau
-    fi
-    yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 206
-    wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207
-    # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
-    if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
-      bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208
-    fi
-    rm -f NVIDIA-Linux-x86_64-410.78.run
-    ;;
-  *)
-    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-    fail 209
-    ;;
-  esac
+        redhat | rhel | centos | fedora)
+            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+                echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
+                dracut --force
+                rmmod nouveau
+            fi
+            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 206
+            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 207
+            # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
+            if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
+                bash NVIDIA-Linux-x86_64-410.78.run -s || fail 208
+            fi
+            rm -f NVIDIA-Linux-x86_64-410.78.run
+            ;;
+
+        *)
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+            fail 209
+            ;;
+    esac
 }
 
 early_packages_update() {
-  check_network_reachable
+    check_network_reachable
 
-  # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
-  cat >/etc/gai.conf <<-EOF
+    # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
+    cat >/etc/gai.conf <<-EOF
 precedence ::ffff:0:0/96 100
 scopev4 ::ffff:169.254.0.0/112  2
 scopev4 ::ffff:127.0.0.0/104    2
 scopev4 ::ffff:0.0.0.0/96       14
 EOF
 
-  case $LINUX_KIND in
-  debian)
-    # Disable interactive installations
-    export DEBIAN_FRONTEND=noninteractive
-    # # Force use of IPv4 addresses when installing packages
-    # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
+    case $LINUX_KIND in
+        debian)
+            # Disable interactive installations
+            export DEBIAN_FRONTEND=noninteractive
+            # # Force use of IPv4 addresses when installing packages
+            # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    sfApt update
-    # Force update of systemd, pciutils
-    sfApt install -q -y systemd pciutils || fail 210
-    # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-    ensure_network_connectivity
-    check_network_reachable
-    ;;
+            sfApt update
+            # Force update of systemd, pciutils
+            sfApt install -q -y systemd pciutils || fail 210
+            # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+            ensure_network_connectivity
+            check_network_reachable
+            ;;
 
-  ubuntu)
-    # Disable interactive installations
-    export DEBIAN_FRONTEND=noninteractive
-    # # Force use of IPv4 addresses when installing packages
-    # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
+        ubuntu)
+            # Disable interactive installations
+            export DEBIAN_FRONTEND=noninteractive
+            # # Force use of IPv4 addresses when installing packages
+            # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    sfApt update
-    # Force update of systemd, pciutils and netplan
-    if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-      sfApt install -y systemd pciutils netplan.io || fail 211
-    else
-      sfApt install -y systemd pciutils || fail 212
-    fi
-    # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-    ensure_network_connectivity
-    check_network_reachable
+            sfApt update
+            # Force update of systemd, pciutils and netplan
+            if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
+                sfApt install -y systemd pciutils netplan.io || fail 211
+            else
+                sfApt install -y systemd pciutils || fail 212
+            fi
+            # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+            ensure_network_connectivity
+            check_network_reachable
 
-    # # Security updates ...
-    # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
-    ;;
+            # # Security updates ...
+            # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
+            ;;
 
-  redhat | rhel | centos | fedora)
-    # # Force use of IPv4 addresses when installing packages
-    # echo "ip_resolve=4" >>/etc/yum.conf
+        redhat | rhel | centos | fedora)
+            # # Force use of IPv4 addresses when installing packages
+            # echo "ip_resolve=4" >>/etc/yum.conf
 
-    # Force update of systemd and pciutils
-    if which dnf; then
-      dnf install -q -y pciutils yum-utils || fail 213
-    else
-      yum install -q -y pciutils yum-utils || fail 213
-    fi
+            # Force update of systemd and pciutils
+            if which dnf; then
+                dnf install -q -y pciutils yum-utils || fail 213
+            else
+                yum install -q -y pciutils yum-utils || fail 213
+            fi
 
-    if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
-      if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
-        echo "Skipping upgrade of systemd when only 1 core is available"
-      else
-        # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-        if which dnf; then
-          op=-1
-          msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
-          echo $msg | grep "Nothing to do" && return
-          [ $op -ne 0 ] && sfFail 213
-        else
-          op=-1
-          msg=$(yum install -q -y systemd 2>&1) && op=$? || true
-          echo $msg | grep "Nothing to do" && return
-          [ $op -ne 0 ] && sfFail 213
-        fi
-        ensure_network_connectivity
-        check_network_reachable
-      fi
-    else
-      if which dnf; then
-        op=-1
-        msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
-        echo $msg | grep "Nothing to do" && return
-        [ $op -ne 0 ] && sfFail 213
-      else
-        op=-1
-        msg=$(yum install -q -y systemd 2>&1) && op=$? || true
-        echo $msg | grep "Nothing to do" && return
-        [ $op -ne 0 ] && sfFail 213
-      fi
-      ensure_network_connectivity
-      check_network_reachable
-    fi
+            if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
+                if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
+                    echo "Skipping upgrade of systemd when only 1 core is available"
+                else
+                    # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+                    if which dnf; then
+                        op=-1
+                        msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                        echo $msg | grep "Nothing to do" && return
+                        [ $op -ne 0 ] && sfFail 213
+                    else
+                        op=-1
+                        msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                        echo $msg | grep "Nothing to do" && return
+                        [ $op -ne 0 ] && sfFail 213
+                    fi
+                    ensure_network_connectivity
+                    check_network_reachable
+                fi
+            else
+                if which dnf; then
+                    op=-1
+                    msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                    echo $msg | grep "Nothing to do" && return
+                    [ $op -ne 0 ] && sfFail 213
+                else
+                    op=-1
+                    msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                    echo $msg | grep "Nothing to do" && return
+                    [ $op -ne 0 ] && sfFail 213
+                fi
+                ensure_network_connectivity
+                check_network_reachable
+            fi
 
-    # # install security updates
-    # yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
-    ;;
-  esac
-  sfProbeGPU
+            # # install security updates
+            # yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
+            ;;
+    esac
+    sfProbeGPU
 }
 
 install_packages() {
-  case $LINUX_KIND in
-  ubuntu | debian)
-    sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
-    ;;
-  redhat | rhel | centos)
-    if which dnf; then
-      dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
-    else
-      yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
-    fi
-    ;;
-  fedora)
-    dnf install -y -q wget jq time zip &>/dev/null || fail 215
-    ;;
-  *)
-    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-    fail 216
-    ;;
-  esac
+    case $LINUX_KIND in
+        ubuntu | debian)
+            sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
+            ;;
+        redhat | rhel | centos)
+            if which dnf; then
+                dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
+            else
+                yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
+            fi
+            ;;
+        fedora)
+            dnf install -y -q wget jq time zip &>/dev/null || fail 215
+            ;;
+        *)
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+            fail 216
+            ;;
+    esac
 }
 
 add_common_repos() {
