@@ -167,94 +167,93 @@ EOF
 }
 
 is_ip_private() {
-  ip=$1
-  ipv=$(sfIP2long $ip)
+    ip=$1
+    ipv=$(sfIP2long $ip)
 
   {{ if .EmulatedPublicNet}}
-  r=$(sfCidr2iprange {{ .EmulatedPublicNet }})
-  bv=$(sfIP2long $(cut -d- -f1 <<<$r))
-  ev=$(sfIP2long $(cut -d- -f2 <<<$r))
-  [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
-  {{- end }}
-  for r in "192.168.0.0-192.168.255.255" "172.16.0.0-172.31.255.255" "10.0.0.0-10.255.255.255"; do
+    r=$(sfCidr2iprange {{ .EmulatedPublicNet }})
     bv=$(sfIP2long $(cut -d- -f1 <<<$r))
     ev=$(sfIP2long $(cut -d- -f2 <<<$r))
     [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
-  done
-  return 1
+  {{- end }}
+    for r in "192.168.0.0-192.168.255.255" "172.16.0.0-172.31.255.255" "10.0.0.0-10.255.255.255"; do
+      bv=$(sfIP2long $(cut -d- -f1 <<<$r))
+      ev=$(sfIP2long $(cut -d- -f2 <<<$r))
+      [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
+    done
+    return 1
 }
 
 identify_nics() {
-  NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
-  NICS=${NICS/[[:cntrl:]]/ }
+    NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
+    NICS=${NICS/[[:cntrl:]]/ }
 
-  for IF in ${NICS}; do
-    IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    [[ ! -z $IP ]] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
-  done
-  PR_IFs=$(echo ${PR_IFs} | xargs) || true
-  PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
-  PU_IP=$(ip a | grep ${PU_IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-  if [[ ! -z ${PU_IP} ]]; then
-    if is_ip_private $PU_IP; then
-      PU_IF=
+    for IF in ${NICS}; do
+        IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+        [[ ! -z $IP ]] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
+    done
+    PR_IFs=$(echo ${PR_IFs} | xargs) || true
+    PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
+    PU_IP=$(ip a | grep ${PU_IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+    if [[ ! -z ${PU_IP} ]]; then
+        if is_ip_private $PU_IP; then
+            PU_IF=
 
-      NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
-      if [[ -z $NO404 ]]; then
-        # Works with FlexibleEngine and potentially with AWS (not tested yet)
-        PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
-        [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-      fi
+            NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
+            if [[ -z $NO404 ]]; then
+                # Works with FlexibleEngine and potentially with AWS (not tested yet)
+                PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
+                [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+            fi
+        fi
     fi
-  fi
-  [[ -z ${PR_IFs} ]] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
+    [[ -z ${PR_IFs} ]] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
 
-  # Keeps track of interfaces identified for future scripting use
-  echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
-  echo "$PU_IF" >${SF_VARDIR}/state/public_nics
+    # Keeps track of interfaces identified for future scripting use
+    echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
+    echo "$PU_IF" >${SF_VARDIR}/state/public_nics
 
-  if [[ ! -z ${PU_IP} ]]; then
-    if [[ -z ${PU_IF} ]]; then
-      if [[ -z ${NO404} ]]; then
-        echo "It seems AWS"
+    if [[ ! -z ${PU_IP} ]]; then
+        if [[ -z ${PU_IF} ]]; then
+            if [[ -z ${NO404} ]]; then
+                echo "It seems AWS"
+                AWS=1
+            else
+                AWS=0
+            fi
+        fi
+    fi
+
+    if [[ "{{.ProviderName}}" == "aws" ]]; then
+        echo "It actually IS AWS"
         AWS=1
-      else
+    else
+        echo "It is NOT AWS"
         AWS=0
-      fi
     fi
-  fi
 
-  if [[ "{{.ProviderName}}" == "aws" ]]; then
-    echo "It actually IS AWS"
-    AWS=1
-  else
-    echo "It is NOT AWS"
-    AWS=0
-  fi
-
-  echo "NICS identified: $NICS"
-  echo "    private NIC(s): $PR_IFs"
-  echo "    public NIC: $PU_IF"
-  echo
+    echo "NICS identified: $NICS"
+    echo "    private NIC(s): $PR_IFs"
+    echo "    public NIC: $PU_IF"
+    echo
 }
 
 substring_diff() {
-  read -a l1 <<<$1
-  read -a l2 <<<$2
-  echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
+    read -a l1 <<<$1
+    read -a l2 <<<$2
+    echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
 }
 
 collect_original_packages() {
-  case $LINUX_KIND in
-  debian | ubuntu)
-    dpkg-query -l >${SF_VARDIR}/log/packages_installed_before.phase2.list
-    ;;
-  redhat | rhel | centos | fedora)
-    rpm -qa | sort >${SF_VARDIR}/log/packages_installed_before.phase2.list
-    ;;
-  *) ;;
-
-  esac
+    case $LINUX_KIND in
+        debian | ubuntu)
+            dpkg-query -l >${SF_VARDIR}/log/packages_installed_before.phase2.list
+            ;;
+        redhat | rhel | centos | fedora)
+            rpm -qa | sort >${SF_VARDIR}/log/packages_installed_before.phase2.list
+            ;;
+        *) ;;
+    esac
 }
 
 ensure_curl_is_installed() {
@@ -373,45 +372,47 @@ update_fqdn() {
 }
 
 configure_network() {
-  case $LINUX_KIND in
-  debian | ubuntu)
-    if systemctl status systemd-networkd &>/dev/null; then
-      configure_network_systemd_networkd
-    elif systemctl status networking &>/dev/null; then
-      configure_network_debian
-    else
-      echo "PROVISIONING_ERROR: failed to determine how to configure network"
-      fail 192
-    fi
-    ;;
+    case $LINUX_KIND in
+        debian | ubuntu)
+            if systemctl status systemd-networkd &>/dev/null; then
+                configure_network_systemd_networkd
+            elif systemctl status networking &>/dev/null; then
+                configure_network_debian
+            else
+                echo "PROVISIONING_ERROR: failed to determine how to configure network"
+                fail 192
+            fi
+            ;;
 
-  redhat | rhel | centos)
-    # Network configuration
-    if systemctl status systemd-networkd &>/dev/null; then
-      configure_network_systemd_networkd
-    else
-      configure_network_redhat
-    fi
-    ;;
-  fedora)
-    configure_network_redhat
-    ;;
-  *)
-    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-    fail 193
-    ;;
-  esac
+        redhat | rhel | centos)
+            # Network configuration
+            if systemctl status systemd-networkd &>/dev/null; then
+                configure_network_systemd_networkd
+            else
+                configure_network_redhat
+            fi
+            ;;
 
-  {{- if .IsGateway }}
-  configure_as_gateway || fail 194
-  install_keepalived || fail 195
-  {{- end }}
+        fedora)
+            configure_network_redhat
+        ;;
 
-  update_fqdn
+        *)
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+            fail 193
+            ;;
+    esac
 
-  check_for_network || {
-    echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
-  }
+    {{- if .IsGateway }}
+    configure_as_gateway || fail 194
+    install_keepalived || fail 195
+    {{- end }}
+
+    update_fqdn
+
+    check_for_network || {
+        echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
+    }
 }
 
 # Configure network for Debian distribution
@@ -471,21 +472,21 @@ EOF
 
 # Configure network using systemd-networkd
 configure_network_systemd_networkd() {
-  echo "Configuring network (using netplan and systemd-networkd)..."
+    echo "Configuring network (using netplan and systemd-networkd)..."
 
-  {{- if .IsGateway }}
-  ISGW=1
-  {{- else}}
-  ISGW=0
-  {{- end}}
+    {{- if .IsGateway }}
+    ISGW=1
+    {{- else}}
+    ISGW=0
+    {{- end}}
 
-  mkdir -p /etc/netplan
-  rm -f /etc/netplan/*
+    mkdir -p /etc/netplan
+    rm -f /etc/netplan/*
 
-  # Recreate netplan configuration with last netplan version and more settings
-  for IF in ${NICS}; do
-    if [[ "$IF" == "$PU_IF" ]]; then
-      cat <<-EOF >/etc/netplan/10-${IF}-public.yaml
+    # Recreate netplan configuration with last netplan version and more settings
+    for IF in ${NICS}; do
+        if [[ "$IF" == "$PU_IF" ]]; then
+            cat <<-EOF >/etc/netplan/10-${IF}-public.yaml
 network:
   version: 2
   renderer: networkd
@@ -499,8 +500,8 @@ network:
           use-dns: false
           use-routes: true
 EOF
-    else
-      cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
+        else
+            cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
 network:
   version: 2
   renderer: networkd
@@ -523,24 +524,24 @@ network:
         use-routes: true
 {{- end}}
 EOF
+        fi
+    done
+
+    if [[ "{{.ProviderName}}" == "aws" ]]; then
+        echo "It actually IS AWS"
+        AWS=1
+    else
+        echo "It is NOT AWS"
+        AWS=0
     fi
-  done
 
-  if [[ "{{.ProviderName}}" == "aws" ]]; then
-    echo "It actually IS AWS"
-    AWS=1
-  else
-    echo "It is NOT AWS"
-    AWS=0
-  fi
-
-  if [[ $AWS -eq 1 ]]; then
-    if [[ $ISGW -eq 0 ]]; then
-      rm -f /etc/netplan/*
-      # Recreate netplan configuration with last netplan version and more settings
-      for IF in ${NICS}; do
-        if [[ "$IF" == "$PU_IF" ]]; then
-          cat <<-EOF >/etc/netplan/10-$IF-public.yaml
+    if [[ $AWS -eq 1 ]]; then
+        if [[ $ISGW -eq 0 ]]; then
+            rm -f /etc/netplan/*
+            # Recreate netplan configuration with last netplan version and more settings
+            for IF in ${NICS}; do
+                if [[ "$IF" == "$PU_IF" ]]; then
+                    cat <<-EOF >/etc/netplan/10-$IF-public.yaml
 network:
   version: 2
   renderer: networkd
@@ -554,8 +555,8 @@ network:
           use-dns: true
           use-routes: true
 EOF
-        else
-          cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
+                else
+                    cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
 network:
   version: 2
   renderer: networkd
