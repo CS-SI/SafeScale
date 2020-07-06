@@ -248,7 +248,7 @@ var networkCreate = cli.Command{
 				Name:    c.String("gwname"),
 				Sizing:  def.Sizing,
 			},
-			KeepOnFailure: c.Bool("keepo-on-failure"),
+			KeepOnFailure: c.Bool("keep-on-failure"),
 		}
 		network, err := client.New().Network.Create(&netdef, temporal.GetExecutionTimeout())
 		if err != nil {
