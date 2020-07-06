@@ -304,6 +304,7 @@ func (handler *NetworkHandler) Create(
 		"request": primaryRequest,
 		"sizing":  sizing,
 		"primary": true,
+		"nokeep": !keeponfailure,
 	})
 	if err != nil {
 		return nil, err
@@ -329,6 +330,7 @@ func (handler *NetworkHandler) Create(
 			"request": secondaryRequest,
 			"sizing":  sizing,
 			"primary": false,
+			"nokeep": !keeponfailure,
 		})
 		if err != nil {
 			return nil, err
@@ -534,6 +536,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	request := inputs["request"].(resources.GatewayRequest)
 	sizing := inputs["sizing"].(resources.SizingRequirements)
 	primary := inputs["primary"].(bool)
+	nokeep := inputs["nokeep"].(bool)
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
 	gw, userData, err := handler.service.CreateGateway(request, &sizing)
@@ -548,7 +551,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 
 	// Starting from here, deletes the primary gateway if exiting with error
 	defer func() {
-		if err != nil {
+		if err != nil && nokeep {
 			logrus.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
 			derr := handler.service.DeleteHost(gw.ID)
 			if derr != nil {
