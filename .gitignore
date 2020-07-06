@@ -121,3 +121,5 @@ lib/security/gateway/client/safe-security
 
 # macOS files
 .DS_Store
+
+cli/safescaled/safescaled__d__v
