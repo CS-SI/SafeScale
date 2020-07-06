@@ -311,6 +311,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		Gateway:  sizing,
 		FailOver: !gwFailoverDisabled,
 		Domain:   req.Domain,
+		KeepOnFailure: req.KeepOnFailure,
 	}
 	clientNetwork := clientInstance.Network
 	network, err := clientNetwork.Create(&def, temporal.GetExecutionTimeout())
@@ -523,7 +524,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Step 2: waits for gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		_ = mastersTask.Abort() // FIXME Handle aborts
+		_ = mastersTask.Abort() // FIXME: Handle aborts
 		_ = privateNodesTask.Abort()
 		return primaryGatewayStatus
 	}

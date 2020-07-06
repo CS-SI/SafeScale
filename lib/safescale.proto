@@ -93,6 +93,7 @@ message NetworkDefinition{
     GatewayDefinition gateway = 4;
     bool fail_over = 5;
     string domain = 6;
+    bool keep_on_failure = 7;
 }
 
 message GatewayDefinition{

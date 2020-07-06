@@ -487,10 +487,7 @@ func (handler *HostHandler) Create(
 		}
 	}
 	defer func() {
-		if err != nil {
-			if keeponfailure {
-				return
-			}
+		if err != nil && !keeponfailure {
 			retryErr := retryOnCommunicationFailure(
 				func() error {
 					return handler.service.DeleteHost(host.ID)
@@ -537,10 +534,7 @@ func (handler *HostHandler) Create(
 
 	// Starting from here, remove metadata if exiting with error
 	defer func() {
-		if err != nil {
-			if keeponfailure {
-				return
-			}
+		if err != nil && !keeponfailure {
 			derr := mh.Delete()
 			if derr != nil {
 				logrus.Errorf("failed to remove host metadata after host creation failure")
