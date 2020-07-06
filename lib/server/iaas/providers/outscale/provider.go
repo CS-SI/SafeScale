@@ -21,6 +21,7 @@ import (
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
@@ -91,7 +92,20 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 	compute := remap(opt["compute"])
 	metadata := remap(opt["metadata"])
 	network := remap(opt["network"])
-	objectstorage := remap(opt["objectstorage"])
+	objstorage := remap(opt["objstorage"])
+
+	region := get(compute, "Region")
+	if _, ok := metadata["Bucket"]; !ok {
+		stackName := get(identity, "provider")
+		domainName := get(compute, "Domain")
+		projectName := get(compute, "ProjectName")
+		var err error
+		metadata["Bucket"], err = objectstorage.BuildMetadataBucketName(stackName, region, domainName, projectName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	options := &outscale.ConfigurationOptions{
 		Identity: outscale.Credentials{
 			AccessKey: get(identity, "AccessKey"),
@@ -118,17 +132,17 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 			VPCName: get(network, "VPCName", "safecale-net"),
 		},
 		ObjectStorage: outscale.StorageConfiguration{
-			AccessKey: get(objectstorage, "AccessKey", get(identity, "AccessKey")),
-			SecretKey: get(objectstorage, "SecretKey", get(identity, "SecretKey")),
-			Endpoint:  get(objectstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region"))),
-			Type:      get(objectstorage, "Type", "s3"),
+			AccessKey: get(objstorage, "AccessKey", get(identity, "AccessKey")),
+			SecretKey: get(objstorage, "SecretKey", get(identity, "SecretKey")),
+			Endpoint:  get(objstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region"))),
+			Type:      get(objstorage, "Type", "s3"),
 		},
 		Metadata: outscale.MetadataConfiguration{
-			AccessKey: get(metadata, "AccessKey", get(objectstorage, "AccessKey", get(identity, "AccessKey"))),
-			SecretKey: get(metadata, "SecretKey", get(objectstorage, "SecretKey", get(identity, "SecretKey"))),
-			Endpoint:  get(metadata, "Endpoint", get(objectstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region")))),
-			Type:      get(metadata, "Type", get(objectstorage, "Type", "s3")),
-			Bucket:    get(metadata, "Bucket", "safescale"),
+			AccessKey: get(metadata, "AccessKey", get(objstorage, "AccessKey", get(identity, "AccessKey"))),
+			SecretKey: get(metadata, "SecretKey", get(objstorage, "SecretKey", get(identity, "SecretKey"))),
+			Endpoint:  get(metadata, "Endpoint", get(objstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region")))),
+			Type:      get(metadata, "Type", get(objstorage, "Type", "s3")),
+			Bucket:    get(metadata, "Bucket", "0.safescale"),
 			CryptKey:  get(metadata, "CryptKey", "safescale"),
 		},
 	}
