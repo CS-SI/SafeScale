@@ -366,11 +366,11 @@ disable_cloudinit_network_autoconf
 disable_services
 create_user
 
-compatible_network
+#compatible_network
 
 ensure_network_connectivity || true
 
-compatible_network
+#compatible_network
 
 touch /etc/cloud/cloud-init.disabled
 
