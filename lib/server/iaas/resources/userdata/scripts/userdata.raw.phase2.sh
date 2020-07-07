@@ -1156,7 +1156,7 @@ EOF
 
     sfApt update
     # Force update of systemd, pciutils and netplan
-    if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
+    if dpkg --compare-versions $(sfGetFact "distrib_version") ge 17.10; then
       sfApt install -y systemd pciutils netplan.io || fail 211
     else
       sfApt install -y systemd pciutils || fail 212

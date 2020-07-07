@@ -1032,6 +1032,7 @@ func normalizeError(in error) (err error) {
 	}
 	return nil
 }
+
 // Delete deletes host referenced by ref
 func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()

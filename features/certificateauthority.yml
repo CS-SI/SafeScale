@@ -271,7 +271,7 @@ feature:
                                     update-ca-certificates || sfFail 198
                                     ;;
                                 redhat|rhel|centos|fedora)
-                                    if [ $(sfGetFact "linux_version") = 6 ]; then
+                                    if [ $(sfGetFact "distrib_version") = 6 ]; then
                                         TARGET=/usr/local/share/ca-certificates
                                     else
                                         TARGET=/etc/pki/ca-trust/source/anchors
