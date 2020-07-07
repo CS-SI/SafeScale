@@ -877,7 +877,8 @@ sfDetectFacts() {
         . /etc/os-release
         FACTS["linux_kind"]=$ID
         LINUX_KIND=${ID,,}
-        FACTS["linux_version"]=$VERSION_ID
+        FACTS["version_id"]=$VERSION_ID
+        FACTS["distrib_version"]=$VERSION_ID
         VERSION_ID=$VERSION_ID
         FULL_VERSION_ID=$VERSION_ID
         [ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
@@ -904,7 +905,8 @@ sfDetectFacts() {
             }
         fi
         FACTS["linux_kind"]=${LINUX_KIND,,}
-        FACTS["linux_version"]=$VERSION_ID
+        FACTS["version_id"]=$VERSION_ID
+        FACTS["distrib_version"]=$VERSION_ID
     fi
 
     # Some facts about system

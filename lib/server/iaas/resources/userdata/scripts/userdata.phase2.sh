@@ -909,21 +909,22 @@ install_keepalived() {
   esac
 
   case $LINUX_KIND in
-  ubuntu | debian)
-    sfApt update && sfApt -y install keepalived || return 1
-    ;;
+    ubuntu | debian)
+      sfApt update && sfApt -y install keepalived || return 1
+      ;;
 
-  redhat | rhel | centos | fedora)
-    if which dnf; then
-      dnf install -q -y keepalived || return 1
-    else
-      yum install -q -y keepalived || return 1
-    fi
-    ;;
-  *)
-    echo "Unsupported Linux distribution '$LINUX_KIND'!"
-    return 1
-    ;;
+    redhat | rhel | centos | fedora)
+      if which dnf; then
+        dnf install -q -y keepalived || return 1
+      else
+        yum install -q -y keepalived || return 1
+      fi
+      mkdir -p /var/run/keepalived &>/dev/null
+      ;;
+    *)
+      echo "Unsupported Linux distribution '$LINUX_KIND'!"
+      return 1
+      ;;
   esac
 
   NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
@@ -979,7 +980,7 @@ EOF
     # Use systemd to ensure keepalived is restarted if network is restarted
     # (otherwise, keepalived is in undetermined state)
     mkdir -p /etc/systemd/system/keepalived.service.d
-    if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+    if [[ $(sfGetFact "redhat_like") -eq 1 ]]; then
       cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
 [Unit]
 Requires=network.service
@@ -1214,16 +1215,16 @@ EOF
             # # Force use of IPv4 addresses when installing packages
             # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-            sfApt update
-            # Force update of systemd, pciutils and netplan
-            if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-                sfApt install -y systemd pciutils netplan.io || fail 211
-            else
-                sfApt install -y systemd pciutils || fail 212
-            fi
-            # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-            ensure_network_connectivity
-            check_network_reachable
+    sfApt update
+    # Force update of systemd, pciutils and netplan
+    if dpkg --compare-versions $(sfGetFact "distrib_version") ge 17.10; then
+      sfApt install -y systemd pciutils netplan.io || fail 211
+    else
+      sfApt install -y systemd pciutils || fail 212
+    fi
+    # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+    ensure_network_connectivity
+    check_network_reachable
 
             # # Security updates ...
             # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
