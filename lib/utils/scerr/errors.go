@@ -712,6 +712,28 @@ func SyntaxError(msg string) ErrSyntax {
 	}
 }
 
+// ErrUnknown is used when the error is not yet categorized
+type ErrUnknown struct {
+	ErrCore
+}
+
+// AddConsequence adds an error 'err' to the list of consequences
+func (e ErrUnknown) AddConsequence(err error) error {
+	e.ErrCore = e.ErrCore.Reset(e.ErrCore.AddConsequence(err))
+	return e
+}
+
+// UnknownError creates a ErrSyntax
+func UnknownError(msg string) ErrUnknown {
+	return ErrUnknown{
+		ErrCore: ErrCore{
+			message:      "uncategorized error: "+msg,
+			cause:        nil,
+			consequences: []error{},
+		},
+	}
+}
+
 func getPartToRemove() string {
 	if anon := removePart.Load(); anon != nil {
 		return anon.(string)
