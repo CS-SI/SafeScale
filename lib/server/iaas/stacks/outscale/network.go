@@ -18,13 +18,14 @@ package outscale
 
 import (
 	"fmt"
-	"github.com/antihax/optional"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/antihax/optional"
 	"github.com/outscale-dev/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
+	"reflect"
 )
 
 func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
@@ -38,7 +39,24 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 		CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
 	})
 	if err != nil {
-		return nil, err
+		switch realErr := err.(type) {
+		case osc.GenericOpenAPIError:
+			switch model := realErr.Model().(type) {
+			case osc.ErrorResponse:
+				switch model.Errors[0].Code {
+				case "9044":
+					return nil, scerr.DuplicateError(fmt.Sprintf("there is already a network '%s'", req.CIDR))
+				default:
+					merr := model.Errors[0]
+					reqId := model.ResponseContext.RequestId
+					return nil, scerr.UnknownError(fmt.Sprintf("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId))
+				}
+			default:
+				return nil, scerr.UnknownError(fmt.Sprintf("from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr.Model()), realErr.Error()))
+			}
+		default:
+			return nil, err
+		}
 	}
 
 	defer func() {
@@ -93,6 +111,22 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	}
 	if secgroup == nil {
 		return nil, err
+	}
+
+	// Check if CIDR intersects with VPC cidr; if not, error
+	vpc, err := s.getVpc(s.Options.Network.VPCID)
+	if err != nil {
+		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s'", req.CIDR), err)
+	}
+	ok, err := utils.DoCIDRsIntersect(vpc.IpRange, req.CIDR)
+	if err != nil {
+		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, vpc.IpRange), nil)
+	}
+	if !ok {
+		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, vpc.IpRange), nil)
+	}
+	if vpc.IpRange == req.CIDR {
+		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': identical to VPC CIDR, choose a subnet of '%s'", req.CIDR, vpc.IpRange), nil)
 	}
 
 	subnet, err := s.createSubnet(req, s.Options.Network.VPCID)
