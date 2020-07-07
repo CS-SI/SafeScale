@@ -100,6 +100,16 @@ func IsCIDRRoutable(cidr string) (bool, error) {
 	return true, nil
 }
 
+// DoCIDRsIntersect tells if the 2 CIDR passed as parameter intersect
+func DoCIDRsIntersect(cidr1, cidr2 string) (bool, error) {
+	_, cidr1Desc, _ := net.ParseCIDR(cidr1)
+	_, cidr2Desc, err := net.ParseCIDR(cidr2)
+	if err != nil {
+		return false, err
+	}
+	return cidr2Desc.Contains(cidr1Desc.IP) || cidr1Desc.Contains(cidr2Desc.IP), nil
+}
+
 func init() {
 	notRoutables := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
 

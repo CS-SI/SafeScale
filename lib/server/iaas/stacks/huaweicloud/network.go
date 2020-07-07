@@ -18,6 +18,7 @@ package huaweicloud
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"net"
 	"strings"
 
@@ -204,13 +205,20 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 	}
 
 	// Checks if CIDR is valid...
-	_, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
-	_, networkDesc, err := net.ParseCIDR(req.CIDR)
+	//_, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
+	//_, networkDesc, err := net.ParseCIDR(req.CIDR)
+	//if err != nil {
+	//	return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err)
+	//}
+	//// .. and if CIDR is inside VPC's one
+	//if !cidrIntersects(vpcnetDesc, networkDesc) {
+	//	return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil)
+	//}
+	ok, err := utils.DoCIDRsIntersect(s.vpc.CIDR, req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err)
+		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil)
 	}
-	// .. and if CIDR is inside VPC's one
-	if !cidrIntersects(vpcnetDesc, networkDesc) {
+	if !ok {
 		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil)
 	}
 
@@ -401,14 +409,15 @@ func convertNumberToIPv4(n uint32) net.IP {
 	return IP
 }
 
-// cidrIntersects tells if the 2 CIDR passed as parameter intersect
-func cidrIntersects(n1, n2 *net.IPNet) bool {
-	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
-}
+// VPL: replaced by utils.DoCIDRsIntersect
+//// cidrIntersects tells if the 2 CIDR passed as parameter intersect
+//func cidrIntersects(n1, n2 *net.IPNet) bool {
+//	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
+//}
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
-	network, networkDesc, _ := net.ParseCIDR(cidr)
+	network, _, _ := net.ParseCIDR(cidr)
 
 	// Validates CIDR regarding the existing subnets
 	subnetworks, err := s.listSubnets()
@@ -416,8 +425,12 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 		return nil, err
 	}
 	for _, s := range *subnetworks {
-		_, sDesc, _ := net.ParseCIDR(s.CIDR)
-		if cidrIntersects(networkDesc, sDesc) {
+		//_, sDesc, _ := net.ParseCIDR(s.CIDR)
+		intersects, err := utils.DoCIDRsIntersect(cidr, s.CIDR)
+		if err != nil {
+			return nil, err
+		}
+		if intersects {
 			return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet '%s (%s)', would intersect with '%s (%s)'", name, cidr, s.Name, s.CIDR), nil)
 		}
 	}
