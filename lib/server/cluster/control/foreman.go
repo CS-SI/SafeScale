@@ -53,7 +53,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -379,7 +378,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
-	kp, err = crypt.GenerateRSAKeyPair(kpName)
+	kp, err = resources.NewKeyPair(kpName)
 	if err != nil {
 		return err
 	}
