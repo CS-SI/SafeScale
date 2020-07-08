@@ -179,6 +179,7 @@ The valid keywords in this section are :
 > | `Password` | MANDATORY, CLIENT |
 > | `SecretKey` | MANDATORY, CLIENT |
 > | `Username` | MANDATORY, CLIENT |
+> | `UserID` | MANDATORY, CLIENT |
 > | `AlternateApiApplicationKey` | OPTIONAL, CLIENT |
 > | `AlternateApiApplicationSecret` | OPTIONAL, CLIENT |
 > | `AlternateApiConsumerKey` | OPTIONAL, CLIENT |
@@ -272,6 +273,7 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | `"local"` |
 > | `"openstack"` |
 > | `"opentelekom"` |
+> | `"outscale"` |
 > | `"ovh"` |
 > | `"gcp"` |
 
@@ -337,7 +339,7 @@ May be used in sections `tenants.identity`, `tenants.objectstorage` and `tenants
 
 ### `ProviderNetwork`
 
-Contains the name of the provider network connected host resources to public network.<br>
+Contains the name of the provider network connecting host resources to public network.<br>
 Is meaningful for some providers:
 
 > | |
@@ -362,6 +364,16 @@ If set to true, allow the scanner to scan the tenant ([cf. SCANNER](SCANNER.md))
 Contains the username for the authentication necessary to connect to the provider.
 
 It (or one of its aliases) must be present in section `tenants.identity`, and may be present in sections `tenants.objectstorage` and `tenants.metadata`.
+
+### `UserID`
+
+Contains the ID of the user.<br/>
+Is meaningful for some providers:
+
+> | |
+> | --- |
+> | `outscale` |
+>
 
 ### `Tenant`
 
