@@ -92,15 +92,20 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 	compute := remap(opt["compute"])
 	metadata := remap(opt["metadata"])
 	network := remap(opt["network"])
-	objstorage := remap(opt["objstorage"])
+	objstorage := remap(opt["objectstorage"])
 
 	region := get(compute, "Region")
+	if region == "" {
+		return nil, scerr.NewErrCore("'Region' parameter in section 'compute' of the tenant is mandatory", nil, nil)
+	}
 	if _, ok := metadata["Bucket"]; !ok {
 		stackName := get(identity, "provider")
-		domainName := get(compute, "Domain")
-		projectName := get(compute, "ProjectName")
+		userID := get(identity, "UserID")
+		if userID == "" {
+			return nil, scerr.NewErrCore("'UserID' parameter in section 'identity' of the tenant is mandatory", nil, nil)
+		}
 		var err error
-		metadata["Bucket"], err = objectstorage.BuildMetadataBucketName(stackName, region, domainName, projectName)
+		metadata["Bucket"], err = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +119,7 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 		Compute: outscale.ComputeConfiguration{
 			URL:                     get(compute, "URL", "outscale.com/api/latest"),
 			Service:                 get(compute, "Service", "api"),
-			Region:                  get(compute, "Region"),
+			Region:                  region,
 			Subregion:               get(compute, "Subregion"),
 			DNSList:                 getList(compute, "DNSList"),
 			DefaultTenancy:          get(compute, "DefaultTenancy", "default"),
@@ -129,7 +134,7 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 		Network: outscale.NetworConfiguration{
 			VPCCIDR: get(network, "VPCCIDR", "192.168.0.0/16"),
 			VPCID:   get(network, "VPCID"),
-			VPCName: get(network, "VPCName", "safecale-net"),
+			VPCName: get(network, "VPCName", "safecale-vpc"),
 		},
 		ObjectStorage: outscale.StorageConfiguration{
 			AccessKey: get(objstorage, "AccessKey", get(identity, "AccessKey")),
