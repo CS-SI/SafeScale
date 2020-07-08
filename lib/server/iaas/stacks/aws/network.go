@@ -151,7 +151,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}
 	}()
 
-	// FIXME Create private and public subnets here...
+	// FIXME: Create private and public subnets here...
 	_, parentNet, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return nil, scerr.Wrap(err, "error parsing requested CIDR")
