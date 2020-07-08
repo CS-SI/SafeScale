@@ -176,7 +176,6 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 
 // GetAuthenticationOptions returns the auth options
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
-
 	opts := p.Stack.GetAuthenticationOptions()
 	cfg := providers.ConfigMap{}
 	cfg.Set("TenantName", opts.TenantName)

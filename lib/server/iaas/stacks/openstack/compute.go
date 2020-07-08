@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	gc "github.com/gophercloud/gophercloud"
@@ -275,6 +274,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	return flvList, nil
 }
 
+// TODO: restore code that call Openstack API to create keypair (even if we will not use it in SafeScale)
 // CreateKeyPair creates a key pair (no import)
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if s == nil {
@@ -684,6 +684,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn().OnExitTrace()()
 
@@ -722,21 +725,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		})
 	}
 
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			return nil, userData, scerr.Errorf(msg, err)
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = s.CreateKeyPair(name)
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			return nil, userData, scerr.Errorf(msg, err)
-		}
-	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -45,6 +46,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -456,6 +458,10 @@ func (handler *HostHandler) Create(
 		domain = "." + domain
 	}
 
+	keypair, err := createKeyPair(name)
+	if err != nil {
+		return nil, err
+	}
 	hostRequest := resources.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
@@ -465,6 +471,7 @@ func (handler *HostHandler) Create(
 		Networks:       networks,
 		DefaultRouteIP: defaultRouteIP,
 		DefaultGateway: primaryGateway,
+		KeyPair:        keypair,
 	}
 
 	var userData *userdata.Content
@@ -794,6 +801,22 @@ func (handler *HostHandler) Create(
 	}
 
 	return host, nil
+}
+
+// createKeyPair creates a *resources.KeyPair
+func createKeyPair(prefix string) (*resources.KeyPair, error) {
+	id, err := uuid.NewV4()
+	if err != nil {
+		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
+		return nil, scerr.Errorf(msg, err)
+	}
+
+	if prefix == "" {
+		prefix = "kp"
+	}
+	name := fmt.Sprintf("%s_%s", prefix, id)
+
+	return crypt.GenerateRSAKeyPair(name)
 }
 
 func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) ([]string, []string) {

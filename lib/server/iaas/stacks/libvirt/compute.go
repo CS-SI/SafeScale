@@ -302,7 +302,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 	// priKey := string(priKeyPem)
 
-	kp, err := crypt.GenerateRSAKeyPair(name)
+	kp, err := resources.NewKeyPair(name)
 	if err != nil {
 		return nil, err
 	}
@@ -315,17 +315,17 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 //-------------HOST MANAGEMENT------------------------------------------------------------------------------------------
@@ -771,6 +771,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 
 	resourceName := request.ResourceName
 	hostName := request.HostName
@@ -808,14 +811,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	//----Initialize----
-	if keyPair == nil {
-		var err error
-		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
-		if err != nil {
-			return nil, userData, scerr.Errorf(fmt.Sprintf("KeyPair creation failed : %s", err.Error()), err)
-		}
-		request.KeyPair = keyPair
-	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {

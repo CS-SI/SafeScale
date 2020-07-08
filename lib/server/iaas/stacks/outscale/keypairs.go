@@ -17,11 +17,7 @@
 package outscale
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"github.com/antihax/optional"
 
@@ -29,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/outscale-dev/osc-sdk-go/osc"
-	"golang.org/x/crypto/ssh"
 )
 
 // CreateKeyPair creates and import a key pair
@@ -44,40 +39,30 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	publicKey := privateKey.PublicKey
-	pub, _ := ssh.NewPublicKey(&publicKey)
-	pubBytes := ssh.MarshalAuthorizedKey(pub)
-	pubKey := string(pubBytes)
+	keypair, err := resources.NewKeyPair(name)
+	if err != nil {
+		return nil, err
+	}
+	return keypair, s.ImportKeyPair(keypair)
+}
 
-	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	priKeyPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: priBytes,
-		},
-	)
-	priKey := string(priKeyPem)
+// ImportKeyPair is used to import an existing KeyPair in Outscale
+func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if keypair == nil {
+		return scerr.InvalidParameterError("keyair", "cannot be nil")
+	}
+
 	createKeypairRequest := osc.CreateKeypairRequest{
-		KeypairName: name,
-		PublicKey:   base64.StdEncoding.EncodeToString(pubBytes),
+		KeypairName: keypair.Name,
+		PublicKey:   base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)),
 	}
 	_, _, err := s.client.KeypairApi.CreateKeypair(s.auth, &osc.CreateKeypairOpts{
 		CreateKeypairRequest: optional.NewInterface(createKeypairRequest),
 	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	// kp.OK.Keypair.
-	// _ = ioutil.WriteFile("/tmp/key.pem", []byte(kp.OK.Keypair.PrivateKey), 0700)
-
-	return &resources.KeyPair{
-		ID:         name,
-		Name:       name,
-		PublicKey:  pubKey,
-		PrivateKey: priKey,
-	}, nil
-
+	return normalizeError(err)
 }
 
 // GetKeyPair returns the key pair identified by id
