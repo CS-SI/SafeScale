@@ -68,7 +68,7 @@ func (s *Stack) ListImages(bool) ([]resources.Image, error) {
 	}
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(normalizeError(err), "failed to list images")
 	}
 	var images []resources.Image
 	for _, omi := range res.Images {
@@ -305,10 +305,20 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*resources.Image, error) {
+func (s *Stack) GetImage(id string) (_ *resources.Image, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	defer func() {
+		if err != nil {
+			err = scerr.Wrap(err, fmt.Sprintf("failed to get image '%s'", id))
+		}
+	}()
+
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
 		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
 			DryRun: false,
@@ -318,7 +328,7 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 		}),
 	})
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get image '%s'", id))
 	}
 	if len(res.Images) != 1 {
 		return nil, scerr.InconsistentError("more than one image with the same id")
@@ -403,9 +413,8 @@ func (s *Stack) createNIC(request *resources.HostRequest, net *resources.Network
 	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
 		CreateNicRequest: optional.NewInterface(nicRequest),
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	// primary := deviceNumber == 0
 	return &res.Nic, nil
@@ -455,7 +464,7 @@ func (s *Stack) deleteNic(nic *osc.Nic) error {
 	_, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
 		DeleteNicRequest: optional.NewInterface(request),
 	})
-	return err
+	return normalizeError(err)
 }
 
 func hostState(state string) hoststate.Enum {
@@ -583,7 +592,7 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 			}),
 		})
 		if err != nil {
-			createErr = err
+			createErr = normalizeError(err)
 			break
 		}
 	}
@@ -610,7 +619,7 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) (err erro
 		Speed: s.Options.Compute.DefaultVolumeSpeed,
 	})
 	if err != nil {
-		return err
+		return normalizeError(err)
 	}
 	defer func() {
 		if err != nil {
@@ -648,7 +657,7 @@ func (s *Stack) getNICS(vmID string) ([]osc.Nic, error) {
 	}
 	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{ReadNicsRequest: optional.NewInterface(request)})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	return res.Nics, nil
 }
@@ -657,7 +666,7 @@ func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, error) {
 
 	resIP, _, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	linkPublicIpRequest := osc.LinkPublicIpRequest{
 		NicId:      nic.NicId,
@@ -674,8 +683,8 @@ func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, error) {
 			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
 		})
 		if err != nil {
-			logrus.Warnf("Cannot delete public ip %s: %v", resIP.PublicIp.PublicIpId, err)
-			return nil, err
+			logrus.Warnf("Cannot delete public ip %s: %v", resIP.PublicIp.PublicIpId, normalizeError(err))
+			return nil, normalizeError(err)
 		}
 	}
 	return &resIP.PublicIp, nil
@@ -893,7 +902,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 		CreateVmsRequest: optional.NewInterface(vmsRequest),
 	})
 	if err != nil {
-		return nil, userData, err
+		return nil, userData, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to create host '%s'", request.ResourceName))
 	}
 
 	if len(resVM.Vms) == 0 {
@@ -1004,7 +1013,7 @@ func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
 		ReadVmsRequest: optional.NewInterface(readVmsRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(vm.Vms) == 0 {
 		return nil, nil
@@ -1023,7 +1032,7 @@ func (s *Stack) deleteHost(id string) error {
 		DeleteVmsRequest: optional.NewInterface(request),
 	})
 	if err != nil {
-		return err
+		return normalizeError(err)
 	}
 	return s.WaitForHostState(id, hoststate.TERMINATED)
 }
@@ -1157,7 +1166,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		}),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(res.Vms) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No host named %s", name))
@@ -1197,7 +1206,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	}
 	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	var hosts []*resources.Host
 	for _, vm := range res.Vms {
@@ -1229,7 +1238,7 @@ func (s *Stack) StopHost(id string) error {
 	_, _, err := s.client.VmApi.StopVms(s.auth, &osc.StopVmsOpts{
 		StopVmsRequest: optional.NewInterface(stopVmsRequest),
 	})
-	return err
+	return normalizeError(err)
 }
 
 // StartHost starts the host identified by id
@@ -1246,7 +1255,7 @@ func (s *Stack) StartHost(id string) error {
 	_, _, err := s.client.VmApi.StartVms(s.auth, &osc.StartVmsOpts{
 		StartVmsRequest: optional.NewInterface(startVmsRequest),
 	})
-	return err
+	return normalizeError(err)
 }
 
 // RebootHost Reboot host
@@ -1263,7 +1272,7 @@ func (s *Stack) RebootHost(id string) error {
 	_, _, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
 		RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
 	})
-	return err
+	return normalizeError(err)
 }
 
 func (s *Stack) perfFromFreq(freq float32) int {
@@ -1299,7 +1308,7 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 		UpdateVmRequest: optional.NewInterface(updateVmRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 
 	return s.InspectHost(id)

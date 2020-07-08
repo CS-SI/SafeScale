@@ -48,18 +48,18 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
 		CreateNicRequest: optional.NewInterface(createNicRequest),
 	})
-
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(res.Nic.PrivateIps) < 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
 	nic := res.Nic
 	// ip, err := s.addPublicIP(&nic)
-	if len(res.Nic.PrivateIps) < 1 {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
-	}
+	// VPL: twice ?
+	// if len(res.Nic.PrivateIps) < 1 {
+	//	return nil, scerr.InconsistentError("Inconsistent provider response")
+	// }
 
 	err = s.setResourceTags(nic.NicId, map[string]string{
 		"name": name,
@@ -96,7 +96,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
-		return 0, err
+		return 0, normalizeError(err)
 	}
 	// No nics linked to the VM
 	if len(res.Nics) == 0 {
@@ -211,7 +211,7 @@ func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
 		DeleteNicRequest: optional.NewInterface(deleteNicRequest),
 	})
 	if err != nil {
-		return err
+		return normalizeError(err)
 	}
 	deletePublicIpRequest := osc.DeletePublicIpRequest{
 		PublicIp: vip.PublicIP,

@@ -3,6 +3,7 @@ package outscale
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
@@ -181,4 +182,30 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 		az[r.SubregionName] = true
 	}
 	return az, nil
+}
+
+func normalizeError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	switch realErr := err.(type) {
+	case osc.GenericOpenAPIError:
+		switch model := realErr.Model().(type) {
+		case osc.ErrorResponse:
+			switch model.Errors[0].Code {
+			case "9044":
+				return scerr.InvalidRequestError("not included in VPC CIDR")
+			default:
+				merr := model.Errors[0]
+				reqId := model.ResponseContext.RequestId
+				return  scerr.UnknownError(fmt.Sprintf("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId))
+			}
+		default:
+			return scerr.UnknownError(fmt.Sprintf("from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr.Model()), realErr.Error()))
+		}
+	default:
+		return err
+	}
+
 }

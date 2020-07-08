@@ -30,7 +30,7 @@ func (s *Stack) getResourceTags(id string) (map[string]string, error) {
 	})
 	tags := make(map[string]string)
 	if err != nil {
-		return tags, err
+		return tags, normalizeError(err)
 	}
 	for _, tag := range resp.Tags {
 		tags[tag.Key] = tag.Value
@@ -62,7 +62,7 @@ func (s *Stack) setResourceTags(id string, tags map[string]string) error {
 	_, _,err := s.client.TagApi.CreateTags(s.auth, &osc.CreateTagsOpts{
 		CreateTagsRequest: optional.NewInterface(createTagsRequest),
 	})
-	return err
+	return normalizeError(err)
 }
 
 func unwrapTags(tags []osc.ResourceTag) map[string]string {

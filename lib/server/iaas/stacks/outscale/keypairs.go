@@ -66,7 +66,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		CreateKeypairRequest: optional.NewInterface(createKeypairRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	// kp.OK.Keypair.
 	// _ = ioutil.WriteFile("/tmp/key.pem", []byte(kp.OK.Keypair.PrivateKey), 0700)
@@ -95,7 +95,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		ReadKeypairsRequest: optional.NewInterface(readKeypairsRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(resp.Keypairs) > 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
@@ -118,7 +118,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	var kps []resources.KeyPair
 	for _, kp := range resp.Keypairs {
@@ -145,5 +145,5 @@ func (s *Stack) DeleteKeyPair(id string) error {
 	_, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
 		DeleteVmsRequest: optional.NewInterface(deleteKeypairRequest),
 	})
-	return err
+	return normalizeError(err)
 }
