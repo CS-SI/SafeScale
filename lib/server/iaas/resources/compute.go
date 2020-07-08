@@ -17,10 +17,16 @@
 package resources
 
 import (
+	"fmt"
+
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -30,6 +36,27 @@ type KeyPair struct {
 	Name       string `json:"name,omitempty"`
 	PrivateKey string `json:"private_key,omitempty"`
 	PublicKey  string `json:"public_key,omitempty"`
+}
+
+// IsNull tells if the keypair is a null value
+func (kp *KeyPair) IsNull() bool {
+	return kp == nil || kp.Name == "" || kp.PublicKey == "" || kp.PrivateKey == ""
+}
+
+// NewKeyPair creates a *resources.KeyPair
+func NewKeyPair(prefix string) (*KeyPair, error) {
+	id, err := uuid.NewV4()
+	if err != nil {
+		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
+		return nil, scerr.Errorf(msg, err)
+	}
+
+	if prefix == "" {
+		prefix = "kp"
+	}
+	name := fmt.Sprintf("%s_%s", prefix, id)
+
+	return crypt.GenerateRSAKeyPair(name)
 }
 
 // SizingRequirements represents host sizing requirements to fulfil

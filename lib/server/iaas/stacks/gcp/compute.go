@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
@@ -35,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -172,6 +170,7 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
+// TODO: is there code to create KeyPair inside GCP ? It should be used there...
 // CreateKeyPair creates a key pair (no import)
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if s == nil {
@@ -201,12 +200,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	// 	PublicKey:  pubKey,
 	// 	PrivateKey: priKey,
 	// }, nil
-	return crypt.GenerateRSAKeyPair(name)
+	return resources.NewKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
@@ -224,6 +223,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 
 	defer scerr.OnPanic(&err)()
 	userData = userdata.NewContent()
@@ -236,23 +238,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, scerr.Errorf(fmt.Sprintf("the host %s must be on at least one network (even if public)", resourceName), nil)
 	}
 
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-			return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = s.CreateKeyPair(name)
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-			return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
-		}
-	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {

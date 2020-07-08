@@ -314,6 +314,9 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	if req.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 
 	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 

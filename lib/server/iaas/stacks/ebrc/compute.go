@@ -17,16 +17,13 @@
 package ebrc
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -34,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/govcd"
 	"github.com/vmware/go-vcloud-director/types/v56"
-	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -228,58 +224,45 @@ func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	logrus.Debugf(">>> stacks.ebrc::CreateKeyPair(%s)", name)
-	defer logrus.Debugf("<<< stacks.ebrc::CreateKeyPair(%s)", name)
-
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+	}
 
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	publicKey := privateKey.PublicKey
-	pub, _ := ssh.NewPublicKey(&publicKey)
-	pubBytes := ssh.MarshalAuthorizedKey(pub)
-	pubKey := string(pubBytes)
+	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
 
-	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	priKeyPem := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: priBytes,
-		},
-	)
-	priKey := string(priKeyPem)
-	return &resources.KeyPair{
-		ID:         name,
-		Name:       name,
-		PublicKey:  pubKey,
-		PrivateKey: priKey,
-	}, nil
+	return resources.NewKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id
 func (s *StackEbrc) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, scerr.Errorf(fmt.Sprintf("Not implemented"), nil)
+	return nil, scerr.NotImplementedError("")
 }
 
 // ListKeyPairs lists available key pairs
 func (s *StackEbrc) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, scerr.Errorf(fmt.Sprintf("Not implemented"), nil)
+	return nil, scerr.NotImplementedError("")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *StackEbrc) DeleteKeyPair(id string) error {
-	return scerr.Errorf(fmt.Sprintf("Not implemented"), nil)
+	return scerr.NotImplementedError("")
 }
 
 // CreateHost creates an host satisfying request
 func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.Host, content *userdata.Content, err error) {
-	logrus.Debug("ebrc.Client.CreateHost() called")
-	defer logrus.Debug("ebrc.Client.CreateHost() done")
-
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
+
+	logrus.Debug("ebrc.Client.CreateHost() called")
+	defer logrus.Debug("ebrc.Client.CreateHost() done")
 
 	userData := userdata.NewContent()
 
@@ -376,7 +359,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	}
 
 	log.Printf("storage_profile %s", storageProfileReference)
-	// FIXME Remove this
+	// FIXME: Remove this
 	// logrus.Warningf("Request [%s]", spew.Sdump(request))
 
 	vapp, err := vdc.FindVAppByName(request.ResourceName)
@@ -405,7 +388,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		}
 	}
 
-	// FIXME Defer vapp creation
+	// FIXME: Defer vapp creation
 	defer func() {
 		if err != nil {
 			vapp, derr := vdc.FindVAppByName(request.ResourceName)
@@ -457,14 +440,6 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	}
 
 	// ----Initialize----
-	if keyPair == nil {
-		var err error
-		keyPair, err = s.CreateKeyPair(fmt.Sprintf("key_%s", resourceName))
-		if err != nil {
-			return nil, userData, scerr.Errorf(fmt.Sprintf("KeyPair creation failed : %s", err.Error()), err)
-		}
-		request.KeyPair = keyPair
-	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {

@@ -38,12 +38,10 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	uuid "github.com/satori/go.uuid"
 )
 
 type portDef struct {
@@ -52,58 +50,34 @@ type portDef struct {
 	toPort   int64
 }
 
-// // createKeyPair creates a key pair
-// func createKeyPair() (publicKeyBytes []byte, privateKeyBytes []byte, err error) {
-// 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-// 	publicKey := privateKey.PublicKey
-// 	pub, err := ssh.NewPublicKey(&publicKey)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-
-// 	publicKeyBytes = ssh.MarshalAuthorizedKey(pub)
-
-// 	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-// 	privateKeyBytes = pem.EncodeToMemory(
-// 		&pem.Block{
-// 			Type:  "RSA PRIVATE KEY",
-// 			Bytes: priBytes,
-// 		},
-// 	)
-// 	return publicKeyBytes, privateKeyBytes, nil
-// }
-
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	// publicKey, privateKey, err := createKeyPair()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// _, err = s.EC2Service.ImportKeyPair(&ec2.ImportKeyPairInput{
-	// 	KeyName:           aws.String(name),
-	// 	PublicKeyMaterial: publicKey,
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return &resources.KeyPair{
-	// 	ID:         name,
-	// 	Name:       name,
-	// 	PrivateKey: string(privateKey),
-	// 	PublicKey:  string(publicKey),
-	// }, nil
-
-	kp, err := crypt.GenerateRSAKeyPair(name)
+	keypair, err := resources.NewKeyPair(name)
 	if err != nil {
 		return nil, err
 	}
 	_, err = s.EC2Service.ImportKeyPair(&ec2.ImportKeyPairInput{
 		KeyName:           aws.String(name),
-		PublicKeyMaterial: []byte(kp.PublicKey),
+		PublicKeyMaterial: []byte(keypair.PublicKey),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return kp, nil
+	return keypair, nil
+}
+
+// ImportKeyPair imports an existing resources.KeyPair inside the provider (not in the interface yet, but will come soon)
+func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if keypair == nil {
+		return scerr.InvalidParameterError("keypair", "cannot be nil")
+	}
+	_, err := s.EC2Service.ImportKeyPair(&ec2.ImportKeyPairInput{
+		KeyName:           aws.String(keypair.Name),
+		PublicKeyMaterial: []byte(keypair.PublicKey),
+	})
+	return err
 }
 
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
@@ -460,6 +434,13 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 }
 
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+	if s == nil {
+		return nil, nil, scerr.InvalidInstanceError()
+	}
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
+
 	defer scerr.OnPanic(&err)()
 
 	userData = userdata.NewContent()
@@ -467,42 +448,11 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	resourceName := request.ResourceName
 	networks := request.Networks
 	hostMustHavePublicIP := request.PublicIP
+	keyPairName := request.KeyPair.Name
 
 	if networks == nil || len(networks) == 0 {
 		return nil, userData, scerr.Errorf(fmt.Sprintf("the host %s must be on at least one network (even if public)", resourceName), nil)
 	}
-
-	keyPairName := ""
-
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-			return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		keyPairName = name
-		request.KeyPair, err = s.CreateKeyPair(name)
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-			return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
-		}
-	} else {
-		keyPairName = request.KeyPair.Name
-	}
-
-	defer func() {
-		if err != nil {
-			derr := s.DeleteKeyPair(keyPairName)
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
 
 	// If no password is provided, create one
 	if request.Password == "" {
@@ -513,7 +463,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		request.Password = password
 	}
 
-	// FIXME AWS Remove logs
+	// FIXME: AWS Remove logs
 	if len(request.Networks) == 1 {
 		if s.Config.BuildSubnetworks {
 			logrus.Warnf("We need either recalculate network segments here or pass the data through metadata")

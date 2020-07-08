@@ -20,11 +20,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/antihax/optional"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/antihax/optional"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
@@ -37,8 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/outscale-dev/osc-sdk-go/osc"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 )
 
 func normalizeImageName(name string) string {
@@ -352,25 +352,26 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return s.parseTemplateID(id)
 }
 
-func (s *Stack) getOrCreateKeypair(request resources.HostRequest) (*resources.KeyPair, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-		logrus.Debugf(utils.Capitalize(msg))
-		return nil, fmt.Errorf(msg)
-	}
-	if request.KeyPair == nil {
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		kp, err := s.CreateKeyPair(name)
-		if err != nil {
-			msg := fmt.Sprintf("Failed to create host key pair: %+v", err)
-			logrus.Errorf(msg)
-			return nil, fmt.Errorf(msg)
-		}
-		return kp, nil
-	}
-	return request.KeyPair, nil
-}
+// VPL: obsolete
+//func (s *Stack) getOrCreateKeypair(request resources.HostRequest) (*resources.KeyPair, error) {
+//	id, err := uuid.NewV4()
+//	if err != nil {
+//		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
+//		logrus.Debugf(utils.Capitalize(msg))
+//		return nil, fmt.Errorf(msg)
+//	}
+//	if request.KeyPair == nil {
+//		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
+//		kp, err := s.CreateKeyPair(name)
+//		if err != nil {
+//			msg := fmt.Sprintf("Failed to create host key pair: %+v", err)
+//			logrus.Errorf(msg)
+//			return nil, fmt.Errorf(msg)
+//		}
+//		return kp, nil
+//	}
+//	return request.KeyPair, nil
+//}
 
 func (s *Stack) getOrCreatePassword(request resources.HostRequest) (string, error) {
 	if request.Password == "" {
@@ -839,20 +840,22 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
-
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 	userData := userdata.NewContent()
 	if request.DefaultGateway == nil && !request.PublicIP {
 		return nil, userData, resources.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
-	keyPair, err := s.getOrCreateKeypair(request)
-	if err != nil {
-		return nil, userData, err
-	}
-	defer func() {
-		_ = s.DeleteKeyPair(keyPair.ID)
-	}()
-	request.KeyPair = keyPair
+	//keyPair, err := s.getOrCreateKeypair(request)
+	//if err != nil {
+	//	return nil, userData, err
+	//}
+	//defer func() {
+	//	_ = s.DeleteKeyPair(keyPair.ID)
+	//}()
+	//request.KeyPair = keyPair
 	password, err := s.getOrCreatePassword(request)
 	request.Password = password
 	if err != nil {
@@ -887,6 +890,22 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 	buf := bytes.NewBuffer(userDataPhase1)
 	buf.WriteString(patchSSH)
 
+	// Import keypair to create host
+	creationKeyPair, err := resources.NewKeyPair(request.ResourceName+"_install")
+	if err != nil {
+		return nil, nil, err
+	}
+	err = s.ImportKeyPair(creationKeyPair)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		derr := s.DeleteKeyPair(creationKeyPair.Name)
+		if derr != nil {
+			logrus.Errorf("failed to delete creation keypair: %v", derr)
+		}
+	}()
+
 	vmsRequest := osc.CreateVmsRequest{
 		ImageId:  request.ImageID,
 		UserData: base64.StdEncoding.EncodeToString(buf.Bytes()),
@@ -896,7 +915,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 			SubregionName: s.Options.Compute.Subregion,
 			Tenancy:       s.Options.Compute.DefaultTenancy,
 		},
-		KeypairName: keyPair.ID,
+		KeypairName: creationKeyPair.Name,
 	}
 	resVM, _, err := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
 		CreateVmsRequest: optional.NewInterface(vmsRequest),

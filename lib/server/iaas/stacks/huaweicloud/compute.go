@@ -19,13 +19,13 @@ package huaweicloud
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -48,7 +48,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
@@ -258,6 +257,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -304,20 +306,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		})
 	}
 
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating UID : %v", err), err)
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = s.CreateKeyPair(name)
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+v", err)
-			logrus.Debugf(utils.Capitalize(msg))
-		}
-	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
