@@ -25,7 +25,6 @@ import (
 	"github.com/antihax/optional"
 	"github.com/outscale-dev/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
-	"reflect"
 )
 
 func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
@@ -39,24 +38,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 		CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
 	})
 	if err != nil {
-		switch realErr := err.(type) {
-		case osc.GenericOpenAPIError:
-			switch model := realErr.Model().(type) {
-			case osc.ErrorResponse:
-				switch model.Errors[0].Code {
-				case "9044":
-					return nil, scerr.DuplicateError(fmt.Sprintf("there is already a network '%s'", req.CIDR))
-				default:
-					merr := model.Errors[0]
-					reqId := model.ResponseContext.RequestId
-					return nil, scerr.UnknownError(fmt.Sprintf("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId))
-				}
-			default:
-				return nil, scerr.UnknownError(fmt.Sprintf("from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr.Model()), realErr.Error()))
-			}
-		default:
-			return nil, err
-		}
+		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to create network with CIDR '%s'", req.CIDR))
 	}
 
 	defer func() {
@@ -72,7 +54,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 				CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
 			})
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = scerr.AddConsequence(err, normalizeError(derr))
 			}
 		}
 	}()
@@ -80,7 +62,6 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 	err = s.setResourceTags(resSubnet.Subnet.SubnetId, map[string]string{
 		"name": req.Name,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +74,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 		UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to create subnet '%s'", req.CIDR))
 	}
 	return &resSubnet.Subnet, nil
 }
@@ -156,7 +137,7 @@ func (s *Stack) getSubnet(id string) (*osc.Subnet, error) {
 		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", id))
 	}
 	if len(res.Subnets) > 1 {
 		return nil, scerr.InconsistentError("Inconstent provider response")
@@ -211,7 +192,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", name))
 	}
 	if len(res.Subnets) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No network named %s", name))
@@ -246,7 +227,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, scerr.Wrap(normalizeError(err),"failed to list networks")
 	}
 	var nets []*resources.Network
 	for _, onet := range res.Subnets {
@@ -270,19 +251,18 @@ func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []osc.N
 		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to list networks of host '%s'", hostID))
 	}
 
 	var subnets []*resources.Network
 	for _, nic := range res.Nics {
 		subnet, err := s.getSubnet(nic.SubnetId)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, scerr.Wrap(err, fmt.Sprintf("failed to list networks of host '%s'", hostID))
 		}
 		subnets = append(subnets, toNetwork(subnet))
 	}
 	return subnets, res.Nics, nil
-
 }
 
 func (s *Stack) deleteSecurityGroup(onet *osc.Net) error {
@@ -294,7 +274,7 @@ func (s *Stack) deleteSecurityGroup(onet *osc.Net) error {
 		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
 	})
 	if err != nil {
-		return err
+		return normalizeError(err)
 	}
 	if len(res.SecurityGroups) == 0 {
 		logrus.Warnf("No security group in network %s", onet.NetId)
@@ -311,7 +291,7 @@ func (s *Stack) deleteSecurityGroup(onet *osc.Net) error {
 			DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
 		})
 		if err != nil {
-			return err
+			return normalizeError(err)
 		}
 	}
 	return nil
@@ -325,7 +305,7 @@ func (s *Stack) deleteSubnet(id string) error {
 	_, _, err := s.client.SubnetApi.DeleteSubnet(s.auth, &osc.DeleteSubnetOpts{
 		DeleteSubnetRequest: optional.NewInterface(deleteSubnetRequest),
 	})
-	return err
+	return normalizeError(err)
 }
 
 // DeleteNetwork deletes the network identified by id
@@ -343,7 +323,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		ReadNicsRequest: optional.NewInterface(readNicsRequest),
 	})
 	if err != nil {
-		logrus.Debugf("Error reading NICS :%v", err)
+		logrus.Debugf("Error reading NICS: %v", normalizeError(err))
 	}
 
 	if len(res.Nics) > 0 {

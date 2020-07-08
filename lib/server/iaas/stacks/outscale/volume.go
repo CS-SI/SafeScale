@@ -44,7 +44,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volu
 		CreateVolumeRequest: optional.NewInterface(createVolumeRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 
 	ov := res.Volume
@@ -151,7 +151,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(res.Volumes) > 1 {
 		return nil, scerr.InconsistentError("Invalid provider response")
@@ -189,7 +189,7 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(res.Volumes) == 0 {
 		return nil, scerr.NotFoundError(fmt.Sprintf("No volume named %s", name))
@@ -223,7 +223,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 
 	var volumes []resources.Volume
@@ -253,7 +253,7 @@ func (s *Stack) DeleteVolume(id string) error {
 	_, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &osc.DeleteVolumeOpts{
 		DeleteVolumeRequest: optional.NewInterface(deleteVolumeRequest),
 	})
-	return err
+	return normalizeError(err)
 }
 
 func freeDevice(usedDevices []string, device string) bool {
@@ -311,7 +311,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		LinkVolumeRequest: optional.NewInterface(linkVolumeRequest),
 	})
 	if err != nil {
-		return "", err
+		return "", normalizeError(err)
 	}
 	return request.VolumeID, nil
 }
@@ -336,7 +336,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 	if len(res.Volumes) > 1 {
 		return nil, scerr.InconsistentError("Invalid provider response")
@@ -403,7 +403,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 		UnlinkVolumeRequest: optional.NewInterface(unlinkVolumeRequest),
 	})
 	if err != nil {
-		return err
+		return normalizeError(err)
 	}
 	return s.WaitForVolumeState(id, volumestate.AVAILABLE)
 }
