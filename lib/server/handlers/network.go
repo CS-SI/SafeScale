@@ -100,7 +100,20 @@ func (handler *NetworkHandler) Create(
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	// Verify that the network doesn't exist first
+	// Verify that the network doesn't exist first and manage by SafeScale
+	_, err = metadata.LoadNetwork(handler.service, name)
+	if err != nil {
+		switch err.(type) {
+		case scerr.ErrNotFound:
+			// so continue
+		default:
+			return nil, err
+		}
+	} else {
+		return nil, scerr.DuplicateError(fmt.Sprintf("network '%s' already exist", name))
+	}
+
+	// Check that the network doesn't exist outside SafeScale scope
 	_, err = handler.service.GetNetworkByName(name)
 	if err != nil {
 		switch err.(type) {
@@ -111,7 +124,7 @@ func (handler *NetworkHandler) Create(
 			return nil, err
 		}
 	} else {
-		return nil, fmt.Errorf("network '%s' already exists", name)
+		return nil, scerr.DuplicateError(fmt.Sprintf("network '%s' already exists (outside SafeScale scope)", name))
 	}
 
 	// Verify the CIDR is not routable
@@ -288,14 +301,10 @@ func (handler *NetworkHandler) Create(
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.Name = primaryGatewayName + domain
-	keypair, err := handler.service.CreateKeyPair("kp_" + primaryGatewayName)
+	primaryRequest.KeyPair, err = resources.NewKeyPair(primaryRequest.Name)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = handler.service.DeleteKeyPair("kp_" + primaryGatewayName)
-	}()
-	primaryRequest.KeyPair = keypair
 	primaryTask, err := concurrency.NewTaskWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -314,14 +323,10 @@ func (handler *NetworkHandler) Create(
 	if failover {
 		secondaryRequest := gwRequest
 		secondaryRequest.Name = secondaryGatewayName + domain
-		keypair, err = handler.service.CreateKeyPair("kp_" + secondaryGatewayName)
+		secondaryRequest.KeyPair, err = resources.NewKeyPair(secondaryRequest.Name)
 		if err != nil {
 			return nil, err
 		}
-		defer func() {
-			_ = handler.service.DeleteKeyPair("kp_" + secondaryGatewayName)
-		}()
-		secondaryRequest.KeyPair = keypair
 		secondaryTask, err = concurrency.NewTaskWithContext(ctx)
 		if err != nil {
 			return nil, err

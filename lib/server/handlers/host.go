@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -46,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -326,24 +324,38 @@ func (handler *HostHandler) Create(
 		return nil, scerr.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
 	}
 
+	// Check if host already exist in SafeScale scope
+	_, err = metadata.LoadHost(handler.service, name)
+	if err != nil {
+		switch err.(type) {
+		case scerr.ErrNotFound:
+			// continue
+		default:
+			return nil, err
+		}
+	} else {
+		return nil, scerr.DuplicateError(fmt.Sprintf("host '%s' already exists", name))
+	}
+
+	// Check if host exist outside SafeScale scope
 	host, err := handler.service.GetHostByName(name)
 	if err != nil {
 		switch err.(type) {
 		case scerr.ErrNotFound:
+			// continue
 		case scerr.ErrTimeout:
 			return nil, err
 		default:
 			return nil, err
 		}
 	} else {
-		hostThere, hsErr := handler.service.GetHostState(name)
-		if hsErr == nil {
-			logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
+		if hostThere, hsErr := handler.service.GetHostState(name); hsErr == nil  {
+			logrus.Warnf("we have a host '%s' (outside SafeScale scope) with status: %s", name, hostThere.String())
 			if hostThere != hoststate.TERMINATED {
 				return nil, resources.ResourceDuplicateError("host", name)
 			}
 		}
-		return nil, resources.ResourceDuplicateError("host", name)
+		return nil, scerr.DuplicateError(fmt.Sprintf("host '%s' already exists (outside SafeScale scope)", name))
 	}
 
 	var (
@@ -458,7 +470,7 @@ func (handler *HostHandler) Create(
 		domain = "." + domain
 	}
 
-	keypair, err := createKeyPair(name)
+	keypair, err := resources.NewKeyPair(name)
 	if err != nil {
 		return nil, err
 	}
@@ -803,21 +815,6 @@ func (handler *HostHandler) Create(
 	return host, nil
 }
 
-// createKeyPair creates a *resources.KeyPair
-func createKeyPair(prefix string) (*resources.KeyPair, error) {
-	id, err := uuid.NewV4()
-	if err != nil {
-		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-		return nil, scerr.Errorf(msg, err)
-	}
-
-	if prefix == "" {
-		prefix = "kp"
-	}
-	name := fmt.Sprintf("%s_%s", prefix, id)
-
-	return crypt.GenerateRSAKeyPair(name)
-}
 
 func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) ([]string, []string) {
 	if sshHandler == nil || host == nil {
