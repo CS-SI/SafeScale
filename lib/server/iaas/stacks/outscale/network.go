@@ -85,15 +85,6 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	// update defaut security group to allow external trafic
-	secgroup, err := s.getNetworkSecurityGroup(s.Options.Network.VPCID)
-	if err != nil {
-		return nil, err
-	}
-	if secgroup == nil {
-		return nil, err
-	}
-
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, err := s.getVpc(s.Options.Network.VPCID)
 	if err != nil {
@@ -109,6 +100,16 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	if vpc.IpRange == req.CIDR {
 		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': identical to VPC CIDR, choose a subnet of '%s'", req.CIDR, vpc.IpRange), nil)
 	}
+
+	// update defaut security group to allow external trafic
+	secgroup, err := s.getNetworkSecurityGroup(s.Options.Network.VPCID)
+	if err != nil {
+		return nil, err
+	}
+	if secgroup == nil {
+		return nil, err
+	}
+
 
 	subnet, err := s.createSubnet(req, s.Options.Network.VPCID)
 	if err != nil {
