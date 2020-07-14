@@ -889,7 +889,7 @@ func (b *foreman) getState(task concurrency.Task) (clusterstate.Enum, error) {
 		stateV1 = clonable.(*clusterpropsv1.State).State
 		return nil
 	})
-	if err != nil{
+	if err != nil {
 		return clusterstate.Unknown, err
 	}
 	return stateV1, nil
@@ -2515,7 +2515,7 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	feat, err := install.NewEmbeddedFeature(task, "docker")
+	feat, err := install.NewFeature(task, "docker")
 	if err != nil {
 		return err
 	}
