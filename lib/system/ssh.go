@@ -246,7 +246,7 @@ func isTunnelReady(port int) bool {
 }
 
 // buildTunnel create SSH from local host to remote host through gateway
-// if localPort is set to 0 then it's  automatically choosed
+// if localPort is set to 0 then it's automatically chosen
 func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 	f, err := CreateTempFileFromString(cfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
