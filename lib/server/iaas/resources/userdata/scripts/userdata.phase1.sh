@@ -171,18 +171,18 @@ disable_services() {
 }
 
 is_network_reachable() {
-  NETROUNDS=24
+  NETROUNDS=12
   REACHED=0
 
   for i in $(seq ${NETROUNDS}); do
     if which curl; then
-      curl -I www.google.com -m 5 | grep "200 OK" && REACHED=1 && break
+      curl -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
     fi
 
     if which wget; then
-      wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+      wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
     else
-      ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+      ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
     fi
 
     sleep 1
