@@ -348,14 +348,10 @@ func (handler *HostHandler) Create(
 		default:
 			return nil, err
 		}
-	} else {
-		if hostThere, hsErr := handler.service.GetHostState(name); hsErr == nil  {
-			logrus.Warnf("we have a host '%s' (outside SafeScale scope) with status: %s", name, hostThere.String())
-			if hostThere != hoststate.TERMINATED {
-				return nil, resources.ResourceDuplicateError("host", name)
-			}
-		}
-		return nil, scerr.DuplicateError(fmt.Sprintf("host '%s' already exists (outside SafeScale scope)", name))
+	}
+	// host in state 'TERMINATED' doesn't really exist, other states mean the host exists
+	if host.LastState != hoststate.TERMINATED {
+		return nil, resources.ResourceDuplicateError("host", name)
 	}
 
 	var (
@@ -748,7 +744,9 @@ func (handler *HostHandler) Create(
 			if stdout != "" || stderr != "" {
 				logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
 			}
-
+			if retcode == 255 {
+				return fmt.Errorf("connection failed, retrying")
+			}
 			return inErr
 		},
 		temporal.GetHostTimeout(),
