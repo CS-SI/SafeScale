@@ -117,18 +117,19 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(id string) error {
+func (s *Stack) DeleteKeyPair(name string) error {
 	if s == nil {
 		return scerr.InvalidInstanceError()
 	}
-	if id == "" {
+	if name == "" {
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
+
 	deleteKeypairRequest := osc.DeleteKeypairRequest{
-		KeypairName: id,
+		KeypairName: name,
 	}
-	_, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
-		DeleteVmsRequest: optional.NewInterface(deleteKeypairRequest),
+	_, _, err := s.client.KeypairApi.DeleteKeypair(s.auth, &osc.DeleteKeypairOpts{
+		DeleteKeypairRequest: optional.NewInterface(deleteKeypairRequest),
 	})
 	return normalizeError(err)
 }

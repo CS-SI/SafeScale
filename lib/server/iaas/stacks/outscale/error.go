@@ -34,13 +34,20 @@ func normalizeError(err error) error {
 		switch model := realErr.Model().(type) {
 		case osc.ErrorResponse:
 			switch model.Errors[0].Code {
-			case "5057":
-				return scerr.NotFoundError("network not found")
-			//case "5071": ?
-			case "9011":
-				return scerr.DuplicateError("a keypair with this name already exists")
-			case "9044":
-				return scerr.InvalidRequestError("not included in VPC CIDR")
+				case "1":
+					return scerr.UnauthorizedError("user is not authenticated")
+				case "4045":
+					return scerr.InvalidRequestError("invalid CIDR")
+				case "5057":
+					return scerr.NotFoundError("network not found")
+				case "5071":
+					return scerr.NotFoundError("keypair not found")
+				case "9011":
+					return scerr.DuplicateError("keypair already exists")
+				case "9044":
+					return scerr.InvalidRequestError("not included in VPC CIDR")
+				case "9058":
+					return scerr.DuplicateError("network already exist")
 			default:
 				merr := model.Errors[0]
 				reqId := model.ResponseContext.RequestId
