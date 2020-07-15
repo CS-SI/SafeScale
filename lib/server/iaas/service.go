@@ -427,23 +427,23 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		msg := fmt.Sprintf("Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
-			log.Debugf(msg, "not enough cores")
+			tracer.Trace(msg, "not enough cores")
 			continue
 		}
 		if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
-			log.Debugf(msg, "too many cores")
+			tracer.Trace(msg, "too many cores")
 			continue
 		}
 		if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
-			log.Debugf(msg, "not enough RAM")
+			tracer.Trace(msg, "not enough RAM")
 			continue
 		}
 		if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
-			log.Debugf(msg, "too many RAM")
+			tracer.Trace(msg, "too many RAM")
 			continue
 		}
 		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
-			log.Debugf(msg, "not enough disk")
+			tracer.Trace(msg, "not enough disk")
 			continue
 		}
 
