@@ -543,6 +543,36 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	primary := inputs["primary"].(bool)
 	nokeep := inputs["nokeep"].(bool)
 
+	// Check if gateway already exist in SafeScale scope
+	_, err = metadata.LoadHost(handler.service, request.Name)
+	if err != nil {
+		switch err.(type) {
+		case scerr.ErrNotFound:
+			// continue
+		default:
+			return nil, err
+		}
+	} else {
+		return nil, scerr.DuplicateError(fmt.Sprintf("host '%s' already exists", request.Name))
+	}
+
+	// Check if host exist outside SafeScale scope
+	gw, err := handler.service.GetHostByName(request.Name)
+	if err != nil {
+		switch err.(type) {
+		case scerr.ErrNotFound:
+			// continue
+		case scerr.ErrTimeout:
+			return nil, err
+		default:
+			return nil, err
+		}
+	}
+	// gw in state 'TERMINATED' doesn't really exist, other states mean the gw exists
+	if gw.LastState != hoststate.TERMINATED {
+		return nil, resources.ResourceDuplicateError("host", request.Name)
+	}
+
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
 	gw, userData, err := handler.service.CreateGateway(request, &sizing)
 	if err != nil {
