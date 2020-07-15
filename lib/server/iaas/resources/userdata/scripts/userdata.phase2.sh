@@ -627,9 +627,9 @@ EOF
     echo done
 }
 
-# Configure network for redhat7-like distributions (rhel, centos, ...)
+# Configure network for redhat alike distributions (rhel, centos, ...)
 configure_network_redhat() {
-    echo "Configuring network (redhat7-like)..."
+    echo "Configuring network (redhat-like)..."
 
     if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
         disable_svc() {
@@ -661,15 +661,24 @@ configure_network_redhat() {
 
     NMCLI=$(which nmcli 2>/dev/null)
     if [[ -z "${NMCLI}" ]]; then
-        configure_network_redhat_without_nmcli || { echo "PROVISIONING_ERROR: failed to set network without NetworkManager" && fail 200 }
+        configure_network_redhat_without_nmcli || {
+            echo "PROVISIONING_ERROR: failed to set network without NetworkManager"
+            fail 200
+        }
     else
-        configure_network_redhat_with_nmcli || { echo "PROVISIONING_ERROR: failed to set network with NetworkManager" && fail 200 }
+        configure_network_redhat_with_nmcli || {
+            echo "PROVISIONING_ERROR: failed to set network with NetworkManager"
+            fail 200
+        }
     fi
 
     enable_svc network
     restart_svc network
 
-    reset_fw || { echo "PROVISIONING_ERROR: failure setting firewall" && fail 201 }
+    reset_fw || {
+        echo "PROVISIONING_ERROR: failure setting firewall"
+        fail 201
+    }
 
     echo done
 }

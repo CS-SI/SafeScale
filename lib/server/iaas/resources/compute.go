@@ -56,7 +56,16 @@ func NewKeyPair(prefix string) (*KeyPair, error) {
 	}
 	name := fmt.Sprintf("%s_%s", prefix, id)
 
-	return crypt.GenerateRSAKeyPair(name)
+	privKey, pubKey, err := crypt.GenerateRSAKeyPair(name)
+	if err != nil {
+		return nil, err
+	}
+	return &KeyPair{
+		ID: name,
+		Name: name,
+		PrivateKey: privKey,
+		PublicKey: pubKey,
+	}, nil
 }
 
 // SizingRequirements represents host sizing requirements to fulfil
