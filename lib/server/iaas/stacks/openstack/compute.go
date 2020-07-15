@@ -44,7 +44,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -287,7 +286,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	return crypt.GenerateRSAKeyPair(name)
+	return resources.NewKeyPair(name)
+}
+
+// ImportKeyPair imports a keypair in OpenStack
+func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
+	return scerr.NotImplementedError("ImportKeyPair is not implemented yet")
 }
 
 // GetKeyPair returns the key pair identified by id
