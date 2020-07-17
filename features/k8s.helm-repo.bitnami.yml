@@ -24,7 +24,7 @@ feature:
 
     requirements:
         - kubernetes
-        - k8s.helm2
+        - k8s.helm
 
     install:
         bash:

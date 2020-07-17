@@ -22,10 +22,19 @@ feature:
         cluster: all
     install:
         bash:
-            check: |
-                which /usr/local/bin/mpiexec &>/dev/null
+            check:
+                pace: pkg
+                steps:
+                    pkg:
+                        targets:
+                            host: yes
+                            clusters:
+                                masters: all
+                                nodes: all
+                        run: |
+                            which /usr/local/bin/mpiexec &>/dev/null
 
-            add: |
+            add:
                 pace: fromsrc
                 steps:
                     fromsrc:
@@ -37,8 +46,12 @@ feature:
                                 nodes: all
                         run: |
                             case $LINUX_KIND in
-                                redhat|centos)
-                                    yum makecache fast
+                                redhat|rhel|fedora|centos)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfRetry 3m 5 "dnf makecache -y"
+                                    else
+                                        sfRetry 3m 5 "yum makecache fast"
+                                    fi
                                     yum groupinstall -y "Development Tools"
                                     yum install -y wget
                                     ;;

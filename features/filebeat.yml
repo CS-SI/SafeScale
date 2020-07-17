@@ -19,6 +19,9 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+    requirements:
+        features:
+            - docker
     parameters:
         - Version=7.2.0
         - ElasticsearchURL=http://{{ .HostIP }}:9200/
@@ -70,7 +73,6 @@ feature:
                                 inputs:
                                     enabled: true
                                     path: ${path.configs}/configs/*.yml
-
 
                             tags: ["safescale"]
 
@@ -129,7 +131,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d || sfFail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
                             sfExit
 
             remove:

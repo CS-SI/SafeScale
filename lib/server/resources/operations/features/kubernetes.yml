@@ -52,8 +52,8 @@ feature:
         - CNI=calico
         - Dashboard=true
         - Hardening=true
-        - KubeVersion=1.14.1
-        - HelmVersion=2.14.1
+        - KubeVersion=1.14.10
+        - HelmVersion=2.15.2
         - DisableHelm=false
         - HelmDefaultNamespace=default
         - ExternalLoadBalancerHostname=
@@ -120,7 +120,7 @@ feature:
                                     sfWaitForApt
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ebtables socat || sfFail 192
                                     ;;
-                                redhat|centos)
+                                redhat|rhel|fedora|centos)
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ebtables socat || sfFail 193
 
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
@@ -179,7 +179,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
 
-                                centos|redhat)
+                                centos|fedora|redhat|rhel)
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum -y install audit audit-libs quota || sfFail 195
                                     ;;
 
@@ -237,7 +237,7 @@ feature:
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
 
-                                centos|redhat)
+                                centos|fedora|redhat|rhel)
                                     cat >/etc/yum.repos.d/kubernetes.repo <<-EOF
                             [kubernetes]
                             name=Kubernetes
@@ -248,6 +248,7 @@ feature:
                             gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
                             exclude=kube*
                             EOF
+
                             {{ if .KubeVersion }}
                                     yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
                             {{ else }}
@@ -273,7 +274,7 @@ feature:
                                 ubuntu|debian)
                                     sfApt update && sfApt -y install keepalived haproxy || sfFail 202
                                     ;;
-                                redhat|centos)
+                                redhat|rhel|centos|fedora)
                                     yum install -q -y keepalived haproxy || sfFail 202
                                     ;;
                                 *)
@@ -511,6 +512,10 @@ feature:
                             oidc-username-claim: "{{ .OIDCUserName }}"
                             oidc-groups-claim: "{{ .OIDCGroupName }}"
                             {{ end }}
+                            ---
+                            apiVersion: kubeproxy.config.k8s.io/v1alpha1
+                            kind: KubeProxyConfiguration
+                            metricsBindAddress: 0.0.0.0:10249
                             EOF
 
                             sfRetry {{.TemplatePullImagesTimeout}} {{.TemplateOperationDelay}} kubeadm config images pull || sfFail 202
@@ -754,7 +759,7 @@ feature:
                                             sfApt update && sfApt install -y patch || sfFail 221
                                             ;;
 
-                                        centos|redhat)
+                                        centos|fedora|redhat|rhel)
                                             yum -y install patch || sfFail 222
                                             ;;
 
@@ -918,7 +923,7 @@ feature:
                                 debian|ubuntu)
                                     sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
                                     ;;
-                                redhat|centos)
+                                redhat|rhel|fedora|centos)
                                     yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
                                     ;;
                             esac

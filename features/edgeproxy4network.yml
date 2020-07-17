@@ -43,7 +43,6 @@ feature:
 #                pace: config,secret,networks,start
                 pace: config,networks,start
                 steps:
-
                     config:
                         timeout: 10
                         targets:
@@ -115,8 +114,7 @@ feature:
 
                             RUN mkdir -p /usr/local/kong/proxy_temp \
                              && chown kong:root /usr/local/kong/proxy_temp \
-                             && chmod u+rwx,go-rwx /usr/local/kong/proxy_temp \
-                             && chmod ug+s /usr/local/kong/proxy_temp
+                             && chmod 0700 /usr/local/kong/proxy_temp
 
                             COPY my-docker-entrypoint.sh /
                             RUN chmod a+rx /my-docker-entrypoint.sh
@@ -270,7 +268,7 @@ feature:
                             gateways: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || sfFail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || sfFail 194
                             sfExit
 
             remove:

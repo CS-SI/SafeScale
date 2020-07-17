@@ -25,14 +25,6 @@ feature:
         - ChartVersion=8.2.4
         - HelmRepoName=stable
         - DockerRegistryURL=hub.docker.com
-        #- DockerRegistryURL=harbor.{{ .Namespace }}.svc.cluster.local/cs/monitoring/tools
-        - DockerRegistryUsername=
-        - DockerRegistryPassword
-
-    requirements:
-        - kubernetes
-        - k8s.helm
-        - k8s.kong-ingress
 
     install:
         bash:
@@ -638,7 +630,7 @@ feature:
                                 --set kubeEtcd.serviceMonitor.scheme="https" \
                                 --set kubeEtcd.serviceMonitor.caFile="/etc/prometheus/secrets/etcd-client/ca.crt" \
                                 --set kubeEtcd.serviceMonitor.keyFile="/etc/prometheus/secrets/etcd-client/server.key" \
-                                --set kubeEtcd.serviceMonitor.certFile="/etc/prometheus/secrets/etcd-client/server.crt" \  
+                                --set kubeEtcd.serviceMonitor.certFile="/etc/prometheus/secrets/etcd-client/server.crt" \
                                 --set prometheus.prometheusSpec.secrets[0]="etcd-client" \
                                 --set prometheus-k8s-exporter.PrometheusK8sExporter.metrics.serviceMonitor.enabled="true" \
                                 --set prometheus-k8s-exporter.PrometheusK8sExporter.metrics.serviceMonitor.additionalLabels.release="prometheus-operator" \

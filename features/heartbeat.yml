@@ -14,11 +14,17 @@
 # limitations under the License.
 #
 
+# FIXME: Not working
+
 ---
 feature:
     suitableFor:
         host: yes
         cluster: all
+    requirements:
+        features:
+            - docker
+
     parameters:
         - Version=7.2.0
         - ElasticsearchURL=http://{{ .HostIP }}:9200/
@@ -27,9 +33,9 @@ feature:
     install:
         bash:
             check:
-                pace: docker
+                pace: service
                 steps:
-                    pkg:
+                    service:
                         targets:
                             hosts: yes
                             masters: all
@@ -108,7 +114,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            cat >${SF_ETCDIR}/heartbeat4safescale/docker-compose.xml <<-EOF
+                            cat >${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml <<-EOF
                             version: '2.1'
 
                             services:
@@ -128,7 +134,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d || sfFail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
                             sfExit
 
             remove:
