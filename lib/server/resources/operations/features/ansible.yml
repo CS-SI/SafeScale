@@ -26,16 +26,16 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     dpkg -l | grep ansible &>/dev/null || sfFail 1
                                     ;;
-                                centos|rhel)
+                                centos|fedora|redhat|rhel)
                                     rpm -qa | grep ansible &>/dev/null || sfFail 1
                                     ;;
                                 *)
@@ -43,37 +43,60 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
+
+                    config:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            [[ ! -d ${SF_ETCDIR}/ansible ]] && sfFail 1
+                            [[ ! -d ${SF_ETCDIR}/ansible/ansible.cfg ]] && sfFail 2
+                            sfExit
 
             add:
-                pace: ansible
+                pace: ansible,config
                 steps:
                     ansible:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     apt-cache showpkg software-properties-common && apt-get install -y software-properties-common
                                     apt-cache showpkg python-software-properties && apt-get install -y python-software-properties
                                     apt-add-repository --yes --update ppa:ansible/ansible
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ansible"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
                                     echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ansible"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
                                     ;;
-                                centos|rhel)
-                                    yum install -y ansible || sfFail 192
+                                centos|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfRetry 3m 5 "dnf install --enablerepo=epel -y ansible" || sfFail 192
+                                    else
+                                        yum install -y ansible || sfFail 192
+                                    fi
+                                    ;;
+                                fedora)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf install -y ansible || sfFail 192
+                                    else
+                                        yum install -y ansible || sfFail 192
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -82,8 +105,87 @@ feature:
                             esac
                             sfExit
 
+                    config:
+                        targets:
+                            hosts: yes
+                            gateways: no
+                            masters: all
+                            nodes: no
+                        run: |
+                            mkdir -p ${SF_ETCDIR}/ansible
+
+                            cat >${SF_ETCDIR}/ansible/ansible.cfg <<-EOF
+                            [defaults]
+                            inventory = ${SF_ETCDIR}/ansible/inventory.cfg
+                            host_key_checking = False
+                            remote_tmp = ${SF_TMPDIR}/ansible-\${USER}
+                            log_path = ${SF_LOGDIR}/ansible.log
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/pathes.cfg <<-EOF
+                            sf_base_dir: "/opt/safescale"
+                            sf_etc_dir: "{{ "{{ sf_base_dir }}/etc" }}"
+                            sf_var_dir: "{{ "{{ sf_base_dir }}/var" }}"
+                            sf_tmp_dir: "{{ "{{ sf_var_dir }}/tmp" }}"
+                            sf_log_dir: "{{ "{{ sf_var_dir }}/log" }}"
+                            sf_state_dir: "{{ "{{ sf_var_dir }}/state" }}"
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/host.cfg <<-EOF
+                            host_private_ip: "{{ .HostIP }}"
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/network.cfg <<-EOF
+                            cidr: "{{ .CIDR }}"
+                            primary_gateway_private_ip: "{{ .PrimaryGatewayIP }}"
+                            primary_gateway_public_ip: "{{ .PrimaryPublicIP }}"
+                            endpoint_ip: "{{ .EndpointIP }}"
+                            default_route_ip: "{{ .DefaultRouteIP }}"
+                            {{ if .SecondaryGatewayIP }}secondary_gateway_private_ip: "{{ .SecondaryGatewayIP }}"{{ end }}
+                            {{ if .SecondaryPublicIP }}secondary_gateway_public_ip: "{{ .SecondaryPublicIP }}"{{ end }}
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/cluster.cfg <<-EOF
+                            cluster_name: "{{ .ClusterName }}"
+                            cluster_flavor: "{{ .ClusterFlavor }}"
+                            cluster_complexity: "{{ .ClusterComplexity }}"
+                            controlplane_uses_vip: {{ .ControlplaneUsesVIP }}
+                            controlplane_endpoint_ip: "{{ .ControlplaneEndpointIP }}"
+                            cluster_admin_username: "{{ .ClusterAdminUsername }}"
+                            EOF
+
+                            cat >${SF_ETCDIR}/ansible/inventory.cfg <<-EOF
+                            [gateways]
+                            primary_gateway ansible_host={{ .PrimaryGatewayIP }}
+                            {{ if .SecondaryGatewayIP }}secondary_gateway ansible_host={{ .SecondaryGatewayIP }}{{ end }}
+
+                            [masters]
+                            {{- range .ClusterMasters }}
+                            {{ .Name }} ansible_host={{ .PrivateIP }}
+                            {{- end }}
+
+                            [nodes]
+                            {{- range .ClusterNodes }}
+                            {{ .Name }} ansible_host={{ .PrivateIP }}
+                            {{- end }}
+
+                            [{{ .ClusterName }}:hosts]
+                            gateways
+                            masters
+                            nodes
+
+                            [{{ .ClusterName }}:vars]
+                            ansible_user={{ .ClusterAdminUsername }}
+                            ansible_python_interpreter=/usr/bin/python3
+                            EOF
+
+                            chown -R {{ .ClusterAdminUsername }} ${SF_ETCDIR}/ansible
+                            chmod -R ug+rw,o-rw ${SF_ETCDIR}/ansible
+                            find ${SF_ETCDIR}/ansible -type d -exec chmod ug+x,o-x {} \;
+                            sfExit
+
             remove:
-                pace: ansible
+                pace: ansible,config
                 steps:
                     ansible:
                         targets:
@@ -97,14 +199,29 @@ feature:
                                     sfWaitForApt && apt-get purge -y ansible*
                                     apt-get autoremove -y
                                     ;;
-                                centos|rhel)
-                                    yum remove -y ansible*
-                                    yum autoremove -y
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf remove -y ansible*
+                                        dnf autoremove -y
+                                    else
+                                        yum remove -y ansible*
+                                        yum autoremove -y
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
 
+                    config:
+                        targets:
+                            gateways: no
+                            hosts: yes
+                            masters: all
+                            nodes: no
+                        run: |
+                            rm -rf ${SF_ETCDIR}/ansible ${SF_LOGDIR}/ansible_*
+                            sfExit
 ...

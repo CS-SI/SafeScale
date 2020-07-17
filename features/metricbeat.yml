@@ -19,6 +19,9 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+    requirements:
+        features:
+            - docker
     parameters:
         - Version=7.2.0
         - ElasticsearchURL=undefined
@@ -177,7 +180,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d || sfFail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
                             sfExit
 
             remove:

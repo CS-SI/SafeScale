@@ -26,21 +26,25 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep ntp &>/dev/null || sfFail 1
+                                    dpkg -l | grep ntp &>/dev/null || sfFail 192
                                     ;;
-                                centos|rhel)
-                                    rpm -qa | grep ntp &>/dev/null || sfFail 1
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        rpm -qa | grep chrony &>/dev/null || sfFail 192
+                                    else
+                                        rpm -qa | grep ntp &>/dev/null || sfFail 192
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 1
+                                    sfFail 193
                                     ;;
                             esac
                             sfExit
@@ -50,62 +54,77 @@ feature:
                 steps:
                     ntp-server:
                         targets:
-                            hosts: no
-                            gateways: all
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y ntp"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update && sfApt install -y ntp" || sfFail 192
                                     ;;
-                                centos|rhel)
-                                    yum install -y ntp || sfFail 192
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        dnf install -y chrony || sfFail 192
+                                    else
+                                        yum install -y ntp || sfFail 192
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 193
                                     ;;
                             esac
                             sfExit
 
                     firewall:
                         targets:
-                            gateways: all
+                            gateways: no
                             hosts: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             # Makes sure firewalld is running, starting first its dependency dbus...
                             sfService start dbus
                             # then firewalld  itself
                             sfService restart firewalld
-                            sfFirewallAdd --zone=public --add-port=123/udp --permanent
-                            sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfFirewallAdd --zone=trusted --add-port=123/udp --permanent
+                            sfFirewallReload || sfFail 194 "Firewall problem"
 
                     ready:
                         targets:
-                            gateways: all
-                            hosts: no
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfService enable ntp || sfFail 195
                                     sfService restart ntp || sfFail 196
                                     op=-1
-                                    sfRetry 5m 5 sfService status ntp &>/dev/null && op=$? || true
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 197
                                     ;;
-                                centos|rhel)
-                                    sfService enable ntpd || sfFail 195
-                                    sfService restart ntpd || sfFail 196
-                                    op=-1
-                                    sfRetry 5m 5 sfService status ntpd &>/dev/null && op=$? || true
-                                    [ $op -ne 0 ] && sfFail 197
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfService enable chronyd || sfFail 195
+                                        sfService restart chronyd || sfFail 196
+                                    else
+                                        sfService enable ntpd || sfFail 195
+                                        sfService restart ntpd || sfFail 196
+                                    fi
+
+                                    if [[ -n $(which dnf) ]]; then
+                                        op=-1
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status chronyd &>/dev/null && op=$? || true
+                                        [ $op -ne 0 ] && sfFail 197
+                                    else
+                                        op=-1
+                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfService status ntpd &>/dev/null && op=$? || true
+                                        [ $op -ne 0 ] && sfFail 197
+                                    fi
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -119,10 +138,10 @@ feature:
                 steps:
                     ntp-server:
                         targets:
-                            gateways: all
-                            hosts: no
+                            hosts: yes
+                            gateways: no
                             masters: all
-                            nodes: all
+                            nodes: no
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -131,10 +150,15 @@ feature:
                                     sfWaitForApt && apt-get purge -y ntp*
                                     apt-get autoremove -y
                                     ;;
-                                centos|rhel)
-                                    sfService disable ntpd
-                                    sfService stop ntpd
-                                    yum remove -y ntp*
+                                centos|fedora|redhat|rhel)
+                                    if [[ -n $(which dnf) ]]; then
+                                        sfService disable chronyd
+                                        sfService stop chronyd
+                                    else
+                                        sfService disable ntpd
+                                        sfService stop ntpd
+                                        yum remove -y ntp*
+                                    fi
                                     yum autoremove -y
                                     ;;
                                 *)

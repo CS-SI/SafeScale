@@ -1,0 +1,112 @@
+# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+feature:
+    context:
+        host: no
+        cluster: dcos,boh
+    requirements:
+        features:
+            - docker
+            - kubernetes
+        cluster:
+            small:
+                nodes: 1
+            normal:
+                nodes: 1
+            large:
+                nodes: 1
+    parameters:
+        - SparkVersion=2.3.3
+
+    install:
+        dcos:
+            check:
+                pace: deploy
+                targets:
+                    masters: one
+                run: |
+                    STATUS=$(sfDcos spark plan show deploy --json | jq .status
+                    echo $STATUS | grep COMPLETE || sfFail 192
+                    sfExit
+
+            add:
+                pace: package,cli
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos package install --yes spark
+                    cli:
+                        targets:
+                            masters: all
+                        run: |
+                            sfDcos package install --yes --cli spark
+
+            remove: |
+                pace: package
+                steps:
+                    package:
+                        targets:
+                            masters: one
+                        run: |
+                            sfDcos package remove --yes spark
+
+        bash:
+            check:
+                pace: distrib
+                steps:
+                    distrib:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ -l /usr/local/spark ] || sfFail 192
+                            VERSION=$(echo $(basename $(readlink -f /usr/local/spark)) | cut -d- -f2)
+                            [ "$VERSION" = "{{.SparkVersion}}" ] || sfFail 193
+                            [ -x /usr/local/spark/bin/spark ] || sfFail 194
+                            sfExit
+
+
+            add:
+                pace: distrib
+                steps:
+                    distrib:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            cd /usr/local
+                            wget -q http://www-eu.apache.org/dist/spark/spark-{{.SparkVersion}}/spark-{{.SparkVersion}}-bin-hadoop2.7.tgz && \
+                            tar zxvf spark-{{.SparkVersion}-bin-hadoop2.7.tgz || sfFail 195
+                            rm -f spark-{{.SparkVersion}}-bin-hadoop2.7.tgz
+                            ln -s /usr/local/spark-{{.SparkVersion}}-bin-hadoop2.7 /usr/local/spark
+                            ln -s /usr/local/spark/bin/spark-submit /usr/local/bin
+
+            remove:
+                pace: distrib
+                steps:
+                    distrib:
+                        targets:
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            rm -rf /usr/local/spark-{{.SparkVersion}}-bin-hadoop*
+                            rm -f /usr/local/spark
+...

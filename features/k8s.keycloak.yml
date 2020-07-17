@@ -28,7 +28,6 @@ feature:
     requirements:
         features:
             - kubernetes
-            - k8s.helm2
             - k8s.helm-repo.codecentric
 
     install:

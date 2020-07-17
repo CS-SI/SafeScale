@@ -48,7 +48,7 @@ feature:
                             masters: one
                         run: |
                             case $LINUX_KIND in
-                                centos|redhat)
+                                centos|fedora|redhat|rhel)
                                     yum install -y openssl || sfFail 192 "Unable to install openssl"
                                     ;;
                                 debian|ubuntu)
@@ -270,8 +270,8 @@ feature:
                                     ln -s ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem /usr/local/share/ca-certificates/$CACN
                                     update-ca-certificates || sfFail 198
                                     ;;
-                                redhat|centos)
-                                    if [ $(sfGetFact "linux_version") = 6 ]; then
+                                redhat|rhel|centos|fedora)
+                                    if [ $(sfGetFact "distrib_version") = 6 ]; then
                                         TARGET=/usr/local/share/ca-certificates
                                     else
                                         TARGET=/etc/pki/ca-trust/source/anchors

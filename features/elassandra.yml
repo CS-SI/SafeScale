@@ -22,7 +22,6 @@ feature:
     requirements:
         features:
             - docker
-            - kong
 
     parameters:
         - KeepDataOnRemoval=yes
@@ -39,7 +38,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            [ -d ${SF_ETC_DIR}/elassandra ] || sfFail 192
+                            [ -d ${SF_ETCDIR}/elassandra ] || sfFail 192
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'strapdata/elassandra:6' &>/dev/null || sfFail 193
                             sfExit
 
@@ -117,7 +116,7 @@ feature:
                             {{ else }}
                             PREFIX="elassandra"
                             {{ end }}
-                            sfRetry 5m 5 docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
 
             remove:
                 pace: stop,remove

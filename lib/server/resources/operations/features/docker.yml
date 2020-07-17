@@ -36,7 +36,11 @@ feature:
                                     dpkg -l | grep docker-ce &>/dev/null || sfFail 1
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
-                                centos|rhel)
+                                centos|redhat|rhel)
+                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 1
+                                    docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
+                                    ;;
+                                fedora)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 1
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
@@ -59,18 +63,49 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -y gnupg2 || sfApt install -y gnupg"
-                                    sfRetry 5m 3 "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail 192
-                                    sfRetry 5m 3 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y gnupg2 || sfApt install -y gnupg"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail 192
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetry 5m 3 "sfApt update"
-                                    sfRetry 5m 3 "sfApt install -qqy docker-ce" || sfFail 194
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -qqy docker-ce" || sfFail 194
                                     ;;
-                                centos|rhel)
-                                    sfRetry 7m 3 yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
-                                    sfRetry 7m 3 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
-                                    sfRetry 7m 3 yum install -y docker-ce || sfFail 194
+                                centos|redhat|rhel)
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
+                                    kop=0
+                                    op=-1
+                                    yum install -y curl --nobest &>/dev/null && op=$? || true
+                                    if [ $op -ne 0 ]; then
+                                        yum install -y curl &>/dev/null && op=$? || true
+                                        if [ $op -ne 0 ]; then
+                                            sfFail 194
+                                        else
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce || sfFail 194
+                                        fi
+                                    else
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce --nobest || sfFail 194
+                                    fi
+                                    cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
+                                    ;;
+                                fedora)
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo
+                                    kop=0
+                                    op=-1
+                                    dnf install -y curl --nobest &>/dev/null && op=$? || true
+                                    if [ $op -ne 0 ]; then
+                                        dnf install -y curl &>/dev/null && op=$? || true
+                                        if [ $op -ne 0 ]; then
+                                            sfFail 194
+                                        else
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf install -y docker-ce || sfFail 194
+                                        fi
+                                    else
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf install -y docker-ce --nobest || sfFail 194
+                                    fi
+                                    systemctl enable --now docker || true
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
@@ -87,7 +122,7 @@ feature:
                             nodes: all
                         run: |
                             op=-1
-                            VERSION=$(sfRetry 2m 5 "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
+                            VERSION=$(sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
                             [ $op -ne 0 ] && sfFail 192
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
                             sfDownload "$URL" docker-compose 3m 5 || sfFail 193
@@ -102,11 +137,11 @@ feature:
                             nodes: all
                         run: |
                             mkdir -p /etc/docker
-                            # if [ "$(sfGetFact use_systemd)" = "1" ]; then
-                            #     DRIVER=systemd
-                            # else
+                            if [ "$(sfGetFact use_systemd)" = "1" ]; then
+                                DRIVER=systemd
+                            else
                                 DRIVER=cgroupfs
-                            # fi
+                            fi
                             if [ "$(sfGetFact redhat_like)" = "1" ]; then
                                 cat > /etc/docker/daemon.json <<-EOF
                             {
@@ -176,14 +211,14 @@ feature:
                             sfService enable docker || sfFail 195
                             sfService restart docker || sfFail 196
                             op=-1
-                            sfRetry 2m 5 "sfService status docker &>/dev/null" && op=$? || true
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfService status docker &>/dev/null" && op=$? || true
                             [ $op -ne 0 ] && sfFail 197
                             sfExit
 
             remove:
                 pace: cleanup
                 steps:
-                    docker-ce:
+                    cleanup:
                         targets:
                             gateways: all
                             hosts: yes
@@ -196,8 +231,11 @@ feature:
                                 debian|ubuntu)
                                     sfApt purge -y docker-ce*
                                     ;;
-                                centos|rhel)
+                                centos|redhat|rhel)
                                     yum remove -y docker-ce*
+                                    ;;
+                                fedora)
+                                    dnf remove -y docker-ce*
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
