@@ -67,6 +67,16 @@ sfApt() {
 }
 export -f sfApt
 
+# try using dnf instead of yum if available
+sfYum() {
+    if [[ -n $(which dnf) ]]; then
+        dnf "$@"
+    else
+        yum "$@"
+    fi
+}
+export -f sfYum
+
 sfWaitLockfile() {
     local ROUNDS=600
     name=$1
