@@ -41,7 +41,7 @@ type Provider interface {
 	// GetAuthenticationOptions returns authentication options as a Config
 	GetAuthenticationOptions() (Config, fail.Error)
 
-	// GetConfigurationfgOpts returns configuration options as a Config
+	// GetConfigurationfgOptions returns configuration options as a Config
 	GetConfigurationOptions() (Config, fail.Error)
 
 	// GetName returns the provider name

@@ -21,6 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -32,7 +33,7 @@ import (
 type LoggedProvider WrappedProvider
 
 // WaitHostReady ...
-func (w LoggedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error {
+func (w LoggedProvider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	defer w.prepare(w.trace("WaitHostReady"))
 	return w.InnerProvider.WaitHostReady(hostParam, timeout)
 }
@@ -226,9 +227,9 @@ func (w LoggedProvider) CreateHost(request abstract.HostRequest) (*abstract.Host
 }
 
 // InspectHost ...
-func (w LoggedProvider) InspectHost(something interface{}) (*abstract.HostFull, fail.Error) {
+func (w LoggedProvider) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
 	defer w.prepare(w.trace("InspectHost"))
-	return w.InnerProvider.InspectHost(something)
+	return w.InnerProvider.InspectHost(hostParam)
 }
 
 // GetHostByName ...
@@ -238,9 +239,9 @@ func (w LoggedProvider) GetHostByName(name string) (*abstract.HostCore, fail.Err
 }
 
 // GetHostState ...
-func (w LoggedProvider) GetHostState(something interface{}) (hoststate.Enum, fail.Error) {
+func (w LoggedProvider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	defer w.prepare(w.trace("GetHostState"))
-	return w.InnerProvider.GetHostState(something)
+	return w.InnerProvider.GetHostState(hostParam)
 }
 
 // ListHosts ...
@@ -250,33 +251,33 @@ func (w LoggedProvider) ListHosts(details bool) (abstract.HostList, fail.Error) 
 }
 
 // DeleteHost ...
-func (w LoggedProvider) DeleteHost(id string) fail.Error {
+func (w LoggedProvider) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	defer w.prepare(w.trace("DeleteHost"))
-	return w.InnerProvider.DeleteHost(id)
+	return w.InnerProvider.DeleteHost(hostParam)
 }
 
 // StopHost ...
-func (w LoggedProvider) StopHost(id string) fail.Error {
+func (w LoggedProvider) StopHost(hostParam stacks.HostParameter) fail.Error {
 	defer w.prepare(w.trace("StopHost"))
-	return w.InnerProvider.StopHost(id)
+	return w.InnerProvider.StopHost(hostParam)
 }
 
 // StartHost ...
-func (w LoggedProvider) StartHost(id string) fail.Error {
+func (w LoggedProvider) StartHost(hostParam stacks.HostParameter) fail.Error {
 	defer w.prepare(w.trace("StartHost"))
-	return w.InnerProvider.StartHost(id)
+	return w.InnerProvider.StartHost(hostParam)
 }
 
 // RebootHost ...
-func (w LoggedProvider) RebootHost(id string) fail.Error {
+func (w LoggedProvider) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	defer w.prepare(w.trace("RebootHost"))
-	return w.InnerProvider.RebootHost(id)
+	return w.InnerProvider.RebootHost(hostParam)
 }
 
 // ResizeHost ...
-func (w LoggedProvider) ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (w LoggedProvider) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	defer w.prepare(w.trace("ResizeHost"))
-	return w.InnerProvider.ResizeHost(id, request)
+	return w.InnerProvider.ResizeHost(hostParam, request)
 }
 
 // CreateVolume ...

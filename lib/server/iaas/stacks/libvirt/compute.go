@@ -734,9 +734,9 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.Host, *libvirt.Do
 	return host, domain, nil
 }
 
-func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (xerr fail.Error) {
-	if host == nil {
-		return fail.InvalidParameterError("host", "cannot be nil")
+func (s *Stack) complementHost(hostCore *abstract.HostCore, newHost *abstract.HostFull) (xerr fail.Error) {
+	if hostCore == nil {
+		return fail.InvalidParameterError("hostCore", "cannot be nil")
 	}
 	if newHost == nil {
 		return fail.InvalidParameterError("newHost", "cannot be nil")
@@ -744,14 +744,14 @@ func (s *Stack) complementHost(host *abstract.Host, newHost *abstract.Host) (xer
 
 	defer fail.OnPanic(&err)
 
-	host.ID = newHost.ID
-	if host.Name == "" {
-		host.Name = newHost.Name
+	hostCore.ID = newHost.ID
+	if hostCore.Name == "" {
+		hostCore.Name = newHost.Name
 	}
-	host.LastState = newHost.LastState
+	hostCore.LastState = newHost.LastState
 
 	// FIXME: this code should have been moved to operations, check this
-	return host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return hostCore.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			newHostNetworkV1 := propertiesv1.NewHostNetwork()
 			readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) fail.Error {
@@ -1060,12 +1060,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, xerr fail.Error) {
+func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahc, hostRef, err := stacks.ValidateHostParam(hostParam)
+	ahc, hostRef, err := stacks.ValidateHostParameter(hostParam)
 	if err != nil {
 		return err
 	}
@@ -1102,9 +1102,13 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(id string) fail.Error {
+func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
+	}
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
 	}
 
 	_, domain, err := s.getHostAndDomainFromRef(id)
@@ -1122,7 +1126,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 		return fail.Wrap(err, "failed to know if the domain is active")
 	}
 	if !isActive {
-		err := s.StartHost(id)
+		err := s.StartHost(ahf.Core.ID)
 		if err != nil {
 			return fail.Wrap(err, "failed to start the domain")
 		}
@@ -1148,7 +1152,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 		if domainName == volumeName {
 			err = s.DeleteVolume(volume.Name)
 			if err != nil {
-				return fail.Wrap(err, "failed to delete volume %s : %s", volumeName)
+				return fail.Wrap(err, "failed to delete volume '%s'", volumeName)
 			}
 		}
 	}
@@ -1157,7 +1161,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.SizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
@@ -1185,64 +1189,77 @@ func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(id string) fail.Error {
+func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	_, domain, err := s.getHostAndDomainFromRef(id)
-	if err != nil {
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	_, domain, xerr := s.getHostAndDomainFromRef(id)
+	if xerr != nil {
 		return fail.Wrap(err, "getHostAndDomainFromRef failed")
 	}
 
 	err = domain.Shutdown()
 	if err != nil {
-		return fail.Wrap(err, "failed to shutdown the host")
+		return fail.Wrap(normalizeError(err), "failed to shutdown the host '%s'", hostRef)
 	}
 
 	return nil
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(id string) fail.Error {
+func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
 
-	_, domain, err := s.getHostAndDomainFromRef(id)
+	_, domain, err := s.getHostAndDomainFromRef(ahf.Core.ID)
 	if err != nil {
 		return fail.Wrap(err, "getHostAndDomainFromRef")
 	}
 
 	err = domain.Create()
 	if err != nil {
-		return fail.Wrap(err, "failed to launch the host")
+		return fail.Wrap(normalizeError(err), "failed to launch the host '%s'", hostRef)
 	}
 
 	return nil
 }
 
 // RebootHost reboot the host identified by id
-func (s *Stack) RebootHost(id string) fail.Error {
+func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
 
-	_, domain, err := s.getHostAndDomainFromRef(id)
+	_, domain, err := s.getHostAndDomainFromRef(ahf.Core.id)
 	if err != nil {
 		return fail.Wrap(err, "getHostAndDomainFromRef failed")
 	}
 
 	err = domain.Reboot(0)
 	if err != nil {
-		return fail.Wrap(err, "failed to reboot the host")
+		return fail.Wrap(normalizeError(err), "failed to reboot the host '%s'", hostRef)
 	}
 
 	return nil
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
+func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s == nil {
 		return hoststate.ERROR, fail.InvalidInstanceError()
 	}

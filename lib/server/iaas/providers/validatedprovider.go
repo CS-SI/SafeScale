@@ -21,6 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -35,22 +36,22 @@ func (w ValidatedProvider) CreateVIP(netID string, name string) (*abstract.Virtu
 	return w.InnerProvider.CreateVIP(netID, name)
 }
 
-func (w ValidatedProvider) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
+func (w ValidatedProvider) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.AddPublicIPToVIP(vip)
 }
 
-func (w ValidatedProvider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
+func (w ValidatedProvider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
+func (w ValidatedProvider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	// FIXME:  Add OK method to vip
 	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) DeleteVIP(vip *abstract.VirtualIP) error {
+func (w ValidatedProvider) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 	// FIXME: Add OK method to vip
 	return w.InnerProvider.DeleteVIP(vip)
 }
@@ -282,8 +283,8 @@ func (w ValidatedProvider) CreateHost(request abstract.HostRequest) (res *abstra
 }
 
 // InspectHost ...
-func (w ValidatedProvider) InspectHost(something interface{}) (res *abstract.HostFull, err fail.Error) {
-	res, err = w.InnerProvider.InspectHost(something)
+func (w ValidatedProvider) InspectHost(hostParam stacks.HostParameter) (res *abstract.HostFull, err fail.Error) {
+	res, err = w.InnerProvider.InspectHost(hostParam)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {
@@ -295,7 +296,7 @@ func (w ValidatedProvider) InspectHost(something interface{}) (res *abstract.Hos
 }
 
 // WaitHostReady ...
-func (w ValidatedProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) error {
+func (w ValidatedProvider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	return w.InnerProvider.WaitHostReady(hostParam, timeout)
 }
 
@@ -311,8 +312,8 @@ func (w ValidatedProvider) GetHostByName(name string) (res *abstract.HostCore, e
 }
 
 // GetHostState ...
-func (w ValidatedProvider) GetHostState(something interface{}) (res hoststate.Enum, err fail.Error) {
-	return w.InnerProvider.GetHostState(something)
+func (w ValidatedProvider) GetHostState(hostParam stacks.HostParameter) (res hoststate.Enum, err fail.Error) {
+	return w.InnerProvider.GetHostState(hostParam)
 }
 
 // ListHosts ...
@@ -331,28 +332,28 @@ func (w ValidatedProvider) ListHosts(details bool) (res abstract.HostList, err f
 }
 
 // DeleteHost ...
-func (w ValidatedProvider) DeleteHost(id string) (xerr fail.Error) {
-	return w.InnerProvider.DeleteHost(id)
+func (w ValidatedProvider) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	return w.InnerProvider.DeleteHost(hostParam)
 }
 
 // StopHost ...
-func (w ValidatedProvider) StopHost(id string) (xerr fail.Error) {
-	return w.InnerProvider.StopHost(id)
+func (w ValidatedProvider) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	return w.InnerProvider.StopHost(hostParam)
 }
 
 // StartHost ...
-func (w ValidatedProvider) StartHost(id string) (xerr fail.Error) {
-	return w.InnerProvider.StartHost(id)
+func (w ValidatedProvider) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	return w.InnerProvider.StartHost(hostParam)
 }
 
 // RebootHost ...
-func (w ValidatedProvider) RebootHost(id string) (xerr fail.Error) {
-	return w.InnerProvider.RebootHost(id)
+func (w ValidatedProvider) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	return w.InnerProvider.RebootHost(hostParam)
 }
 
 // ResizeHost ...
-func (w ValidatedProvider) ResizeHost(id string, request abstract.HostSizingRequirements) (res *abstract.HostFull, err fail.Error) {
-	res, err = w.InnerProvider.ResizeHost(id, request)
+func (w ValidatedProvider) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (res *abstract.HostFull, err fail.Error) {
+	res, err = w.InnerProvider.ResizeHost(hostParam, request)
 	if err != nil {
 		if res != nil {
 			if !res.OK() {

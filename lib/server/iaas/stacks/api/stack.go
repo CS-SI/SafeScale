@@ -81,27 +81,27 @@ type Stack interface {
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
-	// GetHost returns the host identified by id or updates content of a *abstract.HostFull
-	InspectHost(interface{}) (*abstract.HostFull, fail.Error)
+	// InspectHost returns the host identified by id or updates content of a *abstract.HostFull
+	InspectHost(stacks.HostParameter) (*abstract.HostFull, fail.Error)
 	// GetHostByName returns the ID of the host identified by name
 	GetHostByName(string) (*abstract.HostCore, fail.Error)
 	// GetHostState returns the current state of the host identified by id
-	GetHostState(interface{}) (hoststate.Enum, fail.Error)
+	GetHostState(stacks.HostParameter) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts
 	ListHosts(bool) (abstract.HostList, fail.Error)
 	// DeleteHost deletes the host identified by id
-	DeleteHost(id string) fail.Error
+	DeleteHost(stacks.HostParameter) fail.Error
 	// StopHost stops the host identified by id
-	StopHost(id string) fail.Error
+	StopHost(stacks.HostParameter) fail.Error
 	// StartHost starts the host identified by id
-	StartHost(id string) fail.Error
-	// Reboot host
-	RebootHost(id string) fail.Error
+	StartHost(stacks.HostParameter) fail.Error
+	// RebootHost reboots a host
+	RebootHost(stacks.HostParameter) fail.Error
 	// Resize host
-	ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
+	ResizeHost(stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
 
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
-	WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error
+	WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
 
 	// CreateVolume creates a block volume
 	CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error)

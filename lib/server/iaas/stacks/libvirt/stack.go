@@ -18,7 +18,7 @@ type Stack struct {
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error {
+func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) fail.Error {
 	return nil, fail.NotImplementedError("WaitHostReady not implemented yet!") // FIXME: Technical debt
 }
 

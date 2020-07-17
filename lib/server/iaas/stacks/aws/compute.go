@@ -505,7 +505,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     keyPairName := request.KeyPair.Name
 
     if networks == nil || len(networks) == 0 {
-        return nullHF, userData, fail.InvalidRequestError("the ahf '%s' must be on at least one network (even if public)", resourceName)
+        return nullHF, userData, fail.InvalidRequestError("the host '%s' must be on at least one network (even if public)", resourceName)
     }
 
     // If no password is provided, create one
@@ -558,7 +558,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     //	}
     //}
     //if defaultGateway == nil && !hostMustHavePublicIP {
-    //    return nil, userData, fail.InvalidRequestError("the ahf %s must have a gateway or be public", resourceName)
+    //    return nil, userData, fail.InvalidRequestError("the host %s must have a gateway or be public", resourceName)
     //}
 
     // --- prepares data structures for Provider usage ---
@@ -573,7 +573,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     // Determine system disk size based on vcpus count
     template, xerr := s.GetTemplate(request.TemplateID)
     if xerr != nil {
-        return nil, userData, fail.Wrap(xerr, "failed to get ahf template '%s'", request.TemplateID)
+        return nil, userData, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
     }
 
     rim, err := s.GetImage(request.ImageID)
@@ -646,7 +646,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
     // --- query provider for ahf creation ---
 
-    logrus.Debugf("requesting ahf resource creation...")
+    logrus.Debugf("requesting host resource creation...")
     var desistError error
 
     // Retry creation until success, for 10 minutes
@@ -748,10 +748,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
     logrus.Debugf("ahf resource created.")
 
-    // Starting from here, delete ahf if exiting with error
+    // Starting from here, delete host if exiting with error
     defer func() {
         if err != nil { // FIXME: Handle error groups
-            logrus.Infof("Cleanup, deleting ahf '%s'", ahf.Core.Name)
+            logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
             derr := s.DeleteHost(ahf.Core.ID)
             if derr != nil {
                 logrus.Warnf("Error deleting ahf: %v", derr)

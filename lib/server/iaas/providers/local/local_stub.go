@@ -19,6 +19,7 @@
 package local
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -44,21 +45,28 @@ type AuthOptions struct {
 type CfgOptions struct {
 }
 
-func (provider *provider) WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error {
-	return gReport
+// WaitHostReady ...
+func (provider *provider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	return nil, gReport
 }
 
+// Build ...
 func (provider *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	provider.tenantParameters = map[string]interface{}{}
 	return nil, gReport
 }
+
+// GetAuthenticationOptions ...
 func (provider *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	return nil, gReport
 }
+
+// GetConfigurationOptions ...
 func (provider *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	return nil, gReport
 }
 
+// ListAvailabilityZones ...
 func (provider *provider) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	return nil, gReport
 }
@@ -136,31 +144,31 @@ func (provider *provider) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 func (provider *provider) CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
 	return nil, nil, gReport
 }
-func (provider *provider) ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (provider *provider) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, gReport
 }
-func (provider *provider) InspectHost(interface{}) (*abstract.HostFull, fail.Error) {
+func (provider *provider) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
 	return nil, gReport
 }
 func (provider *provider) GetHostByName(string) (*abstract.HostCore, fail.Error) {
 	return nil, gReport
 }
-func (provider *provider) GetHostState(interface{}) (hoststate.Enum, fail.Error) {
+func (provider *provider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	return hoststate.ERROR, gReport
 }
 func (provider *provider) ListHosts(bool) (abstract.HostList, fail.Error) {
 	return nil, gReport
 }
-func (provider *provider) DeleteHost(id string) fail.Error {
+func (provider *provider) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	return gReport
 }
-func (provider *provider) StartHost(id string) fail.Error {
+func (provider *provider) StartHost(hostParam stacks.HostParameter) fail.Error {
 	return gReport
 }
-func (provider *provider) StopHost(id string) fail.Error {
+func (provider *provider) StopHost(hostParam stacks.HostParameter) fail.Error {
 	return gReport
 }
-func (provider *provider) RebootHost(id string) fail.Error {
+func (provider *provider) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	return gReport
 }
 
