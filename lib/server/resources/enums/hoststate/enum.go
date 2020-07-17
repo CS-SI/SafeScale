@@ -22,17 +22,14 @@ package hoststate
 type Enum int
 
 const (
-	// STOPPED when host is stopped
-	STOPPED Enum = iota
-	// STARTING when host is starting
-	STARTING
-	// STARTED when host is started
-	STARTED
-	// STOPPING when host is stopping
-	STOPPING
-	// ERROR when host is in error state*/
-	ERROR
+    STOPPED Enum = iota	// STOPPED when host is stopped
+    STARTING            // STARTING when host is starting
+    STARTED             // STARTED when host is started
+    STOPPING            // STOPPING when host is stopping
+    TERMINATED          // TERMINATED when a host can be enumerated but it's already deleted
 
-	// Unknown ...
-	UNKNOWN
+    ERROR = 254         // when host is in error state
+
+    UNKNOWN = 255       // when the state is undetermined
+
 )

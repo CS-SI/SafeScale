@@ -227,7 +227,7 @@ func (handler *hostHandler) Create(
 	return objh, nil
 }
 
-// ErrorList returns the host list
+// List returns the host list
 func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()

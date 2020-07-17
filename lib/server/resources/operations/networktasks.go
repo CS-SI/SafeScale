@@ -19,6 +19,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -187,7 +188,7 @@ func (objn *network) taskFinalizeGatewayConfiguration(task concurrency.Task, par
 		logrus.Warnf("Unexpected problem rebooting...")
 	}
 
-	if _, xerr = objgw.waitInstallPhase(task, "final"); xerr != nil {
+	if _, xerr = objgw.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
 		return nil, xerr
 	}
 

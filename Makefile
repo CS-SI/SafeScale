@@ -18,7 +18,7 @@ PKG_FILES := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/)
 # List of packages alt
-PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks | xargs -I {} dirname {} | uniq )
+PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks | grep -v vclouddirector | grep -v ebrc |  xargs -I {} dirname {} | uniq )
 # List of packages to test
 TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v sandbox)
 

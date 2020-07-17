@@ -54,7 +54,7 @@ type SSHHandler interface {
 	// Connect(name string) error
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(interface{}) (*system.SSHConfig, fail.Error)
+	GetConfig(stacks.HostParameter) (*system.SSHConfig, fail.Error)
 }
 
 // FIXME ROBUSTNESS All functions MUST propagate context
@@ -70,7 +70,7 @@ func NewSSHHandler(job server.Job) SSHHandler {
 }
 
 // GetConfig creates SSHConfig to connect to an host
-func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.SSHConfig, xerr fail.Error) {
+func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, xerr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -81,7 +81,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 	task := handler.job.GetTask()
 	svc := handler.job.GetService()
 
-	_, hostRef, xerr := stacks.ValidateHostParam(hostParam)
+	_, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -210,7 +210,7 @@ func (handler *sshHandler) GetConfig(hostParam interface{}) (sshConfig *system.S
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *sshHandler) WaitServerReady(hostParam interface{}, timeout time.Duration) (xerr fail.Error) {
+func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (xerr fail.Error) {
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}

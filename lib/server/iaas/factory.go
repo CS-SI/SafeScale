@@ -19,7 +19,6 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
