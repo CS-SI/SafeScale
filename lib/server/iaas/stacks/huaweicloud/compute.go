@@ -482,7 +482,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// host.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 	host.Network.IsGateway = isGateway
 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	if request.PublicIP {
 		var fip *FloatingIP
@@ -547,25 +547,25 @@ func validatehostName(req abstract.HostRequest) (bool, fail.Error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.HostFull, xerr fail.Error) {
+func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahc, _, xerr := stacks.ValidateHostParam(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahc, hoststate.STARTED, 2*temporal.GetBigDelay())
+	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if xerr != nil {
 		return nil, xerr
 	}
 	if server == nil {
-		return nil, abstract.ResourceNotFoundError("host", ahc.ID)
+		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	if host, xerr = s.complementHost(ahc, server); xerr != nil {
+	if host, xerr = s.complementHost(ahf.Core, server); xerr != nil {
 		return nil, xerr
 	}
 	if xerr != nil {
@@ -766,29 +766,34 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(id string) fail.Error {
+func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	_, xerr := s.InspectHost(id)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	_, xerr = s.InspectHost(ahf)
 	if xerr != nil {
 		return xerr
 	}
 
 	if s.cfgOpts.UseFloatingIP {
-		fip, xerr := s.getFloatingIPOfHost(id)
+		fip, xerr := s.getFloatingIPOfHost(ahf.Core.ID)
 		if xerr == nil {
 			if fip != nil {
-				err := floatingips.DisassociateInstance(s.Stack.ComputeClient, id, floatingips.DisassociateOpts{
+				err := floatingips.DisassociateInstance(s.Stack.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
 					FloatingIP: fip.IP,
 				}).ExtractErr()
 				if err != nil {
-					return fail.NewError("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
+					return fail.NewError("error deleting host '%s' : %s", hostRef, openstack.ProviderErrorToString(err))
 				}
 				err = floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
 				if err != nil {
-					return fail.NewError("error deleting host %s : %s", id, openstack.ProviderErrorToString(err))
+					return fail.NewError("error deleting host '%s' : %s", hostRef, openstack.ProviderErrorToString(err))
 				}
 			}
 		}
@@ -800,7 +805,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 		func() error {
 			// 1st, send delete host order
 			if resourcePresent {
-				err := servers.Delete(s.Stack.ComputeClient, id).ExtractErr()
+				err := servers.Delete(s.Stack.ComputeClient, ahf.Core.ID).ExtractErr()
 				if err != nil {
 					switch err.(type) {
 					case gophercloud.ErrDefault404:
@@ -808,7 +813,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 						// metadata deletion will return an error)
 						return nil
 					default:
-						return fail.NewError("failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(err))
+						return fail.NewError("failed to submit host '%s' deletion: %s", hostRef, openstack.ProviderErrorToString(err))
 					}
 				}
 			}
@@ -821,7 +826,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 				innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
 					func() error {
 						var err error
-						host, err = servers.Get(s.Stack.ComputeClient, id).Extract()
+						host, err = servers.Get(s.Stack.ComputeClient, hostRef).Extract()
 						if err == nil {
 							if toHostState(host.Status) == hoststate.ERROR {
 								return nil
@@ -841,8 +846,8 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 				if innerRetryErr != nil {
 					if _, ok := innerRetryErr.(*retry.ErrTimeout); ok {
 						// retry deletion...
-						return fail.Wrap(abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout()),
-							"host '%s' not deleted after %v", id, temporal.GetContextTimeout())
+						return fail.Wrap(abstract.ResourceTimeoutError("host", hostRef, temporal.GetContextTimeout()),
+							"host '%s' not deleted after %v", hostRef, temporal.GetContextTimeout())
 					}
 					return innerRetryErr
 				}
@@ -850,17 +855,17 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 			if !resourcePresent {
 				return nil
 			}
-			return fail.NewError("host '%s' in state 'ERROR', retrying to delete", id)
+			return fail.NewError("host '%s' in state 'ERROR', retrying to delete", hostRef)
 		},
 		0,
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		logrus.Errorf("failed to remove host '%s': %s", id, outerRetryErr.Error())
+		logrus.Errorf("failed to remove host '%s': %s", hostRef, outerRetryErr.Error())
 		return outerRetryErr
 	}
 	if !resourcePresent {
-		return abstract.ResourceNotFoundError("host", id)
+		return abstract.ResourceNotFoundError("host", hostRef)
 	}
 	return nil
 }

@@ -282,7 +282,7 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
 	if err != nil {
-		xerr := TranslateProviderError(err)
+		xerr := NormalizeError(err)
 		logrus.Errorf("failed to delete network: %+v", xerr)
 		return xerr
 	}

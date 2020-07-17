@@ -501,7 +501,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		tErr := openstack.TranslateProviderError(err)
+		tErr := openstack.NormalizeError(err)
 		switch tErr.(type) { // nolint
 		case *fail.ErrInvalidRequest:
 			body := map[string]interface{}{}

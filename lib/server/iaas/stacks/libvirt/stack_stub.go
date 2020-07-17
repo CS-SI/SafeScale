@@ -35,53 +35,53 @@ type Stack struct {
 }
 
 // WaitHostReady ...
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error {
-	return gError
+func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	return abstract.NewHostCore(), gError
 }
 
 // ListAvailabilityZones stub
 func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
-	return nil, gError
+	return map[string]bool{}, gError
 }
 
 // ListRegions stub
 func (s *Stack) ListRegions() ([]string, fail.Error) {
-	return nil, gError
+	return []string{}, gError
 }
 
 // ListImages stub
 func (s *Stack) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	return nil, gError
+	return []abstract.Image{}, gError
 }
 
 // GetImage stub
 func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
-	return nil, gError
+	return &abstract.Image{}, gError
 }
 
 // GetTemplate stub
 func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-	return nil, gError
+	return &abstract.HostTemplate{}, gError
 }
 
 // ListTemplates stub
 func (s *Stack) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	return nil, gError
+	return []abstract.HostTemplate{}, gError
 }
 
 // CreateKeyPair stub
 func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-	return nil, gError
+	return &abstract.KeyPair{}, gError
 }
 
 // GetKeyPair stub
 func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-	return nil, gError
+	return &abstract.KeyPair{}, gError
 }
 
 // ListKeyPairs stub
 func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	return nil, gError
+	return []abstract.KeyPair{}, gError
 }
 
 // DeleteKeyPair stub
@@ -91,22 +91,22 @@ func (s *Stack) DeleteKeyPair(id string) fail.Error {
 
 // CreateNetwork stub
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-	return nil, gError
+	return &abstract.Network{}, gError
 }
 
 // GetNetwork stub
 func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
-	return nil, gError
+	return &abstract.Network{}, gError
 }
 
 // GetNetworkByName stub
 func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
-	return nil, gError
+	return &abstract.Network{}, gError
 }
 
 // ListNetworks stub
 func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
-	return nil, gError
+	return []*abstract.Network{}, gError
 }
 
 // DeleteNetwork stub
@@ -126,7 +126,7 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 
 // CreateVIP stub
 func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
-	return nil, gError
+	return &abstract.VirtualIP{}, gError
 }
 
 // AddPublicIPToVIP stub
@@ -151,67 +151,67 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 
 // CreateHost stub
 func (s *Stack) CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
-	return nil, nil, gError
+	return abstract.NewHostFull(), userdata.NewContent(), gError
 }
 
 // ResizeHost stub
-func (s *Stack) ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	return nil, gError
+func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+	return abstract.NewHostFull(), gError
 }
 
 // InspectHost stub
-func (s *Stack) InspectHost(interface{}) (*abstract.HostFull, fail.Error) {
-	return nil, gError
+func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
+	return abstract.NewHostFull(), gError
 }
 
 // GetHostByName stub
 func (s *Stack) GetHostByName(string) (*abstract.HostCore, fail.Error) {
-	return nil, gError
+	return abstract.NewHostCore(), gError
 }
 
 // GetHostState stub
-func (s *Stack) GetHostState(interface{}) (hoststate.Enum, fail.Error) {
+func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	return hoststate.ERROR, gError
 }
 
 // ListHosts stub
 func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
-	return nil, gError
+	return abstract.HostList{}, gError
 }
 
 // DeleteHost stub
-func (s *Stack) DeleteHost(id string) fail.Error {
+func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // StartHost stub
-func (s *Stack) StartHost(id string) fail.Error {
+func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // StopHost stub
-func (s *Stack) StopHost(id string) fail.Error {
+func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // RebootHost stub
-func (s *Stack) RebootHost(id string) fail.Error {
+func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // CreateVolume stub
 func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	return nil, gError
+	return &abstract.Volume{}, gError
 }
 
 // GetVolume stub
 func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
-	return nil, gError
+	return &abstract.Volume{}, gError
 }
 
 // ListVolumes stub
 func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	return nil, gError
+	return []abstract.Volume{}, gError
 }
 
 // DeleteVolume stub
@@ -226,12 +226,12 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 
 // GetVolumeAttachment stub
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	return nil, gError
+	return &abstract.VolumeAttachment{}, gError
 }
 
 // ListVolumeAttachments stub
 func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-	return nil, gError
+	return []abstract.VolumeAttachment{}, gError
 }
 
 // DeleteVolumeAttachment stub

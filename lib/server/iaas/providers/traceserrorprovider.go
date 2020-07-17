@@ -22,6 +22,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -32,7 +33,7 @@ import (
 type ErrorTraceProvider WrappedProvider
 
 // WaitHostReady ...
-func (w ErrorTraceProvider) WaitHostReady(hostParam interface{}, timeout time.Duration) (err fail.Error) {
+func (w ErrorTraceProvider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
@@ -322,13 +323,13 @@ func (w ErrorTraceProvider) CreateHost(request abstract.HostRequest) (_ *abstrac
 }
 
 // InspectHost ...
-func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *abstract.HostFull, err fail.Error) {
+func (w ErrorTraceProvider) InspectHost(hostParam stacks.HostParameter) (_ *abstract.HostFull, err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:InspectHost", w.Label))
-	return w.InnerProvider.InspectHost(something)
+	return w.InnerProvider.InspectHost(hostParam)
 }
 
 // GetHostByName ...
@@ -342,13 +343,13 @@ func (w ErrorTraceProvider) GetHostByName(name string) (_ *abstract.HostCore, er
 }
 
 // GetHostState ...
-func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enum, err fail.Error) {
+func (w ErrorTraceProvider) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetHostState", w.Label))
-	return w.InnerProvider.GetHostState(something)
+	return w.InnerProvider.GetHostState(hostParam)
 }
 
 // ListHosts ...
@@ -362,53 +363,53 @@ func (w ErrorTraceProvider) ListHosts(details bool) (_ abstract.HostList, err fa
 }
 
 // DeleteHost ...
-func (w ErrorTraceProvider) DeleteHost(id string) (err fail.Error) {
+func (w ErrorTraceProvider) DeleteHost(hostParam stacks.HostParameter) (err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteHost", w.Label))
-	return w.InnerProvider.DeleteHost(id)
+	return w.InnerProvider.DeleteHost(hostParam)
 }
 
 // StopHost ...
-func (w ErrorTraceProvider) StopHost(id string) (err fail.Error) {
+func (w ErrorTraceProvider) StopHost(hostParam stacks.HostParameter) (err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:StopHost", w.Label))
-	return w.InnerProvider.StopHost(id)
+	return w.InnerProvider.StopHost(hostParam)
 }
 
 // StartHost ...
-func (w ErrorTraceProvider) StartHost(id string) (err fail.Error) {
+func (w ErrorTraceProvider) StartHost(hostParam stacks.HostParameter) (err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:StartHost", w.Label))
-	return w.InnerProvider.StartHost(id)
+	return w.InnerProvider.StartHost(hostParam)
 }
 
 // RebootHost ...
-func (w ErrorTraceProvider) RebootHost(id string) (err fail.Error) {
+func (w ErrorTraceProvider) RebootHost(hostParam stacks.HostParameter) (err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:RebootHost", w.Label))
-	return w.InnerProvider.RebootHost(id)
+	return w.InnerProvider.RebootHost(hostParam)
 }
 
 // ResizeHost ...
-func (w ErrorTraceProvider) ResizeHost(id string, request abstract.HostSizingRequirements) (_ *abstract.HostFull, err fail.Error) {
+func (w ErrorTraceProvider) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (_ *abstract.HostFull, err fail.Error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ResizeHost", w.Label))
-	return w.InnerProvider.ResizeHost(id, request)
+	return w.InnerProvider.ResizeHost(hostParam, request)
 }
 
 // CreateVolume ...

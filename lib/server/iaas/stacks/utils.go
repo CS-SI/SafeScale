@@ -5,34 +5,45 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// ValidateHostParam validates host parameter that can be a string as ID or an *abstract.HostCore
-func ValidateHostParam(hostParam interface{}) (*abstract.HostCore, string, fail.Error) {
-	var (
-		ahc     *abstract.HostCore
-		hostRef string
-	)
+// HostParameter can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
+type HostParameter interface{}
+
+// ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
+func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hostRef string, xerr fail.Error) {
+	ahf = abstract.NewHostFull()
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be empty string")
 		}
-		ahc = abstract.NewHostCore()
-		ahc.ID = hostParam
+		ahf.Core.ID = hostParam
 		hostRef = hostParam
 	case *abstract.HostCore:
-		if hostParam == nil {
-			return nil, "", fail.InvalidParameterError("hostParam", "canot be nil")
+		if hostParam.IsNull() {
+			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostCore null value")
 		}
-		ahc = hostParam
-		hostRef = ahc.Name
+		ahf.Core = hostParam
+		hostRef = ahf.Core.Name
 		if hostRef == "" {
-			hostRef = ahc.ID
+			hostRef = ahf.Core.ID
 		}
+	case *abstract.HostFull:
+		if hostParam.IsNull() {
+			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostFull null value")
+		}
+		ahf = hostParam
+		hostRef = ahf.Core.Name
 		if hostRef == "" {
-			return nil, "", fail.InvalidParameterError("hostParam", "at least one of fields 'ID' or 'Name' must not be empty string")
+			hostRef = ahf.Core.ID
 		}
 	default:
-		return nil, "", fail.InvalidParameterError("hostParam", "must be a non-empty string or a *abstract.HostCore")
+		return nil, "", fail.InvalidParameterError("hostParam", "valid types are non-empty string, *abstract.HostCore or *abstract.HostFull")
 	}
-	return ahc, hostRef, nil
+	if hostRef == "" {
+		return nil, "", fail.InvalidParameterError("hostParam", "at least one of fields 'ID' or 'Name' must not be empty string")
+	}
+	if ahf.Core.ID == "" {
+		return nil, "", fail.InvalidParameterError("hostParam", "field ID cannot be empty string")
+	}
+	return ahf, hostRef, nil
 }

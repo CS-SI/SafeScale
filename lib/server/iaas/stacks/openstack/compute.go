@@ -45,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -264,6 +263,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	return flvList, nil
 }
 
+// TODO: replace with code to create KeyPair on provider side if it exists
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	if s == nil {
@@ -276,29 +276,10 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.OnExitTrace()
 
-	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	// publicKey := privateKey.PublicKey
-	// pub, _ := ssh.NewPublicKey(&publicKey)
-	// pubBytes := ssh.MarshalAuthorizedKey(pub)
-	// pubKey := string(pubBytes)
-
-	// priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	// priKeyPem := pem.EncodeToMemory(
-	// 	&pem.Block{
-	// 		Type:  "RSA PRIVATE KEY",
-	// 		Bytes: priBytes,
-	// 	},
-	// )
-	// priKey := string(priKeyPem)
-	// return &abstract.KeyPair{
-	// 	ID:         name,
-	// 	Name:       name,
-	// 	PublicKey:  pubKey,
-	// 	PrivateKey: priKey,
-	// }, nil
-	return crypt.GenerateRSAKeyPair(name)
+	return abstract.NewKeyPair(name)
 }
 
+// TODO: replace with openstack code to get keypair (if it exits)
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	if s == nil {
@@ -420,36 +401,33 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost gathers host information from provider
-func (s *Stack) InspectHost(hostParam interface{}) (*abstract.HostFull, fail.Error) {
+func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
+	nullAhf := abstract.NewHostFull()
 	if s == nil {
-		return nil, fail.InvalidInstanceError()
+		return nullAhf, fail.InvalidInstanceError()
 	}
-
-	ahc, hostRef, xerr := stacks.ValidateHostParam(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullAhf, xerr
 	}
 
 	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
-	server, xerr := s.WaitHostState(ahc, hoststate.STARTED, 2*temporal.GetBigDelay())
+	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if xerr != nil {
-		return nil, xerr
+		return nullAhf, xerr
 	}
 	if server == nil {
-		return nil, abstract.ResourceNotFoundError("host", hostRef)
+		return nullAhf, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	host, xerr := s.complementHost(ahc, *server)
-	if xerr != nil {
-		return nil, xerr
+	ahf.Core.LastState = toHostState(server.Status)
+
+	if !ahf.OK() {
+		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
 	}
 
-	if !host.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
-	}
-
-	return host, nil
+	return ahf, nil
 }
 
 func (s *Stack) queryServer(id string) (*servers.Server, fail.Error) {
@@ -672,13 +650,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
-	// defaultGateway := request.DefaultGateway
-	// isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
-	// defaultGatewayID := ""
-	// defaultGatewayPrivateIP := ""
-	// if defaultGateway != nil {
-	// 	defaultGatewayID = defaultGateway.ID
-	// }
 
 	var nets []servers.Network
 	// If floating IPs are not used and host is public
@@ -854,7 +825,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// newHost.Network.DefaultGatewayID = defaultGatewayID
 	// newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	newHost.Network.IsGateway = request.IsGateway
-	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	// if Floating IP are used and public address is requested
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
@@ -949,28 +920,37 @@ func (s *Stack) SelectedAvailabilityZone() (string, fail.Error) {
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) fail.Error {
+func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	nullAhc := abstract.NewHostCore()
 	if s == nil {
-		return fail.InvalidInstanceError()
+		return nullAhc, fail.InvalidInstanceError()
 	}
 
-	_, err := s.WaitHostState(hostParam, hoststate.STARTED, timeout)
-	return err
+	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return nullAhc, xerr
+	}
+	server, xerr := s.WaitHostState(hostParam, hoststate.STARTED, timeout)
+	if xerr != nil {
+		return nullAhc, xerr
+	}
+	ahf, xerr = s.complementHost(ahf.Core, *server)
+	if xerr != nil {
+		return nullAhc, xerr
+	}
+	return ahf.Core, nil
 }
 
 // WaitHostState waits an host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) WaitHostState(hostParam interface{}, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+func (s *Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahc, hostRef, err := stacks.ValidateHostParam(hostParam)
+	ahf, hostRef, err := stacks.ValidateHostParameter(hostParam)
 	if err != nil {
 		return nil, fail.ToError(err)
-	}
-	if ahc.ID == "" {
-		return nil, fail.InvalidParameterError("hostParam", "field 'ID' cannot be empty string")
 	}
 
 	defer concurrency.NewTracer(nil, true, "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering().OnExitTrace()
@@ -978,7 +958,7 @@ func (s *Stack) WaitHostState(hostParam interface{}, state hoststate.Enum, timeo
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var err error
-			server, err = servers.Get(s.ComputeClient, ahc.ID).Extract()
+			server, err = servers.Get(s.ComputeClient, ahf.Core.ID).Extract()
 			if err != nil {
 				switch err.(type) {
 				case gophercloud.ErrDefault404:
@@ -1064,7 +1044,7 @@ func (s *Stack) WaitHostState(hostParam interface{}, state hoststate.Enum, timeo
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
+func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s == nil {
 		return hoststate.ERROR, fail.InvalidInstanceError()
 	}
@@ -1153,31 +1133,32 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Erro
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(id string) fail.Error {
+func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s", id).WithStopwatch().Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
 	if s.cfgOpts.UseFloatingIP {
-		fip, xerr := s.getFloatingIP(id)
+		fip, xerr := s.getFloatingIP(ahf.Core.ID)
 		if xerr != nil {
-			return fail.Wrap(xerr, "error retrieving floating ip for '%s'", id)
+			return fail.Wrap(xerr, "error retrieving floating ip of host '%s'", hostRef)
 		}
 		if fip != nil {
-			err := floatingips.DisassociateInstance(s.ComputeClient, id, floatingips.DisassociateOpts{
+			err := floatingips.DisassociateInstance(s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
 				FloatingIP: fip.IP,
 			}).ExtractErr()
 			if err != nil {
-				return fail.Wrap(err, "error deleting host '%s' : %s", id, ProviderErrorToString(err))
+				return fail.Wrap(NormalizeError(err), "error deleting host '%s': %s", hostRef, ProviderErrorToString(err))
 			}
 			err = floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
 			if err != nil {
-				return fail.Wrap(err, "error deleting host '%s' : %s", id, ProviderErrorToString(err))
+				return fail.Wrap(NormalizeError(err), "error deleting host '%s' : %s", hostRef, ProviderErrorToString(err))
 			}
 		}
 	}
@@ -1188,16 +1169,16 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 		func() error {
 			// 1st, send delete host order
 			if resourcePresent {
-				innerErr := servers.Delete(s.ComputeClient, id).ExtractErr()
+				innerErr := servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr()
 				if innerErr != nil {
 					switch innerErr.(type) {
 					case gophercloud.ErrDefault404:
 						// Resource not found, consider deletion successful
-						logrus.Debugf("Host '%s' not found, deletion considered successful", id)
+						logrus.Debugf("Host '%s' not found, deletion considered successful", hostRef)
 						resourcePresent = false
 						return nil
 					default:
-						return fail.NewError("failed to submit host '%s' deletion: %s", id, ProviderErrorToString(innerErr))
+						return fail.NewError("failed to submit host '%s' deletion: %s", hostRef, ProviderErrorToString(innerErr))
 					}
 				}
 			}
@@ -1207,7 +1188,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 			if resourcePresent {
 				innerErr := retry.WhileUnsuccessfulDelay5Seconds(
 					func() error {
-						host, err := servers.Get(s.ComputeClient, id).Extract()
+						host, err := servers.Get(s.ComputeClient, ahf.Core.ID).Extract()
 						if err == nil {
 							if toHostState(host.Status) == hoststate.ERROR {
 								return nil
@@ -1227,7 +1208,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 				if innerErr != nil {
 					if _, ok := innerErr.(*fail.ErrTimeout); ok {
 						// retry deletion...
-						return abstract.ResourceTimeoutError("host", id, temporal.GetContextTimeout())
+						return abstract.ResourceTimeoutError("host", hostRef, temporal.GetContextTimeout())
 					}
 					return innerErr
 				}
@@ -1236,7 +1217,7 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 				// logrus.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
 				return nil
 			}
-			return fail.NotAvailableError("host '%s' in state 'ERROR', retrying to delete", id)
+			return fail.NotAvailableError("host '%s' in state 'ERROR', retrying to delete", hostRef)
 		},
 		0,
 		temporal.GetHostCleanupTimeout(),
@@ -1245,86 +1226,89 @@ func (s *Stack) DeleteHost(id string) fail.Error {
 		return fail.Wrap(outerRetryErr, "error deleting host: retry error")
 	}
 	if !resourcePresent {
-		return abstract.ResourceNotFoundError("host", id)
+		return abstract.ResourceNotFoundError("host", hostRef)
 	}
 	return nil
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(id string) fail.Error {
+func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
-	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
+	err := startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
 	if err != nil {
-		return fail.Wrap(err, "error stopping host : %s", ProviderErrorToString(err))
+		return fail.Wrap(NormalizeError(err), "error stopping host")
 	}
 	return nil
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (s *Stack) RebootHost(id string) fail.Error {
+func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
-	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
+	err := servers.Reboot(s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
 	if err != nil {
-		err = servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
+		err = servers.Reboot(s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
 	}
 	if err != nil {
-		ftErr := fail.NewError("error rebooting host '%s': %s", id, ProviderErrorToString(err))
-		return fail.Wrap(err, ftErr.Error())
+		return fail.Wrap(NormalizeError(err), "error rebooting host '%s'", hostRef)
 	}
 	return nil
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(id string) fail.Error {
+func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
-	err := startstop.Start(s.ComputeClient, id).ExtractErr()
+	err := startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
 	if err != nil {
-		return fail.Wrap(err, "error starting host : %s", ProviderErrorToString(err))
+		return fail.Wrap(NormalizeError(err), "error starting host '%s'", hostRef)
 	}
 
 	return nil
 }
 
 // ResizeHost ...
-func (s *Stack) ResizeHost(id string, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+	_/*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", id).WithStopwatch().Entering().OnExitTrace()
+	defer concurrency.NewTracer(nil, debug.ShouldTrace("stack.compute"), "(%s)", hostRef).WithStopwatch().Entering().OnExitTrace()
 
-	// TODO RESIZE Resize Host HERE
+	// TODO: RESIZE Resize Host HERE
 	logrus.Warn("Trying to resize a Host...")
 
-	// TODO RESIZE Call this
+	// TODO: RESIZE Call this
 	// servers.Resize()
 
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
