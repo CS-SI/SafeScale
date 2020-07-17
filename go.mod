@@ -11,8 +11,9 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/OpenPeeDeeP/depguard v1.0.1 // indirect
 	github.com/akavel/rsrc v0.9.0 // indirect
+	github.com/antihax/optional v1.0.0
 	github.com/asaskevich/govalidator v0.0.0-20180315120708-ccb8e960c48f
-	github.com/aws/aws-sdk-go v1.28.2 // indirect
+	github.com/aws/aws-sdk-go v1.28.2
 	github.com/bombsimon/wsl/v2 v2.2.0 // indirect
 	github.com/coreos/go-etcd v2.0.0+incompatible // indirect
 	github.com/cpuguy83/go-md2man v1.0.10 // indirect
@@ -67,10 +68,12 @@ require (
 	github.com/nkovacs/streamquote v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
+	github.com/outscale-dev/osc-sdk-go v1.0.0 // indirect
+	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
 	github.com/ovh/go-ovh v0.0.0-20181109152953-ba5adb4cf014
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/sethvargo/go-password v0.1.1
 	github.com/shirou/gopsutil v0.0.0-20190901111213-e4ec7b275ada // indirect
@@ -87,7 +90,6 @@ require (
 	github.com/tebeka/go2xunit v1.4.10 // indirect
 	github.com/timakin/bodyclose v0.0.0-20190930140734-f7f2e9bca95e // indirect
 	github.com/tommy-muehle/go-mnd v1.3.1-0.20200224220436-e6f9a994e8fa // indirect
-	github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8 // indirect
 	github.com/ultraware/funlen v0.0.2 // indirect
 	github.com/ultraware/whitespace v0.0.4 // indirect
 	github.com/urfave/cli v1.22.4 // indirect
@@ -95,6 +97,7 @@ require (
 	github.com/uudashr/gocognit v1.0.1 // indirect
 	github.com/valyala/fasttemplate v1.1.0 // indirect
 	github.com/valyala/quicktemplate v1.2.0 // indirect
+	github.com/vmware/go-vcloud-director v2.0.0+incompatible
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
@@ -107,7 +110,7 @@ require (
 	google.golang.org/api v0.15.0
 	google.golang.org/appengine v1.6.5
 	google.golang.org/grpc v1.27.0
-	google.golang.org/protobuf v1.23.0
+	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect

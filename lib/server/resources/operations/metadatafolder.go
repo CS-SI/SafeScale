@@ -18,15 +18,17 @@ package operations
 
 import (
 	"bytes"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 )
 
 // folder describes a metadata folder
@@ -157,7 +159,12 @@ func (f *folder) Read(path string, name string, callback func([]byte) fail.Error
 	}
 
 	var buffer bytes.Buffer
-	xerr = f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			return f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
+		},
+		10*time.Second,
+	)
 	if xerr != nil {
 		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
 	}

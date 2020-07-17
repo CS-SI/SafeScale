@@ -29,7 +29,7 @@ import (
 // Contains the function used to convert from abstract structures
 
 // HostTemplateToHostEffectiveSizing converts an abstract.HostTemplate to an abstract.HostEffectiveSizing
-func HostTemplateToHostEffectiveSizing(ht *abstract.HostTemplate) *abstract.HostEffectiveSizing {
+func HostTemplateToHostEffectiveSizing(ht abstract.HostTemplate) *abstract.HostEffectiveSizing {
 	hes := abstract.NewHostEffectiveSizing()
 	hes.Cores = ht.Cores
 	hes.RAMSize = ht.RAMSize

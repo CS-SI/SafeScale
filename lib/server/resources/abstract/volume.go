@@ -128,6 +128,14 @@ type VolumeAttachment struct {
 	Format     string `json:"format,omitempty"`
 }
 
+func NewVolumeAttachment() *VolumeAttachment {
+	return &VolumeAttachment{}
+}
+
+func (va *VolumeAttachment) IsNull() bool {
+	return va == nil || (va.ID == "" && va.Name == "")
+}
+
 // OK ...
 func (va VolumeAttachment) OK() bool {
 	result := true

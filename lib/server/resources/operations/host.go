@@ -337,32 +337,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
 	if hostReq.TemplateID == "" {
-		useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
-		templates, xerr := svc.SelectTemplatesBySize(hostDef, useScannerDB)
+		hostReq.TemplateID, xerr = rh.findTemplateID(hostDef)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+			return nil, xerr
 		}
-		var template abstract.HostTemplate
-		if len(templates) > 0 {
-			template = *(templates[0])
-			msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-			if template.CPUFreq > 0 {
-				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-			}
-			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-			if template.GPUNumber > 0 {
-				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-				if template.GPUType != "" {
-					msg += fmt.Sprintf(" %s", template.GPUType)
-				}
-			}
-			msg += ")"
-			logrus.Infof(msg)
-		} else {
-			logrus.Errorf("failed to find template corresponding to requested resources")
-			return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
-		}
-		hostReq.TemplateID = template.ID
 	}
 
 	var rn resources.Network
@@ -394,27 +372,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// If hostReq.ImageID is not explicitely defined, find an image GetID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
-		if hostDef.Image == "" {
-			cfg, xerr := svc.GetConfigurationOptions()
-			if xerr != nil {
-				return nil, xerr
-			}
-			hostDef.Image = cfg.GetString("DefaultImage")
-		}
-
-		var img *abstract.Image
-		xerr = retry.WhileUnsuccessfulDelay1Second(
-			func() error {
-				var innerXErr fail.Error
-				img, innerXErr = svc.SearchImage(hostDef.Image)
-				return innerXErr
-			},
-			10*time.Second,
-		)
+		hostReq.ImageID, xerr = rh.findImageID(&hostDef)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to find image to use on compute resource")
 		}
-		hostReq.ImageID = img.ID
 	}
 
 	hostReq.Password = "safescale" // VPL:for debugging purpose, remove if you see this!
@@ -521,7 +482,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	logrus.Infof("Waiting start of SSH service on remote host '%s' ...", rh.GetName())
 
 	// TODO: configurable timeout here
-	status, xerr := rh.waitInstallPhase(task, userdata.PHASE1_INIT)
+	status, xerr := rh.waitInstallPhase(task, userdata.PHASE1_INIT, time.Duration(0))
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrTimeout); ok {
 			return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
@@ -590,7 +551,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 
 		// TODO: configurable timeout here
-		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL); xerr != nil {
+		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
 			if _, ok := xerr.(*fail.ErrTimeout); ok {
 				return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
 			}
@@ -602,9 +563,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	} else {
 		// TODO: configurable timeout here
-		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY); xerr != nil {
+		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, time.Duration(0)); xerr != nil {
 			if _, ok := xerr.(*fail.ErrTimeout); ok {
-				return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
+				return nil, fail.Wrap(xerr, "timeout creating a host")
 			}
 			if abstract.IsProvisioningError(xerr) {
 				logrus.Errorf("%+v", xerr)
@@ -616,6 +577,61 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	logrus.Infof("host '%s' created successfully", rh.GetName())
 	return userdataContent, nil
+}
+
+func (rh host) findTemplateID(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
+	svc := rh.GetService()
+	useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
+	templates, xerr := svc.SelectTemplatesBySize(hostDef, useScannerDB)
+	if xerr != nil {
+		return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+	}
+	var template abstract.HostTemplate
+	if len(templates) > 0 {
+		template = *(templates[0])
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+		if template.CPUFreq > 0 {
+			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+		}
+		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+		if template.GPUNumber > 0 {
+			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+			if template.GPUType != "" {
+				msg += fmt.Sprintf(" %s", template.GPUType)
+			}
+		}
+		msg += ")"
+		logrus.Infof(msg)
+	} else {
+		logrus.Errorf("failed to find template corresponding to requested resources")
+		return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+	}
+	return template.ID, nil
+}
+
+func (rh host) findImageID(hostDef *abstract.HostSizingRequirements) (string, fail.Error) {
+	svc := rh.GetService()
+	if hostDef.Image == "" {
+		cfg, xerr := svc.GetConfigurationOptions()
+		if xerr != nil {
+			return "", xerr
+		}
+		hostDef.Image = cfg.GetString("DefaultImage")
+	}
+
+	var img *abstract.Image
+	xerr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			var innerXErr fail.Error
+			img, innerXErr = svc.SearchImage(hostDef.Image)
+			return innerXErr
+		},
+		10*time.Second,
+	)
+	if xerr != nil {
+		return "", xerr
+	}
+	return img.ID, nil
 }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
@@ -644,7 +660,7 @@ func (rh host) runInstallPhase(task concurrency.Task, phase userdata.Phase, user
 	return nil
 }
 
-func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase) (string, fail.Error) {
+func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase, timeout time.Duration) (string, fail.Error) {
 	sshDefaultTimeout := int(temporal.GetHostTimeout().Minutes())
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		num, err := strconv.Atoi(sshDefaultTimeoutCandidate)
@@ -699,7 +715,7 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (stri
 		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL)
+	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL, timeout)
 }
 
 // getOrCreateDefaultNetwork gets network abstract.SingleHostNetworkName or create it if necessary

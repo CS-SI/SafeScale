@@ -18,9 +18,13 @@ package abstract
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -31,6 +35,35 @@ type KeyPair struct {
 	Name       string
 	PrivateKey string
 	PublicKey  string
+}
+
+// IsNull tells if the keypair is a null value
+func (kp *KeyPair) IsNull() bool {
+	return kp == nil || kp.Name == "" || kp.PublicKey == "" || kp.PrivateKey == ""
+}
+
+// NewKeyPair creates a *resources.KeyPair
+func NewKeyPair(prefix string) (*KeyPair, fail.Error) {
+	id, err := uuid.NewV4()
+	if err != nil {
+		return nil, fail.Wrap(err, "failed to create host UUID")
+	}
+
+	if prefix == "" {
+		prefix = "kp"
+	}
+	name := fmt.Sprintf("%s_%s", prefix, id)
+
+	privKey, pubKey, xerr := crypt.GenerateRSAKeyPair(name)
+	if err != nil {
+		return nil, xerr
+	}
+	return &KeyPair{
+		ID: name,
+		Name: name,
+		PrivateKey: privKey,
+		PublicKey: pubKey,
+	}, nil
 }
 
 // HostSizingRequirements represents host sizing requirements to fulfil
@@ -77,9 +110,11 @@ type StoredCPUInfo struct {
 
 // Image represents an OS image
 type Image struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
-	URL  string
+	ID   string        `json:"id,omitempty"`
+	Name string        `json:"name,omitempty"`
+	URL  string        `json:"url,omitempty"`
+	Description string `json:"description,omitempty"`
+	StorageType string `json:"storage_type,omitempty"`
 }
 
 // OK ...
@@ -119,6 +154,9 @@ type HostRequest struct {
 	IsGateway bool
 	// KeepOnFailure tells if resource must be kept on failure
 	KeepOnFailure bool
+	// Use spot-like instance
+	Disposable bool
+
 }
 
 // HostEffectiveSizing ...
@@ -173,6 +211,12 @@ func NewHostCore() *HostCore {
 	return &HostCore{
 		LastState: hoststate.UNKNOWN,
 	}
+}
+
+// IsNull tells if the instance is a null value
+// satisfies interface data.NullValue
+func (hc *HostCore) IsNull() bool {
+	return hc == nil || (hc.ID == "" && hc.Name == "")
 }
 
 // IsConsistent tells if host struct is consistent
@@ -304,7 +348,7 @@ type HostFull struct {
 	Description *HostDescription
 }
 
-// NewHostFull ...
+// NewHostFull creates an instance of HostFull
 func NewHostFull() *HostFull {
 	return &HostFull{
 		Core:        NewHostCore(),
@@ -314,17 +358,35 @@ func NewHostFull() *HostFull {
 	}
 }
 
+// IsNull tells of the instance is a null value
+// satisfies interface data.NullValue
+func (hf *HostFull) IsNull() bool {
+	return hf == nil || hf.Core.IsNull()
+}
+
 // IsConsistent returns true if the struct is consistent
-func (hc *HostFull) IsConsistent() bool {
-	return hc != nil && hc.Core.OK() // && hc.Description.OK() && hc.Sizing.OK() && hc.Network.OK()
+func (hf *HostFull) IsConsistent() bool {
+	return hf != nil && hf.Core.OK() // && hc.Description.OK() && hc.Sizing.OK() && hc.Network.OK()
 }
 
 // OK is a synonym to IsConsistent
-func (hc *HostFull) OK() bool {
-	if hc == nil {
+func (hf *HostFull) OK() bool {
+	if hf == nil {
 		return false
 	}
-	return hc.IsConsistent()
+	return hf.IsConsistent()
+}
+
+// GetID returns the ID of the host
+// satisfies interface data.Identifiable
+func (hf *HostFull) GetID() string {
+	return hf.Core.ID
+}
+
+// GetName returns the name of the host
+// satisfies interface data.Identifiable
+func (hf *HostFull) GetName() string {
+	return hf.Core.Name
 }
 
 // HostList contains a list of HostFull

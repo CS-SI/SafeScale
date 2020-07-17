@@ -52,3 +52,4 @@ func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host
 	}
 	return gw, nil
 }
+
