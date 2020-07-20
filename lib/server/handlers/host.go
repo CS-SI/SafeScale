@@ -348,10 +348,11 @@ func (handler *HostHandler) Create(
 		default:
 			return nil, err
 		}
-	}
-	// host in state 'TERMINATED' doesn't really exist, other states mean the host exists
-	if host.LastState != hoststate.TERMINATED {
-		return nil, resources.ResourceDuplicateError("host", name)
+	} else {
+		// host in state 'TERMINATED' doesn't really exist, other states mean the host exists
+		if host.LastState != hoststate.TERMINATED {
+			return nil, resources.ResourceDuplicateError("host", name)
+		}
 	}
 
 	var (

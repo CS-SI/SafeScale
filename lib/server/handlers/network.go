@@ -567,10 +567,11 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 		default:
 			return nil, err
 		}
-	}
-	// gw in state 'TERMINATED' doesn't really exist, other states mean the gw exists
-	if gw.LastState != hoststate.TERMINATED {
-		return nil, resources.ResourceDuplicateError("host", request.Name)
+	} else {
+		// gw in state 'TERMINATED' doesn't really exist, other states mean the gw exists
+		if gw.LastState != hoststate.TERMINATED {
+			return nil, resources.ResourceDuplicateError("host", request.Name)
+		}
 	}
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", request.Name, request.TemplateID, request.ImageID)
