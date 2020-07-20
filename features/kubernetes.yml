@@ -484,7 +484,7 @@ feature:
                                     #? crash during init phase, to be investigated ...
                                     ## encryption-provider-config: aescbc
                                     profiling: "false"
-                            {{ end }}
+                            {{- end }}
                             controllerManager:
                                 extraArgs:
                                     terminated-pod-gc-threshold: "12500"
@@ -492,7 +492,7 @@ feature:
                                     profiling: "false"
                                     use-service-account-credentials: "true"
                                     feature-gates: RotateKubeletServerCertificate=true
-                            {{ end }}
+                            {{- end }}
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
                             ---
@@ -508,14 +508,14 @@ feature:
                             {{- if .OIDCRealm }}
                                 {{- if .ExternalLoadBalancerHostname }}
                             oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"
-                                {{ else }}
+                                {{- else }}
                             oidc-issuer-url: "https://{{ .EndpointIP }}/realms/{{ .OIDCRealm }}"
                             # oidc-ca-file: "/opt/safescale/etc/pki/ca/certs/rootca.cert.pem"
-                                {{ end }}
+                                {{- end }}
                             oidc-client-id: "{{ .OIDCClientName }}"
                             oidc-username-claim: "{{ .OIDCUserName }}"
                             oidc-groups-claim: "{{ .OIDCGroupName }}"
-                            {{ end }}
+                            {{- end }}
                             ---
                             apiVersion: kubeproxy.config.k8s.io/v1alpha1
                             kind: KubeProxyConfiguration
