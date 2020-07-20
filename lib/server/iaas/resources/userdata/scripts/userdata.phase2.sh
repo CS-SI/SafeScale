@@ -141,6 +141,7 @@ PU_IP=
 PU_IF=
 i_PR_IF=
 o_PR_IF=
+NETMASK=
 AWS=
 
 # Don't request dns name servers from DHCP server
@@ -187,6 +188,8 @@ is_ip_private() {
 identify_nics() {
     NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
     NICS=${NICS/[[:cntrl:]]/ }
+
+    NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
 
     for IF in ${NICS}; do
         IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
@@ -745,31 +748,37 @@ configure_network_redhat_with_nmcli() {
     # Do some cleanup inside /etc/sysconfig/network-scripts
     CONNECTIONS=$(nmcli -f "NAME,DEVICE" -c no -t con)
     for i in $CONNECTIONS; do
-        NAME=$(echo ${i} | cut ':' -f1)
-        DEVICE=$(echo ${i} | cut -d: -f2)
+        NAME=$(echo ${i} | cut -d':' -f1)
+        DEVICE=$(echo ${i} | cut -d':' -f2)
         [[ -z "${DEVICE}" ]] && mv /etc/sysconfig/network-scripts/ifcfg-${NAME} /etc/sysconfig/network-scripts/disabled.ifcfg-${NAME}
     done
 
     # Configure all network interfaces in dhcp
-    for IF in $(nmcli -f 'DEVICE' -c no -t con); do
-        nmcli con mod "${IF}" ipv4.method auto || return 1
-        nmcli con mod "${IF}" connection.autoconnect yes || return 1
+    for IF in $(nmcli -f 'DEVICE' -c no -t dev); do
+        [[ "${IF}" = "lo" ]] && continue
+
+        CONN=$(nmcli -c no -t -f "NAME,DEVICE" con | grep ${IF} | cut -d: -f1)
+        nmcli con mod "${CONN}" connection.autoconnect yes || return 1
+        nmcli con mod "${CONN}" ipv4.method auto || return 1
       {{- if .DNSServers }}
         {{- range .DNSServers }}
-        nmcli con mod "${IF}" ipv4.dns {{ . }} || return 1
+        nmcli con mod "${CONN}" +ipv4.dns {{ . }} || return 1
         {{- end }}
       {{- else }}
         EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
         if [[ -z ${EXISTING_DNS} ]]; then
-            ${NMCLI} con mod "${IF}" ipv4.dns 1.1.1.1 || return 1
+            ${NMCLI} con mod "${CONN}" +ipv4.dns 1.1.1.1 || return 1
         else
-            ${NMCLI} con mod "${IF}" ipv4.dns ${EXISTING_DNS} || return 1
+            ${NMCLI} con mod "${CONN}" +ipv4.dns ${EXISTING_DNS} || return 1
         fi
       {{- end }}
 
       {{- if .AddGateway }}
-        nmcli con modify ${IF} ipv4.gateway {{ .DefaultRouteIP }} || return 1
+        # ipv4.routes doesn't support 0.0.0.0/0 to define default route, so we use 2 route entries corresponding to 0.0.0.0/0
+        nmcli con mod "${CONN}" ipv4.routes "0.0.0.0/1 {{ .DefaultRouteIP }}, 128.0.0.0/1 {{ .DefaultRouteIP }}"
       {{- end}}
+
+        nmcli con up "${CONN}"
     done
 
     configure_dhclient || return 1
@@ -784,6 +793,7 @@ check_for_ip() {
             ;;
         *) ;;
     esac
+
 
     allip=$(ip -f inet -o addr show)
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
@@ -1491,7 +1501,7 @@ check_network_reachable() {
 check_dns_configuration() {
   if [[ -r /etc/resolv.conf ]]; then
     echo "Getting DNS using resolv.conf..."
-    THE_DNS=$(cat /etc/resolv.conf |grep -i '^nameserver'|head -n1|cut -d ' ' -f2)
+    THE_DNS=$(cat /etc/resolv.conf |grep -i '^nameserver'|head -n1|cut -d' ' -f2)
 
     if [[ -n ${THE_DNS} ]]; then
       timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
