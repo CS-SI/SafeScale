@@ -62,6 +62,8 @@ feature:
         - OIDCGroupName=user_groups
         - OIDCUserName=username
         - ControlplaneEndpointIP
+        - PODSubnet=10.244.0.0/16
+        - ServiceSubnet=10.96.0.0/12
 
     install:
         bash:
@@ -455,9 +457,9 @@ feature:
                                     dataDir: /var/lib/etcd
                             networking:
                                 dnsDomain: ${DNSDOMAIN}
-                                podSubnet: 10.244.0.0/16
-                                serviceSubnet: 10.96.0.0/12
-                            {{ if eq .Hardening "true" }}
+                                podSubnet: {{ .PODSubnet }}
+                                serviceSubnet: {{ .ServiceSubnet }}
+                            {{- if eq .Hardening "true" }}
                             apiServer:
                                 timeoutForControlPlane: 4m0s
                                 extraArgs:
@@ -482,12 +484,15 @@ feature:
                                     #? crash during init phase, to be investigated ...
                                     ## encryption-provider-config: aescbc
                                     profiling: "false"
+                            {{ end }}
                             controllerManager:
                                 extraArgs:
                                     terminated-pod-gc-threshold: "12500"
+                            {{- if eq .Hardening "true" }}
                                     profiling: "false"
                                     use-service-account-credentials: "true"
                                     feature-gates: RotateKubeletServerCertificate=true
+                            {{ end }}
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
                             ---
@@ -495,14 +500,13 @@ feature:
                             kind: InitConfiguration
                             localAPIEndpoint:
                                 bindPort: ${LOCAL_PORT}
-                            {{ end }}
                             certificatesDir: /etc/kubernetes/pki
                             clusterName: kubernetes
                             dns:
                                 type: CoreDNS
                             imageRepository: k8s.gcr.io
-                            {{ if .OIDCRealm }}
-                                {{ if .ExternalLoadBalancerHostname }}
+                            {{- if .OIDCRealm }}
+                                {{- if .ExternalLoadBalancerHostname }}
                             oidc-issuer-url: "https://{{ .ExternalLoadBalancerHostname }}/realms/{{ .OIDCRealm }}"
                                 {{ else }}
                             oidc-issuer-url: "https://{{ .EndpointIP }}/realms/{{ .OIDCRealm }}"
