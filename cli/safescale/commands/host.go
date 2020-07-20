@@ -213,6 +213,10 @@ var hostCreate = cli.Command{
 			Name:  "f, force",
 			Usage: "Force creation even if the host doesn't meet the GPU and CPU freq requirements",
 		},
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If set, the resources are not deleted on failure (default: not set)",
+		},
 		cli.StringFlag{
 			Name: "S, sizing",
 			Usage: `Describe sizing of host in format "<component><operator><value>[,...]" where:
@@ -670,6 +674,7 @@ func constructPBHostDefinitionFromCLI(c *cli.Context, key string) (*pb.HostDefin
 		Force:   c.Bool("force"),
 		Domain: c.String("domain"),
 		Sizing:  &pb.HostSizing{},
+		KeepOnFailure: c.Bool("keep-on-failure"),
 	}
 	if t, ok := tokens["cpu"]; ok {
 		min, max, err := t.Validate()
