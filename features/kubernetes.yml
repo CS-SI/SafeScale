@@ -500,7 +500,7 @@ feature:
                             kind: InitConfiguration
                             localAPIEndpoint:
                                 bindPort: ${LOCAL_PORT}
-                            certificatesDir: /etc/kubernetes/pki
+                            certificateDir: /etc/kubernetes/pki
                             clusterName: kubernetes
                             dns:
                                 type: CoreDNS
