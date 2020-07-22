@@ -426,16 +426,6 @@ sfHelm() {
 }
 export -f sfHelm
 
-sfDcos() {
-    sudo -u cladm -i dcos "$@"
-}
-export -f sfDcos
-
-sfMarathon() {
-    sudo -u cladm -i marathon "$@"
-}
-export -f sfMarathon
-
 sfProbeGPU() {
     if which lspci &>/dev/null; then
         val=$(lspci | grep nvidia 2>/dev/null) || true
@@ -914,7 +904,7 @@ sfDetectFacts() {
         redhat|rhel|centos|fedora)
             FACTS["redhat_like"]=1
             FACTS["debian_like"]=0
-			      FACTS["docker_version"]=$(yum info docker-ce || true)
+            FACTS["docker_version"]=$(yum info docker-ce || true)
             ;;
         debian|ubuntu)
             FACTS["redhat_like"]=0
@@ -926,6 +916,14 @@ sfDetectFacts() {
         FACTS["use_systemd"]=1
     else
         FACTS["use_systemd"]=0
+    fi
+
+    if [[ "$(sfService is-active NetworkManager 2>/dev/null)" = "active" ]]; then
+        FACTS["network_service"]="NetworkManager"
+    elif [[ "$(sfService is-active systemd-networkd 2>/dev/null)" = "active" ]]; then
+        FACTS["network_service"]="systemd-networkd"
+    else
+        FACTS["network_service"]="network"
     fi
 
     # Some facts about hardware
