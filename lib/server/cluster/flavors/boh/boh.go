@@ -85,8 +85,8 @@ func minimumRequiredServers(task concurrency.Task, foreman control.Foreman) (int
 		privateNodeCount = 3
 		masterNodeCount = 3
 	case complexity.Large:
-		privateNodeCount = 7
-		masterNodeCount = 3
+		masterNodeCount = 5
+		privateNodeCount = 6
 	}
 	return masterNodeCount, privateNodeCount, 0
 }
