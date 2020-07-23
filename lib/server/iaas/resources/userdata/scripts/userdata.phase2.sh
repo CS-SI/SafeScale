@@ -19,23 +19,23 @@
 {{.Header}}
 
 print_error() {
-  read line file <<<$(caller)
-  echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
-  {{.ExitOnError}}
+    read line file <<<$(caller)
+    echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
+    {{.ExitOnError}}
 }
 trap print_error ERR
 
 fail() {
-  echo "PROVISIONING_ERROR: $1"
-  echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
+    echo "PROVISIONING_ERROR: $1"
+    echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
-  collect_installed_packages
+    collect_installed_packages
 
-  # For compatibility with previous user_data implementation (until v19.03.x)...
-  mkdir -p /var/tmp || true
-  ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
+    # For compatibility with previous user_data implementation (until v19.03.x)...
+    mkdir -p /var/tmp || true
+    ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
 
-  exit $1
+    exit $1
 }
 
 # Redirects outputs to /opt/safescale/log/user_data.phase2.log
@@ -51,87 +51,86 @@ set -x
 {{ .BashLibrary }}
 
 reset_fw() {
-  case $LINUX_KIND in
-  debian | ubuntu)
-    sfApt update &>/dev/null || return 1
-    sfApt install -q -y firewalld || return 1
+    case $LINUX_KIND in
+        debian | ubuntu)
+            sfApt update &>/dev/null || return 1
+            sfApt install -q -y firewalld || return 1
 
-    systemctl stop ufw
-    # systemctl start firewalld || return 1
-    systemctl disable ufw
-    # systemctl enable firewalld
-    sfApt purge -q -y ufw &>/dev/null || return 1
-    ;;
+            systemctl stop ufw
+            # systemctl start firewalld || return 1
+            systemctl disable ufw
+            # systemctl enable firewalld
+            sfApt purge -q -y ufw &>/dev/null || return 1
+            ;;
 
-  rhel | centos | fedora)
-    # firewalld may not be installed
-    if ! systemctl is-active firewalld &>/dev/null; then
-      if ! systemctl status firewalld &>/dev/null; then
-        if which dnf; then
-          dnf install -q -y firewalld || return 1
-        else
-          yum install -q -y firewalld || return 1
-        fi
-      fi
-      # systemctl enable firewalld &>/dev/null
-      # systemctl start firewalld &>/dev/null
-    fi
-    ;;
-  esac
+        rhel | centos | fedora)
+            # firewalld may not be installed
+            if ! systemctl is-active firewalld &>/dev/null; then
+                if ! systemctl status firewalld &>/dev/null; then
+                    if which dnf; then
+                        dnf install -q -y firewalld || return 1
+                    else
+                        yum install -q -y firewalld || return 1
+                    fi
+                fi
+                # systemctl enable firewalld &>/dev/null
+                # systemctl start firewalld &>/dev/null
+            fi
+            ;;
+    esac
 
-  # # Clear interfaces attached to zones
-  # for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
-  #     for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
-  #         sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
-  #     done
-  # done
-  for zone in public trusted; do
-    for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
-      firewall-offline-cmd --zone=$zone --remove-interface=$nic &>/dev/null || true
+    # # Clear interfaces attached to zones
+    # for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
+    #     for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
+    #         sfFirewallAdd --zone=$zone --remove-interface=$nic &>/dev/null || true
+    #     done
+    # done
+    for zone in public trusted; do
+        for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
+            firewall-offline-cmd --zone=$zone --remove-interface=$nic &>/dev/null || true
+        done
     done
-  done
 
-  # Attach Internet interface or source IP to zone public if host is gateway
-  [ ! -z $PU_IF ] && {
-    # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
-    firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
-  }
+    # Attach Internet interface or source IP to zone public if host is gateway
+    [ ! -z $PU_IF ] && {
+        # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
+        firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
+    }
   {{- if or .PublicIP .IsGateway }}
-  [[ -z ${PU_IF} ]] && {
-    # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
-    firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
-  }
+    [[ -z ${PU_IF} ]] && {
+        # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
+        firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
+    }
   {{- end }}
-  # Attach LAN interfaces to zone trusted
-  [[ ! -z ${PR_IFs} ]] && {
-    for i in $PR_IFs; do
-      # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-      firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
-    done
-  }
-  # Attach lo interface to zone trusted
-  # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
-  firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
+    # Attach LAN interfaces to zone trusted
+    [[ ! -z ${PR_IFs} ]] && {
+        for i in $PR_IFs; do
+            # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
+            firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
+        done
+    }
+    # Attach lo interface to zone trusted
+    # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
+    firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
 
-  # Allow service ssh on public zone
-  # sfFirewallAdd --zone=public --add-service=ssh || return 1
-  op=-1
-  SSHEC=$(firewall-offline-cmd --zone=public --add-service=ssh) && op=$? || true
-  if [[ $op -eq 11 ]] || [[ $op -eq 12 ]] || [[ $op -eq 16 ]]; then
-    op=0
-  fi
+    # Allow service ssh on public zone
+    # sfFirewallAdd --zone=public --add-service=ssh || return 1
+    op=-1
+    SSHEC=$(firewall-offline-cmd --zone=public --add-service=ssh) && op=$? || true
+    if [[ $op -eq 11 ]] || [[ $op -eq 12 ]] || [[ $op -eq 16 ]]; then
+        op=0
+    fi
 
-  if [[ $(echo $SSHEC | grep "ALREADY_ENABLED") ]]; then
-    op=0
-  fi
+    if [[ $(echo $SSHEC | grep "ALREADY_ENABLED") ]]; then
+        op=0
+    fi
 
-  if [[ $op -ne 0 ]]; then
-    return 1
-  fi
+    [[ $op -ne 0 ]] && return 1
 
-  # Save current fw settings as permanent
-  # sfFirewallReload
-  sfService enable firewalld
+    # Save current fw settings as permanent
+    # sfFirewallReload
+    sfService enable firewalld
+    return 0
 }
 
 NICS=
@@ -147,14 +146,14 @@ AWS=
 # Don't request dns name servers from DHCP server
 # Don't update default route
 configure_dhclient() {
-  # kill any dhclient process already running
-  pkill dhclient || true
+    # kill any dhclient process already running
+    pkill dhclient || true
 
-  [ -f /etc/dhcp/dhclient.conf ] && (sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf || true)
+    [ -f /etc/dhcp/dhclient.conf ] && (sed -i -e 's/, domain-name-servers//g' /etc/dhcp/dhclient.conf || true)
 
-  if [ -d /etc/dhcp/ ]; then
-    HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
-    cat >>$HOOK_FILE <<-EOF
+    if [ -d /etc/dhcp/ ]; then
+        HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
+        cat >>$HOOK_FILE <<-EOF
 make_resolv_conf() {
     :
 }
@@ -163,8 +162,8 @@ make_resolv_conf() {
 unset new_routers
 {{- end}}
 EOF
-    chmod +x $HOOK_FILE
-  fi
+        chmod +x $HOOK_FILE
+    fi
 }
 
 is_ip_private() {
@@ -260,89 +259,86 @@ collect_original_packages() {
 }
 
 ensure_curl_is_installed() {
-  case $LINUX_KIND in
-  ubuntu | debian)
-    if [[ -n $(which curl) ]]; then
-      return 0
-    fi
-    DEBIAN_FRONTEND=noninteractive apt-get update || return 1
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
-    ;;
-  redhat | rhel | centos | fedora)
-    if [[ -n $(which curl) ]]; then
-      return 0
-    fi
-    if which dnf; then
-      dnf install -y -q curl &>/dev/null || return 1
-    else
-      yum install -y -q curl &>/dev/null || return 1
-    fi
-    ;;
-  *)
-    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-    fail 216
-    ;;
-  esac
+    case $LINUX_KIND in
+    ubuntu | debian)
+        if [[ -n $(which curl) ]]; then
+            return 0
+        fi
+        DEBIAN_FRONTEND=noninteractive apt-get update || return 1
+        DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
+        ;;
+    redhat | rhel | centos | fedora)
+        if [[ -n $(which curl) ]]; then
+            return 0
+        fi
+        if which dnf; then
+            dnf install -y -q curl &>/dev/null || return 1
+        else
+            yum install -y -q curl &>/dev/null || return 1
+        fi
+        ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 216
+        ;;
+    esac
 
-  return 0
+    return 0
 }
 
 collect_installed_packages() {
-  case $LINUX_KIND in
-  debian | ubuntu)
-    dpkg-query -l >${SF_VARDIR}/log/packages_installed_after.phase2.list
-    ;;
-  redhat | rhel | centos | fedora)
-    rpm -qa | sort >${SF_VARDIR}/log/packages_installed_after.phase2.list
-    ;;
-  *) ;;
+    case $LINUX_KIND in
+        debian | ubuntu)
+            dpkg-query -l >${SF_VARDIR}/log/packages_installed_after.phase2.list
+            ;;
+        redhat | rhel | centos | fedora)
+            rpm -qa | sort >${SF_VARDIR}/log/packages_installed_after.phase2.list
+            ;;
+        *) ;;
 
   esac
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-  op=1
-  is_network_reachable && op=$? || true
-  if [[ $op -ne 0 ]]; then
-    echo "ensure_network_connectivity started WITHOUT network..."
-  else
-    echo "ensure_network_connectivity started WITH network..."
-  fi
+    op=1
+    is_network_reachable && op=$? || true
+    if [[ $op -ne 0 ]]; then
+        echo "ensure_network_connectivity started WITHOUT network..."
+    else
+        echo "ensure_network_connectivity started WITH network..."
+    fi
 
   {{- if .AddGateway }}
-  route del -net default &>/dev/null
-  route add -net default gw {{ .DefaultRouteIP }}
+    route del -net default &>/dev/null
+    route add -net default gw {{ .DefaultRouteIP }}
   {{- else }}
-  :
+    :
   {{- end}}
 
-  op=1
-  is_network_reachable && op=$? || true
-  if [[ $op -ne 0 ]]; then
-    echo "ensure_network_connectivity finished WITHOUT network..."
-  else
-    echo "ensure_network_connectivity finished WITH network..."
-  fi
+    op=1
+    is_network_reachable && op=$? || true
+    if [[ $op -ne 0 ]]; then
+        echo "ensure_network_connectivity finished WITHOUT network..."
+    else
+        echo "ensure_network_connectivity finished WITH network..."
+    fi
 
-  if [[ $op -ne 0 ]]; then
-    return 1
-  fi
-
-  return 0
+    [[ $op -ne 0 ]] && return 1
+    return 0
 }
 
 configure_dns() {
-  if systemctl status systemd-resolved &>/dev/null; then
-    echo "Configuring dns with resolved"
-    configure_dns_systemd_resolved
-  elif systemctl status resolvconf &>/dev/null; then
-    echo "Configuring dns with resolvconf"
-    configure_dns_resolvconf
-  else
-    echo "Configuring dns legacy"
-    configure_dns_legacy
-  fi
+    if systemctl status systemd-resolved &>/dev/null; then
+        echo "Configuring dns with resolved"
+        configure_dns_systemd_resolved
+    elif systemctl status resolvconf &>/dev/null; then
+        echo "Configuring dns with resolvconf"
+        configure_dns_resolvconf
+    else
+        echo "Configuring dns legacy"
+        configure_dns_legacy
+    fi
 }
 
 # adds entry in /etc/hosts corresponding to FQDN hostname with private IP
@@ -350,28 +346,28 @@ configure_dns() {
 # - if there is a domain suffix in hostname, /etc/hosts contains FQDN as first entry and short hostname as second, after the IP
 # - if there is no domain suffix in hostname, /etc/hosts contains short hostname as first entry, after the IP
 update_fqdn() {
-  cat /etc/hosts
+    cat /etc/hosts
 
-  FULL_HOSTNAME="{{ .HostName }}"
-  SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
+    FULL_HOSTNAME="{{ .HostName }}"
+    SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
-  # FlexibleEngine seems to add an entry "not not" in /etc/hosts, replace it with
-  sed -i -nr '/^not /!p' /etc/hosts
+    # FlexibleEngine seems to add an entry "not not" in /etc/hosts, replace it with
+    sed -i -nr '/^not /!p' /etc/hosts
 
-  IF=${PR_IFs[0]}
-  if [[ -z ${IF} ]]; then
-    sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
-  else
-    IP=$(ip a | grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    sed -i -nr '/^127.0.1.1/!p' /etc/hosts
-    if [[ "${SHORT_HOSTNAME}" == "${FULL_HOSTNAME}" ]]; then
-      sed -i -nr '/^'"${IP}"'/!p;$a'"${IP}"'\t'"${SHORT_HOSTNAME}" /etc/hosts
+    IF=${PR_IFs[0]}
+    if [[ -z ${IF} ]]; then
+        sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
     else
-      sed -i -nr '/^'"${IP}"'/!p;$a'"${IP}"'\t'"${FULL_HOSTNAME} ${SHORT_HOSTNAME}" /etc/hosts
+        IP=$(ip a | grep ${IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+        sed -i -nr '/^127.0.1.1/!p' /etc/hosts
+        if [[ "${SHORT_HOSTNAME}" == "${FULL_HOSTNAME}" ]]; then
+            sed -i -nr '/^'"${IP}"'/!p;$a'"${IP}"'\t'"${SHORT_HOSTNAME}" /etc/hosts
+        else
+            sed -i -nr '/^'"${IP}"'/!p;$a'"${IP}"'\t'"${FULL_HOSTNAME} ${SHORT_HOSTNAME}" /etc/hosts
+        fi
     fi
-  fi
 
-  cat /etc/hosts
+    cat /etc/hosts
 }
 
 configure_network() {
@@ -420,68 +416,68 @@ configure_network() {
 
 # Configure network for Debian distribution
 configure_network_debian() {
-  echo "Configuring network (debian-like)..."
+    echo "Configuring network (debian-like)..."
 
-  local path=/etc/network/interfaces.d
-  mkdir -p ${path}
-  local cfg=${path}/50-cloud-init.cfg
-  rm -f ${cfg}
+    local path=/etc/network/interfaces.d
+    mkdir -p ${path}
+    local cfg=${path}/50-cloud-init.cfg
+    rm -f ${cfg}
 
-  for IF in ${NICS}; do
-    if [[ "$IF" == "$PU_IF" ]]; then
-      cat <<-EOF >${path}/10-${IF}-public.cfg
+    for IF in ${NICS}; do
+        if [[ "$IF" == "$PU_IF" ]]; then
+            cat <<-EOF >${path}/10-${IF}-public.cfg
 auto ${IF}
 iface ${IF} inet dhcp
 EOF
-    else
-      cat <<-EOF >${path}/11-${IF}-private.cfg
+        else
+            cat <<-EOF >${path}/11-${IF}-private.cfg
 auto ${IF}
 iface ${IF} inet dhcp
 {{- if .AddGateway }}
   up route add -net default gw {{ .DefaultRouteIP }}
 {{- end}}
 EOF
-    fi
-  done
+        fi
+    done
 
-  echo "Looking for network..."
-  check_for_network || {
-    echo "PROVISIONING_ERROR: failed network cfg 0"
-    fail 196
-  }
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 0"
+        fail 196
+    }
 
-  configure_dhclient
+    configure_dhclient
 
-  /sbin/dhclient || true
+    /sbin/dhclient || true
 
-  echo "Looking for network..."
-  check_for_network || {
-    echo "PROVISIONING_ERROR: failed network cfg 1"
-    fail 196
-  }
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 1"
+        fail 196
+    }
 
-  systemctl restart networking
+    systemctl restart networking
 
-  echo "Looking for network..."
-  check_for_network || {
-    echo "PROVISIONING_ERROR: failed network cfg 2"
-    fail 196
-  }
+    echo "Looking for network..."
+    check_for_network || {
+        echo "PROVISIONING_ERROR: failed network cfg 2"
+        fail 196
+    }
 
-  reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 197)
+    reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 197)
 
-  echo done
+    echo done
 }
 
 # Configure network using systemd-networkd
 configure_network_systemd_networkd() {
     echo "Configuring network (using netplan and systemd-networkd)..."
 
-    {{- if .IsGateway }}
+  {{- if .IsGateway }}
     ISGW=1
-    {{- else}}
+  {{- else}}
     ISGW=0
-    {{- end}}
+  {{- end}}
 
     mkdir -p /etc/netplan
     rm -f /etc/netplan/*
@@ -675,9 +671,6 @@ configure_network_redhat() {
         }
     fi
 
-    enable_svc network
-    restart_svc network
-
     reset_fw || {
         echo "PROVISIONING_ERROR: failure setting firewall"
         fail 201
@@ -738,10 +731,13 @@ EOF
     echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
     {{- end }}
 
+    enable_svc network
+    restart_svc network
+
     return 0
 }
 
-# Configure network for redhat7-like distributions (rhel, centos, ...)
+# Configure network for redhat7+ alike distributions (rhel, centos, ...)
 configure_network_redhat_with_nmcli() {
     echo "Configuring network (RedHat 7+ alike with Network Manager)..."
 
@@ -753,13 +749,20 @@ configure_network_redhat_with_nmcli() {
         [[ -z "${DEVICE}" ]] && mv /etc/sysconfig/network-scripts/ifcfg-${NAME} /etc/sysconfig/network-scripts/disabled.ifcfg-${NAME}
     done
 
-    # Configure all network interfaces in dhcp
+    # Configure all network interfaces
     for IF in $(nmcli -f 'DEVICE' -c no -t dev); do
+        # We change nothing on device lo
         [[ "${IF}" = "lo" ]] && continue
+
+        DEV_IP=$(nmcli -g IP4.ADDRESS dev show "${IF}")
+        # We change nothing on device with Public IP Address
+        is_ip_private $(echo ${DEV_IP} | cut -d/ -f1) || continue
 
         CONN=$(nmcli -c no -t -f "NAME,DEVICE" con | grep ${IF} | cut -d: -f1)
         nmcli con mod "${CONN}" connection.autoconnect yes || return 1
-        nmcli con mod "${CONN}" ipv4.method auto || return 1
+        # Assume the IP Address cannot change even if the first time it is affected by DHCP
+        nmcli con mod "${CONN}" ipv4.addresses "${DEV_IP}" || return 1
+        nmcli con mod "${CONN}" ipv4.method manual || return 1
       {{- if .DNSServers }}
         {{- range .DNSServers }}
         nmcli con mod "${CONN}" +ipv4.dns {{ . }} || return 1
@@ -774,14 +777,17 @@ configure_network_redhat_with_nmcli() {
       {{- end }}
 
       {{- if .AddGateway }}
-        # ipv4.routes doesn't support 0.0.0.0/0 to define default route, so we use 2 route entries corresponding to 0.0.0.0/0
-        nmcli con mod "${CONN}" ipv4.routes "0.0.0.0/1 {{ .DefaultRouteIP }}, 128.0.0.0/1 {{ .DefaultRouteIP }}"
+        nmcli con mod "${CONN}" ipv4.gateway "{{ .DefaultRouteIP }}"
       {{- end}}
 
-        nmcli con up "${CONN}"
     done
 
+    nmcli con reload
+
     configure_dhclient || return 1
+
+    enable_svc NetworkManager
+    restart_svc NetworkManager
 
     return 0
 }
@@ -793,7 +799,6 @@ check_for_ip() {
             ;;
         *) ;;
     esac
-
 
     allip=$(ip -f inet -o addr show)
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
@@ -826,129 +831,124 @@ check_for_ip() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 check_for_network() {
-  NETROUNDS=4
-  REACHED=0
-  TRIED=0
+    NETROUNDS=4
+    REACHED=0
+    TRIED=0
 
-  for i in $(seq ${NETROUNDS}); do
-    if which curl; then
-      TRIED=1
-      curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+    for i in $(seq ${NETROUNDS}); do
+        if which curl; then
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        if which wget; then
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
+    done
+
+    if [[ ${REACHED} -eq 0 ]]; then
+        echo "Unable to reach network"
+        return 1
     fi
 
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
+    [[ ! -z "$PU_IF" ]] && {
+        check_for_ip ${PU_IF} || return 1
+    }
+    for i in ${PR_IFs}; do
+        check_for_ip ${i} || return 1
+    done
 
-    if which wget; then
-      TRIED=1
-      wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-    fi
-
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
-  done
-
-  if [[ ${REACHED} -eq 0 ]]; then
-    echo "Unable to reach network"
-    return 1
-  fi
-
-  [[ ! -z "$PU_IF" ]] && {
-    check_for_ip ${PU_IF} || return 1
-  }
-  for i in ${PR_IFs}; do
-    check_for_ip ${i} || return 1
-  done
-
-  return 0
+    return 0
 }
 
 configure_as_gateway() {
-  echo "Configuring host as gateway..."
+    echo "Configuring host as gateway..."
 
-  if [[ ! -z $PR_IFs ]]; then
-    # Enable forwarding
-    for i in /etc/sysctl.d/* /etc/sysctl.conf; do
-      grep -v "net.ipv4.ip_forward=" ${i} >${i}.new
-      mv -f ${i}.new ${i}
-    done
-    cat >/etc/sysctl.d/21-gateway.conf <<-EOF
+    if [[ ! -z $PR_IFs ]]; then
+        # Enable forwarding
+        for i in /etc/sysctl.d/* /etc/sysctl.conf; do
+            grep -v "net.ipv4.ip_forward=" ${i} >${i}.new
+            mv -f ${i}.new ${i}
+        done
+        cat >/etc/sysctl.d/21-gateway.conf <<-EOF
 net.ipv4.ip_forward=1
 net.ipv4.ip_nonlocal_bind=1
 EOF
-    case $LINUX_KIND in
-    ubuntu) systemctl restart systemd-sysctl ;;
-    *) sysctl -p ;;
-    esac
-  fi
+        case $LINUX_KIND in
+            ubuntu) systemctl restart systemd-sysctl ;;
+            *) sysctl -p ;;
+        esac
+    fi
 
-  if [[ ! -z $PU_IF ]]; then
-    # Dedicated public interface available...
+    if [[ ! -z $PU_IF ]]; then
+        # Dedicated public interface available...
 
-    # Allows ping
-    # sfFirewallAdd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
-    firewall-offline-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
-    # Allows masquerading on public zone
-    # sfFirewallAdd --zone=public --add-masquerade
-    firewall-offline-cmd --zone=public --add-masquerade
-  fi
-  # Enables masquerading on trusted zone (mainly for docker networks)
-  # sfFirewallAdd --zone=trusted --add-masquerade
-  firewall-offline-cmd --zone=trusted --add-masquerade
+        # Allows ping
+        firewall-offline-cmd --direct --add-rule ipv4 filter INPUT 0 -p icmp -m icmp --icmp-type 8 -s 0.0.0.0/0 -d 0.0.0.0/0 -j ACCEPT
+        # Allows masquerading on public zone
+        firewall-offline-cmd --zone=public --add-masquerade
+    fi
+    # Enables masquerading on trusted zone (mainly for docker networks)
+    firewall-offline-cmd --zone=trusted --add-masquerade
 
-  # Allows default services on public zone
-  # sfFirewallAdd --zone=public --add-service=ssh 2>/dev/null
-  firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
-  # Applies fw rules
-  # sfFirewallReload
+    # Allows default services on public zone
+    firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
+    # Applies fw rules
+    # sfFirewallReload
 
-  sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
-  sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
-  systemctl restart sshd
+    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 196
+    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
+    systemctl restart sshd
 
-  echo done
+    echo done
 }
 
 install_keepalived() {
-  # Try installing network-scripts if available
-  case $LINUX_KIND in
-  redhat | rhel | centos | fedora)
-    if which dnf; then
-      dnf install -q -y network-scripts || true
-    else
-      yum install -q -y network-scripts || true
-    fi
-    ;;
-  *) ;;
+    # Try installing network-scripts if available
+    case $LINUX_KIND in
+        redhat | rhel | centos | fedora)
+            if which dnf; then
+                dnf install -q -y network-scripts || true
+            else
+                yum install -q -y network-scripts || true
+            fi
+            ;;
+        *) ;;
+    esac
 
-  esac
+    case $LINUX_KIND in
+        ubuntu | debian)
+            sfApt update && sfApt -y install keepalived || return 1
+            ;;
 
-  case $LINUX_KIND in
-    ubuntu | debian)
-      sfApt update && sfApt -y install keepalived || return 1
-      ;;
+        redhat | rhel | centos | fedora)
+            if which dnf; then
+                dnf install -q -y keepalived || return 1
+            else
+                yum install -q -y keepalived || return 1
+            fi
+            mkdir -p /var/run/keepalived &>/dev/null
+            ;;
+        *)
+            echo "Unsupported Linux distribution '$LINUX_KIND'!"
+            return 1
+            ;;
+    esac
 
-    redhat | rhel | centos | fedora)
-      if which dnf; then
-        dnf install -q -y keepalived || return 1
-      else
-        yum install -q -y keepalived || return 1
-      fi
-      mkdir -p /var/run/keepalived &>/dev/null
-      ;;
-    *)
-      echo "Unsupported Linux distribution '$LINUX_KIND'!"
-      return 1
-      ;;
-  esac
+    NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
 
-  NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
-
-  cat >/etc/keepalived/keepalived.conf <<-EOF
+    cat >/etc/keepalived/keepalived.conf <<-EOF
 vrrp_instance vrrp_group_gws_internal {
     state {{ if eq .IsPrimaryGateway true }}MASTER{{ else }}BACKUP{{ end }}
     interface ${PR_IFs[0]}
@@ -995,77 +995,76 @@ vrrp_instance vrrp_group_gws_internal {
 # }
 EOF
 
-  if [ "$(sfGetFact "use_systemd")" = "1" ]; then
-    # Use systemd to ensure keepalived is restarted if network is restarted
-    # (otherwise, keepalived is in undetermined state)
-    mkdir -p /etc/systemd/system/keepalived.service.d
-    if [[ $(sfGetFact "redhat_like") -eq 1 ]]; then
-      cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+    if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+        # Use systemd to ensure keepalived is restarted if network is restarted
+        # (otherwise, keepalived is in undetermined state)
+        mkdir -p /etc/systemd/system/keepalived.service.d
+        if [[ $(sfGetFact "redhat_like") -eq 1 ]]; then
+            cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
 [Unit]
 Requires=network.service
 PartOf=network.service
 EOF
-    else
-      cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+        else
+            cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
 [Unit]
 Requires=systemd-networkd.service
 PartOf=systemd-networkd.service
 EOF
-    fi
-    systemctl daemon-reload
-  fi
-
-  sfService enable keepalived || return 1
-
-  op=-1
-  msg=$(sfService restart keepalived 2>&1) && op=$? || true
-
-  kop=-1
-  echo $msg | grep "Unit network.service not found" && kop=$? || true
-
-  if [[ op -ne 0 ]]; then
-    if [[ kop -eq 0 ]]; then
-      case $LINUX_KIND in
-      redhat | rhel | centos | fedora)
-        if which dnf; then
-          dnf install -q -y network-scripts || return 1
-        else
-          yum install -q -y network-scripts || return 1
         fi
-        ;;
-      *) ;;
-
-      esac
+        systemctl daemon-reload
     fi
-  fi
 
-  sfService restart keepalived || return 1
-  return 0
+    sfService enable keepalived || return 1
+
+    op=-1
+    msg=$(sfService restart keepalived 2>&1) && op=$? || true
+
+    kop=-1
+    echo $msg | grep "Unit network.service not found" && kop=$? || true
+
+    if [[ op -ne 0 ]]; then
+        if [[ kop -eq 0 ]]; then
+            case $LINUX_KIND in
+                redhat | rhel | centos | fedora)
+                    if which dnf; then
+                        dnf install -q -y network-scripts || return 1
+                    else
+                        yum install -q -y network-scripts || return 1
+                    fi
+                    ;;
+                *) ;;
+            esac
+        fi
+    fi
+
+    sfService restart keepalived || return 1
+    return 0
 }
 
 configure_dns_legacy() {
-  echo "Configuring /etc/resolv.conf..."
-  cp /etc/resolv.conf /etc/resolv.conf.bak
+    echo "Configuring /etc/resolv.conf..."
+    cp /etc/resolv.conf /etc/resolv.conf.bak
 
-  rm -f /etc/resolv.conf
+    rm -f /etc/resolv.conf
   {{- if .DNSServers }}
-  if [[ -e /etc/dhcp/dhclient.conf ]]; then
-    dnsservers=
-    for i in {{range .DNSServers}} {{end}}; do
-      [ ! -z $dnsservers ] && dnsservers="$dnsservers, "
-    done
-    [ ! -z $dnsservers ] && echo "prepend domain-name-servers $dnsservers;" >>/etc/dhcp/dhclient.conf
-  else
-    echo "dhclient.conf not modified"
-  fi
+    if [[ -e /etc/dhcp/dhclient.conf ]]; then
+        dnsservers=
+        for i in {{range .DNSServers}} {{end}}; do
+            [ ! -z $dnsservers ] && dnsservers="$dnsservers, "
+        done
+        [ ! -z $dnsservers ] && echo "prepend domain-name-servers $dnsservers;" >>/etc/dhcp/dhclient.conf
+    else
+        echo "dhclient.conf not modified"
+    fi
   {{- else }}
-  if [[ -e /etc/dhcp/dhclient.conf ]]; then
-    echo "prepend domain-name-servers 1.1.1.1;" >>/etc/dhcp/dhclient.conf
-  else
-    echo "/etc/dhcp/dhclient.conf not modified"
-  fi
+    if [[ -e /etc/dhcp/dhclient.conf ]]; then
+        echo "prepend domain-name-servers 1.1.1.1;" >>/etc/dhcp/dhclient.conf
+    else
+        echo "/etc/dhcp/dhclient.conf not modified"
+    fi
   {{- end }}
-  cat <<-'EOF' >/etc/resolv.conf
+    cat <<-'EOF' >/etc/resolv.conf
 {{- if .DNSServers }}
   {{- range .DNSServers }}
 nameserver {{ . }}
@@ -1075,32 +1074,32 @@ nameserver 1.1.1.1
 {{- end }}
 EOF
 
-  # VPL: need to determine if it's a good idea to update resolv.conf with search domain...
-  #      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
-  #    DNSDOMAIN="$(hostname -d)"
-  #    if [[ ! -z "$DNSDOMAIN" ]]; then
-  #cat <<-EOF >>/etc/resolv.conf
-  #search $DNSDOMAIN
-  #EOF
-  #    fi
+    # VPL: need to determine if it's a good idea to update resolv.conf with search domain...
+    #      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
+    #    DNSDOMAIN="$(hostname -d)"
+    #    if [[ ! -z "$DNSDOMAIN" ]]; then
+    #cat <<-EOF >>/etc/resolv.conf
+    #search $DNSDOMAIN
+    #EOF
+    #    fi
 
-  cp /etc/resolv.conf /etc/resolv.conf.edited
-  touch /etc/resolv.conf && sleep 2 || true
+    cp /etc/resolv.conf /etc/resolv.conf.edited
+    touch /etc/resolv.conf && sleep 2 || true
 
-  op=-1
-  is_network_reachable && op=$? || true
+    op=-1
+    is_network_reachable && op=$? || true
 
-  [[ ${op} -ne 0 ]] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf && touch /etc/resolv.conf && sleep 2 || echo "dns change OK..."
+    [[ ${op} -ne 0 ]] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf && touch /etc/resolv.conf && sleep 2 || echo "dns change OK..."
 
-  echo done
+    echo done
 }
 
 configure_dns_resolvconf() {
-  echo "Configuring resolvconf..."
+    echo "Configuring resolvconf..."
 
-  EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+    EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
 
-  cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
+    cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
 {{- if .DNSServers }}
   {{- range .DNSServers }}
 nameserver {{ . }}
@@ -1110,17 +1109,17 @@ nameserver 1.1.1.1
 {{- end }}
 EOF
 
-  # VPL: need to determine if it's a good idea to update resolv.conf with search domain...
-  #      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
-  #    DNSDOMAIN="$(hostname -d)"
-  #    if [[ ! -z "$DNSDOMAIN" ]]; then
-  #        cat <<-EOF >>/etc/resolvconf/resolv.conf.d/head
-  #search $DNSDOMAIN
-  #EOF
-  #    fi
+    # VPL: need to determine if it's a good idea to update resolv.conf with search domain...
+    #      The DNS servers will not be able to resolve hosts from the DNSDOMAIN by themselves, there is a need for an internal DNS server
+    #    DNSDOMAIN="$(hostname -d)"
+    #    if [[ ! -z "$DNSDOMAIN" ]]; then
+    #        cat <<-EOF >>/etc/resolvconf/resolv.conf.d/head
+    #search $DNSDOMAIN
+    #EOF
+    #    fi
 
-  resolvconf -u
-  echo done
+    resolvconf -u
+    echo done
 }
 
 configure_dns_systemd_resolved() {
@@ -1325,51 +1324,51 @@ install_packages() {
 }
 
 add_common_repos() {
-  case $LINUX_KIND in
-  ubuntu)
-    sfFinishPreviousInstall
-    add-apt-repository universe -y || fail 217
-    codename=$(sfGetFact "linux_codename")
-    echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
-    ;;
-  redhat | rhel | centos)
-    if which dnf; then
-      # Install EPEL repo ...
-      sfRetry 3m 5 "dnf install -y epel-release" || fail 217
-      sfRetry 3m 5 "dnf makecache -y" || fail 218
-      # ... but don't enable it by default
-      dnf config-manager --set-disabled epel &>/dev/null || true
-    else
-      # Install EPEL repo ...
-      sfRetry 3m 5 "yum install -y epel-release" || fail 217
-      sfRetry 3m 5 "yum makecache" || fail 218
-      # ... but don't enable it by default
-      yum-config-manager --disablerepo=epel &>/dev/null || true
-    fi
-    ;;
-  fedora)
-    sfRetry 3m 5 "dnf makecache -y" || fail 218
-    ;;
-  esac
+    case $LINUX_KIND in
+        ubuntu)
+            sfFinishPreviousInstall
+            add-apt-repository universe -y || fail 217
+            codename=$(sfGetFact "linux_codename")
+            echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
+            ;;
+        redhat | rhel | centos)
+            if which dnf; then
+                # Install EPEL repo ...
+                sfRetry 3m 5 "dnf install -y epel-release" || fail 217
+                sfRetry 3m 5 "dnf makecache -y" || fail 218
+                # ... but don't enable it by default
+                dnf config-manager --set-disabled epel &>/dev/null || true
+            else
+                # Install EPEL repo ...
+                sfRetry 3m 5 "yum install -y epel-release" || fail 217
+                sfRetry 3m 5 "yum makecache" || fail 218
+                # ... but don't enable it by default
+                yum-config-manager --disablerepo=epel &>/dev/null || true
+            fi
+            ;;
+        fedora)
+            sfRetry 3m 5 "dnf makecache -y" || fail 218
+            ;;
+    esac
 }
 
 configure_locale() {
-  case $LINUX_KIND in
-  ubuntu | debian)
-    locale-gen en_US.UTF-8
-    ;;
-  esac
-  export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+    case $LINUX_KIND in
+    ubuntu | debian)
+        locale-gen en_US.UTF-8
+        ;;
+    esac
+    export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
 force_dbus_restart() {
-  case $LINUX_KIND in
-  ubuntu)
-    sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
-    sudo systemctl daemon-reexec
-    sudo systemctl restart dbus.service
-    ;;
-  esac
+    case $LINUX_KIND in
+        ubuntu)
+            sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
+            sudo systemctl daemon-reexec
+            sudo systemctl restart dbus.service
+            ;;
+    esac
 }
 
 # sets root password to the same as the one for SafeScale OperatorUsername (on distribution where root needs password),
@@ -1377,205 +1376,205 @@ force_dbus_restart() {
 # Root account not being usable remotely (and OperatorUsername being able to become root with sudo), this is not
 # considered a security risk. Especially when set after SSH and Firewall configuration applied.
 configure_root_password() {
-  case ${LINUX_KIND} in
-  redhat | rhel | centos | fedora)
-    echo "root:{{.Password}}" | chpasswd
-    ;;
-  esac
+    case ${LINUX_KIND} in
+        redhat | rhel | centos | fedora)
+            echo "root:{{.Password}}" | chpasswd
+            ;;
+    esac
 }
 
 update_kernel_settings() {
-  cat >/etc/sysctl.d/20-safescale.conf <<-EOF
+    cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
 EOF
-  case $LINUX_KIND in
-  ubuntu) systemctl restart systemd-sysctl ;;
-  *) sysctl -p ;;
-  esac
+    case $LINUX_KIND in
+        ubuntu) systemctl restart systemd-sysctl ;;
+        *) sysctl -p ;;
+    esac
 }
 
 use_cgroups_v1_if_needed() {
-  case $LINUX_KIND in
-  fedora)
-    if [[ -n $(which lsb_release) ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -gt 30 ]]; then
-        dnf install -y grubby || return 1
-        grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
-      fi
-    else
-      if [[ $(echo ${VERSION_ID}) -gt 30 ]]; then
-        dnf install -y grubby || return 1
-        grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
-      fi
-    fi
-    ;;
-  esac
+    case $LINUX_KIND in
+    fedora)
+        if [[ -n $(which lsb_release) ]]; then
+            if [[ $(lsb_release -rs | cut -d. -f1) -gt 30 ]]; then
+                dnf install -y grubby || return 1
+                grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
+            fi
+        else
+            if [[ $(echo ${VERSION_ID}) -gt 30 ]]; then
+                dnf install -y grubby || return 1
+                grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
+            fi
+        fi
+        ;;
+    esac
 
-  return 0
+    return 0
 }
 
 function fail_fast_unsupported_distros() {
-  case $LINUX_KIND in
-  debian)
-    lsb_release -rs | grep "8." && {
-      echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-      fail 201
-    } || true
-    ;;
-  ubuntu)
-    if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-        fail 201
-      fi
-    fi
-    ;;
-  redhat | rhel | centos)
-    if [[ -n $(which lsb_release) ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-        fail 201
-      fi
-    else
-      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
-        fail 201
-      fi
-    fi
-    ;;
-  fedora)
-    if [[ -n $(which lsb_release) ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-        fail 201
-      fi
-    else
-      if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
-        fail 201
-      fi
-    fi
-    ;;
-  *)
-    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-    fail 201
-    ;;
-  esac
+    case $LINUX_KIND in
+        debian)
+            lsb_release -rs | grep "8." && {
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                fail 201
+            } || true
+            ;;
+        ubuntu)
+            if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+                if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                    fail 201
+                fi
+            fi
+            ;;
+        redhat | rhel | centos)
+            if [[ -n $(which lsb_release) ]]; then
+                if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                    fail 201
+                fi
+            else
+                if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+                    fail 201
+                fi
+            fi
+            ;;
+        fedora)
+            if [[ -n $(which lsb_release) ]]; then
+                if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                    fail 201
+                fi
+            else
+                if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+                    fail 201
+                fi
+            fi
+            ;;
+        *)
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+            fail 201
+            ;;
+    esac
 }
 
 check_network_reachable() {
-  NETROUNDS=4
-  REACHED=0
-  TRIED=0
+    NETROUNDS=4
+    REACHED=0
+    TRIED=0
 
-  for i in $(seq ${NETROUNDS}); do
-    if which curl; then
-      TRIED=1
-      curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+    for i in $(seq ${NETROUNDS}); do
+        if which curl; then
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        if which wget; then
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
+    done
+
+    if [[ ${REACHED} -eq 0 ]]; then
+        echo "PROVISIONING_ERROR: Unable to reach network"
+        fail 221
     fi
 
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    if which wget; then
-      TRIED=1
-      wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-    fi
-
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
-  done
-
-  if [[ ${REACHED} -eq 0 ]]; then
-    echo "PROVISIONING_ERROR: Unable to reach network"
-    fail 221
-  fi
-
-  return 0
+    return 0
 }
 
 check_dns_configuration() {
-  if [[ -r /etc/resolv.conf ]]; then
-    echo "Getting DNS using resolv.conf..."
-    THE_DNS=$(cat /etc/resolv.conf |grep -i '^nameserver'|head -n1|cut -d' ' -f2)
+    if [[ -r /etc/resolv.conf ]]; then
+        echo "Getting DNS using resolv.conf..."
+        THE_DNS=$(cat /etc/resolv.conf |grep -i '^nameserver'|head -n1|cut -d' ' -f2)
 
-    if [[ -n ${THE_DNS} ]]; then
-      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        if [[ -n ${THE_DNS} ]]; then
+        timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
     fi
-  fi
 
-  if which systemd-resolve; then
-    echo "Getting DNS using systemd-resolve"
-    THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}')
-    if [[ -n ${THE_DNS} ]]; then
-      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+    if which systemd-resolve; then
+        echo "Getting DNS using systemd-resolve"
+        THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}')
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
     fi
-  fi
 
-  if which resolvectl; then
-    echo "Getting DNS using resolvectl"
-    THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}')
-    if [[ -n ${THE_DNS} ]]; then
-      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+    if which resolvectl; then
+        echo "Getting DNS using resolvectl"
+        THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}')
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
     fi
-  fi
 
-  timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
-  return 1
+    timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
+    return 1
 }
 
 is_network_reachable() {
-  NETROUNDS=4
-  REACHED=0
-  TRIED=0
+    NETROUNDS=4
+    REACHED=0
+    TRIED=0
 
-  for i in $(seq ${NETROUNDS}); do
-    if which curl; then
-      TRIED=1
-      curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+    for i in $(seq ${NETROUNDS}); do
+        if which curl; then
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        if which wget; then
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
+    done
+
+    if [[ ${REACHED} -eq 0 ]]; then
+        echo "Unable to reach network"
+        return 1
     fi
 
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    if which wget; then
-      TRIED=1
-      wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-    fi
-
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
-  done
-
-  if [[ ${REACHED} -eq 0 ]]; then
-    echo "Unable to reach network"
-    return 1
-  fi
-
-  return 0
+    return 0
 }
 
-function compatible_network() {
-  # Try installing network-scripts if available
-  case $LINUX_KIND in
-  redhat | rhel | centos | fedora)
-    if which dnf; then
-      dnf install -q -y network-scripts || true
-    else
-      yum install -q -y network-scripts || true
-    fi
-    ;;
-  *) ;;
-  esac
-}
+#function compatible_network() {
+#    # Try installing network-scripts if available
+#    case $LINUX_KIND in
+#        redhat | rhel | centos | fedora)
+#            if which dnf; then
+#                dnf install -q -y network-scripts || true
+#            else
+#                yum install -q -y network-scripts || true
+#            fi
+#            ;;
+#        *) ;;
+#    esac
+#}
 
 # ---- Main
 
@@ -1588,9 +1587,9 @@ configure_locale
 op=1
 ensure_curl_is_installed && op=$? || true
 if [[ ${op} -ne 0 ]]; then
-  echo "Curl not available yet"
+    echo "Curl not available yet"
 else
-  echo "Curl installed"
+    echo "Curl installed"
 fi
 
 check_dns_configuration
@@ -1606,9 +1605,9 @@ is_network_reachable && op=$? || true
 in_reach_after_dns=$op
 
 if [[ ${in_reach_after_dns} -eq 1 ]]; then
-  if [[ ${in_reach_before_dns} -eq 0 ]]; then
-    echo "PROVISIONING_ERROR: Changing DNS messed up connectivity" && fail 191
-  fi
+    if [[ ${in_reach_before_dns} -eq 0 ]]; then
+        echo "PROVISIONING_ERROR: Changing DNS messed up connectivity" && fail 191
+    fi
 fi
 
 op=1
@@ -1620,9 +1619,9 @@ is_network_reachable && op=$? || true
 in_reach_after_gateway_setup=$op
 
 if [[ ${in_reach_after_gateway_setup} -eq 1 ]]; then
-  if [[ ${in_reach_after_dns} -eq 0 ]]; then
-    echo "PROVISIONING_ERROR: Changing Gateway messed up connectivity" && fail 192
-  fi
+    if [[ ${in_reach_after_dns} -eq 0 ]]; then
+        echo "PROVISIONING_ERROR: Changing Gateway messed up connectivity" && fail 192
+    fi
 fi
 
 add_common_repos
