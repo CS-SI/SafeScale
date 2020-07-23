@@ -295,7 +295,8 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (newHost *resources.Host, err error) {
+	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool,
+) (newHost *resources.Host, err error) {
 
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -306,6 +307,12 @@ func (handler *HostHandler) Create(
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
+
+	defer func() {
+		if newHost == nil && err == nil {
+			logrus.Debugf("host is nil, should not without an error")
+		}
+	}()
 
 	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -664,6 +671,11 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 
+	// VPL:
+	if host == nil {
+		return nil, scerr.InconsistentError("host is nil after mh.Write()")
+	}
+
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
@@ -689,6 +701,11 @@ func (handler *HostHandler) Create(
 		}
 
 		return nil, scerr.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
+	}
+
+	// VPL:
+	if host == nil {
+		return nil, scerr.InconsistentError("host is nil after WaitServerReady('phase1')")
 	}
 
 	// Updates host link with networks
@@ -719,6 +736,11 @@ func (handler *HostHandler) Create(
 	err = install.UploadStringToRemoteFile(string(userDataPhase2), srvutils.ToPBHost(host), filepath, "", "", "")
 	if err != nil {
 		return nil, err
+	}
+
+	// VPL:
+	if host == nil {
+		return nil, scerr.InconsistentError("host is nil after UploadStringToRemoteFile(phase2)")
 	}
 
 	sshConfig, err := sshHandler.GetConfig(ctx, host)
@@ -761,6 +783,11 @@ func (handler *HostHandler) Create(
 		retrieveForensicsData(ctx, sshHandler, host)
 		return nil, err
 	}
+	// VPL:
+	if host == nil {
+		return nil, scerr.InconsistentError("host is nil after Run(phase2)")
+	}
+
 	if retcode != 0 {
 		retrieveForensicsData(ctx, sshHandler, host)
 
@@ -1042,7 +1069,7 @@ func normalizeError(in error) (err error) {
 			case *net.DNSError:
 				return scerr.InvalidRequestError(fmt.Sprintf("failed to resolve by DNS: %v", commErr))
 			default:
-				return scerr.InvalidRequestError(fmt.Sprintf("failed to communicate (error type: %s): %v", reflect.TypeOf(realErr).String(), realErr.Error()))
+				return scerr.InvalidRequestError(fmt.Sprintf("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), realErr.Error()))
 			}
 		default:
 			// In any other case, the error should explain the potential retry has to stop

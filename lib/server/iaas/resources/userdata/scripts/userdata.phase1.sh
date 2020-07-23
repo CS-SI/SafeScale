@@ -190,169 +190,165 @@ disable_services() {
 }
 
 function check_dns_configuration() {
-  if [[ -r /etc/resolv.conf ]]; then
-    echo "Getting DNS using resolv.conf..."
-    THE_DNS=$(cat /etc/resolv.conf |grep -i '^nameserver'|head -n1|cut -d ' ' -f2)
+    if [[ -r /etc/resolv.conf ]]; then
+        echo "Getting DNS using resolv.conf..."
+        THE_DNS=$(cat /etc/resolv.conf |grep -i '^nameserver'|head -n1|cut -d ' ' -f2)
 
-    if [[ -n ${THE_DNS} ]]; then
-      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
     fi
-  fi
 
-  if which systemd-resolve; then
-    echo "Getting DNS using systemd-resolve"
-    THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}')
-    if [[ -n ${THE_DNS} ]]; then
-      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+    if which systemd-resolve; then
+        echo "Getting DNS using systemd-resolve"
+        THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}')
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
     fi
-  fi
 
-  if which resolvectl; then
-    echo "Getting DNS using resolvectl"
-    THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}')
-    if [[ -n ${THE_DNS} ]]; then
-      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+    if which resolvectl; then
+        echo "Getting DNS using resolvectl"
+        THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}')
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
     fi
-  fi
 
-  timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
-  return 1
+    timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
+    return 1
 }
 
 
 function is_network_reachable() {
-  NETROUNDS=4
-  REACHED=0
-  TRIED=0
+    NETROUNDS=4
+    REACHED=0
+    TRIED=0
 
-  for i in $(seq ${NETROUNDS}); do
-    if which curl; then
-      TRIED=1
-      curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+    for i in $(seq ${NETROUNDS}); do
+        if which curl; then
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        if which wget; then
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
+    done
+
+    if [[ ${REACHED} -eq 0 ]]; then
+        echo "Unable to reach network"
+        return 1
     fi
 
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    if which wget; then
-      TRIED=1
-      wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-    fi
-
-    if [[ ${TRIED} -eq 1 ]]; then
-      break
-    fi
-
-    ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
-  done
-
-  if [[ ${REACHED} -eq 0 ]]; then
-    echo "Unable to reach network"
-    return 1
-  fi
-
-  return 0
+    return 0
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
 ensure_network_connectivity() {
-  op=-1
-  is_network_reachable && op=$? || true
-  if [[ ${op} -eq 0 ]]; then
-    echo "ensure_network_connectivity started WITH network..."
-  else
-    echo "ensure_network_connectivity started WITHOUT network..."
-  fi
+    op=-1
+    is_network_reachable && op=$? || true
+    if [[ ${op} -eq 0 ]]; then
+        echo "ensure_network_connectivity started WITH network..."
+    else
+        echo "ensure_network_connectivity started WITHOUT network..."
+    fi
 
   {{- if .AddGateway }}
-  route del -net default &>/dev/null
-  route add -net default gw {{ .DefaultRouteIP }}
+    route del -net default &>/dev/null
+    route add -net default gw {{ .DefaultRouteIP }}
   {{- else }}
-  :
+    :
   {{- end}}
 
-  op=-1
-  is_network_reachable && op=$? || true
-  if [[ ${op} -eq 0 ]]; then
-    echo "ensure_network_connectivity finished WITH network..."
-    return 0
-  else
-    echo "ensure_network_connectivity finished WITHOUT network..."
-  fi
+    op=-1
+    is_network_reachable && op=$? || true
+    if [[ ${op} -eq 0 ]]; then
+        echo "ensure_network_connectivity finished WITH network..."
+        return 0
+    else
+        echo "ensure_network_connectivity finished WITHOUT network..."
+    fi
 
-  echo "" >> /etc/resolv.conf
-  echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+    echo "" >> /etc/resolv.conf
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
 
-  op=-1
-  is_network_reachable && op=$? || true
-  if [[ ${op} -eq 0 ]]; then
-    echo "ensure_network_connectivity finished WITH network AFTER putting custom DNS..."
-    return 0
-  else
+    op=-1
+    is_network_reachable && op=$? || true
+    if [[ ${op} -eq 0 ]]; then
+        echo "ensure_network_connectivity finished WITH network AFTER putting custom DNS..."
+        return 0
+    fi
+
     echo "ensure_network_connectivity finished WITHOUT network, not even custom DNS was enough..."
     return 1
-  fi
 }
 
 function fail_fast_unsupported_distros() {
-  case $LINUX_KIND in
-  debian)
-    lsb_release -rs | grep "8." && {
-      echo "PROVISIONING_ERROR: Unsupported Linux distribution (docker) '$LINUX_KIND $(lsb_release -rs)'!"
-      fail 199
-    } || true
-    ;;
-  ubuntu)
-    if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-        fail 199
-      fi
-    fi
-    ;;
-  redhat | rhel | centos)
-    if [[ -n $(which lsb_release) ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $(lsb_release -rs)'!"
-        fail 199
-      fi
-    else
-      if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $VERSION_ID'!"
-        fail 199
-      fi
-    fi
-    ;;
-  fedora)
-    if [[ -n $(which lsb_release) ]]; then
-      if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-        fail 199
-      fi
-    else
-      if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
-        fail 199
-      fi
-    fi
-    ;;
-  *)
-    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-    fail 199
-    ;;
-  esac
+    case $LINUX_KIND in
+        debian)
+            lsb_release -rs | grep "8." && {
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution (docker) '$LINUX_KIND $(lsb_release -rs)'!"
+                fail 199
+            } || true
+            ;;
+        ubuntu)
+            if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+                if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                    fail 199
+                fi
+            fi
+            ;;
+        redhat | rhel | centos)
+            if [[ -n $(which lsb_release) ]]; then
+                if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $(lsb_release -rs)'!"
+                    fail 199
+                fi
+            elif [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $VERSION_ID'!"
+                fail 199
+            fi
+            ;;
+        fedora)
+            if [[ -n $(which lsb_release) ]]; then
+                if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
+                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                    fail 199
+                fi
+            elif [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+                fail 199
+            fi
+            ;;
+        *)
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+            fail 199
+            ;;
+    esac
 }
 
-function compatible_network() {
-  # Try installing network-scripts if available
-  case $LINUX_KIND in
-  redhat | rhel | centos | fedora)
-    sfYum install -q -y network-scripts || true
-    ;;
-  *) ;;
-  esac
-}
+#function compatible_network() {
+#    # Try installing network-scripts if available
+#    case $LINUX_KIND in
+#        redhat | rhel | centos | fedora)
+#            sfYum install -q -y network-scripts || true
+#            ;;
+#    *) ;;
+#    esac
+#}
 
 # ---- Main
 
