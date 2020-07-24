@@ -904,12 +904,10 @@ sfDetectFacts() {
         redhat|rhel|centos|fedora)
             FACTS["redhat_like"]=1
             FACTS["debian_like"]=0
-            FACTS["docker_version"]=$(yum info docker-ce || true)
             ;;
         debian|ubuntu)
             FACTS["redhat_like"]=0
             FACTS["debian_like"]=1
-            FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
             ;;
     esac
     if systemctl | grep '\-.mount' &>/dev/null; then
@@ -941,8 +939,9 @@ sfDetectFacts() {
 
     sfProbeGPU
 
+    FACTS["docker_version"]=
     if which docker &>/dev/null; then
-        FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }} || true)
+        FACTS["docker_version"]=$(docker version {{ "--format '{{.Server.Version}}'" }} 2>/dev/null || true)
 
         # Some facts about installed features
         id=$(docker ps --filter "name=edgeproxy4network_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
