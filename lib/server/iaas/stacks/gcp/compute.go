@@ -17,27 +17,27 @@
 package gcp
 
 import (
-	"fmt"
-	"strconv"
-	"time"
+    "fmt"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "strconv"
+    "time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
+    "github.com/davecgh/go-spew/spew"
+    "github.com/sirupsen/logrus"
+    "google.golang.org/api/compute/v1"
+    "google.golang.org/api/googleapi"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+    converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
+    propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+    "github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/retry"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------
@@ -477,7 +477,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

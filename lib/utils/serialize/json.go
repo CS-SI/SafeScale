@@ -17,12 +17,11 @@
 package serialize
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
@@ -67,7 +66,7 @@ func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err erro
 		return scerr.InvalidParameterError("apply", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", false).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()

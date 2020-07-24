@@ -18,10 +18,10 @@ package metadata
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -211,7 +211,7 @@ func (mv *Volume) ReadByID(id string) (err error) {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -230,7 +230,7 @@ func (mv *Volume) ReadByName(name string) (err error) {
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -246,7 +246,7 @@ func (mv *Volume) Delete() (err error) {
 		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -273,7 +273,7 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
 		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -296,7 +296,7 @@ func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err err
 		return nil, scerr.InvalidParameterError("volume", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+volume.Name+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+volume.Name+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -327,7 +327,7 @@ func RemoveVolume(svc iaas.Service, volumeID string) (err error) {
 		return scerr.InvalidParameterError("volumeID", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+volumeID+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+volumeID+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -350,7 +350,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

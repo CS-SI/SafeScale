@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"path"
 	"strings"
 
@@ -31,7 +32,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
@@ -85,7 +85,7 @@ func (handler *ShareHandler) Create(
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -251,7 +251,7 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -335,7 +335,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -403,7 +403,7 @@ func (handler *ShareHandler) Mount(
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -634,7 +634,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -754,7 +754,7 @@ func (handler *ShareHandler) ForceInspect(
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -783,7 +783,7 @@ func (handler *ShareHandler) Inspect(
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

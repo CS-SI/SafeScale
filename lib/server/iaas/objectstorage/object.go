@@ -19,12 +19,11 @@ package objectstorage
 import (
 	"bytes"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io"
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
 	log "github.com/sirupsen/logrus"
 
@@ -33,6 +32,8 @@ import (
 	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // object implementation of Object interface
@@ -87,7 +88,7 @@ func (o *object) Reload() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	item, err := o.bucket.container.Item(o.Name)
 	if err != nil {
@@ -116,7 +117,7 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 		return scerr.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	var seekTo int64
 	var length int64
@@ -189,7 +190,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 		return scerr.InvalidParameterError("o.bucket", "cannot be nil")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	item, err := o.bucket.container.Put(o.Name, source, sourceSize, o.GetMetadata())
 	if err != nil {
@@ -205,7 +206,7 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	metadataCopy := o.GetMetadata().Clone()
 
@@ -261,7 +262,7 @@ func (o *object) Delete() error {
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	err := o.bucket.container.RemoveItem(o.Name)
 	if err != nil {
@@ -273,7 +274,7 @@ func (o *object) Delete() error {
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
 func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	for k, v := range newMetadata {
 		o.Metadata[k] = v
@@ -282,7 +283,7 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) {
 
 // AddMetadata adds missing entries in object metadata
 func (o *object) AddMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	for k, v := range newMetadata {
 		_, found := o.Metadata[k]
@@ -294,7 +295,7 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) {
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
 func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) {
-	defer concurrency.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	o.Metadata = newMetadata
 }

@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"net"
 	"strings"
 
@@ -36,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -187,7 +187,7 @@ func (s *Stack) DeleteVPC(id string) error {
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.Network, err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	subnet, err := s.findSubnetByName(req.Name)
@@ -651,7 +651,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 		gwname = "gw-" + req.Network.Name
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	hostReq := resources.HostRequest{

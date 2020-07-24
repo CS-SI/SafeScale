@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	log "github.com/sirupsen/logrus"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -56,7 +56,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 	networkName := in.GetName()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", networkName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -124,7 +124,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -169,7 +169,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -209,7 +209,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -247,7 +247,7 @@ func (s *NetworkListener) Destroy(ctx context.Context, in *pb.Reference) (buf *g
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"net"
 	"net/http"
 	"time"
@@ -48,7 +49,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -261,7 +261,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1108,7 +1108,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 		hostRef = host.ID
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

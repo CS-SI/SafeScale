@@ -20,6 +20,7 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "math"
     "os"
     "os/exec"
@@ -137,7 +138,7 @@ func (b *foreman) ExecuteScript(
     hostID string,
 ) (errCode int, stdOut string, stdErr string, err error) {
 
-    tracer := concurrency.NewTracer(nil, "("+hostID+")", true).GoingIn()
+    tracer := debug.NewTracer(nil, "("+hostID+")", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -166,15 +167,9 @@ func (b *foreman) ExecuteScript(
 
 // construct ...
 func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-    // Wants to inform about the duration of the operation
-    defer temporal.NewStopwatch().OnExitLogInfo(
-        fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
-        fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
-    )()
 
     state := clusterstate.Unknown
 
@@ -525,6 +520,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
         _ = privateNodesTask.Abort()
         return primaryGatewayStatus
     }
+    logrus.Debugf("Primary gateway created")
     if !gwFailoverDisabled {
         if secondaryGatewayTask != nil {
             _, secondaryGatewayStatus = secondaryGatewayTask.Wait()
@@ -534,6 +530,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
                 return secondaryGatewayStatus
             }
         }
+        logrus.Debugf("Secondary gateway created")
     }
 
     // Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
@@ -547,11 +544,13 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     }()
 
     // waits the masters creation
+    logrus.Debugf("Waiting for masters to be created...")
     _, mastersStatus = mastersTask.Wait()
     if mastersStatus != nil {
         _ = privateNodesTask.Abort()
         return mastersStatus
     }
+    logrus.Debugf("Masters created")
 
     // Step 3: start gateway(s) configuration (needs ClusterMasterIPs so masters must be installed first)
     // Configure Gateway(s) and waits for the result
@@ -582,7 +581,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
         }
         return primaryGatewayStatus
     }
-
+    logrus.Debugf("Primary gateway configured")
     if !gwFailoverDisabled {
         if secondaryGatewayTask != nil {
             _, secondaryGatewayStatus = secondaryGatewayTask.Wait()
@@ -590,9 +589,11 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
                 return secondaryGatewayStatus
             }
         }
+        logrus.Debugf("Secondary gateway configured")
     }
 
     // Step 4: configure masters
+    logrus.Debugf("Configuring Masters...") // VPL
     mt, err := task.New()
     if err != nil {
         return err
@@ -601,12 +602,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     if mastersStatus != nil {
         return mastersStatus
     }
+    logrus.Debugf("Masters configured")
 
     // Step 5: awaits nodes creation
     _, privateNodesStatus = privateNodesTask.Wait()
     if privateNodesStatus != nil {
         return privateNodesStatus
     }
+    logrus.Debugf("Nodes created")
 
     // Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
     defer func() {
@@ -629,8 +632,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     if privateNodesStatus != nil {
         return privateNodesStatus
     }
+    logrus.Debugf("Nodes configured")
 
     // At the end, configure cluster as a whole
+    logrus.Debugf("Starting cluster configuration...")
     err = b.configureCluster(task, data.Map{
         "Request":          req,
         "PrimaryGateway":   primaryGateway,
@@ -639,7 +644,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     if err != nil {
         return err
     }
-
+    logrus.Debugf("Cluster configured")
     return nil
 }
 
@@ -647,7 +652,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 func (b *foreman) destruct(task concurrency.Task) (err error) {
     cluster := b.cluster
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -941,7 +946,7 @@ func (b *foreman) unconfigureMaster(task concurrency.Task, pbHost *pb.Host) erro
 // configureCluster ...
 // params contains a data.Map with primary and secondary Gateway hosts
 func (b *foreman) configureCluster(task concurrency.Task, params concurrency.TaskParameters) (err error) {
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1037,7 +1042,7 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
         return scerr.InvalidParameterError("params", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1214,7 +1219,7 @@ func uploadTemplateToFile(
 
 // configureNodesFromList configures nodes from a list
 func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) (err error) {
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1462,7 +1467,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
         return scerr.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1649,7 +1654,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
         return result, scerr.InvalidParameterError("params", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1699,7 +1704,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
         return result, scerr.InvalidParameterError("params", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1727,7 +1732,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
     def := p["masterDef"].(*pb.HostDefinition)
     nokeep := p["nokeep"].(bool)
 
-    tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1786,14 +1791,13 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
     timeout := p["timeout"].(time.Duration)
     nokeep := p["nokeep"].(bool)
 
-    tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
+    tracer := debug.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-    def.KeepOnFailure = !nokeep
-
     hostLabel := fmt.Sprintf("master #%d", index)
-    logrus.Debugf("[%s] starting host resource creation...", hostLabel)
+
+    def.KeepOnFailure = !nokeep
 
     netCfg, err := b.cluster.GetNetworkConfig(t)
     if err != nil {
@@ -1889,7 +1893,6 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
         return nil, client.DecorateError(err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false)
     }
     hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
-    logrus.Debugf("[%s] host resource creation successful", hostLabel)
 
     err = b.installProxyCacheClient(t, pbHost, hostLabel)
     if err != nil {
@@ -1902,14 +1905,13 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
         return nil, err
     }
 
-    logrus.Debugf("[%s] host resource creation successful.", hostLabel)
     return nil, nil
 }
 
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-    tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1977,7 +1979,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
     pbHost := p["host"].(*pb.Host)
     // FIXME: validate parameters
 
-    tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2038,7 +2040,7 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
         return nil, scerr.InvalidParameterError("params[nokeep]", "is missing or not a bool")
     }
 
-    tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2124,14 +2126,12 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
         return nil, scerr.InvalidParameterError("params[nokeep]", "is missing or not a bool")
     }
 
-    tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-    def.KeepOnFailure = !nokeep
-
     hostLabel := fmt.Sprintf("node #%d", index)
-    logrus.Debugf("[%s] starting host resource creation...", hostLabel)
+    def.KeepOnFailure = !nokeep
 
     netCfg, err := b.cluster.GetNetworkConfig(t)
     if err != nil {
@@ -2230,7 +2230,6 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
     }
 
     hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
-    logrus.Debugf("[%s] host resource creation successful.", hostLabel)
 
     err = b.installProxyCacheClient(t, pbHost, hostLabel)
     if err != nil {
@@ -2244,7 +2243,6 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
         return nil, err
     }
 
-    logrus.Debugf("[%s] host resource creation successful.", hostLabel)
     return pbHost.Id, nil
 }
 
@@ -2253,7 +2251,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (task concurrency.TaskResult, err error) {
     clusterName := b.cluster.GetIdentity(t).Name
 
-    tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2319,7 +2317,7 @@ func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskP
     index := p["index"].(int)
     pbHost := p["host"].(*pb.Host)
 
-    tracer := concurrency.NewTracer(t, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(t, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2347,7 +2345,7 @@ func (b *foreman) installTimeServer(task concurrency.Task) (err error) {
     identity := b.cluster.GetIdentity(task)
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2377,7 +2375,7 @@ func (b *foreman) installTimeClient(task concurrency.Task) (err error) {
     identity := b.cluster.GetIdentity(task)
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2409,7 +2407,7 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
     identity := b.cluster.GetIdentity(task)
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2439,7 +2437,7 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
     identity := b.cluster.GetIdentity(task)
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2476,7 +2474,7 @@ func (b *foreman) installAnsible(task concurrency.Task) (err error) {
     identity := b.cluster.GetIdentity(task)
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2506,7 +2504,7 @@ func (b *foreman) installAnsible(task concurrency.Task) (err error) {
 
 // install proxycache-client feature if not disabled
 func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2543,7 +2541,7 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 
 // install proxycache-server feature if not disabled
 func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2580,7 +2578,7 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
 // intallDocker installs docker and docker-compose
 func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabel string) (err error) {
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

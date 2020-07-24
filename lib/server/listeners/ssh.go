@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -29,7 +30,6 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -55,7 +55,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	host := in.GetHost().GetName()
 	command := in.GetCommand()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -96,7 +96,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 	source := in.Source
 	dest := in.Destination
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -28,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -58,7 +58,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	}
 	all := in.GetAll()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -102,7 +102,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	size := in.GetSize()
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -205,7 +205,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 		doNotFormatStr = "FORMAT"
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr), true)
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s, %s)", volumeRef, hostRef, mountPath, filesystem, doNotFormatStr), true)
 	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -249,7 +249,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 		return empty, status.Errorf(codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for host")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -289,7 +289,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 		return empty, status.Errorf(codes.InvalidArgument, "cannot delete volume: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -327,7 +327,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 		return nil, status.Errorf(codes.InvalidArgument, "cannot inspect volume: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

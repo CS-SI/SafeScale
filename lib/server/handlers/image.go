@@ -19,10 +19,10 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -51,7 +51,7 @@ func NewImageHandler(svc iaas.Service) ImageAPI {
 
 // List returns the image list
 func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

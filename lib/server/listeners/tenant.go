@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -74,7 +74,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -107,7 +107,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn 
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -137,7 +137,7 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	name := in.GetName()
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

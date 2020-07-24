@@ -18,6 +18,7 @@ package control
 
 import (
     "fmt"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "strings"
     "time"
 
@@ -112,12 +113,13 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
         return scerr.InvalidParameterError("f", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer temporal.NewStopwatch().OnExitLogInfo(
         fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
         fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
     )()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
     c.Lock(task)
@@ -145,7 +147,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 // GetService returns the service from the provider
 func (c *Controller) GetService(task concurrency.Task) iaas.Service {
     var err error
-    defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+    defer scerr.OnExitLogError(debug.NewTracer(task, "", false).TraceMessage(""), &err)()
 
     if c == nil {
         err = scerr.InvalidInstanceError()
@@ -167,7 +169,7 @@ func (c *Controller) GetIdentity(task concurrency.Task) identity.Identity {
     }
 
     var err error
-    defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+    defer scerr.OnExitLogError(debug.NewTracer(task, "", false).TraceMessage(""), &err)()
 
     if c == nil {
         err = scerr.InvalidInstanceError()
@@ -186,7 +188,7 @@ func (c *Controller) GetProperties(task concurrency.Task) *serialize.JSONPropert
     }
 
     var err error
-    defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+    defer scerr.OnExitLogError(debug.NewTracer(task, "", false).TraceMessage(""), &err)()
 
     if c == nil {
         err = scerr.InvalidInstanceError()
@@ -208,7 +210,7 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
         return config, scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+    defer scerr.OnExitLogError(debug.NewTracer(task, "", false).TraceMessage(""), &err)()
 
     if c == nil {
         return config, scerr.InvalidInstanceError()
@@ -247,7 +249,7 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
         return 0, scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    defer scerr.OnExitLogError(concurrency.NewTracer(task, "", false).TraceMessage(""), &err)()
+    defer scerr.OnExitLogError(debug.NewTracer(task, "", false).TraceMessage(""), &err)()
 
     var count uint
 
@@ -451,7 +453,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
         return nil, scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true)
+    tracer := debug.NewTracer(task, fmt.Sprintf("(%s)", hostID), true)
     defer tracer.GoingIn().OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -502,7 +504,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
         return "", scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -546,7 +548,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
         return "", scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -588,7 +590,7 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -630,7 +632,7 @@ func (c *Controller) DeleteMetadata(task concurrency.Task) (err error) {
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+    tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -777,7 +779,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
         return nil, scerr.InvalidParameterError("count", "must be an int > 0")
     }
 
-    tracer := concurrency.NewTracer(task, fmt.Sprintf("(%d)", count), true)
+    tracer := debug.NewTracer(task, fmt.Sprintf("(%d)", count), true)
     defer tracer.GoingIn().OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -932,7 +934,7 @@ func (c *Controller) GetState(task concurrency.Task) (state clusterstate.Enum, e
         return clusterstate.Unknown, scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -966,7 +968,7 @@ func (c *Controller) ForceGetState(task concurrency.Task) (state clusterstate.En
         return clusterstate.Unknown, scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -998,7 +1000,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
         return scerr.InvalidParameterError("hostID", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+    tracer := debug.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1070,7 +1072,7 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, fmt.Sprintf("('%s')", selectedMaster), true).GoingIn()
+    tracer := debug.NewTracer(task, fmt.Sprintf("('%s')", selectedMaster), true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1112,7 +1114,7 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+    tracer := debug.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1171,7 +1173,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, '%s')", node.Name, selectedMaster), true).GoingIn()
+    tracer := debug.NewTracer(task, fmt.Sprintf("(%s, '%s')", node.Name, selectedMaster), true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1284,7 +1286,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1300,7 +1302,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1428,7 +1430,7 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
         return scerr.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, "", true).GoingIn()
+    tracer := debug.NewTracer(task, "", true).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -18,24 +18,26 @@ package ebrc
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/vmware/go-vcloud-director/govcd"
-	"github.com/vmware/go-vcloud-director/types/v56"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io/ioutil"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/vmware/go-vcloud-director/govcd"
+	"github.com/vmware/go-vcloud-director/types/v56"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 )
@@ -231,7 +233,7 @@ func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	return resources.NewKeyPair(name)

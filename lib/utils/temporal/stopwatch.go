@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
 )
 
 const outputStopwatchTemplate = "%s (elapsed: %s)"

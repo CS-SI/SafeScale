@@ -18,11 +18,11 @@ package metadata
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -90,7 +90,7 @@ func (mh *Host) Write() (err error) {
 		return scerr.InvalidParameterError("m.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+*mh.id+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+*mh.id+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -113,7 +113,7 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -183,7 +183,7 @@ func (mh *Host) ReadByID(id string) (err error) {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -202,7 +202,7 @@ func (mh *Host) ReadByName(name string) (err error) {
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -218,7 +218,7 @@ func (mh *Host) Delete() (err error) {
 		return scerr.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -241,7 +241,7 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 		return scerr.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -264,7 +264,7 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 		return nil, scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -312,7 +312,7 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
@@ -341,7 +341,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+ref+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 

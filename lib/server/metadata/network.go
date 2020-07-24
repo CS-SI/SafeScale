@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -118,7 +118,7 @@ func (m *Network) Write() (err error) {
 		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -140,7 +140,7 @@ func (m *Network) Reload() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -166,7 +166,7 @@ func (m *Network) ReadByReference(ref string) (err error) {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -237,7 +237,7 @@ func (m *Network) ReadByID(id string) (err error) {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -256,7 +256,7 @@ func (m *Network) ReadByName(name string) (err error) {
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -272,7 +272,7 @@ func (m *Network) Delete() (err error) {
 		return scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -303,7 +303,7 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 		return scerr.InvalidParameterError("callback", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -329,7 +329,7 @@ func (m *Network) AttachHost(host *resources.Host) (err error) {
 		return scerr.InvalidParameterError("host", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+host.Name+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+host.Name+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -357,7 +357,7 @@ func (m *Network) DetachHost(hostID string) (err error) {
 		return scerr.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+hostID+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+hostID+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -389,7 +389,7 @@ func (m *Network) ListHosts() (list []*resources.Host, err error) {
 		return nil, scerr.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -441,7 +441,7 @@ func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err err
 		return nil, scerr.InvalidParameterError("net", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -467,7 +467,7 @@ func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
 		return scerr.InvalidParameterError("net", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, "+net.Name+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "(<iaas.Service>, "+net.Name+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -496,7 +496,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+ref+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "(<iaas.Service>, '"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -548,7 +548,7 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 		return nil, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -621,7 +621,7 @@ func (mg *Gateway) Read() (err error) {
 		return scerr.InvalidParameterError("mg.network", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -655,7 +655,7 @@ func (mg *Gateway) Reload() (err error) {
 		return scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -681,7 +681,7 @@ func (mg *Gateway) Delete() (err error) {
 		return scerr.InvalidParameterError("mg.host", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -722,7 +722,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 		return nil, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "(<iaas.Service>, '"+networkID+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -770,7 +770,7 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 		return nil, scerr.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(<iaas.Service>, %s, '%s'", host.Name, networkID), true).GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(<iaas.Service>, %s, '%s'", host.Name, networkID), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
