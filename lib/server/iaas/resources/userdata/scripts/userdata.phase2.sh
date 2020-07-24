@@ -63,7 +63,7 @@ reset_fw() {
             sfApt purge -q -y ufw &>/dev/null || return 1
             ;;
 
-        rhel | centos | fedora)
+        redhat | rhel | centos | fedora)
             # firewalld may not be installed
             if ! systemctl is-active firewalld &>/dev/null; then
                 if ! systemctl status firewalld &>/dev/null; then
@@ -79,6 +79,17 @@ reset_fw() {
             ;;
     esac
 
+    FWCMD=firewall-offline-cmd     # firewall-cmd --permanent "like" command
+    FWCMDnop=$FWCMD                # firewall-cmd "like" command without --permanent
+    FWRELOAD="systemctl enable firewalld"
+    if [[ $(sfGetFact "redhat_like") = 1 && $(sfGetFact "distrib_version") -ge 8 ]]; then
+        FWCMD=sfFirewallAdd
+        FWCMDnop=sfFirewall
+        FWRELOAD=sfFirewallReload
+        systemctl enable firewalld &>/dev/null
+        systemctl start firewalld &>/dev/null
+    fi
+
     # # Clear interfaces attached to zones
     # for zone in $(sfFirewall --get-active-zones | grep -v interfaces | grep -v sources); do
     #     for nic in $(sfFirewall --zone=$zone --list-interfaces || true); do
@@ -86,37 +97,40 @@ reset_fw() {
     #     done
     # done
     for zone in public trusted; do
-        for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
-            firewall-offline-cmd --zone=$zone --remove-interface=$nic &>/dev/null || true
+        for nic in $($FWCMD --zone=$zone --list-interfaces || true); do
+            $FWCMD --zone=$zone --remove-interface=$nic &>/dev/null || true
         done
     done
 
     # Attach Internet interface or source IP to zone public if host is gateway
     [ ! -z $PU_IF ] && {
         # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
-        firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
+        $FWCMD --zone=public --add-interface=$PU_IF || return 1
     }
   {{- if or .PublicIP .IsGateway }}
     [[ -z ${PU_IF} ]] && {
         # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
-        firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
+        $FWCMD --zone=public --add-source=${PU_IP}/32 || return 1
+        $FWCMD --set-default-zone=public || return 1
     }
+  {{- else }}
+        $FWCMDnop --set-default-zone=trusted || return 1
   {{- end }}
     # Attach LAN interfaces to zone trusted
     [[ ! -z ${PR_IFs} ]] && {
         for i in $PR_IFs; do
             # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-            firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
+            $FWCMD --zone=trusted --add-interface=$PR_IFs || return 1
         done
     }
     # Attach lo interface to zone trusted
     # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
-    firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
+    $FWCMD --zone=trusted --add-interface=lo || return 1
 
     # Allow service ssh on public zone
     # sfFirewallAdd --zone=public --add-service=ssh || return 1
     op=-1
-    SSHEC=$(firewall-offline-cmd --zone=public --add-service=ssh) && op=$? || true
+    SSHEC=$($FWCMD --zone=public --add-service=ssh) && op=$? || true
     if [[ $op -eq 11 ]] || [[ $op -eq 12 ]] || [[ $op -eq 16 ]]; then
         op=0
     fi
@@ -128,8 +142,7 @@ reset_fw() {
     [[ $op -ne 0 ]] && return 1
 
     # Save current fw settings as permanent
-    # sfFirewallReload
-    sfService enable firewalld
+    $FWRELOAD
     return 0
 }
 
