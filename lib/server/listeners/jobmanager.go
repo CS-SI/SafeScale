@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -52,7 +52,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 		return empty, status.Errorf(codes.FailedPrecondition, "Can't stop job: job id not set")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", uuid), true).GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", uuid), true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -81,7 +81,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	log "github.com/sirupsen/logrus"
 
@@ -88,7 +89,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 
 // Create creates a cluster following the parameters of the request
 func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err error) {
-	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -99,8 +100,6 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 	if req.CIDR == "" {
 		return nil, scerr.InvalidParameterError("req.CIDR", "cannot be empty!")
 	}
-
-	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
 
 	tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {

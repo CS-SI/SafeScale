@@ -19,12 +19,14 @@ package outscale
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+
 	"github.com/antihax/optional"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/outscale-dev/osc-sdk-go/osc"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // CreateKeyPair creates and import a key pair
@@ -36,7 +38,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	keypair, err := resources.NewKeyPair(name)

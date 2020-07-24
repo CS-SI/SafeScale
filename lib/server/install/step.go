@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"math"
 	"strings"
 	"time"
@@ -265,14 +266,14 @@ type step struct {
 func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResults, err error) {
 	results = StepResults{}
 
-	tracer := concurrency.NewTracer(is.Worker.feature.task, "", true).GoingIn()
+	tracer := debug.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	nHosts := len(hosts)
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, utils.Plural(nHosts)),
 		fmt.Sprintf("Ending step '%s' on %d host%s", is.Name, len(hosts), utils.Plural(nHosts)),
-		log.DebugLevel,
+		log.TraceLevel,
 	)()
 
 	if is.Serial || s.Serialize {

@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"strings"
 	"time"
 
@@ -43,7 +44,6 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -56,7 +56,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	listOpts := regions.ListOpts{
 		ParentRegionID: "RegionOne",
@@ -86,7 +86,7 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -120,7 +120,7 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -160,7 +160,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -192,7 +192,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -225,7 +225,7 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	opts := flavors.ListOpts{}
@@ -283,7 +283,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	return resources.NewKeyPair(name)
@@ -303,7 +303,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidParameterError("id", "cannot be nil")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
@@ -325,7 +325,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := keypairs.List(s.ComputeClient)
@@ -366,7 +366,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -436,7 +436,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		hostRef = host.ID
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	serverState, err := s.GetHostState(host.ID)
 	if err != nil {
@@ -658,7 +658,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
@@ -692,7 +692,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	userData = userdata.NewContent()
 
@@ -1009,7 +1009,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 		hostRef = host.ID
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1126,7 +1126,7 @@ func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ ho
 		hostRef = host.ID
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
 	lastState := hoststate.UNKNOWN
 
 	retryErr := retry.WhileUnsuccessful(
@@ -1209,7 +1209,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 		return hoststate.ERROR, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
 	hostState, err := s.getHostState(hostParam, temporal.GetDefaultDelay())
 
@@ -1222,7 +1222,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	pager := servers.List(s.ComputeClient, servers.ListOpts{})
 	var hosts []*resources.Host
@@ -1301,7 +1301,7 @@ func (s *Stack) DeleteHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Delete floating IP address if there is one
 	if s.cfgOpts.UseFloatingIP {
@@ -1398,7 +1398,7 @@ func (s *Stack) StopHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1416,7 +1416,7 @@ func (s *Stack) RebootHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	err := servers.Reboot(s.ComputeClient, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
@@ -1439,7 +1439,7 @@ func (s *Stack) StartHost(id string) error {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
@@ -1458,7 +1458,7 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// TODO RESIZE Resize Host HERE
 	logrus.Warn("Trying to resize a Host...")

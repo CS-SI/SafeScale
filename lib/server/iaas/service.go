@@ -19,13 +19,15 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"math"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -44,7 +46,6 @@ import (
 	templatefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 )
 
@@ -293,7 +294,7 @@ func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
 func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
-	tracer := concurrency.NewTracer(nil, "", true).GoingIn()
+	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -19,6 +19,7 @@ package control
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -64,7 +65,7 @@ func (m *Metadata) Written() bool {
 // Carry links metadata with cluster struct
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	var err error
-	tracer := concurrency.NewTracer(task, "", false)
+	tracer := debug.NewTracer(task, "", false)
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
@@ -187,7 +188,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 
 // Get returns the content of the metadata
 func (m *Metadata) Get() (_ *Controller, err error) {
-	tracer := concurrency.NewTracer(nil, "", false)
+	tracer := debug.NewTracer(nil, "", false)
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {

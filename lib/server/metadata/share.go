@@ -19,7 +19,7 @@ package metadata
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -211,7 +211,7 @@ func (ms *Share) ReadByID(id string) (err error) {
 		return scerr.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "("+id+")", true).GoingIn()
+	tracer := debug.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -230,7 +230,7 @@ func (ms *Share) ReadByName(name string) (err error) {
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -418,7 +418,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 		return "", scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "(<svc>, '"+ref+"')", true).GoingIn()
+	tracer := debug.NewTracer(nil, "(<svc>, '"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

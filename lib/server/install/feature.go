@@ -18,6 +18,7 @@ package install
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io/ioutil"
 	"strings"
 
@@ -163,7 +164,7 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -212,7 +213,7 @@ func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err err
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(task, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -293,7 +294,7 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -348,7 +349,7 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -370,9 +371,10 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 		return nil, fmt.Errorf("failed to find a way to install '%s'", f.DisplayName())
 	}
 
-	defer temporal.NewStopwatch().OnExitLogInfo(
+	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", f.DisplayName(), t.Type(), t.Name()),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()),
+		logrus.TraceLevel,
 	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
@@ -425,7 +427,7 @@ func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err erro
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

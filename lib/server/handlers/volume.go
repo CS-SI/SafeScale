@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"math"
 	"strconv"
 	"strings"
@@ -36,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -77,7 +77,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -109,7 +109,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -189,7 +189,7 @@ func (handler *VolumeHandler) Inspect(
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "('"+ref+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -254,7 +254,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -368,7 +368,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		return "", scerr.InvalidInstanceError()
 	}
 	// FIXME: validate parameters
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', '%s', %v)", volumeName, hostName, path, format, doNotFormat), true)
 	defer tracer.WithStopwatch().GoingIn().OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1020,7 +1020,7 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 	}
 	// FIXME: validate parameters
 
-	defer scerr.OnExitLogError(concurrency.NewTracer(nil, "", true).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(debug.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
 	sshHandler := NewSSHHandler(handler.service)
 
@@ -1473,7 +1473,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeName, hostName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

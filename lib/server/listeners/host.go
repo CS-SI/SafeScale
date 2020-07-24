@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"google.golang.org/grpc/status"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -75,7 +75,7 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -111,7 +111,7 @@ func (s *HostListener) Stop(ctx context.Context, in *pb.Reference) (empty *googl
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -147,7 +147,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("ref", "cannot be empty string").Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -180,7 +180,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	}
 	all := in.GetAll()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)
 
@@ -221,7 +221,7 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	}
 	name := in.GetName()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -280,7 +280,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 	}
 	name := in.GetName()
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -324,7 +324,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -360,7 +360,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -397,7 +397,7 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 		return empty, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -434,7 +434,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -19,12 +19,12 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -57,7 +57,7 @@ func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error)
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -74,7 +74,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 		return scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -96,7 +96,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 
 // Destroy a bucket, clear then delete
 func (handler *BucketHandler) Destroy(ctx context.Context, name string) (err error) {
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -114,7 +114,7 @@ func (handler *BucketHandler) Destroy(ctx context.Context, name string) (err err
 
 // Delete a bucket
 func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -127,7 +127,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 
 // Inspect a bucket
 func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
-	tracer := concurrency.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -146,7 +146,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 
 // Mount a bucket on an host on the given mount point
 func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -213,7 +213,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 
 // Unmount a bucket
 func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

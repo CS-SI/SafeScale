@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -28,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -60,7 +60,7 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 	shareType := in.GetType()
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", shareName, hostRef, sharePath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -96,7 +96,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	shareName := in.GetName()
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -135,7 +135,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (sl 
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -181,7 +181,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	shareType := in.GetType()
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -220,7 +220,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	shareType := in.GetType()
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s', %s)", hostRef, shareRef, hostPath, shareType), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -255,7 +255,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	shareRef := srvutils.GetReference(in)
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s')", shareRef), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", shareRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

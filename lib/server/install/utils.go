@@ -19,6 +19,7 @@ package install
 import (
 	"bytes"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io/ioutil"
 	"math"
 	"os"
@@ -34,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -171,7 +171,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s:%s)", localpath, host.Name, remotepath), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s, %s:%s)", localpath, host.Name, remotepath), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

@@ -18,13 +18,13 @@ package objectstorage
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/graymeta/stow"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // bucket describes a Bucket
@@ -49,14 +49,14 @@ func newBucket(location stow.Location, bucketName string) (*bucket, error) {
 
 // CreateObject ...
 func (b *bucket) CreateObject(objectName string) (Object, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", objectName), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", objectName), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	return newObject(b, objectName)
 }
 
 // GetObject ...
 func (b *bucket) GetObject(objectName string) (Object, error) {
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s)", objectName), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", objectName), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -74,7 +74,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("(%s, %s)", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s, %s)", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	var list []string
 
@@ -104,7 +104,7 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 		return scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -133,7 +133,7 @@ func (b *bucket) Clear(path, prefix string) error {
 		return scerr.InvalidInstanceContentError("b.container", "cannot be nil")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -164,7 +164,7 @@ func (b *bucket) DeleteObject(objectName string) error {
 		return scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s')", objectName), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", objectName), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -179,7 +179,7 @@ func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to 
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d, %d)", objectName, from, to), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', %d, %d)", objectName, from, to), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -198,7 +198,7 @@ func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', %d)", objectName, sourceSize), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', %d)", objectName, sourceSize), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -224,7 +224,7 @@ func (b *bucket) WriteMultiPartObject(
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -250,7 +250,7 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 		return 0, scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	var count int64
 	fullPath := buildFullPath(path, prefix)
@@ -278,7 +278,7 @@ func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 		return 0, "", scerr.InvalidInstanceError()
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
 
 	var err error
 	var totalSize int64

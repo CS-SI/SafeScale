@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -26,7 +27,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
@@ -44,7 +44,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

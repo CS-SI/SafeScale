@@ -519,7 +519,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
 		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
-		logrus.DebugLevel,
+		logrus.TraceLevel,
 	)()
 
 	var (

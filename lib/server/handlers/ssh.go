@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"strings"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -96,7 +96,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -154,7 +154,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -174,7 +174,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
@@ -217,7 +217,7 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
@@ -314,7 +314,7 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	}
 	// FIXME: validate parameters
 
-	tracer := concurrency.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 

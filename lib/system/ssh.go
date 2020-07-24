@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io"
 	"io/ioutil"
 	"net"
@@ -422,7 +423,7 @@ func (sc *SSHCommand) Display() string {
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
 func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, string, error) {
-	tracer := concurrency.NewTracer(t, fmt.Sprintf("(%s)", outs.String()), false).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(t, fmt.Sprintf("(%s)", outs.String()), false).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
 	return sc.RunWithTimeout(t, outs, 0)
@@ -430,7 +431,7 @@ func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, s
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, error) {
-	tracer := concurrency.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%s, %v)", outs.String(), timeout), true).WithStopwatch().GoingIn()
 	tracer.Trace("command=\n%s\n", sc.Display())
 	defer tracer.OnExitTrace()()
 
@@ -815,7 +816,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 		return "", scerr.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
 	}
 
-	defer concurrency.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), false).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), false).GoingIn().OnExitTrace()()
 
 	defer scerr.OnExitTraceError(
 		fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),

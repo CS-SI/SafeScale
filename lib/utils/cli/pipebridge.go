@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"io"
 	"os"
 
@@ -193,7 +194,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 		return nil, scerr.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
 	}
 
-	tracer := concurrency.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	defer scerr.OnPanic(&err)() // bufio.Scanner.Scan() may panic...

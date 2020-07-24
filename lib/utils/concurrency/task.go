@@ -260,7 +260,6 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
 	go t.run(action, params)
 
-	// tracer := NewTracer(t, "", true)
 	finish := false
 	begin := time.Now()
 
@@ -269,7 +268,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				// tracer.Trace("receiving signal from context, aborting task...")
+				// tracer.trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
 				if t.status == RUNNING && t.abortCh != nil {
 					t.abortCh <- struct{}{}
@@ -277,7 +276,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Unlock()
 			case <-t.doneCh:
 				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
-				// tracer.Trace("receiving done signal from go routine")
+				// tracer.trace("receiving done signal from go routine")
 				t.lock.Lock()
 				t.status = DONE
 				t.lock.Unlock()
@@ -309,7 +308,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				// tracer.Trace("receiving signal from context, aborting task...")
+				// tracer.trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
 				if t.status == RUNNING && t.abortCh != nil {
 					t.abortCh <- struct{}{}
@@ -322,7 +321,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				finish = true
 			case <-t.abortCh:
 				// Abort signal received
-				// tracer.Trace("receiving abort signal")
+				// tracer.trace("receiving abort signal")
 				t.lock.Lock()
 				close(t.abortCh)
 				t.abortCh = nil
@@ -366,7 +365,7 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error)
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	status := t.GetStatus()
 	if status == DONE {
@@ -390,7 +389,7 @@ func (t *task) Wait() (TaskResult, error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If task still running, returns (false, nil)
 func (t *task) TryWait() (bool, TaskResult, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	status := t.GetStatus()
 	if status == DONE {
@@ -415,7 +414,7 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 // If task aborted, returns (true, scerr.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, scerr.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	status := t.GetStatus()
 	if status == DONE {
