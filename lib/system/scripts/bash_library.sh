@@ -55,8 +55,8 @@ export -f sfFinishPreviousInstall
 
 # sfWaitForApt waits an already running apt-like command to finish
 sfWaitForApt() {
-  sfFinishPreviousInstall || true
-  sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+    sfFinishPreviousInstall || true
+    sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
 export -f sfWaitForApt
 
@@ -95,7 +95,7 @@ sfWaitLockfile() {
             echo "Timed out waiting (1 hour!) for ${name} lock!"
             exit 100
         else
-            t=$(($i*6))
+            t=$(($i * 6))
             echo "${name} is unlocked (waited $t seconds), continuing."
         fi
     else
@@ -126,38 +126,40 @@ export -f sfLong2IP
 sfNetmask2cidr() {
     # Assumes there's no "255." after a non-255 byte in the mask
     local x=${1##*255.}
-    set -- 0^^^128^192^224^240^248^252^254^ $(( (${#1} - ${#x})*2 )) ${x%%.*}
+    set -- 0^^^128^192^224^240^248^252^254^ $(((${#1} - ${#x}) * 2)) ${x%%.*}
     x=${1%%$3*}
-    echo $(( $2 + (${#x}/4) ))
+    echo $(($2 + (${#x} / 4)))
 }
 export -f sfNetmask2cidr
 
 # Convert CIDR to netmask
 sfCidr2netmask() {
     local bits=${1#*/}
-    local mask=$((0xffffffff << (32-$bits)))
+    local mask=$((0xffffffff << (32 - $bits)))
     sfLong2IP $mask
 }
 export -f sfCidr2netmask
 
 # Convert CIDR to network
-sfCidr2network()
-{
+sfCidr2network() {
     local base=${1%%/*}
     local bits=${1#*/}
-    local long=$(sfIP2long $base); shift
-    local mask=$((0xffffffff << (32-$bits))); shift
+    local long=$(sfIP2long $base)
+    shift
+    local mask=$((0xffffffff << (32 - $bits)))
+    shift
     sfLong2IP $((long & mask))
 }
 export -f sfCidr2network
 
 # Convert CIDR to broadcast
-sfCidr2broadcast()
-{
+sfCidr2broadcast() {
     local base=${1%%/*}
     local bits=${1#*/}
-    local long=$(sfIP2long $base); shift
-    local mask=$((0xffffffff << (32-$bits))); shift
+    local long=$(sfIP2long $base)
+    shift
+    local mask=$((0xffffffff << (32 - $bits)))
+    shift
     sfLong2IP $((long | ~mask))
 }
 export -f sfCidr2broadcast
@@ -227,7 +229,7 @@ sfRetry() {
         export -f fn
 EOF
     eval "$code"
-      result=$(timeout $timeout bash -c -x fn)
+    result=$(timeout $timeout bash -c -x fn)
     rc=$?
     unset fn
     [ $rc -eq 0 ] && echo $result && return 0
@@ -271,13 +273,13 @@ export -f sfFirewallReload
 # sfInstall installs a package and exits if it fails...
 sfInstall() {
     case $LINUX_KIND in
-        debian|ubuntu)
+        debian | ubuntu)
             export DEBIAN_FRONTEND=noninteractive
             sfRetry 5m 5 "sfApt update"
             sfApt install $1 -y || exit 194
             which $1 || exit 194
             ;;
-        centos|fedora|rhel|redhat)
+        centos | fedora | rhel | redhat)
             if [[ -n $(which dnf) ]]; then
                 dnf install -y $1 || exit 194
             else
@@ -320,7 +322,7 @@ sfDownload() {
         export -f $fn
 EOF
     eval "$code"
-  sfAsyncStart $name $timeout bash -c -x $fn
+    sfAsyncStart $name $timeout bash -c -x $fn
     sfAsyncWait $name
     rc=$?
     unset $fn
@@ -336,7 +338,7 @@ __create_dropzone() {
 
 sfDownloadInDropzone() {
     __create_dropzone &>/dev/null
-    ( cd ~cladm/.dropzone && sfDownload "$@")
+    (cd ~cladm/.dropzone && sfDownload "$@")
 }
 export -f sfDownloadInDropzone
 
@@ -407,9 +409,9 @@ sfHelm() {
     local stop=0
     for p in "$@"; do
         case "$p" in
-            "--*")
-                ;;
-            "search"|"repo")
+            "--*") ;;
+
+            "search" | "repo")
                 stop=1
                 use_tls=
                 ;;
@@ -659,39 +661,108 @@ sfService() {
     # Preventively run daemon-reload in case of changes
     [ "$use_systemd" = "1" ] && systemctl daemon-reload
 
-    case $1 in
-        enable)
-            [ "$use_systemd" = "1" ] && systemctl enable $2 && return $?
-            [ "$redhat_like" = "1" ] && chkconfig $2 on && return $?
-            ;;
-        disable)
-            [ "$use_systemd" = "1" ] && systemctl disable $2 && return $?
-            [ "$redhat_like" = "1" ] && chkconfig $2 off && return $?
-            ;;
-        start)
-            [ "$use_systemd" = "1" ] && systemctl start $2 && return $?
-            [ "$redhat_like" = "1" ] && service $2 start && return $?
-            ;;
-        stop)
-            [ "$use_systemd" = "1" ] && systemctl stop $2 && return $?
-            [ "$redhat_like" = "1" ] && service $2 stop && return $?
-            ;;
-        restart)
-            [ "$use_systemd" = "1" ] && systemctl restart $2 && return $?
-            [ "$redhat_like" = "1" ] && service $2 restart && return $?
-            ;;
-        reload)
-            [ "$use_systemd" = "1" ] && systemctl reload $2 && return $?
-            [ "$redhat_like" = "1" ] && service $2 reload && return $?
-            ;;
-        status)
-            [ "$use_systemd" = "1" ] && systemctl status $2 && return $?
-            [ "$redhat_like" = "1" ] && service $2 status && return $?
-            ;;
-        *)
-            echo "sfService(): unhandled command '$1'"
-            ;;
-    esac
+    if [ "$use_systemd" = "1" ]; then
+        case $1 in
+            is-active)
+                systemctl is-active $2
+                return $?
+                ;;
+            is-enabled)
+                systemctl is-enabled $2
+                return $?
+                ;;
+            enable)
+                systemctl enable $2
+                return $?
+                ;;
+            disable)
+                systemctl disable $2
+                return $?
+                ;;
+            start)
+                systemctl start $2
+                return $?
+                ;;
+            stop)
+                systemctl stop $2
+                return $?
+                ;;
+            restart)
+                systemctl restart $2
+                return $?
+                ;;
+            reload)
+                systemctl reload $2
+                return $?
+                ;;
+            status)
+                systemctl status $2
+                return $?
+                ;;
+            *)
+                echo "sfService(): unhandled command '$1'"
+                ;;
+        esac
+    elif [ "$redhat_like" = "1" ]; then
+        case $1 in
+            enable)
+                chkconfig $2 on
+                return $?
+                ;;
+            disable)
+                chkconfig $2 off
+                return $?
+                ;;
+            start)
+                service $2 start
+                return $?
+                ;;
+            stop)
+                service $2 stop
+                return $?
+                ;;
+            restart)
+                service $2 restart
+                return $?
+                ;;
+            reload)
+                service $2 reload
+                return $?
+                ;;
+            status)
+                service $2 status
+                return $?
+                ;;
+        esac
+    else
+        case $1 in
+            start)
+                service $2 start
+                return $?
+                ;;
+            stop)
+                service $2 stop
+                return $?
+                ;;
+            restart)
+                service $2 restart
+                return $?
+                ;;
+            reload)
+                service $2 reload
+                return $?
+                ;;
+            status)
+                service $2 status
+                return $?
+                ;;
+            *)
+                echo "sfService(): unhandled command '$1'"
+                ;;
+        esac
+    fi
+
+    echo "sfService(): unhandled command '$1'"
     return 1
 }
 export -f sfService
@@ -734,7 +805,7 @@ export -f sfDoesDockerRunContainer
 
 # tells if a container using a specific image and name is running in Swarm mode
 sfDoesDockerRunService() {
-    [  $# -ne 2 ] && return 1
+    [ $# -ne 2 ] && return 1
     local IMAGE=$1
     local NAME=$2
 
@@ -759,7 +830,7 @@ export -f sfDoesDockerRunService
 
 # tells if a stack is running in Swarm mode
 sfDoesDockerRunStack() {
-    [  $# -ne 1 ] && return 1
+    [ $# -ne 1 ] && return 1
     local NAME=$1
 
     docker stack ps $NAME {{ "--filter 'desired-state=running'" }} &>/dev/null
@@ -821,7 +892,7 @@ sfIsPodRunning() {
     local domain=${1#*@}
     [ -z ${domain+x} ] && domain=default
     set +o pipefail
-    ( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
+    (sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
     retcode=$?
     set -o pipefail
     [ $retcode = 0 ] && return 0 || return 1
@@ -836,7 +907,7 @@ export -f sfGithubLastRelease
 
 # Returns the tag name corresponding to the last non-beta release
 sfGithubLastNotBetaRelease() {
-  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases" | jq -c '.[] | select(.tag_name | contains("beta") | not)' | head -n 1 | jq -r .tag_name
+    curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases" | jq -c '.[] | select(.tag_name | contains("beta") | not)' | head -n 1 | jq -r .tag_name
 }
 export -f sfGithubLastNotBetaRelease
 
@@ -848,7 +919,7 @@ sfRandomString() {
     [ $# -ge 1 ] && count=$1
     local charset="[:graph:]"
     [ $# -ge 2 ] && charset="$2"
-    </dev/urandom tr -dc "$charset" | head -c${count} || true
+    tr </dev/urandom -dc "$charset" | head -c${count} || true
     return 0
 }
 export -f sfRandomString
@@ -885,12 +956,12 @@ sfDetectFacts() {
                 VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
                 FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
                 case $VERSION_ID in
-                  ''|*[!0-9]*)
-                    VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
-                    FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
-                    ;;
-                  *)
-                    ;;
+                    '' | *[!0-9]*)
+                        VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+                        FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
+                        ;;
+                    *) ;;
+
                 esac
             }
         fi
@@ -901,11 +972,11 @@ sfDetectFacts() {
 
     # Some facts about system
     case ${FACTS["linux_kind"]} in
-        redhat|rhel|centos|fedora)
+        redhat | rhel | centos | fedora)
             FACTS["redhat_like"]=1
             FACTS["debian_like"]=0
             ;;
-        debian|ubuntu)
+        debian | ubuntu)
             FACTS["redhat_like"]=0
             FACTS["debian_like"]=1
             ;;
@@ -916,9 +987,9 @@ sfDetectFacts() {
         FACTS["use_systemd"]=0
     fi
 
-    if [[ "$(sfService is-active NetworkManager 2>/dev/null)" = "active" ]]; then
+    if sfService is-enabled NetworkManager &>/dev/null; then
         FACTS["network_service"]="NetworkManager"
-    elif [[ "$(sfService is-active systemd-networkd 2>/dev/null)" = "active" ]]; then
+    elif sfService is-enabled systemd-networkd &>/dev/null; then
         FACTS["network_service"]="systemd-networkd"
     else
         FACTS["network_service"]="network"
@@ -929,11 +1000,11 @@ sfDetectFacts() {
     FACTS["sockets"]=${val//[[:blank:]]/}
     val=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
     FACTS["cores/socket"]=${val//[[:blank:]]/}
-    FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores/socket"]} ))
+    FACTS["cores"]=$((${FACTS["sockets"]} * ${FACTS["cores/socket"]}))
     val=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
     FACTS["threads/core"]=${val//[[:blank:]]/}
-    FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads/core"]} ))
-    val=$(( ${FACTS["threads"]} * 2 / 3 ))
+    FACTS["threads"]=$((${FACTS["cores"]} * ${FACTS["threads/core"]}))
+    val=$((${FACTS["threads"]} * 2 / 3))
     [ $val -le 0 ] && val=1
     FACTS["2/3_of_threads"]=$val
 
