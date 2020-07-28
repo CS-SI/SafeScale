@@ -154,7 +154,7 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err 
 }
 
 // Alter protects the data for exclusive write
-func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err fail.Error) {
+func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -174,24 +174,23 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (err fa
 
 	// Make sure c.properties is populated
 	if c.properties == nil {
-		c.properties, err = serialize.NewJSONProperties("resources." + c.kind)
-		if err != nil {
-			return err
+		if c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind); xerr != nil {
+			return xerr
 		}
 	}
 
 	// Reload reloads data from objectstorage to be sure to have the last revision
-	err = c.Reload(task)
-	if err != nil {
-		return err
+	if xerr = c.Reload(task); xerr != nil {
+		return xerr
 	}
 
-	err = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
+	xerr = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
+
 	c.committed = false
 	return c.write(task)
 }

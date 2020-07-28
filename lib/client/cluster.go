@@ -35,7 +35,7 @@ type cluster struct {
 }
 
 // List ...
-func (c *cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, error) {
+func (c *cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, fail.Error) {
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -43,16 +43,20 @@ func (c *cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, er
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	return service.List(ctx, &googleprotobuf.Empty{})
+	result, err := service.List(ctx, &googleprotobuf.Empty{})
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return result, nil
 }
 
 // Inspect ...
-func (c *cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.ClusterResponse, error) {
+func (c *cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.ClusterResponse, fail.Error) {
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -63,13 +67,16 @@ func (c *cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	return service.Inspect(ctx, &protocol.Reference{Name: clusterName})
-
+	result, err := service.Inspect(ctx, &protocol.Reference{Name: clusterName})
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return result, nil
 }
 
 // GetState gets cluster status
@@ -317,4 +324,100 @@ func (c *cluster) RemoveFeature(clusterName, featureName string, params map[stri
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	_, err := service.Remove(ctx, req)
 	return err
+}
+
+// ListInstalledFeatures ...
+func (c *cluster) ListInstalledFeatures(clusterName string, duration time.Duration) (*protocol.FeatureListResponse, error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+	_ = ctx
+	//service := protocol.NewFeatureServiceClient(c.session.connection)
+	return nil, fail.NotImplementedError()
+}
+
+// FindAvailableMaster ...
+func (c *cluster) FindAvailableMaster(clusterName string, duration time.Duration) (*protocol.Host, fail.Error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	host, err := service.FindAvailableMaster(ctx, &protocol.Reference{Name:clusterName})
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return host, nil
+}
+
+// ListMasters ...
+func (c *cluster) ListMasters(clusterName string, duration time.Duration) (*protocol.ClusterNodeListResponse, fail.Error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	list, err := service.ListMasters(ctx, &protocol.Reference{Name:clusterName})
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return list, nil
+}
+
+// ListNodes ...
+func (c *cluster) ListNodes(clusterName string, duration time.Duration) (*protocol.ClusterNodeListResponse, fail.Error) {
+	if c == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	list, err := service.ListNodes(ctx, &protocol.Reference{Name:clusterName})
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return list, nil
 }

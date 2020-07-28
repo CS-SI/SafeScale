@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// Callback describes the function prototype to use
+// Callback describes the function prototype to use to inspect metadata
 type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 
 // Metadata contains the core functions of a persistent object

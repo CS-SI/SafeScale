@@ -76,6 +76,20 @@ func (t *tenant) Set(name string, timeout time.Duration) error {
 	return fail.ToError(err)
 }
 
+// Inspect ...
+func (t *tenant) Inspect(name string, timeout time.Duration) (*protocol.TenantInspectResponse, error) {
+	t.session.Connect()
+	defer t.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewTenantServiceClient(t.session.connection)
+	return service.Inspect(ctx, &protocol.TenantName{Name: name})
+}
+
 // Cleanup ...
 func (t *tenant) Cleanup(name string, timeout time.Duration) error {
 	t.session.Connect()

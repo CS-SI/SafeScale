@@ -198,19 +198,19 @@ func (ht HostTemplate) OK() bool {
 }
 
 // HostCore contains the core information about a host
+// These information should not change over time
+// TODO: profit of immutability status of HostCore to optimize some use (like SSHConfig), avoiding provider calls
 type HostCore struct {
 	ID         string         `json:"id,omitempty"`
 	Name       string         `json:"name,omitempty"`
-	LastState  hoststate.Enum `json:"state,omitempty"`
 	PrivateKey string         `json:"private_key,omitempty"`
 	Password   string         `json:"password,omitempty"`
+	LastState  hoststate.Enum `json:"last_state,omitempty"`
 }
 
 // NewHostCore ...
 func NewHostCore() *HostCore {
-	return &HostCore{
-		LastState: hoststate.UNKNOWN,
-	}
+	return &HostCore{}
 }
 
 // IsNull tells if the instance is a null value
@@ -342,19 +342,21 @@ type HostDescription struct {
 
 // HostFull groups information about host coming from provider
 type HostFull struct {
-	Core        *HostCore
-	Sizing      *HostEffectiveSizing
-	Network     *HostNetwork
-	Description *HostDescription
+	Core         *HostCore
+	Sizing       *HostEffectiveSizing
+	Network      *HostNetwork
+	Description  *HostDescription
+	CurrentState hoststate.Enum `json:"current_state,omitempty"`
 }
 
 // NewHostFull creates an instance of HostFull
 func NewHostFull() *HostFull {
 	return &HostFull{
-		Core:        NewHostCore(),
-		Sizing:      NewHostEffectiveSizing(),
-		Network:     NewHostNetwork(),
-		Description: &HostDescription{},
+		Core:         NewHostCore(),
+		Sizing:       NewHostEffectiveSizing(),
+		Network:      NewHostNetwork(),
+		Description:  &HostDescription{},
+		CurrentState: hoststate.UNKNOWN,
 	}
 }
 

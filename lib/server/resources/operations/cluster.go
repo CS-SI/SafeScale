@@ -127,7 +127,7 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 
 // upgradePropertyNodesIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
 func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) fail.Error {
-	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if !props.Lookup(clusterproperty.NodesV2) {
 			// Replace NodesV1 by NodesV2 properties
 			return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
@@ -173,6 +173,7 @@ func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) fail.Error
 		}
 		return nil
 	})
+	return xerr
 }
 
 // IsNull tells if the instance represents a null value of cluster
@@ -414,7 +415,11 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		c.ClusterIdentity.AdminPassword = cladmPassword
 
 		// Links maker based on Flavor
-		return c.Bootstrap(task)
+		innerXErr = c.Bootstrap(task)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		return nil
 	})
 	if xerr != nil {
 		return xerr
@@ -906,7 +911,7 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
 	return fail.ToError(err)
 }
 
-// Boostrap (re)connects controller with the appropriate Makers
+// Bootstrap (re)connects controller with the appropriate Makers
 func (c *cluster) Bootstrap(task concurrency.Task) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1109,10 +1114,10 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 			config = &propertiesv2.ClusterNetwork{
 				NetworkID:      networkV1.NetworkID,
 				CIDR:           networkV1.CIDR,
-				GatewayID:      networkV1.GatewayID,
-				GatewayIP:      networkV1.GatewayIP,
-				DefaultRouteIP: networkV1.GatewayIP,
-				EndpointIP:     networkV1.PublicIP,
+				//GatewayID:      networkV1.GatewayID,
+				//GatewayIP:      networkV1.GatewayIP,
+				//DefaultRouteIP: networkV1.GatewayIP,
+				//EndpointIP:     networkV1.PublicIP,
 			}
 			return nil
 		})
@@ -1240,6 +1245,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 				return nil
 			})
 		} else {
+			// Legacy...
 			innerErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
@@ -1406,6 +1412,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 				return nil
 			})
 		} else {
+			// Legacy ...
 			innerErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
 				if !ok {
@@ -2543,7 +2550,7 @@ func (c *cluster) unconfigureMaster(task concurrency.Task, host resources.Host) 
 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
-func (c *cluster) configureCluster(task concurrency.Task, params concurrency.TaskParameters) (xerr fail.Error) {
+func (c *cluster) configureCluster(task concurrency.Task, _ concurrency.TaskParameters) (xerr fail.Error) {
 	tracer := concurrency.NewTracer(task, true, "").Entering()
 	defer tracer.OnExitTrace()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
@@ -2556,12 +2563,6 @@ func (c *cluster) configureCluster(task concurrency.Task, params concurrency.Tas
 			logrus.Errorf("[cluster %s] configuration failed: %s", c.GetName(), xerr.Error())
 		}
 	}()
-
-	// VPL: not used anymore, flavor SWARM has to disappear
-	// if xerr = c.createSwarm(task, params); xerr != nil {
-	// 	return xerr
-	// }
-	// ENDVPL
 
 	// Installs reverseproxy feature on cluster (gateways)
 	if xerr = c.installReverseProxy(task); xerr != nil {
@@ -2591,143 +2592,6 @@ func (c *cluster) determineRequiredNodes(task concurrency.Task) (uint, uint, uin
 	}
 	return 0, 0, 0, nil
 }
-
-// VPL: not used anymore, flavor SWARM has to disappear
-// // createSwarm configures cluster
-// func (c *cluster) createSwarm(task concurrency.Task, params concurrency.TaskParameters) (xerr fail.Error) {
-// 	var (
-// 		p                                data.Map
-// 		ok                               bool
-// 		primaryGateway, secondaryGateway resources.Host
-// 	)
-//
-// 	if params == nil {
-// 		return fail.InvalidParameterError("params", "cannot be nil")
-// 	}
-//
-// 	if p, ok = params.(data.Map); !ok {
-// 		return fail.InvalidParameterError("params", "must be a data.Map")
-// 	}
-// 	if primaryGateway, ok = p["PrimaryGateway"].(resources.Host); !ok || primaryGateway == nil {
-// 		return fail.InvalidParameterError("params", "params['PrimaryGateway'] must be defined and cannot be nil")
-// 	}
-// 	secondaryGateway, ok = p["SecondaryGateway"].(resources.Host)
-// 	if !ok {
-// 		logrus.Debugf("secondary gateway not configured")
-// 	}
-//
-// 	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-// 	defer tracer.OnExitTrace()
-// 	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
-//
-// 	// Join masters in Docker Swarm as managers
-// 	joinCmd := ""
-// 	masters, err := c.ListMasters(task)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for _, master := range masters {
-// 		if joinCmd == "" {
-// 			retcode, _, _, err := master.Run(task, "docker swarm init && docker node update "+master.GetName()+" --label-add safescale.host.role=master",
-// 				outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 			if err != nil || retcode != 0 {
-// 				return fail.NewError("failed to init docker swarm")
-// 			}
-// 			retcode, token, stderr, err := master.Run(task, "docker swarm join-token manager -q", outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 			if err != nil || retcode != 0 {
-// 				return fail.NewError("failed to generate token to join swarm as manager: %s", stderr)
-// 			}
-// 			token = strings.Trim(token, "\n")
-// 			ip, err := master.GetPrivateIP(task)
-// 			if err != nil {
-// 				return err
-// 			}
-// 			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, ip)
-// 		} else {
-// 			masterJoinCmd := joinCmd + " && docker node update " + master.GetName() + " --label-add safescale.host.role=master"
-// 			retcode, _, stderr, err := master.Run(task, masterJoinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 			if err != nil || retcode != 0 {
-// 				return fail.NewError("failed to join host '%s' to swarm as manager: %s", master.GetName(), stderr)
-// 			}
-// 		}
-// 	}
-//
-// 	master, xerr := c.FindAvailableMaster(task)
-// 	if xerr != nil {
-// 		return fail.Wrap(xerr, "failed to find an available docker manager")
-// 	}
-//
-// 	// build command to join Docker Swarm as workers
-// 	joinCmd, xerr = c.getSwarmJoinCommand(task, master, true)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-//
-// 	// Join private node in Docker Swarm as workers
-// 	nodes, xerr := c.ListNodes(task)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-// 	for _, node := range nodes {
-// 		retcode, _, stderr, xerr := node.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 		if xerr != nil || retcode != 0 {
-// 			return fail.NewError("failed to join host '%s' to swarm as worker: %s", node.GetName(), stderr)
-// 		}
-// 		labelCmd := "docker node update " + node.GetName() + " --label-add safescale.host.role=node"
-// 		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 		if xerr != nil || retcode != 0 {
-// 			return fail.NewError("failed to label swarm worker '%s' as node: %s", node.GetName(), stderr)
-// 		}
-// 	}
-//
-// 	// Join gateways in Docker Swarm as workers
-// 	retcode, _, stderr, xerr := primaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 	if xerr != nil || retcode != 0 {
-// 		return fail.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.GetName(), stderr)
-// 	}
-// 	labelCmd := "docker node update " + primaryGateway.GetName() + " --label-add safescale.host.role=gateway"
-// 	retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 	if xerr != nil || retcode != 0 {
-// 		return fail.NewError("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.GetName(), stderr)
-// 	}
-//
-// 	if secondaryGateway != nil {
-// 		retcode, _, stderr, xerr := secondaryGateway.Run(task, joinCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 		if xerr != nil || retcode != 0 {
-// 			return fail.NewError("failed to join host '%s' to swarm as worker: %s", primaryGateway.GetName(), stderr)
-// 		}
-// 		labelCmd := "docker node update " + secondaryGateway.GetName() + " --label-add safescale.host.role=gateway"
-// 		retcode, _, stderr, xerr = master.Run(task, labelCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 		if xerr != nil || retcode != 0 {
-// 			return fail.NewError("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.GetName(), stderr)
-// 		}
-// 	}
-//
-// 	return nil
-// }
-//
-// // getSwarmJoinCommand builds the command to obtain swarm token
-// func (c *cluster) getSwarmJoinCommand(task concurrency.Task, selectedMaster resources.Host, worker bool) (string, fail.Error) {
-// 	var memberType string
-// 	if worker {
-// 		memberType = "worker"
-// 	} else {
-// 		memberType = "manager"
-// 	}
-//
-// 	masterIP, xerr := selectedMaster.GetPrivateIP(task)
-// 	if xerr != nil {
-// 		return "", xerr
-// 	}
-//
-// 	tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-// 	retcode, token, stderr, xerr := selectedMaster.Run(task, tokenCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-// 	if xerr != nil || retcode != 0 {
-// 		return "", fail.NewError("failed to generate token to join swarm as worker: %s", stderr)
-// 	}
-// 	token = strings.Trim(token, "\n")
-// 	return fmt.Sprintf("docker swarm join --token %s %s", token, masterIP), nil
-// }
 
 // uploadTemplateToFile uploads a template named 'tmplName' coming from rice 'box' in a file to a remote host
 func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}, fileName string) (string, string, fail.Error) {
@@ -2839,28 +2703,29 @@ func (c *cluster) joinNodesFromList(task concurrency.Task, hosts []resources.Hos
 	return nil
 }
 
-// leaveMastersFromList makes masters from a list leave the cluster
-func (c *cluster) leaveMastersFromList(task concurrency.Task, public bool, hosts []string) fail.Error {
-	if c.makers.LeaveMasterFromCluster == nil {
-		return nil
-	}
-
-	logrus.Debugf("Making Masters leaving cluster...")
-
-	// Joins to cluster is done sequentially, experience shows too many join at the same time
-	// may fail (depending of the cluster Flavor)
-	for _, hostID := range hosts {
-		host, xerr := LoadHost(task, c.service, hostID)
-		if xerr != nil {
-			return xerr
-		}
-		if xerr = c.makers.LeaveMasterFromCluster(task, c, host); xerr != nil {
-			return xerr
-		}
-	}
-
-	return nil
-}
+// VPL: not used anymore
+//// leaveMastersFromList makes masters from a list leave the cluster
+//func (c *cluster) leaveMastersFromList(task concurrency.Task, hosts []string) fail.Error {
+//	if c.makers.LeaveMasterFromCluster == nil {
+//		return nil
+//	}
+//
+//	logrus.Debugf("Making Masters leaving cluster...")
+//
+//	// Joins to cluster is done sequentially, experience shows too many join at the same time
+//	// may fail (depending of the cluster Flavor)
+//	for _, hostID := range hosts {
+//		host, xerr := LoadHost(task, c.service, hostID)
+//		if xerr != nil {
+//			return xerr
+//		}
+//		if xerr = c.makers.LeaveMasterFromCluster(task, c, host); xerr != nil {
+//			return xerr
+//		}
+//	}
+//
+//	return nil
+//}
 
 // leaveNodesFromList makes nodes from a list leave the cluster
 func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, selectedMaster resources.Host) (xerr fail.Error) {
