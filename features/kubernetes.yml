@@ -871,7 +871,7 @@ feature:
                         run: |
                             # Allows pods to start on master if there is only one master (complexity small) or if it's explicitely requested
                             if [[ "{{.ClusterComplexity}}" = "small" || "{{.AllowPodsOnMasters}}" = "true" ]]; then
-                                sfKubectl taint nodes {{ .Hostname }}  node-role.kubernetes.io/master:NoSchedule-
+                                sfKubectl taint nodes {{ .Hostname }}  node-role.kubernetes.io/master:NoSchedule- || true
                             fi
                             sfExit
 
@@ -884,8 +884,7 @@ feature:
                             # Allows pods to start on master if there is only one master (complexity small) or if it's explicitely requested
                             # Note: does not work in v1.14.x, step pod-on-master circumvent the malfunction
                             if [[ "{{.ClusterComplexity}}" = "small" || "{{.AllowPodsOnMasters}}" = "true" ]]; then
-                                # sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
-                                sfKubectl taint nodes --all key:NoSchedule-
+                                sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
                             fi
 
                             # Adds namespace safescale
