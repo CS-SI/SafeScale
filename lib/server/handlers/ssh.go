@@ -253,16 +253,6 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 	return retCode, stdOut, stdErr, err
 }
 
-// // run executes command on the host
-// func (handler *SSHHandler) run(ssh *system.SSHConfig, cmd string) (int, string, string, error) {
-// 	// Create the command
-// 	sshCmd, err := ssh.Command(cmd)
-// 	if err != nil {
-// 		return 0, "", "", err
-// 	}
-// 	return sshCmd.Run(nil, false) // FIXME It CAN lock, use RunWithTimeout instead
-// }
-
 // run executes command on the host
 func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, outs outputs.Enum, duration time.Duration) (int, string, string, error) {
 	// Create the command
