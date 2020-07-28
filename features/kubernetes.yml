@@ -92,7 +92,7 @@ feature:
                             sfFail 196
 
             add:
-                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
+                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,pod-on-masters,final
                 steps:
                     sysconf:
                         targets:
@@ -865,21 +865,34 @@ feature:
                             touch /etc/kubernetes/.joined
                             sfExit
 
+                    pod-on-masters:
+                        targets:
+                            masters: all
+                        run: |
+                            # Allows pods to start on master if there is only one master (complexity small) or if it's explicitely requested
+                            if [[ "{{.ClusterComplexity}}" = "small" || "{{.AllowPodsOnMasters}}" = "true" ]]; then
+                                sfKubectl taint nodes {{ .Hostname }}  node-role.kubernetes.io/master:NoSchedule-
+                            fi
+                            sfExit
+
                     final:
                         targets:
                             masters: one
                         run: |
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
-                            # Allows pods to start on master if there is only one master or if it's explicitely requested
-                            if [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ]; then
-                                sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
+                            # Allows pods to start on master if there is only one master (complexity small) or if it's explicitely requested
+                            # Note: does not work in v1.14.x, step pod-on-master circumvent the malfunction
+                            if [[ "{{.ClusterComplexity}}" = "small" || "{{.AllowPodsOnMasters}}" = "true" ]]; then
+                                # sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
+                                sfKubectl taint nodes --all key:NoSchedule-
                             fi
 
                             # Adds namespace safescale
                             sfKubectl create namespace safescale
                             # FIXME: add label to namespace (in prevision of network policies)
                             # sfKubectl set label
+
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
@@ -920,7 +933,7 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfApt purge -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
+                                    sfApt purge --allow-change-held-packages -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
                                     ;;
                                 redhat|rhel|fedora|centos)
                                     yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
