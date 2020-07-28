@@ -19,7 +19,7 @@ package commands
 import (
 	"fmt"
 
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -51,15 +51,20 @@ func extractFeatureArgument(c *cli.Context) error {
 	return nil
 }
 
-// Use the hostnamPos-th argument of the command as a hostName and use it to get the host instance
+// Use the hostnamePos argument of the command as a hostName and use it to get the host instance
 func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	hostName = c.Args().Get(hostnamePos)
 	if hostName == "" {
 		return clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
+	clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
 	var err error
-	hostInstance, err = client.New().Host.Inspect(hostName, temporal.GetExecutionTimeout())
+	hostInstance, err = clientSession.Host.Inspect(hostName, temporal.GetExecutionTimeout())
 	if err != nil {
 		// fmt.Printf("%s\n", err.Error()
 		return clitools.ExitOnRPC(err.Error())

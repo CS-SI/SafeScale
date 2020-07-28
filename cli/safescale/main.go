@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -28,7 +29,7 @@ import (
 	"syscall"
 
 	"github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/cli/safescale/commands"
 	"github.com/CS-SI/SafeScale/lib/client"
@@ -42,7 +43,7 @@ import (
 
 var profileCloseFunc = func() {}
 
-func cleanup(onAbort bool) {
+func cleanup(clientSession *client.Session, onAbort bool) {
 	if onAbort {
 		fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
 		reader := bufio.NewReader(os.Stdin)
@@ -53,7 +54,7 @@ func cleanup(onAbort bool) {
 			text = "y"
 		}
 		if strings.TrimRight(text, "\n") == "y" {
-			err = client.New().JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+			err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
 			if err != nil {
 				fmt.Printf("failed to stop the process %v\n", err)
 			}
@@ -65,14 +66,13 @@ func cleanup(onAbort bool) {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		for {
-			<-c
-			cleanup(true)
-		}
-	}()
+
+	var (
+		onAbort       bool
+		clientSession *client.Session
+	)
+
+	mainCtx, cancelfunc := context.WithCancel(context.Background())
 
 	app := cli.NewApp()
 	app.Writer = os.Stderr
@@ -110,12 +110,23 @@ func main() {
 			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
 			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
 		},
-		// &cli.IntFlag{
-		// 	Name:  "server",
-		// 	Aliases: []string{"S"},
-		// 	Usage: "Connect to daemon on 'server:port' (not honored yet...)",
-		// 	Value: "localhost:50051",
-		// },
+		&cli.StringFlag{
+			Name:  "server",
+			Aliases: []string{"S"},
+			Usage: "Connect to daemon on host HOST (default: localhost)",
+			Value: "localhost",
+		},
+		&cli.IntFlag{
+			Name:  "port",
+			Aliases: []string{"P"},
+			Usage: "Connect to daemon on port PORT (default: 50051)",
+			Value: 50051,
+		},
+		&cli.StringFlag{
+			Name:  "tenant",
+			Aliases: []string{"T"},
+			Usage: "Use tenant TENANT (default: none)",
+		},
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -153,6 +164,12 @@ func main() {
 			}
 		}
 
+		clientSession, err = client.New(c.String("server"), c.Int("port"))
+		return err
+	}
+
+	app.After = func(c *cli.Context) error {
+		cleanup(clientSession, onAbort)
 		return nil
 	}
 
@@ -188,10 +205,19 @@ func main() {
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	err := app.Run(os.Args)
+	// Starts ctrl+c handler before app.RunContext()
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for {
+			<-c
+			onAbort = true
+			cancelfunc()
+		}
+	}()
+
+	err := app.RunContext(mainCtx, os.Args)
 	if err != nil {
 		fmt.Println("Error Running App : " + err.Error())
 	}
-
-	cleanup(false)
 }

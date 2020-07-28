@@ -17,93 +17,146 @@
 package commands
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/strprocess"
+    "github.com/sirupsen/logrus"
+    cli "github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/lib/client"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/CS-SI/SafeScale/lib/client"
+    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var tenantCmdName = "tenant"
 
 // TenantCmd command
 var TenantCmd = &cli.Command{
-	Name:  "tenant",
-	Usage: "tenant COMMAND",
-	Subcommands: []*cli.Command{
-		tenantList,
-		tenantGet,
-		tenantSet,
-		tenantCleanup,
-	},
+    Name:  "tenant",
+    Usage: "tenant COMMAND",
+    Subcommands: []*cli.Command{
+        tenantList,
+        tenantGet,
+        tenantSet,
+        tenantInspect,
+        tenantCleanup,
+    },
 }
 
 var tenantList = &cli.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "ErrorList available tenants",
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		tenants, err := client.New().Tenant.List(temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of tenants", false).Error())))
-		}
-		return clitools.SuccessResponse(tenants.GetTenants())
-	},
+    Name:    "list",
+    Aliases: []string{"ls"},
+    Usage:   "ErrorList available tenants",
+    Action: func(c *cli.Context) error {
+        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+
+        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        if xerr != nil {
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        }
+
+        tenants, err := clientSession.Tenant.List(temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of tenants", false).Error())))
+        }
+        return clitools.SuccessResponse(tenants.GetTenants())
+    },
 }
 
 var tenantGet = &cli.Command{
-	Name:  "get",
-	Usage: "Get current tenant",
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "get tenant", false).Error())))
-		}
-		return clitools.SuccessResponse(tenant)
-	},
+    Name:  "get",
+    Aliases: []string{"current"},
+    Usage: "Get current tenant",
+    Action: func(c *cli.Context) error {
+        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+
+        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        if xerr != nil {
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        }
+
+        tenant, err := clientSession.Tenant.Get(temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "get tenant", false).Error())))
+        }
+        return clitools.SuccessResponse(tenant)
+    },
 }
 
 var tenantSet = &cli.Command{
-	Name:  "set",
-	Usage: "Set tenant to work with",
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
+    Name:  "set",
+    Usage: "Set tenant to work with",
+    Action: func(c *cli.Context) error {
+        if c.NArg() != 1 {
+            _ = cli.ShowSubcommandHelp(c)
+            return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+        }
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		err := client.New().Tenant.Set(c.Args().First(), temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+
+        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        if xerr != nil {
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        }
+
+        err := clientSession.Tenant.Set(c.Args().First(), temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
+        }
+        return clitools.SuccessResponse(nil)
+    },
+}
+
+var tenantInspect = &cli.Command{
+    Name:  "inspect",
+    Aliases: []string{"show"},
+    Usage: "Inspect tenant",
+    Action: func(c *cli.Context) error {
+        if c.NArg() != 1 {
+            _ = cli.ShowSubcommandHelp(c)
+            return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+        }
+
+        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+
+        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        if xerr != nil {
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        }
+
+        resp, err := clientSession.Tenant.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+        }
+        return clitools.SuccessResponse(resp)
+    },
 }
 
 var tenantCleanup = &cli.Command{
-	Name:  "set",
-	Usage: "Cleanup tenant by removing SafeScale metadata",
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
+    Name:  "cleanup",
+    Usage: "Cleanup tenant by removing SafeScale metadata",
+    Action: func(c *cli.Context) error {
+        if c.NArg() != 1 {
+            _ = cli.ShowSubcommandHelp(c)
+            return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+        }
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		err := client.New().Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
+        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+
+        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        if xerr != nil {
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        }
+
+        err := clientSession.Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
+        }
+        return clitools.SuccessResponse(nil)
+    },
 }
