@@ -77,7 +77,10 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 }
 
 // Alter allows to update a cloneable using a write lock
-func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (err fail.Error) {
+// 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
+// generated with fail.AlteredNothingError().
+// The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
+func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
 	if d == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -91,24 +94,24 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (err
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
-	err = d.lock.Lock(task)
-	if err != nil {
-		return err
+	xerr = d.lock.Lock(task)
+	if xerr != nil {
+		return xerr
 	}
 	defer func() {
 		unlockErr := d.lock.Unlock(task)
 		if unlockErr != nil {
 			logrus.Warn(unlockErr)
 		}
-		if err == nil && unlockErr != nil {
-			err = unlockErr
+		if xerr == nil && unlockErr != nil {
+			xerr = unlockErr
 		}
 	}()
 
 	clone := d.witness.Clone()
-	err = alterer(clone)
-	if err != nil {
-		return err
+	xerr = alterer(clone)
+	if xerr != nil {
+		return xerr
 	}
 	_ = d.witness.Replace(clone)
 	return nil
@@ -149,8 +152,12 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	return d.Alter(task, func(clonable data.Clonable) fail.Error {
+	xerr := d.Alter(task, func(clonable data.Clonable) fail.Error {
 		innerErr := json.Unmarshal(buf, clonable)
-		return fail.NewError(innerErr.Error())
+		if innerErr != nil {
+			return fail.ToError(innerErr)
+		}
+		return nil
 	})
+	return xerr
 }

@@ -45,7 +45,7 @@ type ssh struct {
 }
 
 // Run executes the command
-func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
 	if s == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
@@ -113,18 +113,18 @@ func (s *ssh) Run(task concurrency.Task, hostName, command string, outs outputs.
 	)
 	if retryErr != nil {
 		if realErr, ok := retryErr.(*retry.ErrStopRetry); ok {
-			return -1, "", "", realErr.Cause()
+			return -1, "", "", fail.ToError(realErr.Cause())
 		}
 		return -1, "", "", retryErr
 	}
 	return retcode, stdout, stderr, nil
 }
 
-func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, error) {
+func (s *ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
-		return nil, err
+		return nil, fail.ToError(err)
 	}
 	return cfg, nil
 }
@@ -166,7 +166,20 @@ func extractPath(in string) (string, fail.Error) {
 }
 
 // Copy ...
-func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+	if s == nil {
+		return -1, "", "", fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if from == "" {
+		return -1, "", "", fail.InvalidParameterError("from", "cannot be nil")
+	}
+	if to == "" {
+		return -1, "", "", fail.InvalidParameterError("to", "cannot be nil")
+	}
+
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -209,9 +222,9 @@ func (s *ssh) Copy(task concurrency.Task, from, to string, connectionTimeout, ex
 		upload = true
 	}
 
-	sshCfg, err := s.getHostSSHConfig(hostName)
-	if err != nil {
-		return -1, "", "", err
+	sshCfg, xerr := s.getHostSSHConfig(hostName)
+	if xerr != nil {
+		return -1, "", "", xerr
 	}
 
 	if executionTimeout < temporal.GetHostTimeout() {

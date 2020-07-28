@@ -861,7 +861,10 @@ func (ssh *SSHConfig) CopyWithTimeout(
 
 // copy copies a file/directory from/to local to/from remote, and fails after 'timeout' (if timeout > 0)
 func (ssh *SSHConfig) copy(
-	task concurrency.Task, remotePath, localPath string, isUpload bool, timeout time.Duration,
+	task concurrency.Task,
+	remotePath, localPath string,
+	isUpload bool,
+	timeout time.Duration,
 ) (errc int, stdout string, stderr string, xerr fail.Error) {
 
 	tunnels, sshConfig, xerr := ssh.CreateTunneling()

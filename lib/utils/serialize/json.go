@@ -144,6 +144,8 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 // Returns a pointer to LockedEncodedExtension, on which can be applied method 'Use()'
 // If no extension exists corresponding to the key, an empty one is created (in other words, this call
 // can't fail because a key doesn't exist).
+// 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
+// generated with fail.AlteredNothingError().
 func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(data.Clonable) fail.Error) fail.Error {
 	if x == nil {
 		return fail.InvalidInstanceError()
@@ -182,10 +184,10 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 	}
 	clone := item.Clone()
 
-	err := clone.(*jsonProperty).Alter(task, alterer)
+	xerr := clone.(*jsonProperty).Alter(task, alterer)
 	// err := alterer(clone)
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
 	_ = item.Replace(clone)

@@ -425,47 +425,37 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Er
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
 func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+    nullAhc := abstract.NewHostCore()
     if s == nil {
-        return nil, fail.InvalidInstanceError()
+        return nullAhc, fail.InvalidInstanceError()
+    }
+    ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+    if xerr != nil {
+        return nullAhc, xerr
     }
 
-    var (
-        hostCore *abstract.HostCore
-    )
-    switch hostParam := hostParam.(type) {
-    case string:
-        hostCore = abstract.NewHostCore()
-        hostCore.ID = hostParam
-    case *abstract.HostCore:
-        hostCore = hostParam
-    case *abstract.HostFull:
-        hostCore = hostParam.Core
-    }
-    if hostCore == nil {
-        return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *abstract.HostCore or a *abstract.HostFull")
-    }
-
-    logrus.Debugf(">>> stacks.aws::WaitHostReady(%s)", hostCore.ID)
-    defer logrus.Debugf("<<< stacks.aws::WaitHostReady(%s)", hostCore.ID)
+    // TODO: use concurrency.Tracer
+    logrus.Debugf(">>> stacks.aws::WaitHostReady(%s)", ahf.GetID())
+    defer logrus.Debugf("<<< stacks.aws::WaitHostReady(%s)", ahf.GetID())
 
     retryErr := retry.WhileUnsuccessful(
         func() error {
-            hostTmp, innerXErr := s.InspectHost(hostCore)
+            hostTmp, innerXErr := s.InspectHost(ahf)
             if innerXErr != nil {
                 logrus.Warn(innerXErr)
                 return innerXErr
             }
 
-            hostCore = hostTmp.Core
+            ahf = hostTmp
 
-            if hostCore.LastState == hoststate.ERROR {
-                innerXErr = retry.StopRetryError(fail.NewError(nil, "last state: %s", hostCore.LastState), "error waiting for host in ready state")
+            if hostTmp.CurrentState == hoststate.ERROR {
+                innerXErr = retry.StopRetryError(fail.NewError(nil, "last state: %s", hostTmp.CurrentState), "error waiting for host in ready state")
                 logrus.Warn(innerXErr)
                 return innerXErr
             }
 
-            if hostCore.LastState != hoststate.STARTED {
-                innerXErr = fail.NewError(nil, "not in ready state (current state: %s)", hostCore.LastState.String())
+            if hostTmp.CurrentState != hoststate.STARTED {
+                innerXErr = fail.NewError(nil, "not in ready state (current state: %s)", ahf.CurrentState.String())
                 logrus.Warn(innerXErr)
                 return innerXErr
             }
@@ -477,27 +467,29 @@ func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durat
     if retryErr != nil {
         switch retryErr.(type) {
         case *retry.ErrStopRetry:
-            return hostCore, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostCore.ID, timeout)
+            return nullAhc, fail.ToError(retryErr.Cause())
+        case *retry.ErrTimeout:
+            return nullAhc, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout)
         default:
-            return hostCore, retryErr
+            return nullAhc, retryErr
         }
     }
-    return hostCore, nil
+    return ahf.Core, nil
 }
 
 // CreateHost creates a host
 func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
-    nullHF := abstract.NewHostFull()
+    nullAhf := abstract.NewHostFull()
+    nullUdc := userdata.NewContent()
     if s == nil {
-        return nullHF, nil, fail.InvalidInstanceError()
+        return nullAhf, nullUdc, fail.InvalidInstanceError()
     }
     if request.KeyPair == nil {
-        return nullHF, nil, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+        return nullAhf, nullUdc, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
     }
 
     defer fail.OnPanic(&xerr)
 
-    userData = userdata.NewContent()
 
     resourceName := request.ResourceName
     networks := request.Networks
@@ -505,14 +497,14 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     keyPairName := request.KeyPair.Name
 
     if networks == nil || len(networks) == 0 {
-        return nullHF, userData, fail.InvalidRequestError("the host '%s' must be on at least one network (even if public)", resourceName)
+        return nullAhf, nullUdc, fail.InvalidRequestError("the host '%s' must be on at least one network (even if public)", resourceName)
     }
 
     // If no password is provided, create one
     if request.Password == "" {
         password, err := utils.GeneratePassword(16)
         if err != nil {
-            return nullHF, userData, fail.Wrap(err, "failed to generate password")
+            return nullAhf, nullUdc, fail.Wrap(err, "failed to generate password")
         }
         request.Password = password
     }
@@ -527,7 +519,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     isGateway := request.IsGateway //&& defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
 
     if defaultNetwork == nil && !request.PublicIP {
-        return nullHF, userData, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
+        return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
     }
 
     // FIXME: AWS Remove logs
@@ -564,21 +556,22 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     // --- prepares data structures for Provider usage ---
 
     // Constructs userdata content
+    userData = userdata.NewContent()
     xerr = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
     if xerr != nil {
         logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
-        return nil, userData, fail.Wrap(xerr, "failed to prepare user data content")
+        return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
     }
 
     // Determine system disk size based on vcpus count
     template, xerr := s.GetTemplate(request.TemplateID)
     if xerr != nil {
-        return nil, userData, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
+        return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
     }
 
     rim, err := s.GetImage(request.ImageID)
     if err != nil {
-        return nil, userData, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
+        return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
     }
 
     logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
@@ -587,7 +580,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     if s.AwsConfig.Zone == "" {
         azList, xerr := s.ListAvailabilityZones()
         if xerr != nil {
-            return nil, userData, xerr
+            return nullAhf, nullUdc, xerr
         }
         var az string
         for az = range azList {
@@ -605,43 +598,21 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
     // TODO: adapt to abstract.HostFull.HostNetwork
     ahf.Network.DefaultNetworkID = defaultNetworkID
-    //ahf.Network.DefaultGatewayID = defaultGatewayID
-    //ahf.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-    //xerr = ahf.Properties.Alter(hostproperty.NetworkV1, func(v data.Clonable) fail.Error {
-    //	hostNetworkV1 := v.(*propertiesv1.HostNetwork)
-    //	hostNetworkV1.DefaultNetworkID = defaultNetworkID
-    //	hostNetworkV1.DefaultGatewayID = defaultGatewayID
-    //	hostNetworkV1.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-    //	hostNetworkV1.IsGateway = isGateway
-    //	return nil
-    //})
-    //if xerr != nil {
-    //	return nil, userData, xerr
-    //}
+    ahf.Network.IsGateway = isGateway
 
     // Adds Host property SizingV1
-    // TODO: adapt to abstract.HostFull.HostSizing
     ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
-    //xerr = ahf.Properties.Alter(hostproperty.SizingV1, func(v data.Clonable) fail.Error {
-    //	hostSizingV1 := v.(*propertiesv1.HostSizing)
-    //	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-    //	hostSizingV1.Template = request.TemplateID
-    //	hostSizingV1.AllocatedSize = properties.ModelHostTemplateToPropertyHostSize(template)
-    //	return nil
-    //})
-    //if xerr != nil {
-    //	return nil, userData, xerr
-    //}
+
 
     // Sets provider parameters to create ahf
     userDataPhase1, xerr := userData.Generate("phase1")
     if err != nil {
-        return nil, userData, xerr
+        return nullAhf, nullUdc, xerr
     }
 
     vpcnet, xerr := s.GetNetworkByName(s.AwsConfig.NetworkName)
     if err != nil {
-        return nil, userData, xerr
+        return nullAhf, nullUdc, xerr
     }
 
     // --- query provider for ahf creation ---
@@ -740,10 +711,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
         temporal.GetLongOperationTimeout(),
     )
     if err != nil {
-        return nil, userData, fail.Wrap(err, "Error creating ahf: timeout")
+        return nullAhf, nullUdc, fail.Wrap(err, "Error creating ahf: timeout")
     }
     if desistError != nil {
-        return nil, userData, fail.ForbiddenError(fmt.Sprintf("Error creating ahf: %s", desistError.Error()))
+        return nullAhf, nullUdc, fail.ForbiddenError(fmt.Sprintf("Error creating ahf: %s", desistError.Error()))
     }
 
     logrus.Debugf("ahf resource created.")
@@ -759,8 +730,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
         }
     }()
 
-    if ahf == nil {
-        return nil, nil, fail.InconsistentError("unexpected nil ahf")
+    if ahf.IsNull() {
+        return nullAhf, nullUdc, fail.InconsistentError("unexpected nil ahf")
     }
 
     if !ahf.OK() {

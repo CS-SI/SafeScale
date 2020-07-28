@@ -17,145 +17,170 @@
 package client
 
 import (
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // RemoteFileItem is a helper struct to ease the copy of local files to remote
 type RemoteFileItem struct {
-	Local        string
-	Remote       string
-	RemoteOwner  string
-	RemoteRights string
+    Local        string
+    Remote       string
+    RemoteOwner  string
+    RemoteRights string
 }
 
 // Upload transfers the local file to the hostname
-func (rfc RemoteFileItem) Upload(task concurrency.Task, hostname string) error {
-	if rfc.Local == "" {
-		return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
-	}
-	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error {
+    if rfc.Local == "" {
+        return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
+    }
+    if rfc.Remote == "" {
+        return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
-	}
-	SSHClient := New().SSH
+    }
 
-	// Copy the file
-	retcode, _, _, err := SSHClient.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to copy file '%s'", rfc.Local)
-	}
+    task, xerr := clientSession.GetTask()
+    if xerr != nil {
+        return xerr
+    }
 
-	// Updates owner and access rights if asked for
-	cmd := ""
-	if rfc.RemoteOwner != "" {
-		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
-	}
-	if rfc.RemoteRights != "" {
-		if cmd != "" {
-			cmd += " && "
-		}
-		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
-	}
-	retcode, _, _, err = SSHClient.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to update owner and/or access rights of the remote file")
-	}
+    // Copy the file
+    retcode, _, _, xerr := clientSession.SSH.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    if xerr != nil {
+        return xerr
+    }
+    if retcode != 0 {
+        return fail.NewError("failed to copy file '%s'", rfc.Local)
+    }
 
-	return nil
+    // Updates owner and access rights if asked for
+    cmd := ""
+    if rfc.RemoteOwner != "" {
+        cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
+    }
+    if rfc.RemoteRights != "" {
+        if cmd != "" {
+            cmd += " && "
+        }
+        cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
+    }
+    retcode, _, _, xerr = clientSession.SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    if xerr != nil {
+        return xerr
+    }
+    if retcode != 0 {
+        return fail.NewError("failed to update owner and/or access rights of the remote file")
+    }
+
+    return nil
 }
 
-// Upload transfers the local file to the hostname
-func (rfc RemoteFileItem) UploadString(task concurrency.Task, content string, hostname string) error {
-	if rfc.Remote == "" {
-		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+// UploadString transfers a string as file to the remote host
+func (rfc RemoteFileItem) UploadString(clientSession *Session, content string, hostname string) error {
+    if rfc.Remote == "" {
+        return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
-	}
-	SSHClient := New().SSH
+    }
 
-	// Copy the file
-	retcode, _, _, err := SSHClient.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to copy file '%s'", rfc.Local)
-	}
+    task, xerr := clientSession.GetTask()
+    if xerr != nil {
+        return xerr
+    }
 
-	// Updates owner and access rights if asked for
-	cmd := ""
-	if rfc.RemoteOwner != "" {
-		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
-	}
-	if rfc.RemoteRights != "" {
-		if cmd != "" {
-			cmd += " && "
-		}
-		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
-	}
-	retcode, _, _, err = SSHClient.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to update owner and/or access rights of the remote file")
-	}
-	return nil
+    // Copy the file
+    retcode, _, _, err := clientSession.SSH.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    if err != nil {
+        return err
+    }
+    if retcode != 0 {
+        return fail.NewError("failed to copy file '%s'", rfc.Local)
+    }
+
+    // Updates owner and access rights if asked for
+    cmd := ""
+    if rfc.RemoteOwner != "" {
+        cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
+    }
+    if rfc.RemoteRights != "" {
+        if cmd != "" {
+            cmd += " && "
+        }
+        cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
+    }
+    retcode, _, _, err = clientSession.SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    if err != nil {
+        return err
+    }
+    if retcode != 0 {
+        return fail.NewError("failed to update owner and/or access rights of the remote file")
+    }
+    return nil
 }
 
 // RemoveRemote deletes the remote file from host
-func (rfc RemoteFileItem) RemoveRemote(task concurrency.Task, hostname string) error {
-	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, err := New().SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil || retcode != 0 {
-		return fail.NewError("failed to remove file '%s:%s'", hostname, rfc.Remote)
-	}
-	return nil
+func (rfc RemoteFileItem) RemoveRemote(clientSession *Session, hostname string) error {
+    if clientSession == nil {
+        return fail.InvalidParameterError("clientSession", "cannot be nil")
+    }
+
+    task, xerr := clientSession.GetTask()
+    if xerr != nil {
+        return xerr
+    }
+
+    cmd := "rm -rf " + rfc.Remote
+    retcode, _, _, err := clientSession.SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    if err != nil || retcode != 0 {
+        return fail.NewError("failed to remove file '%s:%s'", hostname, rfc.Remote)
+    }
+    return nil
 }
 
 // RemoteFilesHandler handles the copy of files and cleanup
 type RemoteFilesHandler struct {
-	items []*RemoteFileItem
+    items []*RemoteFileItem
 }
 
 // Add adds a RemoteFileItem in the handler
 func (rfh *RemoteFilesHandler) Add(file *RemoteFileItem) {
-	rfh.items = append(rfh.items, file)
+    rfh.items = append(rfh.items, file)
 }
 
 // Count returns the number of files in the handler
 func (rfh *RemoteFilesHandler) Count() uint {
-	return uint(len(rfh.items))
+    return uint(len(rfh.items))
 }
 
 // Upload executes the copy of files
-func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, hostname string) error {
-	for _, v := range rfh.items {
-		err := v.Upload(task, hostname)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func (rfh *RemoteFilesHandler) Upload(clientSession *Session, hostname string) error {
+    if rfh == nil {
+        return fail.InvalidInstanceError()
+    }
+    if clientSession == nil {
+        return fail.InvalidParameterError("clientSession", "cannot be nil")
+    }
+    if hostname != "" {
+        return fail.InvalidParameterError("hostname", "cannot be empty string")
+    }
+    for _, v := range rfh.items {
+        err := v.Upload(clientSession, hostname)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
 }
 
 // Cleanup executes the removal of remote files.
 // Note: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
-func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, hostname string) {
-	for _, v := range rfh.items {
-		xerr := v.RemoveRemote(task, hostname)
-		if xerr != nil {
-			logrus.Warnf(xerr.Error())
-		}
-	}
+func (rfh *RemoteFilesHandler) Cleanup(clientSession *Session, hostname string) {
+    for _, v := range rfh.items {
+        xerr := v.RemoveRemote(clientSession, hostname)
+        if xerr != nil {
+            logrus.Warnf(xerr.Error())
+        }
+    }
 }

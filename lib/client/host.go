@@ -217,7 +217,7 @@ func (h *host) Resize(def *protocol.HostDefinition, duration time.Duration) (*pr
 	return service.Resize(ctx, def)
 }
 
-func (h *host) ListFeatures(hostRef string, installedOnly bool) (*protocol.FeatureListResponse, error) {
+func (h *host) ListFeatures(hostRef string, installedOnly bool) (*protocol.FeatureListResponse, fail.Error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -232,10 +232,14 @@ func (h *host) ListFeatures(hostRef string, installedOnly bool) (*protocol.Featu
 		InstalledOnly: installedOnly,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
-	return service.List(ctx, &req)
+	result, err := service.List(ctx, &req)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return result, nil
 }
 
-func (h *host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+func (h *host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) fail.Error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -253,10 +257,10 @@ func (h *host) CheckFeature(hostRef, featureName string, params map[string]strin
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
 	_, err := service.Check(ctx, req)
-	return err
+	return fail.ToError(err)
 }
 
-func (h *host) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+func (h *host) AddFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) fail.Error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -274,10 +278,10 @@ func (h *host) AddFeature(hostRef, featureName string, params map[string]string,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
 	_, err := service.Add(ctx, req)
-	return err
+	return fail.ToError(err)
 }
 
-func (h *host) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
+func (h *host) RemoveFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) fail.Error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
