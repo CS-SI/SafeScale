@@ -17,43 +17,50 @@
 package commands
 
 import (
-	"github.com/sirupsen/logrus"
-	cli "github.com/urfave/cli/v2"
+    "github.com/sirupsen/logrus"
+    cli "github.com/urfave/cli/v2"
 
-	"github.com/CS-SI/SafeScale/lib/client"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/CS-SI/SafeScale/lib/client"
+    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/strprocess"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var templateCmdName = "template"
 
 // TemplateCmd command
 var TemplateCmd = &cli.Command{
-	Name:  "template",
-	Usage: "template COMMAND",
-	Subcommands: []*cli.Command{
-		templateList,
-	},
+    Name:  "template",
+    Usage: "template COMMAND",
+    Subcommands: []*cli.Command{
+        templateList,
+    },
 }
 
 var templateList = &cli.Command{
-	Name:    "list",
-	Aliases: []string{"ls"},
-	Usage:   "ErrorList available templates",
-	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "all",
-			Usage: "ErrorList all available templates in tenant (without any filter)",
-		}},
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
-		templates, err := client.New().Template.List(c.Bool("all"), temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
-		}
-		return clitools.SuccessResponse(templates.GetTemplates())
-	},
+    Name:    "list",
+    Aliases: []string{"ls"},
+    Usage:   "ErrorList available templates",
+    Flags: []cli.Flag{
+        &cli.BoolFlag{
+            Name:  "all",
+            Usage: "ErrorList all available templates in tenant (without any filter)",
+        }},
+    Action: func(c *cli.Context) error {
+        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
+
+        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        if xerr != nil {
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        }
+
+        templates, err := clientSession.Template.List(c.Bool("all"), temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
+        }
+        return clitools.SuccessResponse(templates.GetTemplates())
+    },
 }

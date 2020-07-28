@@ -50,7 +50,13 @@ var bucketList = &cli.Command{
 	Usage:   "ErrorList buckets",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", bucketCmdName, c.Command.Name, c.Args())
-		resp, err := client.New().Bucket.List(0)
+
+		clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		resp, err := clientSession.Bucket.List(0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
@@ -71,7 +77,12 @@ var bucketCreate = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		}
 
-		err := client.New().Bucket.Create(c.Args().Get(0), temporal.GetExecutionTimeout())
+		clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		err := clientSession.Bucket.Create(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of bucket", true).Error())))
@@ -96,7 +107,12 @@ var bucketDelete = &cli.Command{
 		bucketList = append(bucketList, c.Args().First())
 		bucketList = append(bucketList, c.Args().Tail()...)
 
-		err := client.New().Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
+		clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		err := clientSession.Bucket.Delete(bucketList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of bucket", true).Error())))
@@ -117,7 +133,12 @@ var bucketInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
 		}
 
-		resp, err := client.New().Bucket.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
+		clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		resp, err := clientSession.Bucket.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of bucket", false).Error())))
@@ -144,7 +165,12 @@ var bucketMount = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		}
 
-		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout())
+		clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		err := clientSession.Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "mount of bucket", true).Error())))
@@ -165,7 +191,12 @@ var bucketUnmount = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		}
 
-		err := client.New().Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
+		clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+		if xerr != nil {
+			return clitools.FailureResponse(xerr)
+		}
+
+		err := clientSession.Bucket.Unmount(c.Args().Get(0), c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unmount of bucket", true).Error())))
