@@ -189,10 +189,10 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 		if rerr != nil {
 			return rerr
 		}
-		if host.Core.LastState == state {
+		if host.CurrentState == state {
 			return nil
 		}
-		if host.Core.LastState == hoststate.ERROR {
+		if host.CurrentState == hoststate.ERROR {
 			return fail.NotAvailableError("host in error state")
 		}
 		select {
