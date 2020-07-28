@@ -63,15 +63,71 @@ message TenantCleanupRequest {
     bool force = 2;
 }
 
-// VPL: not used ?
-// message TenantNameList{
-//     repeated string names = 1;
-// }
+message TenantInspectRequest {
+    string name = 1;
+    string user_id = 2;
+    string group_id = 3;
+}
+
+message KeyValue {
+    string key = 1;
+    string value = 2;
+}
+
+message TenantIdentity {
+    KeyValue user = 1;
+    KeyValue app_key = 2;
+    KeyValue domain = 3;      // some providers need a domain (name or id)
+}
+
+message TenantCompute {
+    string region = 1;
+    string sub_region = 2;
+    string availability_zone = 3;
+    KeyValue context = 4;   // ProjectName, ProjectID, ... the data that allows to isolate the client on the provider side
+    KeyValue api_key = 5;   // The optional API key to access API
+    string whitelist_template_regex = 6;
+    string blacklist_template_regex = 7;
+    string default_image = 8;
+    string default_volume_speed = 9;
+    repeated string dns_list = 10;
+    string operator_username = 11;
+}
+
+message TenantNetwork {
+    string vpc_name = 1;
+    string vpc_idr = 2;
+    string provider_network = 3;
+}
+
+message TenantObjectStorage {
+    string type = 1;
+    string endpoint = 2;
+    string auth_url = 3;
+    string access_key = 4;
+    string region = 5;
+}
+
+message TenantMetadata {
+    TenantObjectStorage storage = 1;
+    string bucket_name = 2;
+    bool crypt = 3;
+}
+
+message TenantInspectResponse {
+    string name = 1;
+    string provider = 2;
+    TenantIdentity identity = 3;
+    TenantCompute compute = 4;
+    TenantObjectStorage object_storage = 5;
+    TenantMetadata metadata = 6;
+}
 
 service TenantService{
-    rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
+    rpc Inspect (TenantName) returns (TenantInspectResponse){}
+    rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Scan (google.protobuf.Empty) returns (google.protobuf.Empty){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
 }
@@ -597,6 +653,7 @@ service ClusterService{
     rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
     rpc StateNode(ClusterNodeRequest) returns (ClusterStateResponse){}
     rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
+    rpc FindAvailableMaster(Reference) returns (Host){}
     rpc InspectMaster(ClusterNodeRequest) returns (Host){}
 }
 
