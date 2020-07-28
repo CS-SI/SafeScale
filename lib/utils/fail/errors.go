@@ -1063,6 +1063,43 @@ func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotata
 }
 
 
+// ErrAlteredNothing is used when an Alter() call changed nothing
+type ErrAlteredNothing struct {
+    *errorCore
+}
+
+// AlteredNothingError creates an ErrAlteredNothing error
+func AlteredNothingError(msg ...interface{}) *ErrAlteredNothing {
+    r := newError(nil, nil, msg...)
+    r.grpcCode = codes.PermissionDenied
+    return &ErrAlteredNothing{r}
+}
+
+// IsNull tells if the instance is null
+func (e *ErrAlteredNothing) IsNull() bool {
+    return e == nil || e.errorCore.IsNull()
+}
+
+// AddConsequence ...
+func (e *ErrAlteredNothing) AddConsequence(err error) Error {
+    if e.IsNull() {
+        logrus.Errorf("invalid call of ErrUnknown.AddConsequence() from null instance")
+        return e
+    }
+    _ = e.errorCore.AddConsequence(err)
+    return e
+}
+
+// Annotate ...
+func (e *ErrAlteredNothing) Annotate(key string, value data.Annotation) data.Annotatable {
+    if e.IsNull() {
+        logrus.Errorf("invalid call of ErrUnknown.Annotate() from null instance")
+        return e
+    }
+    _ = e.errorCore.Annotate(key, value)
+    return e
+}
+
 // ErrUnknown is used when situation is unknown
 type ErrUnknown struct {
     *errorCore
