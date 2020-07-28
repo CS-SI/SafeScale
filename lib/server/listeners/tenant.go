@@ -84,7 +84,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, "", "template list")
+	job, xerr := PrepareJob(ctx, "", "tenant list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -130,7 +130,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "template list")
+	job, xerr := PrepareJob(ctx, "", "tenant get")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -168,7 +168,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, "", "template list")
+	job, xerr := PrepareJob(ctx, "", "tenant set")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -271,4 +271,38 @@ func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (em
 
 	xerr = handler.Scan()
 	return empty, xerr
+}
+
+// Inspect returns information about a tenant
+func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, xerr error) {
+	defer fail.OnExitConvertToGRPCStatus(&xerr)
+	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	job, xerr := PrepareJob(ctx, "", "tenant inspect")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	name := in.GetName()
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	return nil, fail.NotImplementedError("tenant inspect not yet implemented")
 }

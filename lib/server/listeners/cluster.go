@@ -644,6 +644,43 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	return nil, fail.NotImplementedError()
 }
 
+// FindAvailableMaster determines the first master available master (ie the one that responds on ssh request)
+func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.Reference) (_ *protocol.Host, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list masters")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	clusterName := srvutils.GetReference(in)
+	if clusterName == "" {
+		return nil, fail.InvalidRequestError("cluster name is missing")
+	}
+
+	job, err := PrepareJob(ctx, "", "cluster master list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+
+	tracer := concurrency.NewTracer(job.GetTask(), debug.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	defer tracer.OnExitTrace()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	return nil, fail.NotImplementedError()
+}
+
 // InspectMaster returns the information about a master of the cluster
 func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
