@@ -47,8 +47,7 @@ type Session struct {
     Tenant     *tenant
     Volume     *volume
 
-    daemonHost string
-    daemonPort int
+    server     string
     connection *grpc.ClientConn
 
     tenantName string
@@ -62,42 +61,55 @@ var (
     DefaultExecutionTimeout  = temporal.GetExecutionTimeout()
 )
 
+const (
+    defaultServerHost string = "localhost"
+    defaultServerPort string = "50051"
+)
+
 // New returns an instance of safescale Client
-func New(server string, port int) (_ *Session, xerr fail.Error) {
-    if port == 0 {
+func New(server string) (_ *Session, xerr fail.Error) {
+    // Validate server parameter (can be empty string...)
+    if server != "" {
+        parts := strings.Split(server, ":")
+        switch len(parts) {
+        case 1:
+            server = parts[0]+":"+defaultServerPort
+        case 2:
+            num, err := strconv.Atoi(parts[1])
+            if err != nil || num <= 0 {
+                return nil, fail.InvalidParameterError("server", "is invalid")
+            }
+        }
+    } else {
+        // host will be localhost, tries to get port from env,
         if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
             num, err := strconv.Atoi(portCandidate)
-            if err != nil {
+            if err != nil || num <= 0 {
                 logrus.Warnf("Value of SAFESCALED_PORT is invalid, must be an int")
             } else {
-                port = num
+                server = defaultServerHost+":"+portCandidate
             }
         }
     }
-    if port == 0 {
-        port = 50051
-    }
-
     if server == "" {
-        server = "localhost"
+        // empty string, so default value to server
+        server = defaultServerHost+":"+defaultServerPort
     }
 
     s := &Session{
-        daemonHost: server,
-        daemonPort: port,
+        server: server,
+        Bucket: &bucket{session: s},
+        Cluster: &cluster{session: s},
+        Host: &host{session: s},
+        Image:  &image{session: s},
+        Network: &network{session: s},
+        JobManager: &jobManager{session: s},
+        Share: &share{session: s},
+        SSH: &ssh{session: s},
+        Template: &template{session: s},
+        Tenant: &tenant{session: s},
+        Volume: &volume{session: s},
     }
-
-    s.Bucket = &bucket{session: s}
-    s.Cluster = &cluster{session: s}
-    s.Host = &host{session: s}
-    s.Image = &image{session: s}
-    s.Network = &network{session: s}
-    s.JobManager = &jobManager{session: s}
-    s.Share = &share{session: s}
-    s.SSH = &ssh{session: s}
-    s.Template = &template{session: s}
-    s.Tenant = &tenant{session: s}
-    s.Volume = &volume{session: s}
 
     s.task, xerr = concurrency.VoidTask()
     if xerr != nil {
@@ -110,7 +122,7 @@ func New(server string, port int) (_ *Session, xerr fail.Error) {
 // Connect establishes connection with safescaled
 func (s *Session) Connect() {
     if s.connection == nil {
-        s.connection = utils.GetConnection(s.daemonHost, s.daemonPort)
+        s.connection = utils.GetConnection(s.server)
     }
 }
 
