@@ -113,14 +113,8 @@ func main() {
 		&cli.StringFlag{
 			Name:  "server",
 			Aliases: []string{"S"},
-			Usage: "Connect to daemon on host HOST (default: localhost)",
-			Value: "localhost",
-		},
-		&cli.IntFlag{
-			Name:  "port",
-			Aliases: []string{"P"},
-			Usage: "Connect to daemon on port PORT (default: 50051)",
-			Value: 50051,
+			Usage: "Connect to daemon on server SERVER (default: localhost:50051)",
+			Value: "localhost:50051",
 		},
 		&cli.StringFlag{
 			Name:  "tenant",
