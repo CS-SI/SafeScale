@@ -13,4 +13,9 @@ In general, follow the GOLANG coding guidelines, in particular:
 
 As much as possible, follow the [godoc documentation tool formalism](https://blog.golang.org/godoc-documenting-go-code).
 
+## code indentation
+
+- uses 4 spaces for indentation
+- uses spaces instead of tab character for indentation
+
 Good documentation is an everyday job (we still have to respect this mantra ourselves ;-) ).
