@@ -17,7 +17,6 @@
 package utils
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
@@ -27,13 +26,11 @@ import (
 )
 
 // GetConnection returns a connection to GRPC server
-func GetConnection(host string, port int) *grpc.ClientConn {
-	address := fmt.Sprintf("%s:%d", host, port)
-
+func GetConnection(server string) *grpc.ClientConn {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("failed to connect to safescaled (%s:%d): %v", host, port, err)
+		log.Fatalf("failed to connect to safescaled (%s): %v", server, err)
 	}
 	return conn
 }
