@@ -17,17 +17,17 @@
 package cluster
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 var clusterCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
+    lock   sync.Mutex
+    ByID   utils.Cache
+    ByName utils.Cache
 }
 
 func init() {
-	clusterCache.ByName = utils.NewMapCache()
+    clusterCache.ByName = utils.NewMapCache()
 }

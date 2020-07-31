@@ -17,18 +17,18 @@
 package share
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 var shareCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
+    lock   sync.Mutex
+    ByID   utils.Cache
+    ByName utils.Cache
 }
 
 func init() {
-	shareCache.ByID = utils.NewMapCache()
-	shareCache.ByName = utils.NewMapCache()
+    shareCache.ByID = utils.NewMapCache()
+    shareCache.ByName = utils.NewMapCache()
 }

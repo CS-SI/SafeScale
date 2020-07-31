@@ -19,46 +19,47 @@
 package vclouddirector
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"net/url"
+    "net/url"
 
-	"github.com/vmware/go-vcloud-director/govcd"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+    "github.com/vmware/go-vcloud-director/govcd"
+
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 type Stack struct {
-	EbrcService *govcd.VCDClient
-	Config      *stacks.ConfigurationOptions
-	AuthOptions *stacks.AuthenticationOptions
+    EbrcService *govcd.VCDClient
+    Config      *stacks.ConfigurationOptions
+    AuthOptions *stacks.AuthenticationOptions
 }
 
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-	return *s.Config
+    return *s.Config
 }
 
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-	return *s.AuthOptions
+    return *s.AuthOptions
 }
 
 // Build Create and initialize a ClientAPI
 func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
-	stack := &Stack{
-		Config:      &cfg,
-		AuthOptions: &auth,
-	}
+    stack := &Stack{
+        Config:      &cfg,
+        AuthOptions: &auth,
+    }
 
-	u, err := url.ParseRequestURI(auth.IdentityEndpoint)
-	if err != nil {
-		return nil, fail.NewError("unable to pass url")
-	}
+    u, err := url.ParseRequestURI(auth.IdentityEndpoint)
+    if err != nil {
+        return nil, fail.NewError("unable to pass url")
+    }
 
-	vcdclient := govcd.NewVCDClient(*u, localCfg.Insecure)
-	err = vcdclient.Authenticate(auth.Username, auth.Password, auth.ProjectName)
-	if err != nil {
-		return nil, fail.Wrap(normalizeError(err), "Unable to authenticate")
-	}
-	stack.EbrcService = vcdclient
+    vcdclient := govcd.NewVCDClient(*u, localCfg.Insecure)
+    err = vcdclient.Authenticate(auth.Username, auth.Password, auth.ProjectName)
+    if err != nil {
+        return nil, fail.Wrap(normalizeError(err), "Unable to authenticate")
+    }
+    stack.EbrcService = vcdclient
 
-	return stack, nil
+    return stack, nil
 }

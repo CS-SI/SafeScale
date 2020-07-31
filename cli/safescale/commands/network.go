@@ -61,7 +61,7 @@ var networkList = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -91,7 +91,7 @@ var networkDelete = &cli.Command{
         networkList = append(networkList, c.Args().First())
         networkList = append(networkList, c.Args().Tail()...)
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -117,7 +117,7 @@ var networkInspect = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -251,7 +251,7 @@ var networkCreate = &cli.Command{
             KeepOnFailure: c.Bool("keep-on-failure"),
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

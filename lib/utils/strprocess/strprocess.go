@@ -17,59 +17,59 @@
 package strprocess
 
 import (
-	"fmt"
-	"strings"
+    "fmt"
+    "strings"
 )
 
 // Plural returns 's' if value > 1, "" otherwise
 func Plural(value uint) string {
-	if value > 1 {
-		return "s"
-	}
-	return ""
+    if value > 1 {
+        return "s"
+    }
+    return ""
 }
 
 // Capitalize makes the first letter of the first word uppercased
 func Capitalize(value string) string {
-	fields := strings.Fields(value)
-	if len(fields) > 0 {
-		// WORKAROUND: strings.Title consider ' as the beginning of a new word, so "can't" becomes "Can'T"...
-		quoted := strings.Split(fields[0], "'")
-		if len(quoted) > 1 {
-			quoted[0] = strings.Title(quoted[0])
-			fields[0] = strings.Join(quoted, "'")
-		} else {
-			fields[0] = strings.Title(fields[0])
-		}
-	}
-	return strings.Join(fields, " ")
+    fields := strings.Fields(value)
+    if len(fields) > 0 {
+        // WORKAROUND: strings.Title consider ' as the beginning of a new word, so "can't" becomes "Can'T"...
+        quoted := strings.Split(fields[0], "'")
+        if len(quoted) > 1 {
+            quoted[0] = strings.Title(quoted[0])
+            fields[0] = strings.Join(quoted, "'")
+        } else {
+            fields[0] = strings.Title(fields[0])
+        }
+    }
+    return strings.Join(fields, " ")
 }
 
 // FormatStrings formats the strings passed as parameters, using first one as format specifier for fmt.Sprintf if
 // there are more than 1 string.
 func FormatStrings(msg ...interface{}) string {
-	if msg == nil {
-		return ""
-	}
-	l := len(msg)
-	if l == 0 {
-		return ""
-	}
-	if len(msg) > 1 {
-		if _, ok := msg[0].(string); ok {
-			return fmt.Sprintf(msg[0].(string), msg[1:]...)
-		}
+    if msg == nil {
+        return ""
+    }
+    l := len(msg)
+    if l == 0 {
+        return ""
+    }
+    if len(msg) > 1 {
+        if _, ok := msg[0].(string); ok {
+            return fmt.Sprintf(msg[0].(string), msg[1:]...)
+        }
 
-		return ""
-	}
+        return ""
+    }
 
-	if msg[0] == nil {
-		return ""
-	}
+    if msg[0] == nil {
+        return ""
+    }
 
-	if _, ok := msg[0].(string); !ok {
-		return ""
-	}
+    if _, ok := msg[0].(string); !ok {
+        return ""
+    }
 
-	return fmt.Sprint(msg[0].(string))
+    return fmt.Sprint(msg[0].(string))
 }

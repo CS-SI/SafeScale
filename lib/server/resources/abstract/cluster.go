@@ -17,92 +17,92 @@
 package abstract
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // ClusterRequest defines what kind of Cluster is wanted
 type ClusterRequest struct {
-	// GetName is the name of the cluster wanted
-	Name string
-	// CIDR defines the network to create
-	CIDR string
-	// Complexity is the implementation wanted, can be Small, Normal or Large
-	Complexity clustercomplexity.Enum
-	// Flavor tells what kind of cluster to create
-	Flavor clusterflavor.Enum
-	// NetworkID is the GetID of the network to use
-	NetworkID string
-	// Tenant contains the name of the tenant
-	Tenant string
-	// KeepOnFailure is set to True to keep resources on cluster creation failure
-	KeepOnFailure bool
-	// GatewaysDef count
-	GatewaysDef *HostSizingRequirements
-	// NodesDef count
-	MastersDef *HostSizingRequirements
-	// NodesDef count
-	NodesDef *HostSizingRequirements
-	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
-	DisabledDefaultFeatures map[string]struct{}
+    // GetName is the name of the cluster wanted
+    Name string
+    // CIDR defines the network to create
+    CIDR string
+    // Complexity is the implementation wanted, can be Small, Normal or Large
+    Complexity clustercomplexity.Enum
+    // Flavor tells what kind of cluster to create
+    Flavor clusterflavor.Enum
+    // NetworkID is the GetID of the network to use
+    NetworkID string
+    // Tenant contains the name of the tenant
+    Tenant string
+    // KeepOnFailure is set to True to keep resources on cluster creation failure
+    KeepOnFailure bool
+    // GatewaysDef count
+    GatewaysDef *HostSizingRequirements
+    // NodesDef count
+    MastersDef *HostSizingRequirements
+    // NodesDef count
+    NodesDef *HostSizingRequirements
+    // DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
+    DisabledDefaultFeatures map[string]struct{}
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster
 type ClusterIdentity struct {
-	Name       string                 `json:"name"`       // GetName is the name of the cluster
-	Flavor     clusterflavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
-	Complexity clustercomplexity.Enum `json:"complexity"` // Complexity is the mode of cluster
-	Keypair    *KeyPair               `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
-	// AdminPassword contains the password of cladm account. This password
-	// is used to connect via Guacamole, but cannot be used with SSH
-	AdminPassword string `json:"admin_password"`
+    Name       string                 `json:"name"`       // GetName is the name of the cluster
+    Flavor     clusterflavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
+    Complexity clustercomplexity.Enum `json:"complexity"` // Complexity is the mode of cluster
+    Keypair    *KeyPair               `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
+    // AdminPassword contains the password of cladm account. This password
+    // is used to connect via Guacamole, but cannot be used with SSH
+    AdminPassword string `json:"admin_password"`
 }
 
 // NewClusterIdentity ...
 func NewClusterIdentity() *ClusterIdentity {
-	return &ClusterIdentity{}
+    return &ClusterIdentity{}
 }
 
 // Clone makes a copy of the instance
 // satisfies interface data.Clonable
 func (i *ClusterIdentity) Clone() data.Clonable {
-	return NewClusterIdentity().Replace(i)
+    return NewClusterIdentity().Replace(i)
 }
 
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
 func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
-	src := p.(*ClusterIdentity)
-	*i = *src
-	i.Keypair = &KeyPair{}
-	*i.Keypair = *src.Keypair
-	return i
+    src := p.(*ClusterIdentity)
+    *i = *src
+    i.Keypair = &KeyPair{}
+    *i.Keypair = *src.Keypair
+    return i
 }
 
 // GetName returns the name of the cluster
 // Satisfies interface data.Identifiable
 func (i *ClusterIdentity) GetName() string {
-	if i == nil {
-		return ""
-	}
-	return i.Name
+    if i == nil {
+        return ""
+    }
+    return i.Name
 }
 
 // GetID returns the GetID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
 func (i *ClusterIdentity) GetID() string {
-	return i.GetName()
+    return i.GetName()
 }
 
 // OK ...
 func (i *ClusterIdentity) OK() bool {
-	if i == nil {
-		return false
-	}
+    if i == nil {
+        return false
+    }
 
-	result := true
-	result = result && i.Name != ""
-	result = result && i.Flavor != 0
-	return result
+    result := true
+    result = result && i.Name != ""
+    result = result && i.Flavor != 0
+    return result
 }

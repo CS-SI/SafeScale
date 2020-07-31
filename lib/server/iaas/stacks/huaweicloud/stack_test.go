@@ -17,121 +17,121 @@
 package huaweicloud_test
 
 import (
-	"fmt"
-	"os"
-	"testing"
+    "fmt"
+    "os"
+    "testing"
 
-	"github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/tests"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/tests"
 )
 
 var tester *tests.ServiceTester
 var service iaas.Service
 
 func getTester() (*tests.ServiceTester, error) {
-	if tester == nil {
-		theService, err := getClient()
-		if err != nil {
-			return nil, err
-		}
-		// theService, err := flexibleengine.Build(stacks.AuthenticationOptions{}, stacks.ConfigurationOptions{})
-		// if err != nil {
-		// 	return nil, err
-		// }
-		tester = &tests.ServiceTester{
-			Service: theService,
-		}
-	}
-	return tester, nil
+    if tester == nil {
+        theService, err := getClient()
+        if err != nil {
+            return nil, err
+        }
+        // theService, err := flexibleengine.Build(stacks.AuthenticationOptions{}, stacks.ConfigurationOptions{})
+        // if err != nil {
+        // 	return nil, err
+        // }
+        tester = &tests.ServiceTester{
+            Service: theService,
+        }
+    }
+    return tester, nil
 }
 
 func getClient() (iaas.Service, error) {
-	if service == nil {
-		tenantName := ""
-		if tenantOverride := os.Getenv("TEST_FLEXIBLE"); tenantOverride != "" {
-			tenantName = tenantOverride
-		}
-		var err error
-		service, err = iaas.UseService(tenantName)
-		if err != nil || service == nil {
-			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
-		}
-	}
-	return service, nil
+    if service == nil {
+        tenantName := ""
+        if tenantOverride := os.Getenv("TEST_FLEXIBLE"); tenantOverride != "" {
+            tenantName = tenantOverride
+        }
+        var err error
+        service, err = iaas.UseService(tenantName)
+        if err != nil || service == nil {
+            return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
+        }
+    }
+    return service, nil
 }
 
 func Test_Images(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Images(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.Images(t)
 }
 
 func Test_HostTemplates(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.HostTemplates(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.HostTemplates(t)
 }
 
 func Test_KeyPairs(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.KeyPairs(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.KeyPairs(t)
 }
 
 func Test_Networks(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Networks(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.Networks(t)
 }
 
 func Test_Hosts(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Hosts(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.Hosts(t)
 }
 
 func Test_StartStopHost(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.StartStopHost(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.StartStopHost(t)
 }
 
 func Test_Volumes(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Volumes(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.Volumes(t)
 }
 
 func Test_Containers(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Containers(t)
+    tt, err := getTester()
+    if err != nil {
+        t.Skip(err)
+    }
+    require.Nil(t, err)
+    tt.Containers(t)
 }
 
 // func Test_Objects(t *testing.T) {

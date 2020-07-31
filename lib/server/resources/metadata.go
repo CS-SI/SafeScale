@@ -17,11 +17,11 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Callback describes the function prototype to use to inspect metadata
@@ -29,15 +29,15 @@ type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
-	Serialize(concurrency.Task) ([]byte, fail.Error)
-	Deserialize(concurrency.Task, []byte) fail.Error
+    Serialize(concurrency.Task) ([]byte, fail.Error)
+    Deserialize(concurrency.Task, []byte) fail.Error
 
-	GetService() iaas.Service                                                            // GetService returns the iaas.Service used
-	Inspect(task concurrency.Task, callback Callback) fail.Error                         // Inspect protects the data for shared read
-	Alter(task concurrency.Task, callback Callback) fail.Error                           // Alter protects the data for exclusive write
-	Carry(task concurrency.Task, clonable data.Clonable) fail.Error                      // Carry links metadata with real data
-	Read(task concurrency.Task, ref string) fail.Error                                   // Read gets the data from Object Storage
-	Reload(task concurrency.Task) fail.Error                                             // reload Reloads the metadata from the Object Storage, overriding what is in the object
-	BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error // Browse walks through host folder and executes a callback for each entries
-	Delete(task concurrency.Task) fail.Error                                             // Delete deletes the matadata
+    GetService() iaas.Service                                                            // GetService returns the iaas.Service used
+    Inspect(task concurrency.Task, callback Callback) fail.Error                         // Inspect protects the data for shared read
+    Alter(task concurrency.Task, callback Callback) fail.Error                           // Alter protects the data for exclusive write
+    Carry(task concurrency.Task, clonable data.Clonable) fail.Error                      // Carry links metadata with real data
+    Read(task concurrency.Task, ref string) fail.Error                                   // Read gets the data from Object Storage
+    Reload(task concurrency.Task) fail.Error                                             // reload Reloads the metadata from the Object Storage, overriding what is in the object
+    BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error // Browse walks through host folder and executes a callback for each entries
+    Delete(task concurrency.Task) fail.Error                                             // Delete deletes the matadata
 }

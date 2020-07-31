@@ -17,18 +17,18 @@
 package network
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 var networkCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
+    lock   sync.Mutex
+    ByID   utils.Cache
+    ByName utils.Cache
 }
 
 func init() {
-	networkCache.ByID = utils.NewMapCache()
-	networkCache.ByName = utils.NewMapCache()
+    networkCache.ByID = utils.NewMapCache()
+    networkCache.ByName = utils.NewMapCache()
 }

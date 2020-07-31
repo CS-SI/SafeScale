@@ -26,7 +26,7 @@ type Annotations Map
 
 // Annotatable ...
 type Annotatable interface {
-	Annotate(key string, value Annotation) Annotatable // adds an annotation to instance, returning instance
-	Annotations() Annotations                          // gives the annotations
-	Annotation(key string) (Annotation, bool)          // gives one annotation identified by field
+    Annotate(key string, value Annotation) Annotatable // adds an annotation to instance, returning instance
+    Annotations() Annotations                          // gives the annotations
+    Annotation(key string) (Annotation, bool)          // gives one annotation identified by field
 }

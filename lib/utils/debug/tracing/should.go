@@ -14,22 +14,28 @@
  * limitations under the License.
  */
 
-package debug
+package tracing
 
 import (
-	"runtime"
-	"strings"
-	"sync/atomic"
+    "strings"
 )
 
-var sourceFileRemovePart atomic.Value
-
-func init() {
-	var rootPath string
-	if pc, _, _, ok := runtime.Caller(0); ok {
-		if f := runtime.FuncForPC(pc); f != nil {
-			rootPath = strings.Split(f.Name(), "lib/utils/")[0]
-		}
-	}
-	sourceFileRemovePart.Store(rootPath)
+// ShouldTrace tells if a specific trace is asked for
+func ShouldTrace(key string) bool {
+    if key == "" {
+        return false
+    }
+    parts := strings.Split(key, ".")
+    // If key.subkey is defined, return true
+    if len(parts) >= 2 {
+        setting, ok := settings[parts[0]][parts[1]]
+        if ok {
+            return setting
+        }
+    }
+    // If key is defined and there is no subkey, return true (key enabled as a whole)
+    if _, ok := settings[parts[0]]; ok && len(settings[parts[0]]) == 0 {
+        return true
+    }
+    return false
 }

@@ -20,8 +20,8 @@ package data
 
 // Clonable is the interface a struct must satisfy to be able to be cloned
 type Clonable interface {
-	// Clone allows to duplicate Clonable
-	Clone() Clonable
-	// Replace allows to replace a Clonable with data from another one
-	Replace(Clonable) Clonable
+    // Clone allows to duplicate Clonable
+    Clone() Clonable
+    // Replace allows to replace a Clonable with data from another one
+    Replace(Clonable) Clonable
 }

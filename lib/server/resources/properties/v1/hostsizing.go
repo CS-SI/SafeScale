@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostSizingRequirements represents host sizing requirements to fulfil
@@ -27,19 +27,19 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostSizingRequirements struct {
-	MinCores    int     `json:"min_cores,omitempty"`
-	MaxCores    int     `json:"max_cores,omitempty"`
-	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
-	MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
-	MinDiskSize int     `json:"min_disk_size,omitempty"`
-	MinGPU      int     `json:"min_gpu,omitempty"`
-	MinFreq     float32 `json:"min_freq,omitempty"`
-	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
+    MinCores    int     `json:"min_cores,omitempty"`
+    MaxCores    int     `json:"max_cores,omitempty"`
+    MinRAMSize  float32 `json:"min_ram_size,omitempty"`
+    MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
+    MinDiskSize int     `json:"min_disk_size,omitempty"`
+    MinGPU      int     `json:"min_gpu,omitempty"`
+    MinFreq     float32 `json:"min_freq,omitempty"`
+    Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 }
 
 // NewHostSizingRequirements ...
 func NewHostSizingRequirements() *HostSizingRequirements {
-	return &HostSizingRequirements{}
+    return &HostSizingRequirements{}
 }
 
 // HostEffectiveSizing represent sizing elements of an host
@@ -47,22 +47,22 @@ func NewHostSizingRequirements() *HostSizingRequirements {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostEffectiveSizing struct {
-	Cores     int     `json:"cores,omitempty"`
-	RAMSize   float32 `json:"ram_size,omitempty"`
-	DiskSize  int     `json:"disk_size,omitempty"`
-	GPUNumber int     `json:"gpu_number,omitempty"`
-	GPUType   string  `json:"gpu_type,omitempty"`
-	CPUFreq   float32 `json:"cpu_freq,omitempty"`
+    Cores     int     `json:"cores,omitempty"`
+    RAMSize   float32 `json:"ram_size,omitempty"`
+    DiskSize  int     `json:"disk_size,omitempty"`
+    GPUNumber int     `json:"gpu_number,omitempty"`
+    GPUType   string  `json:"gpu_type,omitempty"`
+    CPUFreq   float32 `json:"cpu_freq,omitempty"`
 }
 
 // NewHostEffectiveSizing ...
 func NewHostEffectiveSizing() *HostEffectiveSizing {
-	return &HostEffectiveSizing{}
+    return &HostEffectiveSizing{}
 }
 
 // Reset ...
 func (hs *HostEffectiveSizing) Reset() {
-	*hs = HostEffectiveSizing{}
+    *hs = HostEffectiveSizing{}
 }
 
 // HostSizing contains sizing information about the host
@@ -70,43 +70,43 @@ func (hs *HostEffectiveSizing) Reset() {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostSizing struct {
-	RequestedSize *HostSizingRequirements `json:"requested_size,omitempty"`
-	Template      string                  `json:"template,omitempty"`
-	AllocatedSize *HostEffectiveSizing    `json:"allocated_size,omitempty"`
+    RequestedSize *HostSizingRequirements `json:"requested_size,omitempty"`
+    Template      string                  `json:"template,omitempty"`
+    AllocatedSize *HostEffectiveSizing    `json:"allocated_size,omitempty"`
 }
 
 // NewHostSizing ...
 func NewHostSizing() *HostSizing {
-	return &HostSizing{
-		RequestedSize: NewHostSizingRequirements(),
-		AllocatedSize: NewHostEffectiveSizing(),
-	}
+    return &HostSizing{
+        RequestedSize: NewHostSizingRequirements(),
+        AllocatedSize: NewHostEffectiveSizing(),
+    }
 }
 
 // Reset ...
 func (hs *HostSizing) Reset() {
-	*hs = HostSizing{
-		RequestedSize: NewHostSizingRequirements(),
-		AllocatedSize: NewHostEffectiveSizing(),
-	}
+    *hs = HostSizing{
+        RequestedSize: NewHostSizingRequirements(),
+        AllocatedSize: NewHostEffectiveSizing(),
+    }
 }
 
 // Clone ... (data.Clonable interface)
 func (hs *HostSizing) Clone() data.Clonable {
-	return NewHostSizing().Replace(hs)
+    return NewHostSizing().Replace(hs)
 }
 
 // Replace ...
 func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
-	src := p.(*HostSizing)
-	hs.RequestedSize = NewHostSizingRequirements()
-	*hs.RequestedSize = *src.RequestedSize
-	hs.AllocatedSize = NewHostEffectiveSizing()
-	*hs.AllocatedSize = *src.AllocatedSize
-	hs.Template = src.Template
-	return hs
+    src := p.(*HostSizing)
+    hs.RequestedSize = NewHostSizingRequirements()
+    *hs.RequestedSize = *src.RequestedSize
+    hs.AllocatedSize = NewHostEffectiveSizing()
+    *hs.AllocatedSize = *src.AllocatedSize
+    hs.Template = src.Template
+    return hs
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV1, NewHostSizing())
+    serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV1, NewHostSizing())
 }

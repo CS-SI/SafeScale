@@ -17,10 +17,10 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // ClusterControlPlane contains information used by cluster control plane (when there is one)
@@ -28,30 +28,30 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type ClusterControlPlane struct {
-	VirtualIP *abstract.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
+    VirtualIP *abstract.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
 }
 
 func newClusterControlPlane() *ClusterControlPlane {
-	return &ClusterControlPlane{}
+    return &ClusterControlPlane{}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (cp *ClusterControlPlane) Clone() data.Clonable {
-	return newClusterControlPlane().Replace(cp)
+    return newClusterControlPlane().Replace(cp)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (cp *ClusterControlPlane) Replace(p data.Clonable) data.Clonable {
-	src := p.(*ClusterControlPlane)
-	*cp = *src
-	if src.VirtualIP != nil {
-		cp.VirtualIP = src.VirtualIP.Clone().(*abstract.VirtualIP)
-	}
-	return cp
+    src := p.(*ClusterControlPlane)
+    *cp = *src
+    if src.VirtualIP != nil {
+        cp.VirtualIP = src.VirtualIP.Clone().(*abstract.VirtualIP)
+    }
+    return cp
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.ControlPlaneV1, &ClusterControlPlane{})
+    serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.ControlPlaneV1, &ClusterControlPlane{})
 }

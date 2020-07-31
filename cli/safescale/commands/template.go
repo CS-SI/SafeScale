@@ -18,7 +18,7 @@ package commands
 
 import (
     "github.com/sirupsen/logrus"
-    cli "github.com/urfave/cli/v2"
+    "github.com/urfave/cli/v2"
 
     "github.com/CS-SI/SafeScale/lib/client"
     clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -51,7 +51,7 @@ var templateList = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

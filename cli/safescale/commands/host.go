@@ -68,7 +68,7 @@ var hostStart = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -94,7 +94,7 @@ var hostStop = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -120,7 +120,7 @@ var hostReboot = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -148,7 +148,7 @@ var hostList = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -185,7 +185,7 @@ var hostInspect = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -210,7 +210,7 @@ var hostStatus = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -307,7 +307,7 @@ var hostCreate = &cli.Command{
             return err
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -373,7 +373,7 @@ var hostResize = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -411,7 +411,7 @@ var hostDelete = &cli.Command{
         hostList = append(hostList, c.Args().First())
         hostList = append(hostList, c.Args().Tail()...)
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -436,7 +436,7 @@ var hostSSH = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -467,7 +467,7 @@ var hostListFeaturesCommand = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -524,7 +524,7 @@ var hostAddFeatureCommand = &cli.Command{
         settings := protocol.FeatureSettings{}
         settings.SkipProxy = c.Bool("skip-proxy")
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -587,7 +587,7 @@ var hostCheckFeatureCommand = &cli.Command{
         }
         settings := protocol.FeatureSettings{}
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -650,7 +650,7 @@ var hostRemoveFeatureCommand = &cli.Command{
         }
         settings := protocol.FeatureSettings{}
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

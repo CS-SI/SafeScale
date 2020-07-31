@@ -22,9 +22,9 @@ package outputs
 type Enum int
 
 const (
-	_ Enum = iota
-	// COLLECT to collect the outputs at the end of execution
-	COLLECT
-	// DISPLAY to display the outputs during the execution (without collect)
-	DISPLAY
+    _ Enum = iota
+    // COLLECT to collect the outputs at the end of execution
+    COLLECT
+    // DISPLAY to display the outputs during the execution (without collect)
+    DISPLAY
 )

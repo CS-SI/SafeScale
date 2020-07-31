@@ -28,6 +28,8 @@ import (
     "github.com/sirupsen/logrus"
 
     "github.com/CS-SI/SafeScale/lib/protocol"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
     "github.com/CS-SI/SafeScale/lib/server/resources"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
@@ -37,8 +39,6 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
     "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
     propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
     propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
     "github.com/CS-SI/SafeScale/lib/system"
@@ -46,6 +46,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/data"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     "github.com/CS-SI/SafeScale/lib/utils/retry"
     "github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -114,7 +115,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
     )
     if xerr != nil {
         switch xerr.(type) {
-        case *fail.ErrAlteredNothing:   // This error means nothing has been change, so no need to update cache
+        case *fail.ErrAlteredNothing: // This error means nothing has been change, so no need to update cache
             return rh, nil
         case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
             xerr = fail.NotFoundError("metadata of host '%s' not found", ref)
@@ -333,7 +334,7 @@ func (rh *host) Reload(task concurrency.Task) fail.Error {
             }
             allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
             // FIXME: how to compare the 2 structs ?
-            if allocated !=	hostSizingV2.AllocatedSize {
+            if allocated != hostSizingV2.AllocatedSize {
                 hostSizingV2.AllocatedSize = allocated
                 changed = true
             }
@@ -404,9 +405,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
         return nil, fail.NotAvailableError("already carrying host '%s'", hostname)
     }
 
-    tracer := concurrency.NewTracer(task, debug.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError("failed to create host", &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, "failed to create host")
     defer fail.OnPanic(&xerr)
 
     svc := rh.GetService()
@@ -1475,8 +1476,8 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, debug.ShouldTrace("resources.host"), "(%s)", name).Entering()
-    defer tracer.OnExitTrace()
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
+    defer tracer.Exiting()
 
     feat, xerr := NewFeature(task, name)
     if xerr != nil {
@@ -1524,8 +1525,8 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
         return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, debug.ShouldTrace("resources.host"), "(%s)", name).Entering()
-    defer tracer.OnExitTrace()
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
+    defer tracer.Exiting()
 
     feat, xerr := NewFeature(task, name)
     if xerr != nil {
@@ -1557,8 +1558,8 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
         return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, false /*Trace.Host, */, "(%s)", name).Entering()
-    defer tracer.OnExitTrace()
+    tracer := debug.NewTracer(task, false /*Trace.Host, */, "(%s)", name).Entering()
+    defer tracer.Exiting()
 
     feat, xerr := NewFeature(task, name)
     if xerr != nil {

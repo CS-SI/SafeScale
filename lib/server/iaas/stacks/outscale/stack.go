@@ -1,210 +1,226 @@
+/*
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package outscale
 
 import (
-	"context"
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"regexp"
+    "context"
+    "fmt"
+    "regexp"
 
-	"github.com/outscale/osc-sdk-go/osc"
+    "github.com/outscale/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Credentials outscale credentials
 type Credentials struct {
-	AccessKey string
-	SecretKey string
+    AccessKey string
+    SecretKey string
 }
 
 // ComputeConfiguration outscale compute configuration
 type ComputeConfiguration struct {
-	URL                     string
-	Region                  string
-	Subregion               string
-	Service                 string
-	DefaultImage            string
-	DefaultVolumeSpeed      volumespeed.Enum
-	DefaultTenancy          string
-	DNSList                 []string
-	OperatorUsername        string
-	WhitelistTemplateRegexp *regexp.Regexp
-	BlacklistTemplateRegexp *regexp.Regexp
-	WhitelistImageRegexp    *regexp.Regexp
-	BlacklistImageRegexp    *regexp.Regexp
+    URL                     string
+    Region                  string
+    Subregion               string
+    Service                 string
+    DefaultImage            string
+    DefaultVolumeSpeed      volumespeed.Enum
+    DefaultTenancy          string
+    DNSList                 []string
+    OperatorUsername        string
+    WhitelistTemplateRegexp *regexp.Regexp
+    BlacklistTemplateRegexp *regexp.Regexp
+    WhitelistImageRegexp    *regexp.Regexp
+    BlacklistImageRegexp    *regexp.Regexp
 }
 
 // NetworConfiguration outscale network configuration
 type NetworConfiguration struct {
-	VPCName string
-	VPCCIDR string
-	VPCID   string
+    VPCName string
+    VPCCIDR string
+    VPCID   string
 }
 
 // StorageConfiguration outscale storage configuration
 type StorageConfiguration struct {
-	Type      string
-	Endpoint  string
-	AccessKey string
-	SecretKey string
+    Type      string
+    Endpoint  string
+    AccessKey string
+    SecretKey string
 }
 
 // MetadataConfiguration metadata storage configuration
 type MetadataConfiguration struct {
-	Type      string
-	Endpoint  string
-	AccessKey string
-	SecretKey string
-	Bucket    string
-	CryptKey  string
+    Type      string
+    Endpoint  string
+    AccessKey string
+    SecretKey string
+    Bucket    string
+    CryptKey  string
 }
 
 // ConfigurationOptions outscale stack configuration options
 type ConfigurationOptions struct {
-	Identity      Credentials           `json:"identity,omitempty"`
-	Compute       ComputeConfiguration  `json:"compute,omitempty"`
-	Network       NetworConfiguration   `json:"network,omitempty"`
-	ObjectStorage StorageConfiguration  `json:"objectstorage,omitempty"`
-	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
+    Identity      Credentials           `json:"identity,omitempty"`
+    Compute       ComputeConfiguration  `json:"compute,omitempty"`
+    Network       NetworConfiguration   `json:"network,omitempty"`
+    ObjectStorage StorageConfiguration  `json:"objectstorage,omitempty"`
+    Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
 // Stack Outscale Stack to adapt outscale IaaS API
 type Stack struct {
-	Options              ConfigurationOptions
-	client               *osc.APIClient
-	auth                 context.Context
-	CPUPerformanceMap    map[int]float32
-	VolumeSpeedsMap      map[string]volumespeed.Enum
-	configurationOptions *stacks.ConfigurationOptions
-	deviceNames          []string
+    Options              ConfigurationOptions
+    client               *osc.APIClient
+    auth                 context.Context
+    CPUPerformanceMap    map[int]float32
+    VolumeSpeedsMap      map[string]volumespeed.Enum
+    configurationOptions *stacks.ConfigurationOptions
+    deviceNames          []string
 }
 
 // New creates a new Stack
 func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
-	if options == nil {
-		return nil, fail.InvalidParameterError("options", "cannot be nil")
-	}
+    if options == nil {
+        return nil, fail.InvalidParameterError("options", "cannot be nil")
+    }
 
-	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stacks.outscale"), "(%v)", options).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", options).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	client := osc.NewAPIClient(osc.NewConfiguration())
-	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
-		AccessKey: options.Identity.AccessKey,
-		SecretKey: options.Identity.SecretKey,
-	})
-	volumeSpeeds := map[string]volumespeed.Enum{
-		"standard": volumespeed.COLD,
-		"gp2":      volumespeed.HDD,
-		"io1":      volumespeed.SSD,
-	}
-	s := Stack{
-		Options:         *options,
-		client:          client,
-		VolumeSpeedsMap: volumeSpeeds,
-		CPUPerformanceMap: map[int]float32{
-			1: 3.0,
-			2: 2.5,
-			3: 2.0,
-		},
-		deviceNames: deviceNames(),
-		configurationOptions: &stacks.ConfigurationOptions{
-			ProviderNetwork:           "",
-			DNSList:                   options.Compute.DNSList,
-			UseFloatingIP:             true,
-			UseLayer3Networking:       false,
-			UseNATService:             false,
-			ProviderName:              "outscale",
-			BuildSubnetworks:          false,
-			AutoHostNetworkInterfaces: false,
-			VolumeSpeeds:              volumeSpeeds,
-			DefaultImage:              options.Compute.DefaultImage,
-			MetadataBucket:            options.Metadata.Bucket,
-			OperatorUsername:          options.Compute.OperatorUsername,
-			BlacklistImageRegexp:      options.Compute.BlacklistImageRegexp,
-			BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
-			WhitelistImageRegexp:      options.Compute.WhitelistImageRegexp,
-			WhitelistTemplateRegexp:   options.Compute.WhitelistTemplateRegexp,
-		},
-		auth: auth,
-	}
-	return &s, s.initDefaultNetwork()
+    client := osc.NewAPIClient(osc.NewConfiguration())
+    auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
+        AccessKey: options.Identity.AccessKey,
+        SecretKey: options.Identity.SecretKey,
+    })
+    volumeSpeeds := map[string]volumespeed.Enum{
+        "standard": volumespeed.COLD,
+        "gp2":      volumespeed.HDD,
+        "io1":      volumespeed.SSD,
+    }
+    s := Stack{
+        Options:         *options,
+        client:          client,
+        VolumeSpeedsMap: volumeSpeeds,
+        CPUPerformanceMap: map[int]float32{
+            1: 3.0,
+            2: 2.5,
+            3: 2.0,
+        },
+        deviceNames: deviceNames(),
+        configurationOptions: &stacks.ConfigurationOptions{
+            ProviderNetwork:           "",
+            DNSList:                   options.Compute.DNSList,
+            UseFloatingIP:             true,
+            UseLayer3Networking:       false,
+            UseNATService:             false,
+            ProviderName:              "outscale",
+            BuildSubnetworks:          false,
+            AutoHostNetworkInterfaces: false,
+            VolumeSpeeds:              volumeSpeeds,
+            DefaultImage:              options.Compute.DefaultImage,
+            MetadataBucket:            options.Metadata.Bucket,
+            OperatorUsername:          options.Compute.OperatorUsername,
+            BlacklistImageRegexp:      options.Compute.BlacklistImageRegexp,
+            BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
+            WhitelistImageRegexp:      options.Compute.WhitelistImageRegexp,
+            WhitelistTemplateRegexp:   options.Compute.WhitelistTemplateRegexp,
+        },
+        auth: auth,
+    }
+    return &s, s.initDefaultNetwork()
 }
 
 func (s *Stack) initDefaultNetwork() fail.Error {
-	if s.Options.Network.VPCID != "" {
-		return nil
-	}
-	if s.Options.Network.VPCName == "" {
-		s.Options.Network.VPCName = "safescale-vpc"
-	}
-	if s.Options.Network.VPCCIDR == "" {
-		s.Options.Network.VPCCIDR = "192.168.0.0/16"
-	}
-	onet, err := s.getVpcByName(s.Options.Network.VPCName)
-	if err != nil || onet == nil { // Try to create the network
-		onet, err = s.createVpc(s.Options.Network.VPCName, s.Options.Network.VPCCIDR)
-		if err != nil {
-			return err
-		}
-	}
-	s.Options.Network.VPCID = onet.NetId
+    if s.Options.Network.VPCID != "" {
+        return nil
+    }
+    if s.Options.Network.VPCName == "" {
+        s.Options.Network.VPCName = "safescale-vpc"
+    }
+    if s.Options.Network.VPCCIDR == "" {
+        s.Options.Network.VPCCIDR = "192.168.0.0/16"
+    }
+    onet, err := s.getVpcByName(s.Options.Network.VPCName)
+    if err != nil || onet == nil { // Try to create the network
+        onet, err = s.createVpc(s.Options.Network.VPCName, s.Options.Network.VPCCIDR)
+        if err != nil {
+            return err
+        }
+    }
+    s.Options.Network.VPCID = onet.NetId
 
-	return nil
+    return nil
 }
 
 func deviceNames() []string {
-	var deviceNames []string
-	for i := int('d'); i <= int('z'); i++ {
-		deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", string(i)))
-	}
-	return deviceNames
+    var deviceNames []string
+    for i := int('d'); i <= int('z'); i++ {
+        deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", string(i)))
+    }
+    return deviceNames
 }
 
 // ListRegions list available regions
 func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
-	if s == nil {
-		return []string{}, fail.InvalidInstanceError()
-	}
+    if s == nil {
+        return []string{}, fail.InvalidInstanceError()
+    }
 
-	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	return []string{
-		"cn-southeast-1",
-		"eu-west-2",
-		"us-east-2",
-		"us-west-1",
-	}, nil
+    if s == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+    return []string{
+        "cn-southeast-1",
+        "eu-west-2",
+        "us-east-2",
+        "us-west-1",
+    }, nil
 }
 
 // ListAvailabilityZones returns availability zone in a set
 func (s *Stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
-	emptyMap := make(map[string]bool, 0)
-	if s == nil {
-		return emptyMap, fail.InvalidInstanceError()
-	}
+    emptyMap := make(map[string]bool, 0)
+    if s == nil {
+        return emptyMap, fail.InvalidInstanceError()
+    }
 
-	tracer := concurrency.NewTracer(nil, debug.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
-	if err != nil {
-		return emptyMap, normalizeError(err)
-	}
+    resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
+    if err != nil {
+        return emptyMap, normalizeError(err)
+    }
 
-	az = make(map[string]bool, len(resp.Subregions))
-	for _, r := range resp.Subregions {
-		az[r.SubregionName] = true
-	}
-	return az, nil
+    az = make(map[string]bool, len(resp.Subregions))
+    for _, r := range resp.Subregions {
+        az[r.SubregionName] = true
+    }
+    return az, nil
 }

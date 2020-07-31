@@ -17,17 +17,17 @@
 package operations
 
 var (
-	// Trace contains what to trace during debug log
-	Trace = struct {
-		Cluster bool
-		Host    bool
-		Network bool
-		Share   bool
-		Tenant  bool
-		Volume  bool
-		Feature struct {
-			Action bool
-			Step   bool
-		}
-	}{}
+    // Trace contains what to trace during debug log
+    Trace = struct {
+        Cluster bool
+        Host    bool
+        Network bool
+        Share   bool
+        Tenant  bool
+        Volume  bool
+        Feature struct {
+            Action bool
+            Step   bool
+        }
+    }{}
 )

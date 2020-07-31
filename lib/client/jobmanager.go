@@ -17,43 +17,43 @@
 package client
 
 import (
-	"time"
+    "time"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+    googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/protocol"
+    "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // bucket is the part of the safescale client handling buckets
 type jobManager struct {
-	// session is not used currently.
-	session *Session
+    // session is not used currently.
+    session *Session
 }
 
 // List ...
-func (c *jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
-	c.session.Connect()
-	defer c.session.Disconnect()
-	service := protocol.NewJobServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(false)
-	if xerr != nil {
-		return nil, xerr
-	}
+func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
+    c.session.Connect()
+    defer c.session.Disconnect()
+    service := protocol.NewJobServiceClient(c.session.connection)
+    ctx, xerr := utils.GetContext(false)
+    if xerr != nil {
+        return nil, xerr
+    }
 
-	return service.List(ctx, &googleprotobuf.Empty{})
+    return service.List(ctx, &googleprotobuf.Empty{})
 }
 
 // Stop sends a signal to the server to stop a running job
-func (c *jobManager) Stop(uuid string, timeout time.Duration) error {
-	c.session.Connect()
-	defer c.session.Disconnect()
-	service := protocol.NewJobServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(false)
-	if xerr != nil {
-		return xerr
-	}
+func (c jobManager) Stop(uuid string, timeout time.Duration) error {
+    c.session.Connect()
+    defer c.session.Disconnect()
+    service := protocol.NewJobServiceClient(c.session.connection)
+    ctx, xerr := utils.GetContext(false)
+    if xerr != nil {
+        return xerr
+    }
 
-	_, err := service.Stop(ctx, &protocol.JobDefinition{Uuid: uuid})
-	return err
+    _, err := service.Stop(ctx, &protocol.JobDefinition{Uuid: uuid})
+    return err
 }

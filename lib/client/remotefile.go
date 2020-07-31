@@ -42,13 +42,8 @@ func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error 
 
     }
 
-    task, xerr := clientSession.GetTask()
-    if xerr != nil {
-        return xerr
-    }
-
     // Copy the file
-    retcode, _, _, xerr := clientSession.SSH.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    retcode, _, _, xerr := clientSession.SSH.Copy(rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
     if xerr != nil {
         return xerr
     }
@@ -67,7 +62,7 @@ func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error 
         }
         cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
     }
-    retcode, _, _, xerr = clientSession.SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    retcode, _, _, xerr = clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
     if xerr != nil {
         return xerr
     }
@@ -85,13 +80,8 @@ func (rfc RemoteFileItem) UploadString(clientSession *Session, content string, h
 
     }
 
-    task, xerr := clientSession.GetTask()
-    if xerr != nil {
-        return xerr
-    }
-
     // Copy the file
-    retcode, _, _, err := clientSession.SSH.Copy(task, rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    retcode, _, _, err := clientSession.SSH.Copy(rfc.Local, hostname+":"+rfc.Remote, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
     if err != nil {
         return err
     }
@@ -110,7 +100,7 @@ func (rfc RemoteFileItem) UploadString(clientSession *Session, content string, h
         }
         cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
     }
-    retcode, _, _, err = clientSession.SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    retcode, _, _, err = clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
     if err != nil {
         return err
     }
@@ -126,13 +116,8 @@ func (rfc RemoteFileItem) RemoveRemote(clientSession *Session, hostname string) 
         return fail.InvalidParameterError("clientSession", "cannot be nil")
     }
 
-    task, xerr := clientSession.GetTask()
-    if xerr != nil {
-        return xerr
-    }
-
     cmd := "rm -rf " + rfc.Remote
-    retcode, _, _, err := clientSession.SSH.Run(task, hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    retcode, _, _, err := clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
     if err != nil || retcode != 0 {
         return fail.NewError("failed to remove file '%s:%s'", hostname, rfc.Remote)
     }

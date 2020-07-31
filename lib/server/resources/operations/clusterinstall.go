@@ -43,6 +43,8 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     "github.com/CS-SI/SafeScale/lib/utils/serialize"
     "github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -287,14 +289,23 @@ func (c *cluster) ExecuteScript(
     task concurrency.Task, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
     host resources.Host,
 ) (_ int, _ string, _ string, xerr fail.Error) {
-    // ) (errCode int, stdOut string, stdErr string, xerr fail.Error) {
-    tracer := concurrency.NewTracer(nil, true, "("+host.GetName()+")").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
 
     if c == nil {
         return -1, "", "", fail.InvalidInstanceError()
     }
+    if task == nil {
+        return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
+    }
+    if tmplName == "" {
+        return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
+    }
+    if host.IsNull() {
+        return -1, "", "", fail.InvalidParameterError("host", "cannot be null value")
+    }
+
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "("+host.GetName()+")").Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
     box, err := getTemplateBox()
     if err != nil {
@@ -339,13 +350,13 @@ func (c *cluster) ExecuteScript(
 
 // installNodeRequirements ...
 func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
-    tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     // VPL: integrate what is found in <flavor>_install__<nodetype>.sh in node_install_requirements.sh and this part will
     // be removed
-    //if c.makers.GetTemplateBox == nil {
+    // if c.makers.GetTemplateBox == nil {
     //	return fail.InvalidParameterError("c.makers.GetTemplateBox", "cannot be nil")
     // }
     // ENDVPL
@@ -501,9 +512,9 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
     }
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     disabled := false
     xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -548,9 +559,9 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
     }
     clusterName := identity.Name
 
-    tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     disabled := false
     xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -598,9 +609,9 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
         return fail.InvalidParameterError("hostLabel", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
     defer fail.OnPanic(&xerr)
 
     disabled := false
@@ -643,9 +654,9 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
         return fail.InvalidParameterError("hostLabel", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
     defer fail.OnPanic(&xerr)
 
     disabled := false
@@ -688,9 +699,9 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
         return fail.InvalidParameterError("hostLabel", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     // uses NewFeature() to let a chance to the user to use it's own docker feature
     feat, xerr := NewFeature(task, "docker")

@@ -50,12 +50,14 @@ The content of this configuration file is explained in [TENANTS.md](TENANTS.md).
 
 Each `tenants` section contains specific authentication parameters for each Cloud Provider.
 > - `client` can be one of the available provider's drivers in
+>    - aws
 >    - cloudferro
 >    - flexibleengine
 >    - gcp
 >    - local (unstable, not compiled by default, cf this [documentation](LIBVIRT_PROVIDER.md))
 >    - openstack (pure OpenStack support)
 >    - opentelekom
+>    - outscale
 >    - ovh
 > - `name` is a logical name representing the tenant
 >
@@ -150,6 +152,28 @@ Ready to serve :-)
 
 By default, ```safescaled``` displays only warnings and errors messages. To have more information, you can use ```-v``` to increase verbosity, and ```-d``` to use debug mode (```-d -v``` will produce A LOT of messages, it's for debug purposes).
 <br><br>
+
+#### Options
+
+option | description
+----- | -----
+`--verbose, -v` | Increase the verbosity.<br><br>ex: `safescale -v host create ...`
+`--debug, -d` | Displays debugging information.<br><br>ex: `safescale -d host create ...`
+`--listen, -l` | defines on what interface and what port safescaled will listen; default is `localhost:50051`
+
+Examples:
+```bash
+$ safescaled 
+```
+will start the daemon, listening on `localhost` on default port `50051`; it will be reachable only from the same host.
+<br>
+```bash
+$ safescaled -v -l :50000
+```
+will start the daemon, listening on all interfaces and on port `50000` (instead of default port 50051)
+<br>
+
+Note: `-d -v` will display far more debugging information than simply `-d` (used to trace what is going on in details)
 
 ## safescale
 

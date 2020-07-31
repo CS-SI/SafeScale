@@ -105,7 +105,7 @@ var clusterListCommand = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -162,7 +162,7 @@ var clusterInspectCommand = &cli.Command{
             return clitools.FailureResponse(err)
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -465,7 +465,7 @@ var clusterCreateCommand = &cli.Command{
         // 	}
         // }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -553,7 +553,7 @@ var clusterDeleteCommand = &cli.Command{
             logrus.Println("'-f,--force' does nothing yet")
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -581,7 +581,7 @@ var clusterStopCommand = &cli.Command{
             return clitools.FailureResponse(err)
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -609,7 +609,7 @@ var clusterStartCommand = &cli.Command{
         }
         clusterRef := c.Args().First()
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -635,7 +635,7 @@ var clusterStateCommand = &cli.Command{
             return clitools.FailureResponse(err)
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -711,7 +711,7 @@ var clusterExpandCommand = &cli.Command{
             ImageId:    los,
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -783,7 +783,7 @@ var clusterShrinkCommand = &cli.Command{
             Count: int32(count),
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -880,7 +880,7 @@ var clusterKubectlCommand = &cli.Command{
             cmdStr += ` ` + strings.Join(filteredArgs, " ")
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -978,7 +978,7 @@ var clusterHelmCommand = &cli.Command{
         }
         cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1012,11 +1012,6 @@ func executeCommand(clientSession *client.Session, command string, files *client
         return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
     }
 
-    task, xerr := clientSession.GetTask()
-    if xerr != nil {
-        return xerr
-    }
-
     if files != nil && files.Count() > 0 {
         if !Debug {
             defer files.Cleanup(clientSession, master.GetId())
@@ -1027,7 +1022,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
         }
     }
 
-    retcode, stdout, stderr, xerr := clientSession.SSH.Run(task, master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+    retcode, stdout, stderr, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
     if xerr != nil {
         msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
         return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1063,12 +1058,12 @@ var clusterListFeaturesCommand = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
 
-        features, err := clientSession.Cluster.ListInstalledFeatures(clusterName, 0)	// FIXME: set timeout
+        features, err := clientSession.Cluster.ListInstalledFeatures(clusterName, 0) // FIXME: set timeout
         if err != nil {
             err = fail.FromGRPCStatus(err)
             return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1119,7 +1114,7 @@ var clusterAddFeatureCommand = &cli.Command{
         settings := protocol.FeatureSettings{}
         settings.SkipProxy = c.Bool("skip-proxy")
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1169,7 +1164,7 @@ var clusterCheckFeatureCommand = &cli.Command{
 
         settings := protocol.FeatureSettings{}
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1223,7 +1218,7 @@ var clusterRemoveFeatureCommand = &cli.Command{
         // will try to apply them... Quick fix: Setting SkipProxy to true prevent this
         settings.SkipProxy = true
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1270,7 +1265,7 @@ var clusterNodeListCommand = &cli.Command{
 
         var formatted []map[string]interface{}
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1313,7 +1308,7 @@ var clusterNodeInspectCommand = &cli.Command{
             return clitools.FailureResponse(err)
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1366,7 +1361,7 @@ var clusterNodeDeleteCommand = &cli.Command{
             logrus.Println("'-f,--force' does nothing yet")
         }
 
-        clientSession,xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -1466,7 +1461,7 @@ var clusterMasterListCommand = &cli.Command{
 
         var formatted []map[string]interface{}
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

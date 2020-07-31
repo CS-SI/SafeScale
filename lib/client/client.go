@@ -35,17 +35,17 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-    Bucket     *bucket
-    Cluster    *cluster
-    Host       *host
-    Image      *image
-    JobManager *jobManager
-    Network    *network
-    Share      *share
-    SSH        *ssh
-    Template   *template
-    Tenant     *tenant
-    Volume     *volume
+    Bucket     bucket
+    Cluster    cluster
+    Host       host
+    Image      image
+    JobManager jobManager
+    Network    network
+    Share      share
+    SSH        ssh
+    Template   template
+    Tenant     tenant
+    Volume     volume
 
     server     string
     connection *grpc.ClientConn
@@ -70,53 +70,79 @@ const (
 func New(server string) (_ *Session, xerr fail.Error) {
     // Validate server parameter (can be empty string...)
     if server != "" {
-        parts := strings.Split(server, ":")
-        switch len(parts) {
-        case 1:
-            server = parts[0]+":"+defaultServerPort
-        case 2:
-            num, err := strconv.Atoi(parts[1])
-            if err != nil || num <= 0 {
-                return nil, fail.InvalidParameterError("server", "is invalid")
-            }
+        if server, xerr = validateServerString(server); xerr != nil {
+            return nil, fail.Wrap(xerr, "server is invalid")
         }
-    } else {
-        // host will be localhost, tries to get port from env,
+    }
+    // if server is empty, try to see if env SAFESCALED_SERVER is set...
+    if server == "" {
+        server = os.Getenv("SAFESCALED_SERVER")
+        if server, xerr = validateServerString(server); xerr != nil {
+            logrus.Warnf("Content of environment variable SAFESCALED_SERVER is invalid, ignoring.")
+            server = ""
+        }
+    }
+    // LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
+    if server == "" {
         if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
             num, err := strconv.Atoi(portCandidate)
             if err != nil || num <= 0 {
-                logrus.Warnf("Value of SAFESCALED_PORT is invalid, must be an int")
+                logrus.Warnf("Content of environment variable SAFESCALED_PORT is invalid, must be an int")
             } else {
-                server = defaultServerHost+":"+portCandidate
+                server = defaultServerHost + ":" + portCandidate
             }
         }
     }
     if server == "" {
         // empty string, so default value to server
-        server = defaultServerHost+":"+defaultServerPort
+        server = defaultServerHost + ":" + defaultServerPort
     }
 
-    s := &Session{
-        server: server,
-        Bucket: &bucket{session: s},
-        Cluster: &cluster{session: s},
-        Host: &host{session: s},
-        Image:  &image{session: s},
-        Network: &network{session: s},
-        JobManager: &jobManager{session: s},
-        Share: &share{session: s},
-        SSH: &ssh{session: s},
-        Template: &template{session: s},
-        Tenant: &tenant{session: s},
-        Volume: &volume{session: s},
-    }
-
+    s := &Session{server: server}
     s.task, xerr = concurrency.VoidTask()
     if xerr != nil {
-            return nil, xerr
-        }
+        return nil, xerr
+    }
+
+    s.Bucket = bucket{session: s}
+    s.Cluster = cluster{session: s}
+    s.Host = host{session: s}
+    s.Image = image{session: s}
+    s.Network = network{session: s}
+    s.JobManager = jobManager{session: s}
+    s.Share = share{session: s}
+    s.SSH = ssh{session: s}
+    s.Template = template{session: s}
+    s.Tenant = tenant{session: s}
+    s.Volume = volume{session: s}
 
     return s, nil
+}
+
+func validateServerString(server string) (string, fail.Error) {
+    if server == "" {
+        return "", nil
+    }
+
+    parts := strings.Split(server, ":")
+    switch len(parts) {
+    case 1:
+        server = parts[0] + ":" + defaultServerPort
+    case 2:
+        num, err := strconv.Atoi(parts[1])
+        if err != nil || num <= 0 {
+            return "", fail.InvalidParameterError("server", "is invalid")
+        }
+        if parts[0] == "" {
+            server = defaultServerHost
+        } else {
+            server = parts[0]
+        }
+        server += ":" + parts[1]
+    default:
+        return "", fail.InvalidParameterError("server", "is invalid")
+    }
+    return server, nil
 }
 
 // Connect establishes connection with safescaled

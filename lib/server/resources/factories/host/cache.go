@@ -17,18 +17,18 @@
 package host
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 var hostCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
+    lock   sync.Mutex
+    ByID   utils.Cache
+    ByName utils.Cache
 }
 
 func init() {
-	hostCache.ByID = utils.NewMapCache()
-	hostCache.ByName = utils.NewMapCache()
+    hostCache.ByID = utils.NewMapCache()
+    hostCache.ByName = utils.NewMapCache()
 }

@@ -17,117 +17,117 @@
 package client
 
 import (
-	"time"
+    "time"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+    googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/protocol"
+    "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // share is the part of the safescale client handilng Shares
 type share struct {
-	session *Session
+    session *Session
 }
 
 // Create ...
-func (n *share) Create(def *protocol.ShareDefinition, timeout time.Duration) error {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
+func (n share) Create(def *protocol.ShareDefinition, timeout time.Duration) error {
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := protocol.NewShareServiceClient(n.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return xerr
+    }
 
-	_, err := service.Create(ctx, def)
-	if err != nil {
-		return DecorateTimeoutError(err, "creation of share", true)
-	}
-	return nil
+    _, err := service.Create(ctx, def)
+    if err != nil {
+        return DecorateTimeoutError(err, "creation of share", true)
+    }
+    return nil
 }
 
 // Delete deletes a share
-func (n *share) Delete(name string, timeout time.Duration) error {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
+func (n share) Delete(name string, timeout time.Duration) error {
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := protocol.NewShareServiceClient(n.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return xerr
+    }
 
-	_, err := service.Delete(ctx, &protocol.Reference{Name: name})
-	if err != nil {
-		return DecorateTimeoutError(err, "deletion of share", true)
-	}
-	return nil
+    _, err := service.Delete(ctx, &protocol.Reference{Name: name})
+    if err != nil {
+        return DecorateTimeoutError(err, "deletion of share", true)
+    }
+    return nil
 }
 
 // List ...
-func (n *share) List(timeout time.Duration) (*protocol.ShareList, error) {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
+func (n share) List(timeout time.Duration) (*protocol.ShareList, error) {
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := protocol.NewShareServiceClient(n.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return nil, xerr
+    }
 
-	list, err := service.List(ctx, &googleprotobuf.Empty{})
-	if err != nil {
-		return nil, DecorateTimeoutError(err, "list of shares", true)
-	}
-	return list, nil
+    list, err := service.List(ctx, &googleprotobuf.Empty{})
+    if err != nil {
+        return nil, DecorateTimeoutError(err, "list of shares", true)
+    }
+    return list, nil
 }
 
 // Mount ...
-func (n *share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
+func (n share) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := protocol.NewShareServiceClient(n.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return xerr
+    }
 
-	_, err := service.Mount(ctx, def)
-	if err != nil {
-		return DecorateTimeoutError(err, "mount of share", true)
-	}
-	return nil
+    _, err := service.Mount(ctx, def)
+    if err != nil {
+        return DecorateTimeoutError(err, "mount of share", true)
+    }
+    return nil
 }
 
 // Unmount ...
-func (n *share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
+func (n share) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := protocol.NewShareServiceClient(n.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return xerr
+    }
 
-	_, err := service.Unmount(ctx, def)
-	if err != nil {
-		return DecorateTimeoutError(err, "unmount of share", true)
-	}
-	return nil
+    _, err := service.Unmount(ctx, def)
+    if err != nil {
+        return DecorateTimeoutError(err, "unmount of share", true)
+    }
+    return nil
 }
 
 // Inspect ...
-func (n *share) Inspect(name string, timeout time.Duration) (*protocol.ShareMountList, error) {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
+func (n share) Inspect(name string, timeout time.Duration) (*protocol.ShareMountList, error) {
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := protocol.NewShareServiceClient(n.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return nil, xerr
+    }
 
-	list, err := service.Inspect(ctx, &protocol.Reference{Name: name})
-	if err != nil {
-		return nil, DecorateTimeoutError(err, "inspection of share", true)
-	}
-	return list, nil
+    list, err := service.Inspect(ctx, &protocol.Reference{Name: name})
+    if err != nil {
+        return nil, DecorateTimeoutError(err, "inspection of share", true)
+    }
+    return list, nil
 }

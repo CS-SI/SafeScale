@@ -17,17 +17,17 @@
 package operations
 
 import (
-	"sync/atomic"
+    "sync/atomic"
 
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
 )
 
 // Tenant structure to handle name and GetService for a tenant
 type Tenant struct {
-	Name    string
-	Service iaas.Service
+    Name    string
+    Service iaas.Service
 }
 
 // currentTenant contains the current tenant
@@ -35,41 +35,41 @@ var currentTenant atomic.Value
 
 // CurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
 func CurrentTenant() *Tenant {
-	anon := currentTenant.Load()
-	if anon == nil {
-		tenants, err := iaas.GetTenants()
-		if err != nil || len(tenants) != 1 {
-			return nil
-		}
+    anon := currentTenant.Load()
+    if anon == nil {
+        tenants, err := iaas.GetTenants()
+        if err != nil || len(tenants) != 1 {
+            return nil
+        }
 
-		// Set unique tenant as selected
-		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
-		for _, anon := range tenants {
-			name := anon.(string)
-			service, err := iaas.UseService(name)
-			if err != nil {
-				return nil
-			}
-			currentTenant.Store(&Tenant{Name: name, Service: service})
-			break // nolint
-		}
-		anon = currentTenant.Load()
-	}
-	return anon.(*Tenant)
+        // Set unique tenant as selected
+        logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
+        for _, anon := range tenants {
+            name := anon.(string)
+            service, err := iaas.UseService(name)
+            if err != nil {
+                return nil
+            }
+            currentTenant.Store(&Tenant{Name: name, Service: service})
+            break // nolint
+        }
+        anon = currentTenant.Load()
+    }
+    return anon.(*Tenant)
 }
 
 // SetCurrentTenant sets  the tenant to use for upcoming commands
 func SetCurrentTenant(tenantName string) error {
-	tenant := CurrentTenant()
-	if tenant != nil && tenant.Name == tenantName {
-		return nil
-	}
+    tenant := CurrentTenant()
+    if tenant != nil && tenant.Name == tenantName {
+        return nil
+    }
 
-	service, err := iaas.UseService(tenantName)
-	if err != nil {
-		return err
-	}
-	tenant = &Tenant{Name: tenantName, Service: service}
-	currentTenant.Store(tenant)
-	return nil
+    service, err := iaas.UseService(tenantName)
+    if err != nil {
+        return err
+    }
+    tenant = &Tenant{Name: tenantName, Service: service}
+    currentTenant.Store(tenant)
+    return nil
 }

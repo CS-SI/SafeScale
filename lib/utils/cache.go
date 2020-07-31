@@ -17,98 +17,98 @@
 package utils
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_cache.go -package=mocks github.com/CS-SI/SafeScale/lib/utils Cache
 
 // Cache is an interface for caching elements
 type Cache interface {
-	SetBy(string, func() (interface{}, fail.Error)) fail.Error
-	Set(string, interface{}) fail.Error
-	ForceSetBy(string, func() (interface{}, fail.Error)) fail.Error
-	ForceSet(string, interface{}) fail.Error
-	Reset(string) Cache
-	Get(string) (interface{}, bool)
-	GetOrDefault(string, interface{}) interface{}
+    SetBy(string, func() (interface{}, fail.Error)) fail.Error
+    Set(string, interface{}) fail.Error
+    ForceSetBy(string, func() (interface{}, fail.Error)) fail.Error
+    ForceSet(string, interface{}) fail.Error
+    Reset(string) Cache
+    Get(string) (interface{}, bool)
+    GetOrDefault(string, interface{}) interface{}
 }
 
 // MapCache implements Cache interface using map
 type MapCache struct {
-	lock  sync.RWMutex
-	cache map[string]interface{}
+    lock  sync.RWMutex
+    cache map[string]interface{}
 }
 
 // NewMapCache ...
 func NewMapCache() Cache {
-	return &MapCache{
-		cache: map[string]interface{}{},
-	}
+    return &MapCache{
+        cache: map[string]interface{}{},
+    }
 }
 
 // SetBy ...
 func (c *MapCache) SetBy(key string, by func() (interface{}, fail.Error)) fail.Error {
-	c.lock.Lock()
-	if _, ok := c.cache[key]; !ok {
-		value, err := by()
-		if err != nil {
-			return err
-		}
-		c.cache[key] = value
-	}
-	c.lock.Unlock()
-	return nil
+    c.lock.Lock()
+    if _, ok := c.cache[key]; !ok {
+        value, err := by()
+        if err != nil {
+            return err
+        }
+        c.cache[key] = value
+    }
+    c.lock.Unlock()
+    return nil
 }
 
 // ForceSetBy ...
 func (c *MapCache) ForceSetBy(key string, by func() (interface{}, fail.Error)) fail.Error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+    c.lock.Lock()
+    defer c.lock.Unlock()
 
-	value, xerr := by()
-	if xerr != nil {
-		return xerr
-	}
-	c.cache[key] = value
-	return nil
+    value, xerr := by()
+    if xerr != nil {
+        return xerr
+    }
+    c.cache[key] = value
+    return nil
 }
 
 // Set ...
 func (c *MapCache) Set(key string, value interface{}) fail.Error {
-	return c.SetBy(key, func() (interface{}, fail.Error) { return value, nil })
+    return c.SetBy(key, func() (interface{}, fail.Error) { return value, nil })
 }
 
 // ForceSet ...
 func (c *MapCache) ForceSet(key string, value interface{}) fail.Error {
-	return c.ForceSetBy(key, func() (interface{}, fail.Error) { return value, nil })
+    return c.ForceSetBy(key, func() (interface{}, fail.Error) { return value, nil })
 }
 
 // Reset ...
 func (c *MapCache) Reset(key string) Cache {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+    c.lock.Lock()
+    defer c.lock.Unlock()
 
-	delete(c.cache, key)
-	return c
+    delete(c.cache, key)
+    return c
 }
 
 // Get ...
 func (c *MapCache) Get(key string) (value interface{}, ok bool) {
-	c.lock.RLock()
-	defer c.lock.Unlock()
+    c.lock.RLock()
+    defer c.lock.Unlock()
 
-	value, ok = c.cache[key]
-	return
+    value, ok = c.cache[key]
+    return
 }
 
 // GetOrDefault ...
 func (c *MapCache) GetOrDefault(key string, def interface{}) (value interface{}) {
-	var ok bool
-	value, ok = c.Get(key)
-	if !ok {
-		value = def
-	}
-	return
+    var ok bool
+    value, ok = c.Get(key)
+    if !ok {
+        value = def
+    }
+    return
 }

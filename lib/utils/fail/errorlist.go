@@ -17,69 +17,70 @@
 package fail
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
+
+    "github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // ErrorList ...
 type ErrorList struct {
-	*errorCore
-	errors []error
+    *errorCore
+    errors []error
 }
 
 // NewErrorList creates a ErrorList
 func NewErrorList(errors []error) Error {
-	if len(errors) == 0 {
-		return &ErrorList{}
-	}
+    if len(errors) == 0 {
+        return &ErrorList{}
+    }
 
-	return &ErrorList{
-		errorCore: newError(nil, nil, ""),
-		errors:    errors,
-	}
+    return &ErrorList{
+        errorCore: newError(nil, nil, ""),
+        errors:    errors,
+    }
 }
 
 // AddConsequence ...
 func (e *ErrorList) AddConsequence(err error) Error {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
-		return e
-	}
-	_ = e.errorCore.AddConsequence(err)
-	return e
+    if e.IsNull() {
+        logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
+        return e
+    }
+    _ = e.errorCore.AddConsequence(err)
+    return e
 }
 
 // Annotate ...
 // satisfies interface data.Annotatable
 func (e *ErrorList) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
-		return e
-	}
-	_ = e.errorCore.Annotate(key, value)
-	return e
+    if e.IsNull() {
+        logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
+        return e
+    }
+    _ = e.errorCore.Annotate(key, value)
+    return e
 }
 
 // Note: no Reset() overloading, it's wanted... It doesn't have that much sense with ErrorList
 
 // Error returns a string containing all the errors
 func (e *ErrorList) Error() string {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of ErrorList.Error() from null instance")
-		return ""
-	}
-	var r string
-	for _, v := range e.errors {
-		r += v.Error() + "\n"
-	}
-	return r
+    if e.IsNull() {
+        logrus.Errorf("invalid call of ErrorList.Error() from null instance")
+        return ""
+    }
+    var r string
+    for _, v := range e.errors {
+        r += v.Error() + "\n"
+    }
+    return r
 }
 
 // ToErrorSlice transforms ErrorList to []error
 func (e *ErrorList) ToErrorSlice() []error {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
-		return []error{}
-	}
-	return e.errors
+    if e.IsNull() {
+        logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
+        return []error{}
+    }
+    return e.errors
 }

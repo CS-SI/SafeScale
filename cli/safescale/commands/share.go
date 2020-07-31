@@ -23,7 +23,7 @@ import (
 
     "github.com/sirupsen/logrus"
 
-    cli "github.com/urfave/cli/v2"
+    "github.com/urfave/cli/v2"
 
     "github.com/CS-SI/SafeScale/lib/client"
     "github.com/CS-SI/SafeScale/lib/protocol"
@@ -103,7 +103,7 @@ var shareCreate = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -154,8 +154,7 @@ var shareDelete = &cli.Command{
         )
         errMessage.Store("")
 
-
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -195,7 +194,7 @@ var shareList = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -231,7 +230,7 @@ var shareMount = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -267,7 +266,7 @@ var shareUnmount = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -299,7 +298,7 @@ var shareInspect = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

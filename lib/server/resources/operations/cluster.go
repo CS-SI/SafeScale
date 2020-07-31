@@ -47,6 +47,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/data"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     "github.com/CS-SI/SafeScale/lib/utils/retry"
     "github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -203,13 +204,13 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").Entering()
-    defer tracer.OnExitTrace()
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
     defer temporal.NewStopwatch().OnExitLogInfo(
         fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
         fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
     )()
-    defer fail.OnExitLogError(tracer.TraceMessage("failed to create cluster infrastructure:"), &xerr)
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage("failed to create cluster infrastructure:"))
     defer fail.OnPanic(&xerr)
 
     // Creates first metadata of cluster after initialization
@@ -984,9 +985,9 @@ func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, x
         return 0, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
     c.SafeRLock(task)
     defer c.SafeRUnlock(task)
@@ -1012,9 +1013,9 @@ func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomple
         return 0, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
     c.SafeRLock(task)
     defer c.SafeRUnlock(task)
@@ -1040,9 +1041,9 @@ func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string,
         return "", fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     c.SafeRLock(task)
     defer c.SafeRUnlock(task)
@@ -1094,9 +1095,9 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
         return config, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
         if props.Lookup(clusterproperty.NetworkV2) {
@@ -1114,10 +1115,10 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
             config = &propertiesv2.ClusterNetwork{
                 NetworkID: networkV1.NetworkID,
                 CIDR:      networkV1.CIDR,
-                //GatewayID:      networkV1.GatewayID,
-                //GatewayIP:      networkV1.GatewayIP,
-                //DefaultRouteIP: networkV1.GatewayIP,
-                //EndpointIP:     networkV1.PublicIP,
+                // GatewayID:      networkV1.GatewayID,
+                // GatewayIP:      networkV1.GatewayIP,
+                // DefaultRouteIP: networkV1.GatewayIP,
+                // EndpointIP:     networkV1.PublicIP,
             }
             return nil
         })
@@ -1156,9 +1157,9 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(nil, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
     defer fail.OnPanic(&xerr)
 
     // If the cluster is in state Stopping or Stopped, do nothing
@@ -1323,9 +1324,9 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(nil, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     // If the cluster is stopped, do nothing
     var prevState clusterstate.Enum
@@ -1479,9 +1480,9 @@ func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, xerr fa
         return state, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
     defer fail.OnPanic(&xerr)
 
     if c.makers.GetState != nil {
@@ -1520,9 +1521,9 @@ func (c *cluster) AddNode(task concurrency.Task, def *abstract.HostSizingRequire
         return nil, fail.InvalidParameterError("def", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(nil, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     nodes, xerr := c.AddNodes(task, 1, def, image)
     if xerr != nil {
@@ -1544,9 +1545,9 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
         return nil, fail.InvalidParameterError("count", "must be an int > 0")
     }
 
-    tracer := concurrency.NewTracer(task, true, "(%d)", count)
-    defer tracer.Entering().OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
+    defer tracer.Entering().Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
     var hostImage string
     xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1743,9 +1744,9 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv2.Clus
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(nil, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     selectedMaster, xerr := c.FindAvailableMaster(task)
     if xerr != nil {
@@ -1785,9 +1786,9 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
         return fail.InvalidParameterError("hostID", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(nil, false, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     var selectedMaster resources.Host
     if selectedMasterID == "" {
@@ -1883,7 +1884,7 @@ func (c *cluster) ListMasters(task concurrency.Task) (list resources.IndexedList
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnPanic(&xerr)
-    defer fail.OnExitLogError("failed to get list of masters", &xerr)
+    defer fail.OnExitLogError(&xerr, "failed to get list of masters")
 
     list = resources.IndexedListOfClusterNodes{}
     xerr = c.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1942,7 +1943,7 @@ func (c *cluster) ListMasterIDs(task concurrency.Task) (list data.IndexedListOfS
     if task == nil {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
-    defer fail.OnExitLogError("failed to get list of master IDs", &xerr)
+    defer fail.OnExitLogError(&xerr, "failed to get list of master IDs")
     defer fail.OnPanic(&xerr)
 
     list = data.IndexedListOfStrings{}
@@ -1969,7 +1970,7 @@ func (c *cluster) ListMasterIPs(task concurrency.Task) (list data.IndexedListOfS
     if task == nil {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
-    defer fail.OnExitLogError("failed to get list of master IPs", &xerr)
+    defer fail.OnExitLogError(&xerr, "failed to get list of master IPs")
     defer fail.OnPanic(&xerr)
 
     list = data.IndexedListOfStrings{}
@@ -1999,8 +2000,8 @@ func (c *cluster) FindAvailableMaster(task concurrency.Task) (master resources.H
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").Entering()
-    defer tracer.OnExitTrace()
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
     defer fail.OnPanic(&xerr)
 
     found := false
@@ -2136,7 +2137,7 @@ func (c *cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedListOfStr
     if task == nil {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
-    defer fail.OnExitLogError("failed to get list of node IP addresses", &xerr)
+    defer fail.OnExitLogError(&xerr, "failed to get list of node IP addresses")
     defer fail.OnPanic(&xerr)
 
     list = data.IndexedListOfStrings{}
@@ -2168,9 +2169,9 @@ func (c *cluster) FindAvailableNode(task concurrency.Task) (node resources.Host,
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    tracer := concurrency.NewTracer(task, true, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
     defer fail.OnPanic(&xerr)
 
     list, err := c.ListNodes(task)
@@ -2241,7 +2242,7 @@ func (c *cluster) CountNodes(task concurrency.Task) (count uint, xerr fail.Error
         return 0, fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    defer fail.OnExitLogError(concurrency.NewTracer(task, debug.ShouldTrace("cluster"), "").TraceMessage(""), &xerr)
+    defer fail.OnExitLogError(&xerr, debug.NewTracer(task, tracing.ShouldTrace("cluster")).TraceMessage())
 
     xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
         return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
@@ -2272,9 +2273,9 @@ func (c *cluster) Node(task concurrency.Task, hostID string) (host resources.Hos
         return nil, fail.InvalidParameterError("hostID", "cannot be empty string")
     }
 
-    tracer := concurrency.NewTracer(task, true, "(%s)", hostID)
-    defer tracer.Entering().OnExitTrace()
-    defer fail.OnExitLogError(fmt.Sprintf("failed to get node identified by '%s'", hostID), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%s)", hostID)
+    defer tracer.Entering().Exiting()
+    defer fail.OnExitLogError(&xerr, "failed to get node identified by '%s'", hostID)
     defer fail.OnPanic(&xerr)
 
     found := false
@@ -2551,9 +2552,9 @@ func (c *cluster) unconfigureMaster(task concurrency.Task, host resources.Host) 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
 func (c *cluster) configureCluster(task concurrency.Task, _ concurrency.TaskParameters) (xerr fail.Error) {
-    tracer := concurrency.NewTracer(task, true, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     logrus.Infof("[cluster %s] configuring cluster...", c.GetName())
     defer func() {
@@ -2619,9 +2620,9 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 
 // configureNodesFromList configures nodes from a list
 func (c *cluster) configureNodesFromList(task concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
-    tracer := concurrency.NewTracer(task, true, "").Entering()
-    defer tracer.OnExitTrace()
-    defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
     var (
         hostID string
@@ -2704,8 +2705,8 @@ func (c *cluster) joinNodesFromList(task concurrency.Task, hosts []resources.Hos
 }
 
 // VPL: not used anymore
-//// leaveMastersFromList makes masters from a list leave the cluster
-//func (c *cluster) leaveMastersFromList(task concurrency.Task, hosts []string) fail.Error {
+// // leaveMastersFromList makes masters from a list leave the cluster
+// func (c *cluster) leaveMastersFromList(task concurrency.Task, hosts []string) fail.Error {
 //	if c.makers.LeaveMasterFromCluster == nil {
 //		return nil
 //	}
@@ -2725,7 +2726,7 @@ func (c *cluster) joinNodesFromList(task concurrency.Task, hosts []resources.Hos
 //	}
 //
 //	return nil
-//}
+// }
 
 // leaveNodesFromList makes nodes from a list leave the cluster
 func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, selectedMaster resources.Host) (xerr fail.Error) {

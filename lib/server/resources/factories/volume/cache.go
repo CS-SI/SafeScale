@@ -17,18 +17,18 @@
 package volume
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils"
 )
 
 var volumeCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
+    lock   sync.Mutex
+    ByID   utils.Cache
+    ByName utils.Cache
 }
 
 func init() {
-	volumeCache.ByID = utils.NewMapCache()
-	volumeCache.ByName = utils.NewMapCache()
+    volumeCache.ByID = utils.NewMapCache()
+    volumeCache.ByName = utils.NewMapCache()
 }

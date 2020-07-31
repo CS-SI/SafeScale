@@ -28,7 +28,7 @@ import (
     grpcstatus "google.golang.org/grpc/status"
 
     "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
     "github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
@@ -64,8 +64,8 @@ type Error interface {
 
     AnnotationFormatter(func(data.Annotations) string)
 
-    ForceSetCause(error) Error   // set the cause of the error
-    TrySetCause(error) bool // set the cause of the error if not already set
+    ForceSetCause(error) Error // set the cause of the error
+    TrySetCause(error) bool    // set the cause of the error if not already set
 
     // Error() string   // VPL: comes from error...
 
@@ -189,7 +189,7 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 }
 
 // Cause returns an error's cause
-func (e *errorCore) Cause() error {
+func (e errorCore) Cause() error {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.RootCause() from null instance")
         return nil
@@ -199,7 +199,7 @@ func (e *errorCore) Cause() error {
 
 // CauseError returns the string of the error cause
 // VPL: is it really necessary ? e.Cause().Error() does the job...
-func (e *errorCore) CauseError() string {
+func (e errorCore) CauseError() string {
     if !e.IsNull() {
         if e.cause != nil {
             return e.cause.Error()
@@ -209,7 +209,7 @@ func (e *errorCore) CauseError() string {
 }
 
 // RootCause returns the initial error's cause
-func (e *errorCore) RootCause() error {
+func (e errorCore) RootCause() error {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.RootCause() from null instance")
         return nil
@@ -219,7 +219,7 @@ func (e *errorCore) RootCause() error {
 
 // RootCauseError returns the string corresponding to the root cause
 // VPL: is it reallyt necessary ? e.RootCause().Error() does the job...
-func (e *errorCore) RootCauseError() string {
+func (e errorCore) RootCauseError() string {
     if !e.IsNull() {
         err := e.RootCause()
         if err != nil {
@@ -245,7 +245,7 @@ func defaultAnnotationFormatter(a data.Annotations) string {
 }
 
 // Annotations ...
-func (e *errorCore) Annotations() data.Annotations {
+func (e errorCore) Annotations() data.Annotations {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.Annotations() from null instance")
         return nil
@@ -254,7 +254,7 @@ func (e *errorCore) Annotations() data.Annotations {
 }
 
 // Annotation ...
-func (e *errorCore) Annotation(key string) (data.Annotation, bool) {
+func (e errorCore) Annotation(key string) (data.Annotation, bool) {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.Annotation() from null instance")
         return nil, false
@@ -268,7 +268,7 @@ func (e *errorCore) Annotation(key string) (data.Annotation, bool) {
 func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.Annotate() from null instance")
-        return &errorCore{}
+        return e
     }
 
     if e.annotations != nil {
@@ -295,7 +295,7 @@ func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string)
 func (e *errorCore) AddConsequence(err error) Error {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.AddConsequence() from null instance")
-        return &errorCore{}
+        return e
     }
     if err != nil {
         if e.consequences == nil {
@@ -307,17 +307,17 @@ func (e *errorCore) AddConsequence(err error) Error {
 }
 
 // Consequences returns the consequences of current error (detected teardown problems)
-func (e *errorCore) Consequences() []error {
+func (e errorCore) Consequences() []error {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.Consequences() from null instance")
-        return nil
+        return []error{}
     }
     return e.consequences
 }
 
 // Error returns a human-friendly error explanation
 // satisfies interface error
-func (e *errorCore) Error() string {
+func (e errorCore) Error() string {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.Error() from null instance")
         return ""
@@ -325,7 +325,9 @@ func (e *errorCore) Error() string {
 
     msgFinal := e.message
 
-    msgFinal += e.causeFormatter(e)
+    if e.causeFormatter != nil {
+        msgFinal += e.causeFormatter(&e)
+    }
 
     if len(e.annotations) > 0 {
         msgFinal += "\nWith annotations: "
@@ -336,7 +338,7 @@ func (e *errorCore) Error() string {
 }
 
 // GRPCCode returns the appropriate error code to use with gRPC
-func (e *errorCore) GRPCCode() codes.Code {
+func (e errorCore) GRPCCode() codes.Code {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.GRPCCode() from null instance")
         return codes.Unknown
@@ -345,7 +347,7 @@ func (e *errorCore) GRPCCode() codes.Code {
 }
 
 // ToGRPCStatus returns a grpcstatus struct from error
-func (e *errorCore) ToGRPCStatus() error {
+func (e errorCore) ToGRPCStatus() error {
     if e.IsNull() {
         logrus.Errorf("invalid call of errorCore.ToGRPCStatus() from null instance")
         return nil
@@ -791,7 +793,7 @@ type ErrNotImplemented struct {
 
 // NotImplementedError creates a ErrNotImplemented report
 func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
-    r := newError(nil, nil, debug.DecorateWithCallTrace("not implemented yet:", strprocess.FormatStrings(msg...), ""))
+    r := newError(nil, nil, callstack.DecorateWithCallStack("not implemented yet:", strprocess.FormatStrings(msg...), ""))
     r.grpcCode = codes.Unimplemented
     return &ErrNotImplemented{r}
 }
@@ -803,7 +805,7 @@ func (e *ErrNotImplemented) IsNull() bool {
 
 // NotImplementedErrorWithReason creates a ErrNotImplemented report
 func NotImplementedErrorWithReason(what string, why string) Error {
-    r := newError(nil, nil, debug.DecorateWithCallTrace("not implemented yet:", what, why))
+    r := newError(nil, nil, callstack.DecorateWithCallStack("not implemented yet:", what, why))
     r.grpcCode = codes.Unimplemented
     return &ErrNotImplemented{r}
 }
@@ -835,7 +837,7 @@ type ErrRuntimePanic struct {
 
 // RuntimePanicError creates a ErrRuntimePanic error
 func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
-    r := newError(nil, nil, debug.DecorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""))
+    r := newError(nil, nil, callstack.DecorateWithCallStack(strprocess.FormatStrings(msg...), "", ""))
     r.grpcCode = codes.Internal
     return &ErrRuntimePanic{r}
 }
@@ -872,7 +874,7 @@ type ErrInvalidInstance struct {
 
 // InvalidInstanceError creates a ErrInvalidInstance error
 func InvalidInstanceError() *ErrInvalidInstance {
-    r := newError(nil, nil, debug.DecorateWithCallTrace("invalid instance:", "", "calling method from a nil pointer"))
+    r := newError(nil, nil, callstack.DecorateWithCallStack("invalid instance:", "", "calling method from a nil pointer"))
     r.grpcCode = codes.FailedPrecondition
     return &ErrInvalidInstance{r}
 }
@@ -909,7 +911,7 @@ type ErrInvalidParameter struct {
 
 // InvalidParameterError creates a ErrInvalidParameter error
 func InvalidParameterError(what, why string) *ErrInvalidParameter {
-    r := newError(nil, nil, debug.DecorateWithCallTrace("invalid parameter:", what, why))
+    r := newError(nil, nil, callstack.DecorateWithCallStack("invalid parameter:", what, why))
     r.grpcCode = codes.FailedPrecondition
     return &ErrInvalidParameter{r}
 }
@@ -946,7 +948,7 @@ type ErrInvalidInstanceContent struct {
 
 // InvalidInstanceContentError returns an instance of ErrInvalidInstanceContent.
 func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
-    r := newError(nil, nil, debug.DecorateWithCallTrace("invalid instance content:", what, why))
+    r := newError(nil, nil, callstack.DecorateWithCallStack("invalid instance content:", what, why))
     r.grpcCode = codes.FailedPrecondition
     return &ErrInvalidInstanceContent{r}
 }
@@ -983,7 +985,7 @@ type ErrInconsistent struct {
 
 // InconsistentError creates a ErrInconsistent error
 func InconsistentError(msg ...interface{}) *ErrInconsistent {
-    r := newError(nil, nil, debug.DecorateWithCallTrace(strprocess.FormatStrings(msg...), "", ""))
+    r := newError(nil, nil, callstack.DecorateWithCallStack(strprocess.FormatStrings(msg...), "", ""))
     r.grpcCode = codes.DataLoss
     return &ErrInconsistent{r}
 }
@@ -1061,7 +1063,6 @@ func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotata
     _ = e.errorCore.Annotate(key, value)
     return e
 }
-
 
 // ErrAlteredNothing is used when an Alter() call changed nothing
 type ErrAlteredNothing struct {

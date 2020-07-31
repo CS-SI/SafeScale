@@ -17,11 +17,12 @@
 package commands
 
 import (
+    "github.com/sirupsen/logrus"
+    "github.com/urfave/cli/v2"
+
     "github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     "github.com/CS-SI/SafeScale/lib/utils/strprocess"
-    "github.com/sirupsen/logrus"
-    cli "github.com/urfave/cli/v2"
 
     "github.com/CS-SI/SafeScale/lib/client"
     clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -50,7 +51,7 @@ var tenantList = &cli.Command{
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -65,13 +66,13 @@ var tenantList = &cli.Command{
 }
 
 var tenantGet = &cli.Command{
-    Name:  "get",
+    Name:    "get",
     Aliases: []string{"current"},
-    Usage: "Get current tenant",
+    Usage:   "Get current tenant",
     Action: func(c *cli.Context) error {
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -96,7 +97,7 @@ var tenantSet = &cli.Command{
 
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -111,9 +112,9 @@ var tenantSet = &cli.Command{
 }
 
 var tenantInspect = &cli.Command{
-    Name:  "inspect",
+    Name:    "inspect",
     Aliases: []string{"show"},
-    Usage: "Inspect tenant",
+    Usage:   "Inspect tenant",
     Action: func(c *cli.Context) error {
         if c.NArg() != 1 {
             _ = cli.ShowSubcommandHelp(c)
@@ -122,7 +123,7 @@ var tenantInspect = &cli.Command{
 
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -147,7 +148,7 @@ var tenantCleanup = &cli.Command{
 
         logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

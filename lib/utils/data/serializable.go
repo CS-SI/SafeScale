@@ -21,6 +21,6 @@ package data
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
 // and reverse operation (Unserialize()
 type Serializable interface {
-	Serialize() ([]byte, error)
-	Deserialize([]byte) error
+    Serialize() ([]byte, error)
+    Deserialize([]byte) error
 }
