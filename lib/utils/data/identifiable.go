@@ -20,6 +20,6 @@ package data
 
 // Identifiable proposes methods to identify a struct
 type Identifiable interface {
-	GetName() string // Returns the name of the instance
-	GetID() string   // Returns the GetID of the instance
+    GetName() string // Returns the name of the instance
+    GetID() string   // Returns the GetID of the instance
 }

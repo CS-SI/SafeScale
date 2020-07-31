@@ -19,21 +19,21 @@ package converters
 // Contains functions that are used to convert from system
 
 import (
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/system"
+    "github.com/CS-SI/SafeScale/lib/protocol"
+    "github.com/CS-SI/SafeScale/lib/system"
 )
 
 // ToProtocolSSHConfig converts a system.SSHConfig into a SshConfig
 func SSHConfigFromSystemToProtocol(from *system.SSHConfig) *protocol.SshConfig {
-	var gw *protocol.SshConfig
-	if from.GatewayConfig != nil {
-		gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)
-	}
-	return &protocol.SshConfig{
-		Gateway:    gw,
-		Host:       from.Host,
-		Port:       int32(from.Port),
-		PrivateKey: from.PrivateKey,
-		User:       from.User,
-	}
+    var gw *protocol.SshConfig
+    if from.GatewayConfig != nil {
+        gw = SSHConfigFromSystemToProtocol(from.GatewayConfig)
+    }
+    return &protocol.SshConfig{
+        Gateway:    gw,
+        Host:       from.Host,
+        Port:       int32(from.Port),
+        PrivateKey: from.PrivateKey,
+        User:       from.User,
+    }
 }

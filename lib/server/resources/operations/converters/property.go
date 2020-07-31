@@ -19,47 +19,47 @@ package converters
 // Contains functions that are used to convert from property
 
 import (
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+    "github.com/CS-SI/SafeScale/lib/protocol"
+    propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 )
 
 // ShareFromPropertyToProtocol convert a share from host to protocol message
 func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare) *protocol.ShareDefinition {
-	return &protocol.ShareDefinition{
-		Id:              share.ID,
-		Name:            share.Name,
-		Host:            &protocol.Reference{Name: hostName},
-		Path:            share.Path,
-		Type:            "nfs",
-		OptionsAsString: share.ShareOptions,
-	}
+    return &protocol.ShareDefinition{
+        Id:              share.ID,
+        Name:            share.Name,
+        Host:            &protocol.Reference{Name: hostName},
+        Path:            share.Path,
+        Type:            "nfs",
+        OptionsAsString: share.ShareOptions,
+    }
 }
 
 // ToProtocolShareMount convert share mount on host to protocol message
 func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *propertiesv1.HostRemoteMount) *protocol.ShareMountDefinition {
-	return &protocol.ShareMountDefinition{
-		Share: &protocol.Reference{Name: shareName},
-		Host:  &protocol.Reference{Name: hostName},
-		Path:  mount.Path,
-		Type:  mount.FileSystem,
-	}
+    return &protocol.ShareMountDefinition{
+        Share: &protocol.Reference{Name: shareName},
+        Host:  &protocol.Reference{Name: hostName},
+        Path:  mount.Path,
+        Type:  mount.FileSystem,
+    }
 }
 
 // ToProtocolShareMountList converts share mounts from host to protocol message
 func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare, mounts map[string]*propertiesv1.HostRemoteMount) *protocol.ShareMountList {
-	var pbMounts []*protocol.ShareMountDefinition
-	for k, v := range mounts {
-		pbMounts = append(pbMounts, &protocol.ShareMountDefinition{
-			Host:  &protocol.Reference{Name: k},
-			Share: &protocol.Reference{Name: share.Name},
-			Path:  v.Path,
-			Type:  "nfs",
-		})
-	}
-	return &protocol.ShareMountList{
-		Share:     ShareFromPropertyToProtocol(hostName, share),
-		MountList: pbMounts,
-	}
+    var pbMounts []*protocol.ShareMountDefinition
+    for k, v := range mounts {
+        pbMounts = append(pbMounts, &protocol.ShareMountDefinition{
+            Host:  &protocol.Reference{Name: k},
+            Share: &protocol.Reference{Name: share.Name},
+            Path:  v.Path,
+            Type:  "nfs",
+        })
+    }
+    return &protocol.ShareMountList{
+        Share:     ShareFromPropertyToProtocol(hostName, share),
+        MountList: pbMounts,
+    }
 }
 
 // // VolumeAttachmentFromPropertyToProtocol converts an api.Volume to a *VolumeInfo

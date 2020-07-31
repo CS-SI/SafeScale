@@ -20,8 +20,8 @@ package volumeproperty
 type Enum string
 
 const (
-	// DescriptionV1 specifies optional additional info describing volume (purpose, ...)
-	DescriptionV1 = "1"
-	// AttachedV1 contains additional information about hosts attaching the volume
-	AttachedV1 = "2"
+    // DescriptionV1 specifies optional additional info describing volume (purpose, ...)
+    DescriptionV1 = "1"
+    // AttachedV1 contains additional information about hosts attaching the volume
+    AttachedV1 = "2"
 )

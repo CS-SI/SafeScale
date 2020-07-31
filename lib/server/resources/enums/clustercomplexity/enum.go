@@ -19,49 +19,49 @@ package clustercomplexity
 //go:generate stringer -type=Enum
 
 import (
-	"strings"
+    "strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Enum represents the complexity of a cluster
 type Enum int
 
 const (
-	// Small is the simplest mode of cluster
-	Small Enum = 1
-	// Normal allows the cluster to be resistant to 1 master failure
-	Normal Enum = 3
-	// Large allows the cluster to be resistant to 2 master failures and is sized for high Large of agents
-	Large Enum = 5
+    // Small is the simplest mode of cluster
+    Small Enum = 1
+    // Normal allows the cluster to be resistant to 1 master failure
+    Normal Enum = 3
+    // Large allows the cluster to be resistant to 2 master failures and is sized for high Large of agents
+    Large Enum = 5
 )
 
 var (
-	stringMap = map[string]Enum{
-		"small":  Small,
-		"normal": Normal,
-		"large":  Large,
-	}
+    stringMap = map[string]Enum{
+        "small":  Small,
+        "normal": Normal,
+        "large":  Large,
+    }
 
-	enumMap = map[Enum]string{
-		Small:  "Small",
-		Normal: "Normal",
-		Large:  "Large",
-	}
+    enumMap = map[Enum]string{
+        Small:  "Small",
+        Normal: "Normal",
+        Large:  "Large",
+    }
 )
 
 // Parse returns a Enum corresponding to the string parameter
 // If the string doesn't correspond to any Enum, returns an error (nil otherwise)
 // This function is intended to be used to parse user input.
 func Parse(v string) (Enum, error) {
-	var (
-		e  Enum
-		ok bool
-	)
-	lowered := strings.ToLower(v)
-	if e, ok = stringMap[lowered]; !ok {
-		return e, fail.NotFoundError("failed to find a Complexity.Enum corresponding to '%s'", v)
-	}
-	return e, nil
+    var (
+        e  Enum
+        ok bool
+    )
+    lowered := strings.ToLower(v)
+    if e, ok = stringMap[lowered]; !ok {
+        return e, fail.NotFoundError("failed to find a Complexity.Enum corresponding to '%s'", v)
+    }
+    return e, nil
 
 }

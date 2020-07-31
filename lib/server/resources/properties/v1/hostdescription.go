@@ -17,11 +17,11 @@
 package propertiesv1
 
 import (
-	"time"
+    "time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostDescription contains description information for the host
@@ -29,40 +29,40 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostDescription struct {
-	Created time.Time `json:"created,omitempty"`  // tells when the host has been created
-	Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of the host
-	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified (by SafeScale)
-	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host (not set for now)
-	Tenant  string    `json:"tenant,omitempty"`   // contains the tenant name used to create the host
-	Domain  string    `json:"domain,omitempty"`   // Contains the domain used to define the FQDN of the host at creation (taken from first network attached to the host)
+    Created time.Time `json:"created,omitempty"`  // tells when the host has been created
+    Creator string    `json:"creator,omitempty"`  // contains information (forged) about the creator of the host
+    Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified (by SafeScale)
+    Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host (not set for now)
+    Tenant  string    `json:"tenant,omitempty"`   // contains the tenant name used to create the host
+    Domain  string    `json:"domain,omitempty"`   // Contains the domain used to define the FQDN of the host at creation (taken from first network attached to the host)
 }
 
 // NewHostDescription ...
 func NewHostDescription() *HostDescription {
-	return &HostDescription{}
+    return &HostDescription{}
 }
 
 // Reset returns a blank HostDescription
 func (hd *HostDescription) Reset() {
-	*hd = HostDescription{}
+    *hd = HostDescription{}
 }
 
 // Content ... (data.Clonable interface)
 func (hd *HostDescription) Content() interface{} {
-	return hd
+    return hd
 }
 
 // Clone ... (data.Clonable interface)
 func (hd *HostDescription) Clone() data.Clonable {
-	return NewHostDescription().Replace(hd)
+    return NewHostDescription().Replace(hd)
 }
 
 // Replace ... (data.Clonable interface)
 func (hd *HostDescription) Replace(p data.Clonable) data.Clonable {
-	*hd = *p.(*HostDescription)
-	return hd
+    *hd = *p.(*HostDescription)
+    return hd
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.DescriptionV1, NewHostDescription())
+    serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.DescriptionV1, NewHostDescription())
 }

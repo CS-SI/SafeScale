@@ -20,5 +20,5 @@ package data
 
 // NullValue ...
 type NullValue interface {
-	IsNull() bool // Tells if the underlying instance is a Null Value
+    IsNull() bool // Tells if the underlying instance is a Null Value
 }

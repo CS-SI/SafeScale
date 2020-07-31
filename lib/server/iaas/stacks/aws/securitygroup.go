@@ -17,9 +17,9 @@
 package aws
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func (s *Stack) createSecurityGroup(vpcID string, name string) (string, fail.Error) {
-	return "", fail.NotImplementedError("createSecurityGroup() not implemented yet") // FIXME: Technical debt
+    return "", fail.NotImplementedError("createSecurityGroup() not implemented yet") // FIXME: Technical debt
 }

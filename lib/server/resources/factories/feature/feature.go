@@ -17,10 +17,10 @@
 package feature
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/server/resources"
+    "github.com/CS-SI/SafeScale/lib/server/resources/operations"
+    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // // ErrorList lists all features suitable for hosts
@@ -67,37 +67,37 @@ import (
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 func New(task concurrency.Task, name string) (resources.Feature, error) {
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "can't be empty string!")
-	}
+    if task == nil {
+        return nil, fail.InvalidParameterError("task", "cannot be nil")
+    }
+    if name == "" {
+        return nil, fail.InvalidParameterError("name", "can't be empty string!")
+    }
 
-	feat, err := operations.NewFeature(task, name)
-	if err != nil {
-		if _, ok := err.(*fail.ErrNotFound); !ok {
-			return nil, err
-		}
+    feat, err := operations.NewFeature(task, name)
+    if err != nil {
+        if _, ok := err.(*fail.ErrNotFound); !ok {
+            return nil, err
+        }
 
-		// Failed to find a spec file on filesystem, trying with embedded ones
-		feat, err = operations.NewEmbeddedFeature(task, name)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return feat, nil
+        // Failed to find a spec file on filesystem, trying with embedded ones
+        feat, err = operations.NewEmbeddedFeature(task, name)
+        if err != nil {
+            return nil, err
+        }
+    }
+    return feat, nil
 }
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
 func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) {
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "canno't be empty string!")
-	}
+    if task == nil {
+        return nil, fail.InvalidParameterError("task", "cannot be nil")
+    }
+    if name == "" {
+        return nil, fail.InvalidParameterError("name", "canno't be empty string!")
+    }
 
-	return operations.NewEmbeddedFeature(task, name)
+    return operations.NewEmbeddedFeature(task, name)
 }

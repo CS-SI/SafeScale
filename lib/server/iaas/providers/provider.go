@@ -17,9 +17,9 @@
 package providers
 
 import (
-	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_providerapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/providers Provider
@@ -27,29 +27,29 @@ import (
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack
 type Provider interface {
-	Build(map[string]interface{}) (Provider, fail.Error)
+    Build(map[string]interface{}) (Provider, fail.Error)
 
-	stacks.Stack
+    stacks.Stack
 
-	// ListImages lists available OS images
-	ListImages(all bool) ([]abstract.Image, fail.Error)
+    // ListImages lists available OS images
+    ListImages(all bool) ([]abstract.Image, fail.Error)
 
-	// ListTemplates lists available host templates
-	// Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
+    // ListTemplates lists available host templates
+    // Host templates are sorted using Dominant Resource Fairness Algorithm
+    ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
-	// GetAuthenticationOptions returns authentication options as a Config
-	GetAuthenticationOptions() (Config, fail.Error)
+    // GetAuthenticationOptions returns authentication options as a Config
+    GetAuthenticationOptions() (Config, fail.Error)
 
-	// GetConfigurationfgOptions returns configuration options as a Config
-	GetConfigurationOptions() (Config, fail.Error)
+    // GetConfigurationfgOptions returns configuration options as a Config
+    GetConfigurationOptions() (Config, fail.Error)
 
-	// GetName returns the provider name
-	GetName() string
+    // GetName returns the provider name
+    GetName() string
 
-	// GetCapabilities returns the capabilities of the provider
-	GetCapabilities() Capabilities
+    // GetCapabilities returns the capabilities of the provider
+    GetCapabilities() Capabilities
 
-	// GetTenantParameters returns the tenant parameters as read
-	GetTenantParameters() map[string]interface{}
+    // GetTenantParameters returns the tenant parameters as read
+    GetTenantParameters() map[string]interface{}
 }

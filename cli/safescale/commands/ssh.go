@@ -73,11 +73,7 @@ var sshRun = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
-        if xerr != nil {
-            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-        }
-        task, xerr := clientSession.GetTask()
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -88,7 +84,7 @@ var sshRun = &cli.Command{
         } else {
             timeout = temporal.GetHostTimeout()
         }
-        retcode, _, _, err := clientSession.SSH.Run(task, c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
+        retcode, _, _, err := clientSession.SSH.Run(c.Args().Get(0), c.String("c"), outputs.DISPLAY, temporal.GetConnectionTimeout(), timeout)
         if err != nil {
             err = fail.FromGRPCStatus(err)
             return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh run", false).Error())))
@@ -125,11 +121,7 @@ var sshCopy = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
-        if xerr != nil {
-            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-        }
-        task, xerr := clientSession.GetTask()
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -140,7 +132,7 @@ var sshCopy = &cli.Command{
         } else {
             timeout = temporal.GetHostTimeout()
         }
-        retcode, _, _, err := clientSession.SSH.Copy(task, normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
+        retcode, _, _, err := clientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout)
         if err != nil {
             err = fail.FromGRPCStatus(err)
             return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
@@ -177,7 +169,7 @@ var sshConnect = &cli.Command{
             return fmt.Errorf("missing mandatory argument <Host_name>")
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -229,7 +221,7 @@ var sshTunnel = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
@@ -285,7 +277,7 @@ var sshClose = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
         }
 
-        clientSession, xerr := client.New(c.String("server"), c.Int("port"))
+        clientSession, xerr := client.New(c.String("server"))
         if xerr != nil {
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }

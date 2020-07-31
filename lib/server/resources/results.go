@@ -18,30 +18,30 @@ package resources
 
 // UnitResult ...
 type UnitResult interface {
-	Successful() bool
-	Completed() bool
-	Error() error
-	ErrorMessage() string
+    Successful() bool
+    Completed() bool
+    Error() error
+    ErrorMessage() string
 }
 
 // UnitResults ...
 type UnitResults interface {
-	AddSingle(string, UnitResult)
-	Completed() bool
-	Uncompleted() []string
-	ErrorMessages() string
-	Successful() bool
+    AddSingle(string, UnitResult)
+    Completed() bool
+    Uncompleted() []string
+    ErrorMessages() string
+    Successful() bool
 }
 
 // Results ...
 type Results interface {
-	Add(string, UnitResults) error
-	AddUnit(string, string, UnitResult) error
-	Successful() bool
-	AllErrorMessages() string
-	ErrorMessagesOfUnit(name string) string
-	ErrorMessagesOfKey(name string) string
-	ResultsOfKey(key string) UnitResults
-	// ResultsOfUnit(unitKey string) UnitResults
-	Keys() []string
+    Add(string, UnitResults) error
+    AddUnit(string, string, UnitResult) error
+    Successful() bool
+    AllErrorMessages() string
+    ErrorMessagesOfUnit(name string) string
+    ErrorMessagesOfKey(name string) string
+    ResultsOfKey(key string) UnitResults
+    // ResultsOfUnit(unitKey string) UnitResults
+    Keys() []string
 }

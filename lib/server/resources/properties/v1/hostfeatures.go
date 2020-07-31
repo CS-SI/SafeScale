@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostInstalledFeature ...
@@ -27,25 +27,25 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostInstalledFeature struct {
-	HostContext bool     `json:"host_context,omitempty"` // tells if the feature has been explicitly installed for host (opposed to for cluster)
-	RequiredBy  []string `json:"required_by,omitempty"`  // tells what feature(s) needs this one
-	Requires    []string `json:"requires,omitempty"`
+    HostContext bool     `json:"host_context,omitempty"` // tells if the feature has been explicitly installed for host (opposed to for cluster)
+    RequiredBy  []string `json:"required_by,omitempty"`  // tells what feature(s) needs this one
+    Requires    []string `json:"requires,omitempty"`
 }
 
 // NewHostInstalledFeature ...
 func NewHostInstalledFeature() *HostInstalledFeature {
-	return &HostInstalledFeature{
-		RequiredBy: []string{},
-		Requires:   []string{},
-	}
+    return &HostInstalledFeature{
+        RequiredBy: []string{},
+        Requires:   []string{},
+    }
 }
 
 // Reset resets the content of the property
 func (p *HostInstalledFeature) Reset() {
-	*p = HostInstalledFeature{
-		RequiredBy: []string{},
-		Requires:   []string{},
-	}
+    *p = HostInstalledFeature{
+        RequiredBy: []string{},
+        Requires:   []string{},
+    }
 }
 
 // HostFeatures ...
@@ -53,38 +53,38 @@ func (p *HostInstalledFeature) Reset() {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostFeatures struct {
-	Installed map[string]*HostInstalledFeature `json:"installed,omitempty"` // list of installed features, indexed on feature name
+    Installed map[string]*HostInstalledFeature `json:"installed,omitempty"` // list of installed features, indexed on feature name
 }
 
 // NewHostFeatures ...
 func NewHostFeatures() *HostFeatures {
-	return &HostFeatures{
-		Installed: map[string]*HostInstalledFeature{},
-	}
+    return &HostFeatures{
+        Installed: map[string]*HostInstalledFeature{},
+    }
 }
 
 // Reset resets the content of the property
 func (hf *HostFeatures) Reset() {
-	*hf = HostFeatures{
-		Installed: map[string]*HostInstalledFeature{},
-	}
+    *hf = HostFeatures{
+        Installed: map[string]*HostInstalledFeature{},
+    }
 }
 
 // Clone ...  (data.Clonable interface)
 func (hf *HostFeatures) Clone() data.Clonable {
-	return NewHostFeatures().Replace(hf)
+    return NewHostFeatures().Replace(hf)
 }
 
 // Replace ...  (data.Clonable interface)
 func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
-	src := p.(*HostFeatures)
-	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
-	for k, v := range src.Installed {
-		hf.Installed[k] = v
-	}
-	return hf
+    src := p.(*HostFeatures)
+    hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
+    for k, v := range src.Installed {
+        hf.Installed[k] = v
+    }
+    return hf
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.FeaturesV1, NewHostFeatures())
+    serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.FeaturesV1, NewHostFeatures())
 }

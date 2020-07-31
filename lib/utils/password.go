@@ -17,42 +17,42 @@
 package utils
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 
-	"github.com/sethvargo/go-password/password"
+    "github.com/sethvargo/go-password/password"
 )
 
 var generator *password.Generator
 
 // GeneratePassword generates a password with length at least 12
 func GeneratePassword(length uint8) (string, error) {
-	if length < 12 {
-		return "", fail.InvalidParameterError("length", "cannot be under 12")
-	}
-	numsym := int(length) / 3
-	pass, err := generator.Generate(int(length), numsym, numsym, false, true)
-	if err != nil {
-		return "", err
-	}
-	return pass, nil
+    if length < 12 {
+        return "", fail.InvalidParameterError("length", "cannot be under 12")
+    }
+    numsym := int(length) / 3
+    pass, err := generator.Generate(int(length), numsym, numsym, false, true)
+    if err != nil {
+        return "", err
+    }
+    return pass, nil
 }
 
 func init() {
-	var err error
-	// generator is created with characters allowed
-	// Removed characters:
-	// - confusing characters like: il|! or 0O
-	// - alphabetic characters that can moved between QWERTY and AZERTY: AaQqWwZz
-	// - symbols that can be difficult to find on different layouts, like: #_[]{}
-	generator, err = password.NewGenerator(&password.GeneratorInput{
-		LowerLetters: "bcdefghjknprstuvxy",
-		UpperLetters: "BCDEFGHJKLNPRSTUVXY",
-		Digits:       "123456789",
-		Symbols:      "-+*/.,:;()_",
-	})
-	if err != nil {
-		panic(fmt.Sprintf("failed to create password generator: %v!", err))
-	}
+    var err error
+    // generator is created with characters allowed
+    // Removed characters:
+    // - confusing characters like: il|! or 0O
+    // - alphabetic characters that can moved between QWERTY and AZERTY: AaQqWwZz
+    // - symbols that can be difficult to find on different layouts, like: #_[]{}
+    generator, err = password.NewGenerator(&password.GeneratorInput{
+        LowerLetters: "bcdefghjknprstuvxy",
+        UpperLetters: "BCDEFGHJKLNPRSTUVXY",
+        Digits:       "123456789",
+        Symbols:      "-+*/.,:;()_",
+    })
+    if err != nil {
+        panic(fmt.Sprintf("failed to create password generator: %v!", err))
+    }
 }

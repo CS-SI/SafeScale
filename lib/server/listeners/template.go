@@ -17,16 +17,15 @@
 package listeners
 
 import (
-	"context"
+    "context"
 
-	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
+    "github.com/asaskevich/govalidator"
+    "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/protocol"
+    "github.com/CS-SI/SafeScale/lib/server/handlers"
+    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // safescale template list --all=false
@@ -36,44 +35,44 @@ type TemplateListener struct{}
 
 // ErrorList available templates
 func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (tl *protocol.TemplateList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list templates")
+    defer fail.OnExitConvertToGRPCStatus(&err)
+    defer fail.OnExitWrapError(&err, "cannot list templates")
 
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
+    if s == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+    if ctx == nil {
+        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+    }
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-	}
+    ok, err := govalidator.ValidateStruct(in)
+    if err != nil || !ok {
+        logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+    }
 
-	job, xerr := PrepareJob(ctx, "", "template list")
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
+    job, xerr := PrepareJob(ctx, "", "template list")
+    if xerr != nil {
+        return nil, xerr
+    }
+    defer job.Close()
+    task := job.GetTask()
 
-	all := in.GetAll()
-	tracer := concurrency.NewTracer(task, true, "").WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+    all := in.GetAll()
+    tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewTemplateHandler(job)
-	templates, xerr := handler.List(all)
-	if xerr != nil {
-		return nil, xerr
-	}
+    handler := handlers.NewTemplateHandler(job)
+    templates, xerr := handler.List(all)
+    if xerr != nil {
+        return nil, xerr
+    }
 
-	// Build response mapping resources.Host to protocol.Host
-	var pbTemplates []*protocol.HostTemplate
-	for _, template := range templates {
-		pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractToProtocol(template))
-	}
-	rv := &protocol.TemplateList{Templates: pbTemplates}
-	return rv, nil
+    // Build response mapping resources.Host to protocol.Host
+    var pbTemplates []*protocol.HostTemplate
+    for _, template := range templates {
+        pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractToProtocol(template))
+    }
+    rv := &protocol.TemplateList{Templates: pbTemplates}
+    return rv, nil
 }

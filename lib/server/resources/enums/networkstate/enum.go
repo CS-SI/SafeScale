@@ -22,18 +22,18 @@ package networkstate
 type Enum int
 
 const (
-	// UNKNOWNSTATE
-	UNKNOWNSTATE Enum = iota
+    // UNKNOWNSTATE
+    UNKNOWNSTATE Enum = iota
 
-	// GATEWAY_CREATION when gateway(s) is(are) created
-	GATEWAY_CREATION
+    // GATEWAY_CREATION when gateway(s) is(are) created
+    GATEWAY_CREATION
 
-	// PHASE2 when gateway(s) is(are) configured
-	GATEWAY_CONFIGURATION
+    // PHASE2 when gateway(s) is(are) configured
+    GATEWAY_CONFIGURATION
 
-	// READY when ready
-	READY
+    // READY when ready
+    READY
 
-	// NETWORKERROR when error
-	NETWORKERROR
+    // NETWORKERROR when error
+    NETWORKERROR
 )

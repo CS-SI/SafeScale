@@ -23,6 +23,6 @@ import "github.com/CS-SI/SafeScale/lib/utils/fail"
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
 // and reverse operation (Unserialize()
 type Serializable interface {
-	Serialize() ([]byte, fail.Error)
-	Deserialize([]byte) fail.Error
+    Serialize() ([]byte, fail.Error)
+    Deserialize([]byte) fail.Error
 }

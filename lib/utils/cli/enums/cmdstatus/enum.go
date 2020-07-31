@@ -22,10 +22,10 @@ package cmdstatus
 type Enum int
 
 const (
-	// Command works as intended
-	SUCCESS Enum = iota
-	// Command failed
-	FAILURE
-	// Unset
-	UNKNOWN
+    // Command works as intended
+    SUCCESS Enum = iota
+    // Command failed
+    FAILURE
+    // Unset
+    UNKNOWN
 )

@@ -17,27 +17,27 @@
 package client
 
 import (
-	"time"
+    "time"
 
-	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/protocol"
+    "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // host is the safescale client part handling hosts
 type image struct {
-	// session is not used currently
-	session *Session
+    // session is not used currently
+    session *Session
 }
 
 // List return the list of availble images on the current tenant
-func (img *image) List(all bool, timeout time.Duration) (*protocol.ImageList, error) {
-	img.session.Connect()
-	defer img.session.Disconnect()
-	service := protocol.NewImageServiceClient(img.session.connection)
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
+func (img image) List(all bool, timeout time.Duration) (*protocol.ImageList, error) {
+    img.session.Connect()
+    defer img.session.Disconnect()
+    service := protocol.NewImageServiceClient(img.session.connection)
+    ctx, xerr := utils.GetContext(true)
+    if xerr != nil {
+        return nil, xerr
+    }
 
-	return service.List(ctx, &protocol.ImageListRequest{All: all})
+    return service.List(ctx, &protocol.ImageListRequest{All: all})
 }

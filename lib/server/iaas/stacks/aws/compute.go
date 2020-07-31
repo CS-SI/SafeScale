@@ -20,10 +20,11 @@ import (
     "encoding/base64"
     "encoding/json"
     "fmt"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     "strings"
     "time"
+
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 
     "github.com/davecgh/go-spew/spew"
     "github.com/sirupsen/logrus"
@@ -277,23 +278,23 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fa
 // createFilters ...
 func createFilters() []*ec2.Filter {
     filters := []*ec2.Filter{
-        &ec2.Filter{
+        {
             Name:   aws.String("state"),
             Values: []*string{aws.String("available")},
         },
-        &ec2.Filter{
+        {
             Name:   aws.String("architecture"),
             Values: []*string{aws.String("x86_64")},
         },
-        &ec2.Filter{
+        {
             Name:   aws.String("virtualization-type"),
             Values: []*string{aws.String("hvm")},
         },
-        &ec2.Filter{
+        {
             Name:   aws.String("root-device-type"),
             Values: []*string{aws.String("ebs")},
         },
-        &ec2.Filter{
+        {
             Name:   aws.String("ena-support"),
             Values: []*string{aws.String("true")},
         },
@@ -328,11 +329,11 @@ func (s *Stack) ListImages() ([]abstract.Image, fail.Error) {
     var images []abstract.Image
 
     filters := []*ec2.Filter{
-        &ec2.Filter{
+        {
             Name:   aws.String("architecture"),
             Values: []*string{aws.String("x86_64")},
         },
-        &ec2.Filter{
+        {
             Name:   aws.String("state"),
             Values: []*string{aws.String("available")},
         },
@@ -490,10 +491,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
     defer fail.OnPanic(&xerr)
 
-
     resourceName := request.ResourceName
     networks := request.Networks
-    //hostMustHavePublicIP := request.PublicIP
+    // hostMustHavePublicIP := request.PublicIP
     keyPairName := request.KeyPair.Name
 
     if networks == nil || len(networks) == 0 {
@@ -516,7 +516,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
         }
         return request.Networks[0]
     }()
-    isGateway := request.IsGateway //&& defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
+    isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
 
     if defaultNetwork == nil && !request.PublicIP {
         return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
@@ -533,12 +533,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     }
 
     defaultNetworkID := defaultNetwork.ID
-    //defaultNetwork := request.Networks[0]
-    //defaultGateway := request.DefaultGateway
-    //isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
-    //defaultGatewayID := ""
-    //defaultGatewayPrivateIP := ""
-    //if defaultGateway != nil {
+    // defaultNetwork := request.Networks[0]
+    // defaultGateway := request.DefaultGateway
+    // isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
+    // defaultGatewayID := ""
+    // defaultGatewayPrivateIP := ""
+    // if defaultGateway != nil {
     //	xerr = defaultGateway.Properties.Inspect(hostproperty.NetworkV1, func(v data.Clonable) fail.Error {
     //		hostNetworkV1 := v.(*propertiesv1.HostNetwork)
     //		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
@@ -548,10 +548,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     //	if err != nil {
     //		return nil, userData, xerr
     //	}
-    //}
-    //if defaultGateway == nil && !hostMustHavePublicIP {
+    // }
+    // if defaultGateway == nil && !hostMustHavePublicIP {
     //    return nil, userData, fail.InvalidRequestError("the host %s must have a gateway or be public", resourceName)
-    //}
+    // }
 
     // --- prepares data structures for Provider usage ---
 
@@ -602,7 +602,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
     // Adds Host property SizingV1
     ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
-
 
     // Sets provider parameters to create ahf
     userDataPhase1, xerr := userData.Generate("phase1")
@@ -768,7 +767,7 @@ func isAWSErr(err error) bool {
 
 func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, error) {
     dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-        Filters: []*ec2.Filter{&ec2.Filter{
+        Filters: []*ec2.Filter{{
             Name:   aws.String("group-name"),
             Values: []*string{aws.String(name)},
         }},
@@ -788,7 +787,7 @@ func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, err
 
 func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, error) {
     dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-        Filters: []*ec2.Filter{&ec2.Filter{
+        Filters: []*ec2.Filter{{
             Name:   aws.String("group-name"),
             Values: []*string{aws.String(name)},
         }},
@@ -996,7 +995,7 @@ func buildAwsMachine(
         },
         NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
         TagSpecifications: []*ec2.TagSpecification{
-            &ec2.TagSpecification{
+            {
                 ResourceType: aws.String("instance"),
                 Tags: []*ec2.Tag{
                     {
@@ -1052,7 +1051,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 
     awsHost, err := s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
         Filters: []*ec2.Filter{
-            &ec2.Filter{
+            {
                 Name:   aws.String("instance-id"),
                 Values: []*string{aws.String(hostRef)},
             },
@@ -1065,7 +1064,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
     if len(awsHost.Reservations) == 0 {
         awsHost, err = s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
             Filters: []*ec2.Filter{
-                &ec2.Filter{
+                {
                     Name: aws.String("tag:Name"),
                     Values: []*string{
                         aws.String(hostRef),
@@ -1185,12 +1184,12 @@ func fromMachineTypeToHostEffectiveSizing(stack *Stack, machineType string) abst
     for _, template := range templates {
         if template.Name == machineType {
             hs := abstract.HostEffectiveSizing{
-                Cores: template.Cores,
-                CPUFreq: template.CPUFreq,
-                DiskSize: template.DiskSize,
-                RAMSize: template.RAMSize,
+                Cores:     template.Cores,
+                CPUFreq:   template.CPUFreq,
+                DiskSize:  template.DiskSize,
+                RAMSize:   template.RAMSize,
                 GPUNumber: template.GPUNumber,
-                GPUType: template.GPUType,
+                GPUType:   template.GPUType,
             }
             return hs
         }
@@ -1315,7 +1314,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
     ips, err := s.EC2Service.DescribeAddresses(&ec2.DescribeAddressesInput{
         Filters: []*ec2.Filter{
-            &ec2.Filter{
+            {
                 Name:   aws.String("instance-id"),
                 Values: []*string{aws.String(ahf.GetID())},
             },
@@ -1480,7 +1479,7 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
     if retryErr != nil {
         switch retryErr.(type) {
         case *retry.ErrTimeout:
-            return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef , temporal.GetHostCleanupTimeout())
+            return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
         }
         return retryErr
     }

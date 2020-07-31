@@ -20,8 +20,8 @@ import "github.com/CS-SI/SafeScale/lib/utils/fail"
 
 // normalizeError translates AWS error to SafeScale one
 func normalizeError(err error) fail.Error {
-	if err == nil {
-		return nil
-	}
-	return fail.ToError(err)
+    if err == nil {
+        return nil
+    }
+    return fail.ToError(err)
 }

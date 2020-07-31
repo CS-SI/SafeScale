@@ -17,11 +17,11 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/server"
+    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateHandler
@@ -30,32 +30,32 @@ import (
 
 // TemplateHandler defines API to manipulate hosts
 type TemplateHandler interface {
-	List(all bool) ([]abstract.HostTemplate, fail.Error)
+    List(all bool) ([]abstract.HostTemplate, fail.Error)
 }
 
 // templateHandler template service
 type templateHandler struct {
-	job server.Job
+    job server.Job
 }
 
 // NewTemplateHandler creates a template service
 // FIXME: what to do if job == nil ?
 func NewTemplateHandler(job server.Job) TemplateHandler {
-	return &templateHandler{job: job}
+    return &templateHandler{job: job}
 }
 
 // ErrorList returns the template list
 func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, xerr fail.Error) {
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
-	}
+    if handler == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+    if handler.job == nil {
+        return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+    }
 
-	tracer := concurrency.NewTracer(handler.job.GetTask(), debug.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.OnExitTrace()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)
+    tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	return handler.job.GetService().ListTemplates(all)
+    return handler.job.GetService().ListTemplates(all)
 }

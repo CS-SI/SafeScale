@@ -17,32 +17,32 @@
 package share
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/resources"
+    "github.com/CS-SI/SafeScale/lib/server/resources/operations"
+    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // New creates an instance of resources.Share
 func New(svc iaas.Service) (resources.Share, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
-	}
-	return operations.NewShare(svc)
+    if svc == nil {
+        return nil, fail.InvalidParameterError("svc", "cannot be nil")
+    }
+    return operations.NewShare(svc)
 }
 
 // Load loads the metadata of a share and returns an instance of resources.Share
 func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
-	}
-	if ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
+    if task == nil {
+        return nil, fail.InvalidParameterError("task", "cannot be nil")
+    }
+    if svc == nil {
+        return nil, fail.InvalidParameterError("svc", "cannot be nil")
+    }
+    if ref == "" {
+        return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+    }
 
-	return operations.LoadShare(task, svc, ref)
+    return operations.LoadShare(task, svc, ref)
 }

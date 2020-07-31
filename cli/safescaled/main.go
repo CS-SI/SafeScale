@@ -29,23 +29,22 @@ import (
 
     "github.com/dlespiau/covertool/pkg/exit"
     "github.com/sirupsen/logrus"
-    cli "github.com/urfave/cli/v2"
+    "github.com/urfave/cli/v2"
     "google.golang.org/grpc"
     "google.golang.org/grpc/reflection"
 
     "github.com/CS-SI/SafeScale/lib/protocol"
+    _ "github.com/CS-SI/SafeScale/lib/server"
     "github.com/CS-SI/SafeScale/lib/server/iaas"
     "github.com/CS-SI/SafeScale/lib/server/listeners"
     "github.com/CS-SI/SafeScale/lib/server/utils"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
-
-    _ "github.com/CS-SI/SafeScale/lib/server"
 )
 
 var profileCloseFunc = func() {}
 
 const (
-    defaultDaemonHost string = "localhost"       // By default, safescaled only listen on localhost
+    defaultDaemonHost string = "localhost" // By default, safescaled only listen on localhost
     defaultDaemonPort string = "50051"
 )
 
@@ -68,7 +67,7 @@ func work(c *cli.Context) {
 
     // NOTE: is it the good behavior ? Shouldn't we fail ?
     // If trace settings cannot be registered, report it but do not fail
-    err := debug.RegisterTraceSettings(appTrace)
+    err := tracing.RegisterTraceSettings(appTrace)
     if err != nil {
         logrus.Errorf(err.Error())
     }
@@ -156,13 +155,13 @@ func assembleListenString(c *cli.Context) string {
             if err != nil || num <= 0 {
                 logrus.Warningf("Environment variable 'SAFESCALED_PORT' contains invalid content ('%s'): ignored.", port)
             } else {
-                listen = defaultDaemonHost+":"+port
+                listen = defaultDaemonHost + ":" + port
             }
         }
     }
     // At last, if listen is empty, build it from defaults
     if listen == "" {
-        listen = defaultDaemonHost+":"+defaultDaemonPort
+        listen = defaultDaemonHost + ":" + defaultDaemonPort
     }
     return listen
 }
@@ -176,7 +175,7 @@ func main() {
     app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
 
     app.Authors = []*cli.Author{
-        &cli.Author{
+        {
             Name:  "CS-SI",
             Email: "safescale@c-s.fr",
         },
@@ -204,10 +203,9 @@ func main() {
             // TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
         },
         &cli.StringFlag{
-            Name:  "listen",
+            Name:    "listen",
             Aliases: []string{"l"},
-            Usage: "Listen on specified port `IP:PORT`",
-            Value: "localhost:50051",
+            Usage:   "Listen on specified port `IP:PORT` (default: localhost:50051)",
         },
     }
 

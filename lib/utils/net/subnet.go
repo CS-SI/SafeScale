@@ -17,8 +17,9 @@
 package net
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"net"
+    "net"
+
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // FirstIncludedSubnet takes a parent CIDR range and gives the first subnet within it
@@ -26,7 +27,7 @@ import (
 //
 // For example, 192.168.0.0/16, extended by 8 bits becomes 192.168.0.0/24.
 func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, fail.Error) {
-	return NthIncludedSubnet(base, maskAddition, 0)
+    return NthIncludedSubnet(base, maskAddition, 0)
 }
 
 // NthIncludedSubnet takes a parent CIDR range and gives the 'nth' subnet within it with the
@@ -34,26 +35,26 @@ func FirstIncludedSubnet(base net.IPNet, maskAddition uint8) (net.IPNet, fail.Er
 //
 // For example, 192.168.0.0/16, extended by 8 bits gives as 4th subnet 192.168.4.0/24.
 func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet, fail.Error) {
-	ip := base.IP
-	mask := base.Mask
+    ip := base.IP
+    mask := base.Mask
 
-	parentLen, addrLen := mask.Size()
-	newPrefixLen := parentLen + int(maskAddition)
+    parentLen, addrLen := mask.Size()
+    newPrefixLen := parentLen + int(maskAddition)
 
-	if newPrefixLen > addrLen {
-		return net.IPNet{}, fail.OverflowError(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
-	}
+    if newPrefixLen > addrLen {
+        return net.IPNet{}, fail.OverflowError(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
+    }
 
-	maxNetNum := uint64(1<<uint64(maskAddition)) - 1
-	if uint64(1) > maxNetNum {
-		return net.IPNet{}, fail.OverflowError(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
-	}
+    maxNetNum := uint64(1<<uint64(maskAddition)) - 1
+    if uint64(1) > maxNetNum {
+        return net.IPNet{}, fail.OverflowError(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
+    }
 
-	ipAsNumber := IPv4ToUInt32(ip)
-	bitShift := uint32(32 - newPrefixLen)
-	ipAsNumber |= uint32(nth) << bitShift
-	return net.IPNet{
-		IP:   UInt32ToIPv4(ipAsNumber),
-		Mask: net.CIDRMask(newPrefixLen, addrLen),
-	}, nil
+    ipAsNumber := IPv4ToUInt32(ip)
+    bitShift := uint32(32 - newPrefixLen)
+    ipAsNumber |= uint32(nth) << bitShift
+    return net.IPNet{
+        IP:   UInt32ToIPv4(ipAsNumber),
+        Mask: net.CIDRMask(newPrefixLen, addrLen),
+    }, nil
 }

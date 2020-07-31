@@ -17,37 +17,37 @@
 package propertiesv2
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // ClusterDefaults ...
 // !!! FROZEN !!!
 type ClusterDefaults struct {
-	GatewaySizing HostSizingRequirements `json:"gateway_sizing"` // GatewaySizing keeps the default node definition
-	MasterSizing  HostSizingRequirements `json:"master_sizing"`  // MasterSizing keeps the default node definition
-	NodeSizing    HostSizingRequirements `json:"node_sizing"`    // NodeSizing keeps the default node definition
-	Image         string                 `json:"image"`          // Image keeps the default Linux image to use
+    GatewaySizing HostSizingRequirements `json:"gateway_sizing"` // GatewaySizing keeps the default node definition
+    MasterSizing  HostSizingRequirements `json:"master_sizing"`  // MasterSizing keeps the default node definition
+    NodeSizing    HostSizingRequirements `json:"node_sizing"`    // NodeSizing keeps the default node definition
+    Image         string                 `json:"image"`          // Image keeps the default Linux image to use
 }
 
 func newClusterDefaults() *ClusterDefaults {
-	return &ClusterDefaults{}
+    return &ClusterDefaults{}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (cd *ClusterDefaults) Clone() data.Clonable {
-	return newClusterDefaults().Replace(cd)
+    return newClusterDefaults().Replace(cd)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
-	*cd = *p.(*ClusterDefaults)
-	return cd
+    *cd = *p.(*ClusterDefaults)
+    return cd
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV2, newClusterDefaults())
+    serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV2, newClusterDefaults())
 }

@@ -375,7 +375,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 	go t.run(action, params)
 
 	sig, _ := t.GetSignature()
-	// tracer := NewTracer(true, t, "")
+	// tracer := newTracer(true, t, "")
 	finish := false
 
 	if timeout > 0 {
