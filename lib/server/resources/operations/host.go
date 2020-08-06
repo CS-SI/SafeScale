@@ -91,7 +91,7 @@ func nullHost() *host {
 
 // LoadHost ...
 func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nullHost(), fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc == nil {
@@ -243,7 +243,7 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
     if rh.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if callback == nil {
@@ -265,7 +265,7 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, _ fa
     if rh.IsNull() {
         return state, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return state, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -289,7 +289,7 @@ func (rh *host) Reload(task concurrency.Task) fail.Error {
     if rh.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -376,7 +376,7 @@ func (rh *host) Reload(task concurrency.Task) fail.Error {
 // GetState returns the last known state of the host, without forced inspect
 func (rh host) GetState(task concurrency.Task) (state hoststate.Enum) {
     state = hoststate.UNKNOWN
-    if rh.IsNull() || task == nil {
+    if rh.IsNull() || task.IsNull() {
         return state
     }
 
@@ -397,7 +397,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
     if rh.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     hostname := rh.GetName()
@@ -807,7 +807,7 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (stri
     if rh.IsNull() {
         return "", fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return "", fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -860,7 +860,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
     if rh.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1099,7 +1099,7 @@ func (rh host) GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Erro
     if rh.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 

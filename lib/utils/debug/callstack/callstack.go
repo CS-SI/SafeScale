@@ -17,19 +17,18 @@
 package callstack
 
 import (
+    "bufio"
     "fmt"
     "path/filepath"
+    "reflect"
     "runtime"
     godebug "runtime/debug"
     "strings"
-    "sync/atomic"
 )
 
-
-var sourceFileRemovePart atomic.Value
-
-// DecorateWithCallStack adds call trace to the message "prefix what: why"
-func DecorateWithCallStack(prefix, what, why string) string {
+// DecorateWith adds call trace to the message "prefix what: why"
+// 'ignoreCount' indicates the number of call that have to be ignored at the beginning of the stack trace
+func DecorateWith(prefix, what, why string, ignoreCount int) string {
     const missingPrefixMessage = "uncategorized error occurred:"
 
     msg := prefix
@@ -41,9 +40,13 @@ func DecorateWithCallStack(prefix, what, why string) string {
         msg += " '" + what + "'"
     }
 
-    if pc, file, line, ok := runtime.Caller(2); ok {
+    if ignoreCount < 2 {
+        ignoreCount = 2
+    }
+
+    if pc, file, line, ok := runtime.Caller(ignoreCount); ok {
         if f := runtime.FuncForPC(pc); f != nil {
-            filename := strings.Replace(file, SourceFilePartToRemove(), "", 1)
+            filename := strings.Replace(file, sourceFilePrefixToRemove(), "", 1)
             if what == "" {
                 msg += fmt.Sprintf(" %s", filepath.Base(f.Name()))
             } else {
@@ -59,24 +62,59 @@ func DecorateWithCallStack(prefix, what, why string) string {
             msg += ": " + why
         }
     }
-    msg += "\n" + string(godebug.Stack())
+    msg += "\n" + string(IgnoreTraceUntil(godebug.Stack(), "SafeScale/lib/utils/debug/callstack/callstack", FirstOccurence))
     return msg
 }
 
-// SourceFilePartToRemove returns the part of the file path to remove before display.
-func SourceFilePartToRemove() string {
-    if anon := sourceFileRemovePart.Load(); anon != nil {
-        return anon.(string)
-    }
-    return "github.com/CS-SI/SafeScale/"
-}
+// Occurrence defines at what occurrence of search IgnoreTraceUntil() will stop
+type Occurrence bool
+const (
+    FirstOccurence Occurrence = false
+    LastOccurence  Occurrence = true
+)
 
-func init() {
-    var rootPath string
-    if pc, _, _, ok := runtime.Caller(0); ok {
-        if f := runtime.FuncForPC(pc); f != nil {
-            rootPath = strings.Split(f.Name(), "lib/utils/")[0]
-        }
+// IgnoreTraceUntil cuts all the lines of the trace before and including lines with 'search' in it
+// if 'stop' contains FirstOccurence, cuts until the first occurence of line containing 'search'
+// if 'stop' contains LastOccurence, cuts until the last occurence of line containing 'search'
+func IgnoreTraceUntil(callTrace interface{}, search string, stop Occurrence) string {
+    if callTrace == nil {
+        return ""
     }
-    sourceFileRemovePart.Store(rootPath)
+
+    var source string
+    switch casted := callTrace.(type) {
+    case []uint8:
+        source = string(casted)
+    case string:
+        source = casted
+    default:
+        return fmt.Sprintf("do not known how to handle calltrace type '%s'", reflect.TypeOf(callTrace).String())
+    }
+
+    if search == "" {
+        return source
+    }
+
+    var (
+        buffer string
+        goroutine string
+        found bool
+    )
+    scanner := bufio.NewScanner(strings.NewReader(source))
+    if !scanner.Scan() {
+        return ""
+    }
+    goroutine = scanner.Text()+"\n"
+
+    changeSourcePath := SourceFilePathUpdater()
+    for scanner.Scan() {
+        line := scanner.Text()
+        if (stop == LastOccurence || !found) && strings.Contains(line, search) {
+            buffer = ""
+            found = true
+            continue
+        }
+        buffer += changeSourcePath(line) + "\n"
+    }
+    return goroutine+buffer
 }

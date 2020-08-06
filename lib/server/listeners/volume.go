@@ -27,6 +27,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/handlers"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
     srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 

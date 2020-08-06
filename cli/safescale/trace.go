@@ -18,7 +18,12 @@ package main
 
 // appTrace contains the default parts that we want to trace
 var appTrace = `{
-	"concurrency": {
-		"task": true
-	}
+    "concurrency": {
+        "lock": false,
+        "task": true
+    },
+    "ssh": {},
+    "resources": {
+        "cluster": true
+    }
 }`

@@ -168,7 +168,7 @@ func (s *Session) SetTask(task concurrency.Task) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     s.task = task
@@ -180,7 +180,7 @@ func (s *Session) GetTask() (concurrency.Task, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if s.task == nil {
+    if s.task.IsNull() {
         return nil, fail.InvalidInstanceContentError("s.task", "cannot be nil")
     }
     return s.task, nil

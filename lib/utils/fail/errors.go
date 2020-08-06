@@ -793,7 +793,7 @@ type ErrNotImplemented struct {
 
 // NotImplementedError creates a ErrNotImplemented report
 func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
-    r := newError(nil, nil, callstack.DecorateWithCallStack("not implemented yet:", strprocess.FormatStrings(msg...), ""))
+    r := newError(nil, nil, callstack.DecorateWith("not implemented yet:", strprocess.FormatStrings(msg...), "", 0))
     r.grpcCode = codes.Unimplemented
     return &ErrNotImplemented{r}
 }
@@ -805,7 +805,7 @@ func (e *ErrNotImplemented) IsNull() bool {
 
 // NotImplementedErrorWithReason creates a ErrNotImplemented report
 func NotImplementedErrorWithReason(what string, why string) Error {
-    r := newError(nil, nil, callstack.DecorateWithCallStack("not implemented yet:", what, why))
+    r := newError(nil, nil, callstack.DecorateWith("not implemented yet:", what, why, 0))
     r.grpcCode = codes.Unimplemented
     return &ErrNotImplemented{r}
 }
@@ -837,7 +837,7 @@ type ErrRuntimePanic struct {
 
 // RuntimePanicError creates a ErrRuntimePanic error
 func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
-    r := newError(nil, nil, callstack.DecorateWithCallStack(strprocess.FormatStrings(msg...), "", ""))
+    r := newError(nil, nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
     r.grpcCode = codes.Internal
     return &ErrRuntimePanic{r}
 }
@@ -874,7 +874,7 @@ type ErrInvalidInstance struct {
 
 // InvalidInstanceError creates a ErrInvalidInstance error
 func InvalidInstanceError() *ErrInvalidInstance {
-    r := newError(nil, nil, callstack.DecorateWithCallStack("invalid instance:", "", "calling method from a nil pointer"))
+    r := newError(nil, nil, callstack.DecorateWith("invalid instance:", "", "calling method from a nil pointer", 0))
     r.grpcCode = codes.FailedPrecondition
     return &ErrInvalidInstance{r}
 }
@@ -911,7 +911,7 @@ type ErrInvalidParameter struct {
 
 // InvalidParameterError creates a ErrInvalidParameter error
 func InvalidParameterError(what, why string) *ErrInvalidParameter {
-    r := newError(nil, nil, callstack.DecorateWithCallStack("invalid parameter:", what, why))
+    r := newError(nil, nil, callstack.DecorateWith("invalid parameter:", what, why, 0))
     r.grpcCode = codes.FailedPrecondition
     return &ErrInvalidParameter{r}
 }
@@ -948,7 +948,7 @@ type ErrInvalidInstanceContent struct {
 
 // InvalidInstanceContentError returns an instance of ErrInvalidInstanceContent.
 func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
-    r := newError(nil, nil, callstack.DecorateWithCallStack("invalid instance content:", what, why))
+    r := newError(nil, nil, callstack.DecorateWith("invalid instance content:", what, why, 0))
     r.grpcCode = codes.FailedPrecondition
     return &ErrInvalidInstanceContent{r}
 }
@@ -985,7 +985,7 @@ type ErrInconsistent struct {
 
 // InconsistentError creates a ErrInconsistent error
 func InconsistentError(msg ...interface{}) *ErrInconsistent {
-    r := newError(nil, nil, callstack.DecorateWithCallStack(strprocess.FormatStrings(msg...), "", ""))
+    r := newError(nil, nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
     r.grpcCode = codes.DataLoss
     return &ErrInconsistent{r}
 }

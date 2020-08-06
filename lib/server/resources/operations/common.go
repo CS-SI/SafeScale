@@ -64,7 +64,7 @@ func RetrieveForensicsData(task concurrency.Task, host resources.Host) {
 // GetPhaseWarningsAndErrors ...
 // FIXME: documentation
 func GetPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]string, []string) {
-    if task == nil || host == nil {
+    if task.IsNull() || host == nil {
         return []string{}, []string{}
     }
 

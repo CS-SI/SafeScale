@@ -163,13 +163,13 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
     if _, ok := v["CIDR"]; !ok {
         v["CIDR"] = networkCfg.CIDR
     }
-    var controlPlaneV1 *propertiesv1.ClusterControlPlane
+    var controlPlaneV1 *propertiesv1.ClusterControlplane
     xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
         return props.Inspect(task, clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
             var ok bool
-            controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlPlane)
+            controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlplane)
             if !ok {
-                return fail.InconsistentError("'*propertiesv1.ClusterControlPlane' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                return fail.InconsistentError("'*propertiesv1.ClusterControlplane' expected, '%s' provided", reflect.TypeOf(clonable).String())
             }
             return nil
         })

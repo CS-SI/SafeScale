@@ -24,7 +24,10 @@ import (
     "github.com/CS-SI/SafeScale/lib/protocol"
     "github.com/CS-SI/SafeScale/lib/server/resources"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
     "github.com/CS-SI/SafeScale/lib/system"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // SSHConfigFromProtocolToSystem converts a protocol.SshConfig into a system.SSHConfig
@@ -120,4 +123,64 @@ func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string 
     }
     out = strings.TrimRight(out, ",")
     return out
+}
+
+// ClusterRequestFromProtocolToAbstract ...
+func ClusterRequestFromProtocolToAbstract(in protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, xerr fail.Error) {
+    nullCR := abstract.ClusterRequest{}
+
+    var (
+        gatewaySizing *abstract.HostSizingRequirements
+        masterSizing *abstract.HostSizingRequirements
+        nodeSizing *abstract.HostSizingRequirements
+    )
+    if in.GatewaySizing != "" {
+        gatewaySizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.GatewaySizing)
+        if xerr != nil {
+            return nullCR, xerr
+        }
+    }
+    if gatewaySizing == nil {
+        gatewaySizing = &abstract.HostSizingRequirements{MinGPU: -1}
+    }
+
+    if in.MasterSizing != "" {
+        masterSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.MasterSizing)
+        if xerr != nil {
+            return nullCR, xerr
+        }
+    }
+    if masterSizing == nil {
+        masterSizing = &abstract.HostSizingRequirements{MinGPU: -1}
+    }
+
+    if in.NodeSizing != "" {
+        nodeSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.NodeSizing)
+        if xerr != nil {
+            return nullCR, xerr
+        }
+    }
+    if nodeSizing == nil {
+        nodeSizing = &abstract.HostSizingRequirements{MinGPU: -1}
+    }
+
+    disabled := map[string]struct{}{}
+    for _, v := range in.Disabled {
+        disabled[v] = struct{}{}
+    }
+
+    out := abstract.ClusterRequest{
+        Name:                    in.Name,
+        CIDR:                    in.Cidr,
+        Domain:                  in.Domain,
+        Complexity:              clustercomplexity.Enum(in.Complexity),
+        Flavor:                  clusterflavor.Enum(in.Flavor),
+        GatewaysDef:             *gatewaySizing,
+        MastersDef:              *masterSizing,
+        NodesDef:                *nodeSizing,
+        OS:                      in.Os,
+        KeepOnFailure:           in.KeepOnFailure,
+        DisabledDefaultFeatures: disabled,
+    }
+    return out, nil
 }

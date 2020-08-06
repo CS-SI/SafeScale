@@ -26,6 +26,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/handlers"
     "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
 )
 
 // safescale image list --all=false

@@ -28,6 +28,7 @@ import (
     rice "github.com/GeertJohan/go.rice"
     "github.com/sirupsen/logrus"
 
+    "github.com/CS-SI/SafeScale/lib/protocol"
     "github.com/CS-SI/SafeScale/lib/server/iaas"
     "github.com/CS-SI/SafeScale/lib/server/resources"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -79,7 +80,7 @@ func nullCluster() *cluster {
 
 // NewCluster ...
 func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc == nil {
@@ -97,7 +98,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 
 // LoadCluster ...
 func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc == nil {
@@ -200,7 +201,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -330,12 +331,22 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     // FIXME: validate parameters
 
-    xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+    // Initializes instance
+    ci := abstract.NewClusterIdentity()
+    ci.Name = req.Name
+    ci.Flavor = req.Flavor
+    ci.Complexity = req.Complexity
+    xerr := c.Carry(task, ci)
+    if xerr != nil {
+        return xerr
+    }
+
+    return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
         innerXErr := props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
             featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
             if !ok {
@@ -372,9 +383,9 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
             if !ok {
                 return fail.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
             }
-            defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*req.GatewaysDef)
-            defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*req.MastersDef)
-            defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*req.NodesDef)
+            defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
+            defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
+            defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
             defaultsV2.Image = req.NodesDef.Image
             return nil
         })
@@ -422,12 +433,6 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
         }
         return nil
     })
-    if xerr != nil {
-        return xerr
-    }
-
-    // Writes the metadata for the first time
-    return c.Carry(task, c)
 }
 
 // defineSizings calculates the sizings needed for the hosts of the cluster
@@ -443,9 +448,7 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
     )
 
     // Determine default image
-    if req.NodesDef != nil {
-        imageID = req.NodesDef.Image
-    }
+    imageID = req.NodesDef.Image
     if imageID == "" && c.makers.DefaultImage != nil {
         imageID = c.makers.DefaultImage(task, c)
     }
@@ -466,7 +469,7 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
             MinGPU:      -1,
         }
     }
-    gatewaysDef := complementSizingRequirements(req.GatewaysDef, *gatewaysDefault)
+    gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
     gatewaysDef.Image = imageID
 
     // Determine master sizing
@@ -483,7 +486,7 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
         }
     }
     // Note: no way yet to define master sizing from cli...
-    mastersDef := complementSizingRequirements(req.MastersDef, *mastersDefault)
+    mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
     mastersDef.Image = imageID
 
     // Determine node sizing
@@ -500,7 +503,7 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
         }
     }
     // nodesDefault.ImageID = imageID
-    nodesDef := complementSizingRequirements(req.NodesDef, *nodesDefault)
+    nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
     nodesDef.Image = imageID
 
     xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -879,7 +882,7 @@ func (c *cluster) Serialize(task concurrency.Task) ([]byte, fail.Error) {
     if c.IsNull() {
         return []byte{}, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -896,7 +899,7 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if len(buf) == 0 {
@@ -917,7 +920,7 @@ func (c *cluster) Bootstrap(task concurrency.Task) (xerr fail.Error) {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -938,18 +941,24 @@ func (c *cluster) Bootstrap(task concurrency.Task) (xerr fail.Error) {
 }
 
 // Browse walks through cluster folder and executes a callback for each entry
-func (c *cluster) Browse(task concurrency.Task, callback func([]byte) fail.Error) fail.Error {
+func (c *cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if callback == nil {
         return fail.InvalidParameterError("callback", "cannot be nil")
     }
 
-    return c.core.BrowseFolder(task, callback)
+    return c.core.BrowseFolder(task, func(buf []byte) fail.Error {
+        aci := abstract.NewClusterIdentity()
+        if xerr := aci.Deserialize(buf); xerr != nil {
+            return xerr
+        }
+        return callback(aci)
+    })
 }
 
 // GetIdentity returns the identity of the cluster
@@ -957,7 +966,7 @@ func (c *cluster) GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, 
     if c.IsNull() {
         return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return abstract.ClusterIdentity{}, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -981,7 +990,7 @@ func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, x
     if c.IsNull() {
         return 0, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return 0, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1009,7 +1018,7 @@ func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomple
     if c.IsNull() {
         return 0, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return 0, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1037,7 +1046,7 @@ func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string,
     if c.IsNull() {
         return "", fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return "", fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1066,7 +1075,7 @@ func (c *cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, x
     if c.IsNull() {
         return keyPair, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return keyPair, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1091,7 +1100,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
     if c.IsNull() {
         return config, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return config, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1153,7 +1162,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
         return fail.InvalidInstanceError()
     }
 
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1320,7 +1329,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
     if c == nil {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1476,7 +1485,7 @@ func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, xerr fa
     if c == nil {
         return state, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return state, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1514,7 +1523,7 @@ func (c *cluster) AddNode(task concurrency.Task, def *abstract.HostSizingRequire
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if def == nil {
@@ -1538,7 +1547,7 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if count <= 0 {
@@ -1740,7 +1749,7 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv2.Clus
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1779,7 +1788,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
     if c == nil {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if hostID == "" {
@@ -1880,7 +1889,7 @@ func (c *cluster) ListMasters(task concurrency.Task) (list resources.IndexedList
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnPanic(&xerr)
@@ -1911,7 +1920,7 @@ func (c *cluster) ListMasterNames(task concurrency.Task) (list data.IndexedListO
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnPanic(&xerr)
@@ -1940,7 +1949,7 @@ func (c *cluster) ListMasterIDs(task concurrency.Task) (list data.IndexedListOfS
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnExitLogError(&xerr, "failed to get list of master IDs")
@@ -1967,7 +1976,7 @@ func (c *cluster) ListMasterIPs(task concurrency.Task) (list data.IndexedListOfS
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnExitLogError(&xerr, "failed to get list of master IPs")
@@ -1996,7 +2005,7 @@ func (c *cluster) FindAvailableMaster(task concurrency.Task) (master resources.H
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -2041,7 +2050,7 @@ func (c *cluster) ListNodes(task concurrency.Task) (list resources.IndexedListOf
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnPanic(&xerr)
@@ -2074,7 +2083,7 @@ func (c *cluster) ListNodeNames(task concurrency.Task) (list data.IndexedListOfS
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnPanic(&xerr)
@@ -2104,7 +2113,7 @@ func (c *cluster) ListNodeIDs(task concurrency.Task) (list data.IndexedListOfStr
     if c == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     defer fail.OnPanic(&xerr)
@@ -2882,4 +2891,136 @@ func (c *cluster) deleteHosts(task concurrency.Task, hosts []resources.Host) fai
         errors = append(errors, xerr)
     }
     return fail.NewErrorList(errors)
+}
+
+func (c *cluster) ToProtocol(task concurrency.Task) (*protocol.ClusterResponse, fail.Error) {
+    out := &protocol.ClusterResponse{}
+    xerr := c.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+        ci, ok := clonable.(*abstract.ClusterIdentity)
+        if !ok {
+            return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
+        }
+        out.Identity = converters.ClusterIdentityFromAbstractToProtocol(*ci)
+
+        innerXErr := props.Inspect(task, clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
+            controlplaneV1, ok := clonable.(*propertiesv1.ClusterControlplane)
+            if !ok {
+                return fail.InconsistentError("'*propertiesv1.ClusterControlplane' expected, '%s' provided", reflect.TypeOf(clonable).String())
+            }
+            out.Controlplane = converters.ClusterControlplaneFromPropertyToProtocol(*controlplaneV1)
+            return nil
+        })
+        if innerXErr != nil {
+            return innerXErr
+        }
+
+        innerXErr = props.Inspect(task, clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
+            compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
+            if !ok {
+                return fail.InconsistentError("'*propertiesv1.ClusterComposite' expected, '%s' provided", reflect.TypeOf(clonable).String())
+            }
+            out.Composite = converters.ClusterCompositeFromPropertyToProtocol(*compositeV1)
+            return nil
+        })
+        if innerXErr != nil {
+            return innerXErr
+        }
+
+        if props.Lookup(clusterproperty.DefaultsV2) {
+            innerXErr = props.Inspect(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+                defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                _ = defaultsV2 // TODO: fix code
+                return nil
+            })
+        } else {
+            // Legacy
+            innerXErr = props.Inspect(task, clusterproperty.DefaultsV1, func(clonable data.Clonable) fail.Error {
+                defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                _ = defaultsV1 // TODO: fix code
+                return nil
+            })
+        }
+        if innerXErr != nil {
+            return innerXErr
+        }
+
+        if props.Lookup(clusterproperty.NetworkV2) {
+            innerXErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+                networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                _ = networkV2 // TODO: fix code
+                return nil
+            })
+        } else {
+            // Legacy
+            innerXErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
+                networkV1, ok := clonable.(*propertiesv1.ClusterDefaults)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                _ = networkV1 // TODO: fix code
+                return nil
+            })
+        }
+        if innerXErr != nil {
+            return innerXErr
+        }
+
+        if props.Lookup(clusterproperty.NodesV2) {
+            innerXErr = props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+                nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                _ = nodesV2 // TODO: fix code
+                return nil
+            })
+        } else {
+            // Legacy
+            innerXErr = props.Inspect(task, clusterproperty.NodesV1, func(clonable data.Clonable) fail.Error {
+                nodesV1, ok := clonable.(*propertiesv1.ClusterNodes)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv1.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                _ = nodesV1 // TODO: fix code
+                return nil
+            })
+        }
+        if innerXErr != nil {
+            return innerXErr
+        }
+
+        innerXErr = props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+            featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+            if !ok {
+                return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+            }
+            _ = featuresV1 // TODO: fix code
+            return nil
+        })
+        if innerXErr != nil {
+            return innerXErr
+        }
+
+        return props.Inspect(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+            stateV1, ok := clonable.(*propertiesv1.ClusterState)
+            if !ok {
+                return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+            }
+            out.State = protocol.ClusterState(stateV1.State)
+            return nil
+        })
+    })
+    if xerr != nil {
+        return nil, xerr
+    }
+    return out, nil
 }

@@ -18,7 +18,7 @@ func TestControlPlane_Clone(t *testing.T) {
     ct := newClusterControlPlane()
     ct.VirtualIP = vip
 
-    clonedCt, ok := ct.Clone().(*ClusterControlPlane)
+    clonedCt, ok := ct.Clone().(*ClusterControlplane)
     if !ok {
         t.Fail()
     }

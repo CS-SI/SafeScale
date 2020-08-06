@@ -25,6 +25,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/protocol"
     "github.com/CS-SI/SafeScale/lib/server/handlers"
     "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -33,7 +34,7 @@ import (
 // TemplateListener host service server grpc
 type TemplateListener struct{}
 
-// ErrorList available templates
+// List available templates
 func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (tl *protocol.TemplateList, err error) {
     defer fail.OnExitConvertToGRPCStatus(&err)
     defer fail.OnExitWrapError(&err, "cannot list templates")

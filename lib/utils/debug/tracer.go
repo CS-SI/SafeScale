@@ -74,8 +74,10 @@ const (
 // NewTracer creates a new Tracer instance
 func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
     t := tracer{
-        taskSig: task.GetSignature(),
         enabled: enable,
+    }
+    if task != nil {
+        t.taskSig = task.GetSignature()
     }
 
     message := strprocess.FormatStrings(msg...)
@@ -95,7 +97,7 @@ func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
     // }
     // VPL: la version d'Oscar
     if pc, file, _, ok := runtime.Caller(1); ok {
-        t.fileName = strings.Replace(file, callstack.SourceFilePartToRemove(), "", 1)
+        t.fileName = callstack.SourceFilePathUpdater()(file)
         if f := runtime.FuncForPC(pc); f != nil {
             t.funcName = filepath.Base(f.Name())
         }

@@ -128,13 +128,13 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
     }
 
     var jsoned []byte
-    err := d.Inspect(task, func(clonable data.Clonable) fail.Error {
+    xerr := d.Inspect(task, func(clonable data.Clonable) fail.Error {
         var innerErr error
         jsoned, innerErr = json.Marshal(clonable)
-        return fail.NewError(innerErr.Error())
+        return fail.ToError(innerErr)
     })
-    if err != nil {
-        return nil, err
+    if xerr != nil {
+        return nil, xerr
     }
     return jsoned, nil
 }
@@ -152,12 +152,7 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
         return fail.InvalidParameterError("buf", "cannot be empty []byte")
     }
 
-    xerr := d.Alter(task, func(clonable data.Clonable) fail.Error {
-        innerErr := json.Unmarshal(buf, clonable)
-        if innerErr != nil {
-            return fail.ToError(innerErr)
-        }
-        return nil
+    return d.Alter(task, func(clonable data.Clonable) fail.Error {
+        return fail.ToError(json.Unmarshal(buf, clonable))
     })
-    return xerr
 }

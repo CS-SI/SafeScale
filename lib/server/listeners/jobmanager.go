@@ -27,6 +27,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/server"
     "github.com/CS-SI/SafeScale/lib/server/iaas"
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 

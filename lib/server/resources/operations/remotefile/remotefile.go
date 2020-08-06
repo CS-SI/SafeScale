@@ -41,7 +41,7 @@ type Item struct {
 
 // Upload transfers the local file to the hostname
 func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if host == nil {
@@ -125,7 +125,7 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
         return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 

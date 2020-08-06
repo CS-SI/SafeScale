@@ -132,7 +132,7 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err 
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if callback == nil {
@@ -158,7 +158,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if callback == nil {
@@ -206,7 +206,7 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Error {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if clonable == nil {
@@ -258,7 +258,7 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if ref == "" {
@@ -359,7 +359,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -377,7 +377,7 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if callback == nil {
@@ -394,7 +394,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -447,7 +447,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
     if c.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -505,7 +505,7 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
