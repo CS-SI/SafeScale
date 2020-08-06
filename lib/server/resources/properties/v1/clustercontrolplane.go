@@ -23,28 +23,28 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// ClusterControlPlane contains information used by cluster control plane (when there is one)
+// ClusterControlplane contains information used by cluster control plane (when there is one)
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
-type ClusterControlPlane struct {
+type ClusterControlplane struct {
     VirtualIP *abstract.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
 }
 
-func newClusterControlPlane() *ClusterControlPlane {
-    return &ClusterControlPlane{}
+func newClusterControlPlane() *ClusterControlplane {
+    return &ClusterControlplane{}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cp *ClusterControlPlane) Clone() data.Clonable {
+func (cp *ClusterControlplane) Clone() data.Clonable {
     return newClusterControlPlane().Replace(cp)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (cp *ClusterControlPlane) Replace(p data.Clonable) data.Clonable {
-    src := p.(*ClusterControlPlane)
+func (cp *ClusterControlplane) Replace(p data.Clonable) data.Clonable {
+    src := p.(*ClusterControlplane)
     *cp = *src
     if src.VirtualIP != nil {
         cp.VirtualIP = src.VirtualIP.Clone().(*abstract.VirtualIP)
@@ -53,5 +53,5 @@ func (cp *ClusterControlPlane) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.ControlPlaneV1, &ClusterControlPlane{})
+    serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.ControlPlaneV1, &ClusterControlplane{})
 }

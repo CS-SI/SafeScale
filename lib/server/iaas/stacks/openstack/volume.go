@@ -17,12 +17,10 @@
 package openstack
 
 import (
-    "fmt"
+    "strings"
 
-    "github.com/davecgh/go-spew/spew"
     "github.com/sirupsen/logrus"
 
-    "github.com/gophercloud/gophercloud"
     volumesv1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
     volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
     "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
@@ -34,6 +32,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
+    netretry "github.com/CS-SI/SafeScale/lib/utils/net"
     "github.com/CS-SI/SafeScale/lib/utils/retry"
     "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -88,7 +87,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, rerr fail.Error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -98,39 +97,42 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
-    volume, rerr = s.GetVolume(request.Name)
-    if rerr != nil {
-        if _, ok := rerr.(*fail.ErrNotFound); !ok {
-            return nil, rerr
+    volume, xerr = s.GetVolume(request.Name)
+    if xerr != nil {
+        if _, ok := xerr.(*fail.ErrNotFound); !ok {
+            return nil, xerr
         }
     }
     if volume != nil {
         return nil, abstract.ResourceDuplicateError("volume", request.Name)
     }
 
-    az, rerr := s.SelectedAvailabilityZone()
-    if rerr != nil {
+    az, xerr := s.SelectedAvailabilityZone()
+    if xerr != nil {
         return nil, abstract.ResourceDuplicateError("volume", request.Name)
     }
 
-    var (
-        err error
-        v   abstract.Volume
-    )
+    var v   abstract.Volume
     switch s.versions["volume"] {
     case "v1":
         var vol *volumesv1.Volume
-        vol, err = volumesv1.Create(s.VolumeClient, volumesv1.CreateOpts{
-            AvailabilityZone: az,
-            Name:             request.Name,
-            Size:             request.Size,
-            VolumeType:       s.getVolumeType(request.Speed),
-        }).Extract()
-        if err != nil {
+        xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+            func() (innerErr error) {
+                vol, innerErr = volumesv1.Create(s.VolumeClient, volumesv1.CreateOpts{
+                    AvailabilityZone: az,
+                    Name:             request.Name,
+                    Size:             request.Size,
+                    VolumeType:       s.getVolumeType(request.Speed),
+                }).Extract()
+                return NormalizeError(innerErr)
+            },
+            2*temporal.GetDefaultDelay(),
+        )
+        if xerr != nil {
             break
         }
         if vol == nil {
-            err = fail.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
+            xerr = fail.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
             break
         }
         v = abstract.Volume{
@@ -142,17 +144,23 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
         }
     case "v2":
         var vol *volumesv2.Volume
-        vol, err = volumesv2.Create(s.VolumeClient, volumesv2.CreateOpts{
-            AvailabilityZone: az,
-            Name:             request.Name,
-            Size:             request.Size,
-            VolumeType:       s.getVolumeType(request.Speed),
-        }).Extract()
-        if err != nil {
+        xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+            func() (innerErr error) {
+                vol, innerErr = volumesv2.Create(s.VolumeClient, volumesv2.CreateOpts{
+                    AvailabilityZone: az,
+                    Name:             request.Name,
+                    Size:             request.Size,
+                    VolumeType:       s.getVolumeType(request.Speed),
+                }).Extract()
+                return NormalizeError(innerErr)
+            },
+            2*temporal.GetDefaultDelay(),
+        )
+        if xerr != nil {
             break
         }
         if vol == nil {
-            err = fail.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
+            xerr = fail.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
             break
         }
         v = abstract.Volume{
@@ -163,10 +171,10 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
             State: toVolumeState(vol.Status),
         }
     default:
-        err = fail.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
+        xerr = fail.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
     }
-    if err != nil {
-        return nil, fail.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
+    if xerr != nil {
+        return nil, xerr
     }
 
     return &v, nil
@@ -183,21 +191,29 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-    r := volumesv2.Get(s.VolumeClient, id)
-    volume, err := r.Extract()
-    if err != nil {
-        if _, ok := err.(gophercloud.ErrDefault404); ok {
+    var vol *volumesv2.Volume
+    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            vol, innerErr = volumesv2.Get(s.VolumeClient, id).Extract()
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if xerr != nil {
+        switch xerr.(type) {
+        case *fail.ErrNotFound:
             return nil, abstract.ResourceNotFoundError("volume", id)
+        default:
+            return nil, xerr
         }
-        return nil, fail.Wrap(err, "error getting volume: %s", ProviderErrorToString(err))
     }
 
     av := abstract.Volume{
-        ID:    volume.ID,
-        Name:  volume.Name,
-        Size:  volume.Size,
-        Speed: s.getVolumeSpeed(volume.VolumeType),
-        State: toVolumeState(volume.Status),
+        ID:    vol.ID,
+        Name:  vol.Name,
+        Size:  vol.Size,
+        Speed: s.getVolumeSpeed(vol.VolumeType),
+        State: toVolumeState(vol.Status),
     }
     return &av, nil
 }
@@ -211,39 +227,47 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
 
     var vs []abstract.Volume
-    err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-        list, err := volumesv2.ExtractVolumes(page)
-        if err != nil {
-            logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
-            return false, err
-        }
-        for _, vol := range list {
-            av := abstract.Volume{
-                ID:    vol.ID,
-                Name:  vol.Name,
-                Size:  vol.Size,
-                Speed: s.getVolumeSpeed(vol.VolumeType),
-                State: toVolumeState(vol.Status),
-            }
-            vs = append(vs, av)
-        }
-        return true, nil
-    })
-    if err != nil || len(vs) == 0 {
-        if err != nil {
-            return nil, fail.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
-        }
-        logrus.Warnf("Complete volume list empty")
+    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+                list, err := volumesv2.ExtractVolumes(page)
+                if err != nil {
+                    logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
+                    return false, err
+                }
+                for _, vol := range list {
+                    av := abstract.Volume{
+                        ID:    vol.ID,
+                        Name:  vol.Name,
+                        Size:  vol.Size,
+                        Speed: s.getVolumeSpeed(vol.VolumeType),
+                        State: toVolumeState(vol.Status),
+                    }
+                    vs = append(vs, av)
+                }
+                return true, nil
+            })
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if xerr != nil || len(vs) == 0 {
+        return nil, xerr
     }
+    // VPL: empty list is not an abnormal situation, do not log
+    // if len(vs) == 0 {
+    // logrus.Warnf("Complete volume list empty")
+    // }
+
     return vs, nil
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(id string) (rerr fail.Error) {
+func (s *Stack) DeleteVolume(id string) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
-    if id == "" {
+    if id = strings.TrimSpace(id); id == "" {
         return fail.InvalidParameterError("id", "cannot be empty string")
     }
 
@@ -251,28 +275,26 @@ func (s *Stack) DeleteVolume(id string) (rerr fail.Error) {
 
     var (
         timeout = temporal.GetBigDelay()
+        commDelay = 2*temporal.GetDefaultDelay()
     )
 
-    retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+    return retry.WhileUnsuccessfulDelay5Seconds(
         func() error {
-            r := volumesv2.Delete(s.VolumeClient, id, nil)
-            err := r.ExtractErr()
-            if err != nil {
-                switch err.(type) {
-                case gophercloud.ErrDefault400:
-                    return fail.NotAvailableError("volume not in state 'available'")
-                default:
-                    return fail.ToError(err)
-                }
+            innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+                func() error {
+                    innerErr := volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
+                    return NormalizeError(innerErr)
+                },
+                commDelay,
+            )
+            switch innerXErr.(type) {
+            case *fail.ErrInvalidRequest:
+                return fail.NotAvailableError("volume not in state 'available'")
             }
-            return nil
+            return innerXErr
         },
         timeout,
     )
-    if retryErr != nil {
-        return retryErr
-    }
-    return nil
 }
 
 // CreateVolumeAttachment attaches a volume to an host
@@ -283,27 +305,26 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
     if s == nil {
         return "", fail.InvalidInstanceError()
     }
-    if request.Name == "" {
+    if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
         return "", fail.InvalidParameterError("request.Name", "cannot be empty string")
     }
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
 
     // Creates the attachment
-    r := volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
-        VolumeID: request.VolumeID,
-    })
-    va, err := r.Extract()
-    if err != nil {
-        spew.Dump(r.Err)
-        // switch r.Err.(type) {
-        // 	case
-        // }
-        // message := extractMessageFromBadRequest(r.Err)
-        // if message != ""
-        return "", fail.Wrap(err, fmt.Sprintf("error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID, ProviderErrorToString(err)))
+    var va *volumeattach.VolumeAttachment
+    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            va, innerErr = volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
+                VolumeID: request.VolumeID,
+            }).Extract()
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if xerr != nil {
+        return "", xerr
     }
-
     return va.ID, nil
 }
 
@@ -312,18 +333,25 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if serverID == "" {
+    if serverID = strings.TrimSpace(serverID); serverID == "" {
         return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
     }
-    if id == "" {
+    if id = strings.TrimSpace(id); id == "" {
         return nil, fail.InvalidParameterError("id", "cannot be empty string")
     }
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
 
-    va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
-    if err != nil {
-        return nil, fail.Wrap(err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
+    var va *volumeattach.VolumeAttachment
+    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if xerr != nil {
+        return nil, xerr
     }
     return &abstract.VolumeAttachment{
         ID:       va.ID,
@@ -338,31 +366,37 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if serverID == "" {
+    if serverID = strings.TrimSpace(serverID); serverID == "" {
         return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
     }
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
     var vs []abstract.VolumeAttachment
-    err := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
-        list, err := volumeattach.ExtractVolumeAttachments(page)
-        if err != nil {
-            return false, fail.Wrap(err, "Error listing volume attachment: extracting attachments")
-        }
-        for _, va := range list {
-            ava := abstract.VolumeAttachment{
-                ID:       va.ID,
-                ServerID: va.ServerID,
-                VolumeID: va.VolumeID,
-                Device:   va.Device,
-            }
-            vs = append(vs, ava)
-        }
-        return true, nil
-    })
-    if err != nil {
-        return nil, fail.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
+    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
+                list, err := volumeattach.ExtractVolumeAttachments(page)
+                if err != nil {
+                    return false, err
+                }
+                for _, va := range list {
+                    ava := abstract.VolumeAttachment{
+                        ID:       va.ID,
+                        ServerID: va.ServerID,
+                        VolumeID: va.VolumeID,
+                        Device:   va.Device,
+                    }
+                    vs = append(vs, ava)
+                }
+                return true, nil
+            })
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if xerr != nil {
+        return []abstract.VolumeAttachment{}, xerr
     }
     return vs, nil
 }
@@ -372,19 +406,20 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
-    if serverID == "" {
+    if serverID = strings.TrimSpace(serverID); serverID == "" {
         return fail.InvalidParameterError("serverID", "cannot be empty string")
     }
-    if vaID == "" {
+    if vaID = strings.TrimSpace(vaID); vaID == "" {
         return fail.InvalidParameterError("vaID", "cannot be empty string")
     }
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
-    r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
-    err := r.ExtractErr()
-    if err != nil {
-        return fail.Wrap(err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
-    }
-    return nil
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
 }
