@@ -23,6 +23,8 @@ import (
 
     "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
+    netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // GetSecurityGroup returns the default security group
@@ -31,98 +33,104 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, fail.Error) 
     opts := secgroups.ListOpts{
         Name: s.DefaultSecurityGroupName,
     }
-    err := secgroups.List(s.NetworkClient, opts).EachPage(func(page pagination.Page) (bool, error) {
-        list, err := secgroups.ExtractGroups(page)
-        if err != nil {
-            return false, err
-        }
-        for _, e := range list {
-            if e.Name == name {
-                sgList = append(sgList, e)
-            }
-        }
-        return true, nil
-    })
-    if len(sgList) == 0 {
-        return nil, fail.ToError(err)
+    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := secgroups.List(s.NetworkClient, opts).EachPage(func(page pagination.Page) (bool, error) {
+                list, err := secgroups.ExtractGroups(page)
+                if err != nil {
+                    return false, err
+                }
+                for _, e := range list {
+                    if e.Name == name {
+                        sgList = append(sgList, e)
+                    }
+                }
+                return true, nil
+            })
+            return NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if xerr != nil {
+        return nil, xerr
     }
     if len(sgList) > 1 {
         return nil, fail.OverflowError(nil, 1, "several security groups named '%s' found", name)
     }
-
+    // VPL: no security group is not an abnormal situation, do not error
+    if len(sgList) == 0 {
+        return nil, nil
+    }
     return &sgList[0], nil
 }
 
 func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, fail.Error) {
-    sg, err := s.GetSecurityGroup(s.DefaultSecurityGroupName)
-    if err != nil {
-        return nil, fail.NewError("error listing routers: %s", ProviderErrorToString(err))
+    sg, xerr := s.GetSecurityGroup(s.DefaultSecurityGroupName)
+    if xerr != nil {
+        return nil, xerr
+    }
+    if sg == nil {
+        return nil, fail.NotFoundError("no default security group (named '%s') found", s.DefaultSecurityGroupName)
     }
     return sg, nil
+}
+
+// TODO: write a public equivalent to addRuleToSecurityGroup with rule absgtraction from SafeScale (to be defined)
+// addRuleToSecurityGroup adds a rule to a security group
+func (s *Stack) addRuleToSecurityGroup(groupID string, rule secrules.CreateOpts) fail.Error {
+    rule.SecGroupID = groupID
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, err := secrules.Create(s.NetworkClient, rule).Extract()
+            return NormalizeError(err)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
 }
 
 // createTCPRules creates TCP rules to configure the default security group
 func (s *Stack) createTCPRules(groupID string) fail.Error {
     // Open TCP Ports
-    ruleOpts := secrules.CreateOpts{
+    rule := secrules.CreateOpts{
         Direction:      secrules.DirIngress,
         PortRangeMin:   1,
         PortRangeMax:   65535,
         EtherType:      secrules.EtherType4,
-        SecGroupID:     groupID,
         Protocol:       secrules.ProtocolTCP,
         RemoteIPPrefix: "0.0.0.0/0",
     }
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
+    }
 
-    _, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
-    }
-    ruleOpts = secrules.CreateOpts{
-        Direction:      secrules.DirIngress,
-        PortRangeMin:   1,
-        PortRangeMax:   65535,
-        EtherType:      secrules.EtherType6,
-        SecGroupID:     groupID,
-        Protocol:       secrules.ProtocolTCP,
-        RemoteIPPrefix: "::/0",
-    }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+    rule.EtherType = secrules.EtherType6
+    rule.RemoteIPPrefix = "::/0"
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
 
     // Outbound = egress == going to Outside
-    ruleOpts = secrules.CreateOpts{
+    rule = secrules.CreateOpts{
         Direction:      secrules.DirEgress,
         PortRangeMin:   1,
         PortRangeMax:   65535,
         EtherType:      secrules.EtherType4,
-        SecGroupID:     groupID,
         Protocol:       secrules.ProtocolTCP,
         RemoteIPPrefix: "0.0.0.0/0",
     }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
-    ruleOpts = secrules.CreateOpts{
-        Direction:      secrules.DirEgress,
-        PortRangeMin:   1,
-        PortRangeMax:   65535,
-        EtherType:      secrules.EtherType6,
-        SecGroupID:     groupID,
-        Protocol:       secrules.ProtocolTCP,
-        RemoteIPPrefix: "::/0",
-    }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    return fail.ToError(err)
+
+    rule.EtherType = secrules.EtherType6
+    rule.RemoteIPPrefix = "::/0"
+    return s.addRuleToSecurityGroup(groupID, rule)
 }
 
 // createUDPRules creates UDP rules to configure the default security group
 func (s *Stack) createUDPRules(groupID string) fail.Error {
     // Inbound == ingress == coming from Outside
-    ruleOpts := secrules.CreateOpts{
+    rule := secrules.CreateOpts{
         Direction:      secrules.DirIngress,
         PortRangeMin:   1,
         PortRangeMax:   65535,
@@ -131,26 +139,18 @@ func (s *Stack) createUDPRules(groupID string) fail.Error {
         Protocol:       secrules.ProtocolUDP,
         RemoteIPPrefix: "0.0.0.0/0",
     }
-    _, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
-    ruleOpts = secrules.CreateOpts{
-        Direction:      secrules.DirIngress,
-        PortRangeMin:   1,
-        PortRangeMax:   65535,
-        EtherType:      secrules.EtherType6,
-        SecGroupID:     groupID,
-        Protocol:       secrules.ProtocolUDP,
-        RemoteIPPrefix: "::/0",
-    }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+
+    rule.EtherType = secrules.EtherType6
+    rule.RemoteIPPrefix = "::/0"
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
 
     // Outbound = egress == going to Outside
-    ruleOpts = secrules.CreateOpts{
+    rule = secrules.CreateOpts{
         Direction:      secrules.DirEgress,
         PortRangeMin:   1,
         PortRangeMax:   65535,
@@ -159,70 +159,50 @@ func (s *Stack) createUDPRules(groupID string) fail.Error {
         Protocol:       secrules.ProtocolUDP,
         RemoteIPPrefix: "0.0.0.0/0",
     }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
-    ruleOpts = secrules.CreateOpts{
-        Direction:      secrules.DirEgress,
-        PortRangeMin:   1,
-        PortRangeMax:   65535,
-        EtherType:      secrules.EtherType6,
-        SecGroupID:     groupID,
-        Protocol:       secrules.ProtocolUDP,
-        RemoteIPPrefix: "::/0",
-    }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    return fail.ToError(err)
+
+    rule.EtherType = secrules.EtherType6
+    rule.RemoteIPPrefix =  "::/0"
+    return s.addRuleToSecurityGroup(groupID, rule)
 }
 
 // createICMPRules creates ICMP rules inside the default security group
 func (s *Stack) createICMPRules(groupID string) error {
     // Inbound == ingress == coming from Outside
-    ruleOpts := secrules.CreateOpts{
+    rule := secrules.CreateOpts{
         Direction:      secrules.DirIngress,
         EtherType:      secrules.EtherType4,
         SecGroupID:     groupID,
         Protocol:       secrules.ProtocolICMP,
         RemoteIPPrefix: "0.0.0.0/0",
     }
-    _, err := secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
-    ruleOpts = secrules.CreateOpts{
-        Direction:      secrules.DirIngress,
-        EtherType:      secrules.EtherType6,
-        SecGroupID:     groupID,
-        Protocol:       secrules.ProtocolICMP,
-        RemoteIPPrefix: "::/0",
-    }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+
+    rule.EtherType = secrules.EtherType6
+    rule.RemoteIPPrefix= "::/0"
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
 
     // Outbound = egress == going to Outside
-    ruleOpts = secrules.CreateOpts{
+    rule = secrules.CreateOpts{
         Direction:      secrules.DirEgress,
         EtherType:      secrules.EtherType4,
         SecGroupID:     groupID,
         Protocol:       secrules.ProtocolICMP,
         RemoteIPPrefix: "0.0.0.0/0",
     }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    if err != nil {
-        return fail.ToError(err)
+    if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+        return xerr
     }
-    ruleOpts = secrules.CreateOpts{
-        Direction:      secrules.DirEgress,
-        EtherType:      secrules.EtherType6,
-        SecGroupID:     groupID,
-        Protocol:       secrules.ProtocolICMP,
-        RemoteIPPrefix: "::/0",
-    }
-    _, err = secrules.Create(s.NetworkClient, ruleOpts).Extract()
-    return fail.ToError(err)
+
+    rule.EtherType = secrules.EtherType6
+    rule.RemoteIPPrefix = "::/0"
+    return s.addRuleToSecurityGroup(groupID, rule)
 }
 
 // InitDefaultSecurityGroup create an open Security Group
@@ -232,9 +212,9 @@ func (s *Stack) InitDefaultSecurityGroup() fail.Error {
     if s.DefaultSecurityGroupName == "" {
         s.DefaultSecurityGroupName = stacks.DefaultSecurityGroupName
     }
-    sg, rerr := s.getDefaultSecurityGroup()
-    if rerr != nil {
-        return rerr
+    sg, xerr := s.getDefaultSecurityGroup()
+    if xerr != nil {
+        return xerr
     }
     if sg != nil {
         s.SecurityGroup = sg

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package app
 
 var (
     // Debug if set to true, work in debug mode

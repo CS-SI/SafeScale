@@ -24,6 +24,8 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
+    netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // ListOpts to define parameter of list
@@ -136,43 +138,58 @@ func (s *Stack) ListFloatingIPs() pagination.Pager {
 }
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
-func (s *Stack) GetFloatingIP(id string) (*FloatingIP, error) {
+func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
     r := getResult{}
     url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
     opts := gophercloud.RequestOpts{
         JSONResponse: &r.Body,
         OkCodes:      []int{200, 201},
     }
-    _, err := s.Stack.Driver.Request("GET", url, &opts)
-    r.Err = err
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, err := s.Stack.Driver.Request("GET", url, &opts)
+            r.Err = err
+            return openstack.NormalizeError(err)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
+    }
+
     fip, err := r.Extract()
     if err != nil {
-        return nil, fail.NewError("failed to get information for Floating IP id '%s': %s", id, openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
     return fip, nil
 }
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
 func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
-    pager := s.ListFloatingIPs()
     found := false
     fip := FloatingIP{}
-    err := pager.EachPage(func(page pagination.Page) (bool, error) {
-        list, err := extractFloatingIPs(page)
-        if err != nil {
-            return false, err
-        }
-        for _, i := range list {
-            if i.PublicIPAddress == ipAddress {
-                found = true
-                fip = i
-                return false, nil
-            }
-        }
-        return true, nil
-    })
-    if err != nil {
-        return nil, fail.NewError("failed to browse Floating IPs: %s", openstack.ProviderErrorToString(err))
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := s.ListFloatingIPs().EachPage(func(page pagination.Page) (bool, error) {
+                list, err := extractFloatingIPs(page)
+                if err != nil {
+                    return false, err
+                }
+                for _, i := range list {
+                    if i.PublicIPAddress == ipAddress {
+                        found = true
+                        fip = i
+                        return false, nil
+                    }
+                }
+                return true, nil
+            })
+            return openstack.NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
     }
     if found {
         return &fip, nil
@@ -181,13 +198,13 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
+func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
     ipOpts := ipCreateOpts{
         Type: "5_bgp",
     }
     bi, err := ipOpts.toFloatingIPCreateMap()
     if err != nil {
-        return nil, fail.NewError("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
     bandwidthOpts := bandwidthCreateOpts{
         Name:      "bandwidth-" + s.vpc.Name,
@@ -196,7 +213,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
     }
     bb, err := bandwidthOpts.toBandwidthCreateMap()
     if err != nil {
-        return nil, fail.NewError("failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
     // Merger bi in bb
     for k, v := range bi {
@@ -210,35 +227,46 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
         JSONResponse: &r.Body,
         OkCodes:      []int{200, 201},
     }
-    _, err = s.Stack.Driver.Request("POST", url, &opts)
-    if err != nil {
-        return nil, fail.NewError("failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err))
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, innerErr := s.Stack.Driver.Request("POST", url, &opts)
+            return openstack.NormalizeError(innerErr)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
     }
     fip, err := r.Extract()
     if err != nil {
-        return nil, fail.Wrap(err, "failed to create Floating IP")
+        return nil, openstack.NormalizeError(err)
     }
     return fip, nil
 }
 
 // DeleteFloatingIP deletes a floating IP
-func (s *Stack) DeleteFloatingIP(id string) error {
+func (s *Stack) DeleteFloatingIP(id string) fail.Error {
     r := deleteResult{}
     url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
     opts := gophercloud.RequestOpts{
         JSONResponse: &r.Body,
         OkCodes:      []int{200, 201},
     }
-    _, r.Err = s.Stack.Driver.Request("DELETE", url, &opts)
-    err := r.ExtractErr()
-    return err
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, r.Err = s.Stack.Driver.Request("DELETE", url, &opts)
+            err := r.ExtractErr()
+            return openstack.NormalizeError(err)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
 }
 
-// AssociateFloatingIP to host
-func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) error {
-    fip, err := s.GetFloatingIP(id)
-    if err != nil {
-        return fail.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
+// AssociateFloatingIP associates a floating ip to an host
+func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+    fip, xerr := s.GetFloatingIP(id)
+    if xerr != nil {
+        return xerr
     }
 
     b := map[string]interface{}{
@@ -247,20 +275,21 @@ func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) error {
         },
     }
 
-    r := servers.ActionResult{}
-    _, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
-    err = r.ExtractErr()
-    if err != nil {
-        return fail.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
-    }
-    return nil
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            r := servers.ActionResult{}
+            _, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+            return openstack.NormalizeError(r.ExtractErr())
+        },
+        2*temporal.GetDefaultDelay(),
+    )
 }
 
 // DissociateFloatingIP from host
-func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) error {
-    fip, err := s.GetFloatingIP(id)
-    if err != nil {
-        return fail.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
+func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+    fip, xerr := s.GetFloatingIP(id)
+    if xerr != nil {
+        return xerr
     }
 
     b := map[string]interface{}{
@@ -269,11 +298,12 @@ func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) error {
         },
     }
 
-    r := servers.ActionResult{}
-    _, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
-    err = r.ExtractErr()
-    if err != nil {
-        return fail.NewError("failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err))
-    }
-    return nil
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            r := servers.ActionResult{}
+            _, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+            return openstack.NormalizeError(r.ExtractErr())
+        },
+        2*temporal.GetDefaultDelay(),
+    )
 }

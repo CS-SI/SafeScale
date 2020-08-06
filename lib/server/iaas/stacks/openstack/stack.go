@@ -91,7 +91,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
     // Openstack client
     s.Driver, err = openstack.AuthenticatedClient(gcOpts)
     if err != nil {
-        return nil, fail.NewError(ProviderErrorToString(err))
+        return nil, NormalizeError(err)
     }
 
     // Compute API
@@ -102,10 +102,9 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
         })
     default:
         return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
-
     }
     if err != nil {
-        return nil, fail.NewError(ProviderErrorToString(err))
+        return nil, NormalizeError(err)
     }
 
     // Network API
@@ -118,7 +117,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
         return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
     }
     if err != nil {
-        return nil, fail.NewError(ProviderErrorToString(err))
+        return nil, NormalizeError(err)
     }
 
     // Volume API
@@ -135,14 +134,14 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
         return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
     }
     if err != nil {
-        return nil, fail.NewError(ProviderErrorToString(err))
+        return nil, NormalizeError(err)
     }
 
     // Get provider network ID from network service
     if cfg.ProviderNetwork != "" {
         s.ProviderNetworkID, err = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
         if err != nil {
-            return nil, fail.NewError(ProviderErrorToString(err))
+            return nil, NormalizeError(err)
         }
     }
 

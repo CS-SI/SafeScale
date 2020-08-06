@@ -17,9 +17,10 @@
 package huaweicloud
 
 import (
+    "strings"
+
     "github.com/sirupsen/logrus"
 
-    "github.com/gophercloud/gophercloud"
     "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
     "github.com/gophercloud/gophercloud/pagination"
 
@@ -28,6 +29,8 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
+    netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // // DeleteVolume deletes the volume identified by id
@@ -102,10 +105,18 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
         Size:             request.Size,
         VolumeType:       s.getVolumeType(request.Speed),
     }
-    vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
-    if err != nil {
-        return nil, fail.NewError("error creating volume: %s", openstack.ProviderErrorToString(err))
+    var vol *volumes.Volume
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            vol, innerErr = volumes.Create(s.Stack.VolumeClient, opts).Extract()
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
     }
+
     v := abstract.Volume{
         ID:    vol.ID,
         Name:  vol.Name,
@@ -122,53 +133,75 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+    if id = strings.TrimSpace(id); id == "" {
+        return nil, fail.InvalidParameterError("id", "cannot be empty string")
+    }
 
-    r := volumes.Get(s.Stack.VolumeClient, id)
-    volume, err := r.Extract()
-    if err != nil {
-        if _, ok := err.(gophercloud.ErrDefault404); ok {
+    var vol *volumes.Volume
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            vol, innerErr = volumes.Get(s.Stack.VolumeClient, id).Extract()
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        switch commRetryErr.(type) {
+        case *fail.ErrNotFound:
             return nil, abstract.ResourceNotFoundError("volume", id)
+        default:
+            return nil, commRetryErr
         }
-        return nil, fail.Wrap(err, "error getting volume: %s", openstack.ProviderErrorToString(err))
     }
 
     av := abstract.Volume{
-        ID:    volume.ID,
-        Name:  volume.Name,
-        Size:  volume.Size,
-        Speed: s.getVolumeSpeed(volume.VolumeType),
-        State: toVolumeState(volume.Status),
+        ID:    vol.ID,
+        Name:  vol.Name,
+        Size:  vol.Size,
+        Speed: s.getVolumeSpeed(vol.VolumeType),
+        State: toVolumeState(vol.Status),
     }
     return &av, nil
 }
 
 // ListVolumes lists volumes
 func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+    if s == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+
     var vs []abstract.Volume
-    err := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-        list, err := volumes.ExtractVolumes(page)
-        if err != nil {
-            logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
-            return false, err
-        }
-        for _, vol := range list {
-            av := abstract.Volume{
-                ID:    vol.ID,
-                Name:  vol.Name,
-                Size:  vol.Size,
-                Speed: s.getVolumeSpeed(vol.VolumeType),
-                State: toVolumeState(vol.Status),
-            }
-            vs = append(vs, av)
-        }
-        return true, nil
-    })
-    if err != nil {
-        return nil, fail.Wrap(err, "error listing volume types")
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+                list, err := volumes.ExtractVolumes(page)
+                if err != nil {
+                    logrus.Errorf("Error listing volumes: volume extraction: %+v", err)
+                    return false, err
+                }
+                for _, vol := range list {
+                    av := abstract.Volume{
+                        ID:    vol.ID,
+                        Name:  vol.Name,
+                        Size:  vol.Size,
+                        Speed: s.getVolumeSpeed(vol.VolumeType),
+                        State: toVolumeState(vol.Status),
+                    }
+                    vs = append(vs, av)
+                }
+                return true, nil
+            })
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
     }
-    if len(vs) == 0 {
-        logrus.Warnf("Complete volume list empty")
-    }
+    // VPL: empty list is not an abnormal situation, do not log or raise error
+    // if len(vs) == 0 {
+    //     logrus.Warnf("Complete volume list empty")
+    // }
     return vs, nil
 }
 

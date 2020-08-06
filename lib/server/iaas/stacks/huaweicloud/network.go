@@ -92,40 +92,54 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
 
     b, err := gophercloud.BuildRequestBody(req, "vpc")
     if err != nil {
-        return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
 
-    resp := vpcCreateResult{}
     url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs"
+    resp := vpcCreateResult{}
     opts := gophercloud.RequestOpts{
         JSONBody:     b,
         JSONResponse: &resp.Body,
         OkCodes:      []int{200, 201},
     }
-    _, err = s.Stack.Driver.Request("POST", url, &opts)
-    if err != nil {
-        return nil, fail.NewError("failed to send a POST request to provider '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, err = s.Stack.Driver.Request("POST", url, &opts)
+            return openstack.NormalizeError(err)
+        },
+        2*temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, fail.Prepend(commRetryErr, "query to create VPC failed")
     }
     vpc, err := resp.Extract()
     if err != nil {
-        return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
 
     // Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
-    router, err := routers.Get(s.Stack.NetworkClient, vpc.ID).Extract()
-    if err != nil {
-        nerr := s.DeleteVPC(vpc.ID)
-        if nerr != nil {
-            logrus.Warnf("Error deleting VPC: %v", nerr)
+    var router *routers.Router
+    commRetryErr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            router, innerErr = routers.Get(s.Stack.NetworkClient, vpc.ID).Extract()
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        derr := s.DeleteVPC(vpc.ID)
+        if derr != nil {
+            logrus.Warnf("Error deleting VPC: %v", derr)
+            commRetryErr.AddConsequence(derr)
         }
-        return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+        return nil, fail.Prepend(commRetryErr, "failed to find OpenStack router of VPC")
     }
     vpc.Router = router
 
     // Searching for the Network binded to the VPC
-    network, err := s.findVPCBindedNetwork(vpc.Name)
-    if err != nil {
-        return nil, fail.NewError("failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err))
+    network, xerr := s.findVPCBindedNetwork(vpc.Name)
+    if xerr != nil {
+        return nil, fail.Prepend(xerr, "failed to find network binded to VPC")
     }
     vpc.Network = network
 
@@ -150,9 +164,16 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, fail.Er
         return nil, fail.NotFoundError(nil, nil, "failed to find router associated to VPC '%s'", vpcName)
     }
 
-    network, err := networks.Get(s.Stack.NetworkClient, router.NetworkID).Extract()
-    if err != nil {
-        return nil, fail.NotFoundError("failed to find binded network of VPC '%s': %s", vpcName, openstack.ProviderErrorToString(err))
+    var network *networks.Network
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() (innerErr error) {
+            network, innerErr = networks.Get(s.Stack.NetworkClient, router.NetworkID).Extract()
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, fail.Prepend(commRetryErr, "failed to get information of binded network")
     }
     return network, nil
 }
@@ -165,11 +186,21 @@ func (s *Stack) GetVPC(id string) (*VPC, fail.Error) {
         JSONResponse: &r.Body,
         OkCodes:      []int{200, 201},
     }
-    _, err := s.Stack.Driver.Request("GET", url, &opts)
-    r.Err = err
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, err := s.Stack.Driver.Request("GET", url, &opts)
+            r.Err = err
+            return openstack.NormalizeError(err)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
+    }
+
     vpc, err := r.Extract()
     if err != nil {
-        return nil, fail.NewError("error getting Network %s: %s", id, openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
     return vpc, nil
 }
@@ -322,21 +353,30 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if name == "" {
+    if name = strings.TrimSpace(name); name == "" {
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
 
     // Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
     r := networks.GetResult{}
-    _, r.Err = s.Stack.NetworkClient.Get(s.Stack.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
-        OkCodes: []int{200, 203},
-    })
-    if r.Err != nil {
-        if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, r.Err = s.Stack.NetworkClient.Get(s.Stack.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
+                OkCodes: []int{200, 203},
+            })
+            return openstack.NormalizeError(r.Err)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        switch commRetryErr.(type) {
+        case *fail.ErrForbidden:
             return nil, abstract.ResourceForbiddenError("network", name)
+        default:
+            return nil, commRetryErr
         }
-        return nil, fail.NewError("query for network '%s' failed: %v", name, r.Err)
     }
+
     subnetworks, found := r.Body.(map[string]interface{})["subnets"].([]interface{})
     if found && len(subnetworks) > 0 {
         var (
@@ -439,8 +479,6 @@ type subnetDeleteResult struct {
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Error) {
-    const CANNOT = "cannot create subnet"
-
     network, networkDesc, _ := net.ParseCIDR(cidr)
 
     // Validates CIDR regarding the existing subnets
@@ -449,7 +487,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
         return nil, xerr
     }
     if xerr = wouldOverlap(subnetworks, *networkDesc); xerr != nil {
-        return nil, fail.Wrap(xerr, CANNOT)
+        return nil, xerr
     }
     // for _, s := range subnetworks {
     // 	_, sDesc, _ := net.ParseCIDR(s.CIDR)
@@ -489,7 +527,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
     }
     b, err := gophercloud.BuildRequestBody(req, "subnet")
     if err != nil {
-        return nil, fail.NewError("error preparing subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err))
+        return nil, openstack.NormalizeError(err)
     }
 
     respCreate := subnetCreateResult{}
@@ -499,13 +537,18 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
         JSONResponse: &respCreate.Body,
         OkCodes:      []int{200, 201},
     }
-    _, err = s.Stack.Driver.Request("POST", url, &opts)
-    if err != nil {
-        tErr := openstack.NormalizeError(err)
-        switch tErr.(type) { // nolint
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, innerErr := s.Stack.Driver.Request("POST", url, &opts)
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        switch commRetryErr.(type) { // nolint
         case *fail.ErrInvalidRequest:
             body := map[string]interface{}{}
-            err = json.Unmarshal([]byte(tErr.Error()), &body)
+            err = json.Unmarshal([]byte(commRetryErr.Error()), &body)
             if err != nil {
                 err = fail.InconsistentError("response is not json")
             } else {
@@ -514,17 +557,17 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
                 case "VPC.0003":
                     err = fail.NotFoundError("VPC has vanished")
                 default:
-                    err = fail.Wrap(tErr, fmt.Sprintf("response code '%s' is not handled", code))
+                    err = fail.Prepend(commRetryErr, "response code '%s' is not handled", code)
                 }
             }
-            return nil, fail.Wrap(err, CANNOT)
+            return nil, fail.ToError(err)
         }
-        return nil, fail.Wrap(tErr, CANNOT)
+        return nil, commRetryErr
     }
 
     subnet, err := respCreate.Extract()
     if err != nil {
-        return nil, fail.Wrap(err, CANNOT)
+        return nil, openstack.NormalizeError(err)
     }
 
     // Subnet creation started, need to wait the subnet to reach the status ACTIVE
@@ -534,14 +577,20 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
 
     retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
         func() error {
-            _, err = s.Stack.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
-            if err == nil {
+            commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+                func() error {
+                    _, err = s.Stack.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
+                    return openstack.NormalizeError(err)
+                },
+                temporal.GetDefaultDelay(),
+            )
+            if commRetryErr == nil {
                 subnet, err = respGet.Extract()
                 if err == nil && subnet.Status == "ACTIVE" {
                     return nil
                 }
             }
-            return err
+            return openstack.NormalizeError(err)
         },
         temporal.GetContextTimeout(),
         func(try retry.Try, v verdict.Enum) {
@@ -560,19 +609,23 @@ func (s *Stack) listSubnets() ([]subnets.Subnet, fail.Error) {
         return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
     })
     var subnetList []subnets.Subnet
-    paginationErr := pager.EachPage(func(page pagination.Page) (bool, error) {
-        list, err := subnets.ExtractSubnets(page)
-        if err != nil {
-            return false, fail.NewError("error listing subnets: %s", openstack.ProviderErrorToString(err))
-        }
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := pager.EachPage(func(page pagination.Page) (bool, error) {
+                list, err := subnets.ExtractSubnets(page)
+                if err != nil {
+                    return false, openstack.NormalizeError(err)
+                }
 
-        subnetList = append(subnetList, list...)
-
-        return true, nil
-    })
-    if paginationErr != nil {
-        logrus.Warnf("We have a pagination error: %v", paginationErr)
-        return nil, fail.ToError(paginationErr)
+                subnetList = append(subnetList, list...)
+                return true, nil
+            })
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
     }
     return subnetList, nil
 }
@@ -585,18 +638,24 @@ func (s *Stack) getSubnet(id string) (*subnets.Subnet, fail.Error) {
         JSONResponse: &r.Body,
         OkCodes:      []int{200, 201},
     }
-    _, err := s.Stack.Driver.Request("GET", url, &opts)
-    r.Err = err
-    subnet, err := r.Extract()
-    if err != nil {
-        return nil, fail.NewError("failed to get information for subnet id '%s': %s", id, openstack.ProviderErrorToString(err))
+    var subnet *subnetEx
+    commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            _, innerErr := s.Stack.Driver.Request("GET", url, &opts)
+            r.Err = innerErr
+            subnet, innerErr = r.Extract()
+            return openstack.NormalizeError(innerErr)
+        },
+        temporal.GetDefaultDelay(),
+    )
+    if commRetryErr != nil {
+        return nil, commRetryErr
     }
     return &subnet.Subnet, nil
 }
 
 // deleteSubnet deletes a subnet
 func (s *Stack) deleteSubnet(id string) fail.Error {
-    resp := subnetDeleteResult{}
     url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + s.vpc.ID + "/subnets/" + id
     opts := gophercloud.RequestOpts{
         OkCodes: []int{204},
@@ -605,23 +664,31 @@ func (s *Stack) deleteSubnet(id string) fail.Error {
     // FlexibleEngine has the curious behavior to be able to tell us all Hosts are deleted, but
     // cannot delete the subnet because there is still at least one host...
     // So we retry subnet deletion until all hosts are really deleted and subnet can be deleted
-    xerr := retry.Action(
+    return retry.Action(
         func() error {
-            r, _ := s.Stack.Driver.Request("DELETE", url, &opts)
-            if r == nil {
-                return fail.NewError("failed to acknowledge DELETE command submission")
-            }
-            switch r.StatusCode {
-            case 404:
-                logrus.Infof("subnet '%s' not found, considered as success", id)
-                fallthrough
-            case 200, 204:
-                return nil
-            case 409:
-                return fmt.Errorf("409")
-            default:
-                return fmt.Errorf("DELETE command failed with status %d", r.StatusCode)
-            }
+            return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+                func() error {
+                    r, innerErr := s.Stack.Driver.Request("DELETE", url, &opts)
+                    if innerErr != nil {
+                        return openstack.NormalizeError(innerErr)
+                    }
+                    if r != nil {
+                        switch r.StatusCode {
+                        case 404:
+                            logrus.Infof("subnet '%s' not found, considered as success", id)
+                            fallthrough
+                        case 200, 204:
+                            return nil
+                        case 409:
+                            return fail.NewError("409")
+                        default:
+                            return fail.NewError("DELETE command failed with status %d", r.StatusCode)
+                        }
+                    }
+                    return nil
+                },
+                temporal.GetDefaultDelay(),
+            )
         },
         retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostCleanupTimeout())),
         retry.Constant(temporal.GetDefaultDelay()),
@@ -637,15 +704,6 @@ func (s *Stack) deleteSubnet(id string) fail.Error {
             }
         },
     )
-    if xerr != nil {
-        return fail.Wrap(xerr, "failed to submit deletion of subnet '%s'", id)
-    }
-    // Deletion submit has been executed, checking returned error code
-    err := resp.ExtractErr()
-    if err != nil {
-        return fail.NewError("error deleting subnet '%s': %s", id, openstack.ProviderErrorToString(err))
-    }
-    return nil
 }
 
 // findSubnetByName returns a subnets.Subnet if subnet named as 'name' exists
