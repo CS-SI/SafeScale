@@ -32,6 +32,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 

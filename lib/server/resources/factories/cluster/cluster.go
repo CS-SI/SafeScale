@@ -19,13 +19,37 @@ package cluster
 import (
     "github.com/CS-SI/SafeScale/lib/server/iaas"
     "github.com/CS-SI/SafeScale/lib/server/resources"
+    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/operations"
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+// List returns a list of available hosts
+func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
+    nullList := []abstract.ClusterIdentity{}
+
+    if task.IsNull() {
+        return nullList, fail.InvalidParameterError("task", "cannot be null value")
+    }
+    if svc.IsNull() {
+        return nullList, fail.InvalidParameterError("svc", "cannot be null value")
+    }
+
+    objc, xerr := New(task, svc)
+    if xerr != nil {
+        return nil, xerr
+    }
+    list = []abstract.ClusterIdentity{}
+    xerr = objc.Browse(task, func(hc *abstract.ClusterIdentity) fail.Error {
+        list = append(list, *hc)
+        return nil
+    })
+    return list, xerr
+}
+
 // New creates a new instance of resources.Cluster
-func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err error) {
+func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
     if svc == nil {
         return nil, fail.InvalidParameterError("svc", "cannot be nil")
     }
@@ -33,8 +57,8 @@ func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, err erro
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, err error) {
-    if task == nil {
+func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("t", "cannot be nil")
     }
     if svc == nil {

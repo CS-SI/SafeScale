@@ -24,7 +24,7 @@ import (
 )
 
 func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if host == nil {

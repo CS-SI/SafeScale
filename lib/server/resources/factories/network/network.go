@@ -36,7 +36,7 @@ func New(svc iaas.Service) (resources.Network, fail.Error) {
 
 // Load loads the metadata of a network and returns an instance of resources.Network
 func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc == nil {

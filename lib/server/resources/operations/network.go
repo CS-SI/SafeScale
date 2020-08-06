@@ -76,7 +76,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 
 // LoadNetwork loads the metadata of a network
 func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nullNetwork(), fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc.IsNull() {
@@ -117,7 +117,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
     if objn.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -578,7 +578,7 @@ func (objn network) Browse(task concurrency.Task, callback func(*abstract.Networ
     if objn.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "can't be nil")
     }
     if callback == nil {
@@ -600,7 +600,7 @@ func (objn *network) AttachHost(task concurrency.Task, host resources.Host) (xer
     if objn.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if host == nil {
@@ -633,7 +633,7 @@ func (objn *network) DetachHost(task concurrency.Task, hostID string) (xerr fail
     if objn.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if hostID == "" {
@@ -666,7 +666,7 @@ func (objn network) ListHosts(task concurrency.Task) (_ []resources.Host, xerr f
     if objn.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -700,7 +700,7 @@ func (objn network) GetGateway(task concurrency.Task, primary bool) (_ resources
     if objn.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -748,7 +748,7 @@ func (objn *network) Delete(task concurrency.Task) (xerr fail.Error) {
     if objn.IsNull() {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -912,7 +912,7 @@ func (objn network) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fa
     if objn.IsNull() {
         return "", fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return "", fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -952,7 +952,7 @@ func (objn network) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.E
     if objn.IsNull() {
         return ip, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return ip, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1009,7 +1009,7 @@ func (objn network) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP
     if objn.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1036,7 +1036,7 @@ func (objn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error
     if objn.IsNull() {
         return "", fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return "", fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -1064,7 +1064,7 @@ func (objn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr
     if objn.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 

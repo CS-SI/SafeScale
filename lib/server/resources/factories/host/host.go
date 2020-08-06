@@ -26,7 +26,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// ErrorList returns a list of available hosts
+// List returns a list of available hosts
 func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
     if svc == nil {
         return nil, fail.InvalidParameterError("svc", "cannot be nil")
@@ -65,7 +65,7 @@ func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 
 // Load loads the metadata of host and returns an instance of resources.Host
 func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc == nil {

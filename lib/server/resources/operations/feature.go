@@ -63,7 +63,7 @@ func nullFeature() *feature {
 
 // ListFeatures lists all features suitable for hosts or clusters
 func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
@@ -133,7 +133,7 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, fai
 //    - fail.ErrNotFound if no feature is found by its name
 //    - fail.ErrSyntax if feature found contains syntax error
 func NewFeature(task concurrency.Task, name string) (_ resources.Feature, xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nullFeature(), fail.InvalidParameterError("task", "cannot be nil")
     }
     if name == "" {
@@ -186,7 +186,7 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, xerr f
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ resources.Feature, xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nullFeature(), fail.InvalidParameterError("task", "cannot be nil")
     }
     if name == "" {

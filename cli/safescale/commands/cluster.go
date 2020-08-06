@@ -17,7 +17,6 @@
 package commands
 
 import (
-    "encoding/json"
     "fmt"
     "os"
     "path/filepath"
@@ -32,7 +31,6 @@ import (
     "github.com/CS-SI/SafeScale/lib/protocol"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
     "github.com/CS-SI/SafeScale/lib/utils"
     clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -204,78 +202,60 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
         "complexity_label": c.GetIdentity().GetComplexity().String(),
         "admin_login":      "cladm",
         "admin_password":   c.GetIdentity().GetAdminPassword(),
-        "keypair":          c.GetIdentity().GetSshConfig().GetPrivateKey(),
+        // "keypair":        c.GetIdentity().GetSshConfig().GetPrivateKey(),
+        "ssh_private_key":  c.GetIdentity().GetPrivateKey(),
     }
 
-    properties := c.GetProperties()
-    var (
-        content  map[string]interface{}
-        sgwpubip string
-    )
-    for _, v := range properties {
-        err := json.Unmarshal([]byte(v), &content)
-        if err != nil {
-            return nil, fail.ToError(err)
-        }
-        for propnum, propcont := range content {
-            switch propnum {
-            case clusterproperty.CompositeV1:
-                if tenants, ok := propcont.([]interface{}); ok {
-                    result["tenant"] = tenants[0]
-                }
-            case clusterproperty.ControlPlaneV1:
-                if cp, ok := propcont.(map[string]interface{}); ok {
-                    result["controplanevip"] = cp["VIP"]
-                }
-            case clusterproperty.NetworkV2:
-                if net, ok := propcont.(map[string]interface{}); ok {
-                    result["network_id"] = net["NetworkID"]
-                    result["cidr"] = net["CIDR"]
-                    result["default_route_ip"] = net["DefaultRouteIP"]
-                    result["primary_gateway_ip"] = net["GatewayIP"]
-                    result["endpoint_ip"] = net["EndpointIP"]
-                    result["primary_public_ip"] = net["EndpointIP"]
-                    if sgwpubip, ok = net["SecondaryPublicIP"].(string); ok && sgwpubip != "" {
-                        result["secondary_gateway_ip"] = net["SecondaryGatewayIP"]
-                        result["secondary_public_ip"] = sgwpubip
-                    }
-                }
-            case clusterproperty.DefaultsV1:
-                if _, ok := result["defaults"]; !ok {
-                    if defaults, ok := propcont.(map[string]interface{}); ok {
-                        result["defaults"] = map[string]interface{}{
-                            "image":  defaults["Image"].(string),
-                            "master": defaults["MasterSizing"],
-                            "node":   defaults["NodeSizing"],
-                        }
-                    }
-                }
-            case clusterproperty.DefaultsV2:
-                if defaults, ok := propcont.(map[string]interface{}); ok {
-                    result["defaults"] = map[string]interface{}{
-                        "image":   defaults["Image"],
-                        "gateway": defaults["GatewaySizing"],
-                        "master":  defaults["MasterSizing"],
-                        "node":    defaults["NodeSizing"],
-                    }
-                }
-            case clusterproperty.NodesV2:
-                if nodes, ok := propcont.(map[string]map[string]interface{}); ok {
-                    result["nodes"] = map[string]interface{}{
-                        "masters": nodes["Masters"],
-                        "nodes":   nodes["PrivateNodes"],
-                    }
-                }
-            case clusterproperty.FeaturesV1:
-                result["features"] = propcont.(map[string]map[string]interface{})
-            case clusterproperty.StateV1:
-                if state, ok := propcont.(clusterstate.Enum); ok {
-                    result["last_state"] = state
-                    result["last_state_label"] = state.String()
-                }
-            }
+    if c.Composite != nil && len(c.Composite.Tenants) > 0 {
+        result["tenant"] = c.Composite.Tenants[0]
+    }
+
+    if c.Controlplane != nil {
+        if c.Controlplane.Vip != nil {
+            result["controplane_vip"] = c.Controlplane.Vip.PrivateIp
         }
     }
+
+    var sgwpubip string
+    if c.Network != nil {
+        result["network_id"] = c.Network.NetworkId
+        result["cidr"] = c.Network.Cidr
+        result["default_route_ip"] = c.Network.DefaultRouteIp
+        result["primary_gateway_ip"] = c.Network.GatewayIp
+        result["endpoint_ip"] = c.Network.EndpointIp
+        result["primary_public_ip"] = c.Network.EndpointIp
+        if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {
+            result["secondary_gateway_ip"] = sgwpubip
+            result["secondary_public_ip"] = sgwpubip
+        }
+    }
+
+    if c.Defaults != nil {
+        result["defaults"] = map[string]interface{}{
+            "image":   c.Defaults.Image,
+            "gateway": c.Defaults.GatewaySizing,
+            "master":  c.Defaults.MasterSizing,
+            "node":    c.Defaults.NodeSizing,
+        }
+    }
+
+    nodes := map[string][]*protocol.Host{}
+    if c.Masters != nil {
+        nodes["masters"] = c.Masters
+    }
+    if c.Nodes != nil {
+        nodes["nodes"] = c.Nodes
+    }
+    result["nodes"] = nodes
+
+    if c.InstalledFeatures != nil {
+        result["installed_features"] = c.InstalledFeatures
+    }
+    if c.DisabledFeatures != nil {
+        result["disabled_features"] = c.DisabledFeatures
+    }
+
+    result["last_state"] = c.State
     result["admin_login"] = "cladm"
 
     // Add information not directly in cluster GetConfig()

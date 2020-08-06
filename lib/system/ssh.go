@@ -506,7 +506,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
     if sc == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
 
@@ -755,7 +755,7 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
     if ssh == nil {
         return nil, fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     ctx, err := task.GetContext()
@@ -787,7 +787,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
     if ssh == nil {
         return "", fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return "", fail.InvalidParameterError("task", "cannot be nil")
     }
     if phase == "" {

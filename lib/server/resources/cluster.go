@@ -17,6 +17,7 @@
 package resources
 
 import (
+    "github.com/CS-SI/SafeScale/lib/protocol"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
@@ -35,6 +36,7 @@ type Cluster interface {
     Targetable
     data.NullValue
 
+    Browse(task concurrency.Task, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error                                                         // ...
     Create(task concurrency.Task, req abstract.ClusterRequest) fail.Error // Create creates a new cluster and save its metadata
     GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, fail.Error)
     GetFlavor(task concurrency.Task) (clusterflavor.Enum, fail.Error)                                                   // Flavor returns the flavor of the cluster
@@ -65,4 +67,5 @@ type Cluster interface {
     AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)       // adds feature on cluster
     RemoveFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)    // removes feature from cluster
     ListInstalledFeatures(task concurrency.Task) ([]Feature, fail.Error)                                                // returns the list of installed features
+    ToProtocol(concurrency.Task) (*protocol.ClusterResponse, fail.Error)
 }

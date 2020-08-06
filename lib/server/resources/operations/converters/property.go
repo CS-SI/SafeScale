@@ -35,7 +35,7 @@ func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare)
     }
 }
 
-// ToProtocolShareMount convert share mount on host to protocol message
+// ShareMountFromPropertyToProtocol convert share mount on host to protocol message
 func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *propertiesv1.HostRemoteMount) *protocol.ShareMountDefinition {
     return &protocol.ShareMountDefinition{
         Share: &protocol.Reference{Name: shareName},
@@ -45,7 +45,7 @@ func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *
     }
 }
 
-// ToProtocolShareMountList converts share mounts from host to protocol message
+// ShareMountListFromPropertyToProtocol converts share mounts from host to protocol message
 func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare, mounts map[string]*propertiesv1.HostRemoteMount) *protocol.ShareMountList {
     var pbMounts []*protocol.ShareMountDefinition
     for k, v := range mounts {
@@ -72,3 +72,17 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 // 	}
 // 	return out
 // }
+
+func ClusterControlplaneFromPropertyToProtocol(in  propertiesv1.ClusterControlplane) *protocol.ClusterControlplane {
+    out := protocol.ClusterControlplane{
+        Vip: VirtualIPFromAbstractToProtocol(*in.VirtualIP),
+    }
+    return &out
+}
+
+func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *protocol.ClusterComposite {
+    out := protocol.ClusterComposite{}
+    out.Tenants = make([]string, len(in.Tenants))
+    copy(out.Tenants, in.Tenants)
+    return &out
+}

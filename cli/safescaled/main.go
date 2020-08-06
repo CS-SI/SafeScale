@@ -37,8 +37,9 @@ import (
     _ "github.com/CS-SI/SafeScale/lib/server"
     "github.com/CS-SI/SafeScale/lib/server/iaas"
     "github.com/CS-SI/SafeScale/lib/server/listeners"
-    "github.com/CS-SI/SafeScale/lib/server/utils"
+    app2 "github.com/CS-SI/SafeScale/lib/utils/app"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 )
 
 var profileCloseFunc = func() {}
@@ -218,14 +219,14 @@ func main() {
 
         if strings.Contains(path.Base(os.Args[0]), "-cover") {
             logrus.SetLevel(logrus.TraceLevel)
-            utils.Verbose = true
+            app2.Verbose = true
         } else {
             logrus.SetLevel(logrus.WarnLevel)
         }
 
         if c.Bool("verbose") {
             logrus.SetLevel(logrus.InfoLevel)
-            utils.Verbose = true
+            app2.Verbose = true
         }
         if c.Bool("debug") {
             if c.Bool("verbose") {
@@ -233,7 +234,7 @@ func main() {
             } else {
                 logrus.SetLevel(logrus.DebugLevel)
             }
-            utils.Debug = true
+            app2.Debug = true
         }
         return nil
     }

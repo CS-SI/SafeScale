@@ -56,7 +56,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
     ok, err := govalidator.ValidateStruct(in)
     if err == nil {
         if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+            logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
         }
     }
 

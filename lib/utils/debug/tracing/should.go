@@ -26,7 +26,7 @@ func ShouldTrace(key string) bool {
         return false
     }
     parts := strings.Split(key, ".")
-    // If key.subkey is defined, return true
+    // If key.subkey is defined, return its value
     if len(parts) >= 2 {
         setting, ok := settings[parts[0]][parts[1]]
         if ok {

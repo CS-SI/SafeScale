@@ -34,6 +34,7 @@ import (
     "github.com/CS-SI/SafeScale/cli/safescale/commands"
     "github.com/CS-SI/SafeScale/lib/client"
     "github.com/CS-SI/SafeScale/lib/server/utils"
+    app2 "github.com/CS-SI/SafeScale/lib/utils/app"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -141,18 +142,18 @@ func main() {
 
         if strings.Contains(path.Base(os.Args[0]), "-cover") {
             logrus.SetLevel(logrus.TraceLevel)
-            utils.Verbose = true
+            app2.Verbose = true
         } else {
             logrus.SetLevel(logrus.WarnLevel)
         }
 
         // Defines trace level wanted by user
-        if utils.Verbose = c.Bool("verbose"); utils.Verbose {
+        if app2.Verbose = c.Bool("verbose"); app2.Verbose {
             logrus.SetLevel(logrus.InfoLevel)
-            utils.Verbose = true
+            app2.Verbose = true
         }
-        if utils.Debug = c.Bool("debug"); utils.Debug {
-            if utils.Verbose {
+        if app2.Debug = c.Bool("debug"); app2.Debug {
+            if app2.Verbose {
                 logrus.SetLevel(logrus.TraceLevel)
             } else {
                 logrus.SetLevel(logrus.DebugLevel)

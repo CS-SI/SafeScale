@@ -26,8 +26,9 @@ import (
     "google.golang.org/grpc/status"
 
     "github.com/CS-SI/SafeScale/lib/protocol"
+    clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
+    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -36,7 +37,7 @@ import (
 // ClusterListener host service server grpc
 type ClusterListener struct{}
 
-// ErrorList lists clusters
+// List lists clusters
 func (s *ClusterListener) List(ctx context.Context, in *googleprotobuf.Empty) (hl *protocol.ClusterListResponse, err error) {
     defer fail.OnExitConvertToGRPCStatus(&err)
     defer fail.OnExitWrapError(&err, "cannot list clusters")
@@ -57,12 +58,17 @@ func (s *ClusterListener) List(ctx context.Context, in *googleprotobuf.Empty) (h
         return nil, xerr
     }
     defer job.Close()
+    task := job.GetTask()
 
-    tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster")).WithStopwatch().Entering()
     defer tracer.Exiting()
     defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    return nil, fail.NotImplementedError()
+    list, xerr := clusterfactory.List(task, job.GetService())
+    if xerr != nil {
+        return nil, xerr
+    }
+    return converters.ClusterListFromAbstractToProtocol(list), nil
 }
 
 // Create creates a new cluster
@@ -81,7 +87,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
     }
 
     if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-        logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+        logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
     }
 
     job, xerr := PrepareJob(ctx, "", "cluster create")
@@ -95,11 +101,25 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
     tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
     defer tracer.Exiting()
     defer fail.OnExitLogError(&err, tracer.TraceMessage())
+    instance, xerr := clusterfactory.New(task, job.GetService())
+    if xerr != nil {
+        return nil, xerr
+    }
 
-    return nil, fail.NotImplementedError()
+    req, xerr := converters.ClusterRequestFromProtocolToAbstract(*in)
+    if xerr != nil {
+        return nil, xerr
+    }
+
+    xerr = instance.Create(task, req)
+    if xerr != nil {
+        return nil, xerr
+    }
+
+    return instance.ToProtocol(task)
 }
 
-// Status returns the status of a cluster
+// State returns the status of a cluster
 func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht *protocol.ClusterStateResponse, err error) {
     defer fail.OnExitConvertToGRPCStatus(&err)
     defer fail.OnExitWrapError(&err, "cannot get cluster status")

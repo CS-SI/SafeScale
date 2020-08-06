@@ -850,7 +850,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
         return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
     }
 
-    if w.feature.task == nil {
+    if w.feature.task.IsNull() {
         return fail.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
     }
 

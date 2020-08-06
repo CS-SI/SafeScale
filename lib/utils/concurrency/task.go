@@ -25,6 +25,7 @@ import (
 
     uuid "github.com/satori/go.uuid"
 
+    "github.com/CS-SI/SafeScale/lib/utils/data"
     "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -74,6 +75,8 @@ type TaskGuard interface {
 
 // TaskCore is the interface of core methods to control task and taskgroup
 type TaskCore interface {
+    data.NullValue
+
     Abort() fail.Error
     Abortable() (bool, fail.Error)
     Aborted() bool
@@ -167,17 +170,6 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
     return newTask(context.Background(), parentTask)
 }
 
-func (t *task) GetLastError() (error, fail.Error) {
-    if t == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-
-    t.mu.Lock()
-    defer t.mu.Unlock()
-
-    return t.err, nil
-}
-
 // NewTaskWithContext ...
 func NewTaskWithContext(ctx context.Context, parentTask Task) (Task, fail.Error) {
     if ctx == nil {
@@ -227,9 +219,24 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
     return &t, nil
 }
 
+func (t *task) IsNull() bool {
+    return t == nil || t.id == ""
+}
+
+func (t *task) GetLastError() (error, fail.Error) {
+    if t.IsNull() {
+        return nil, fail.InvalidInstanceError()
+    }
+
+    t.mu.Lock()
+    defer t.mu.Unlock()
+
+    return t.err, nil
+}
+
 // GetID returns an unique id for the task
 func (t *task) GetID() (string, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return "", fail.InvalidInstanceError()
     }
 
@@ -242,7 +249,7 @@ func (t *task) GetID() (string, fail.Error) {
 // MustGetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (t *task) MustGetSignature() (string, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return "", fail.InvalidInstanceError()
     }
 
@@ -254,10 +261,6 @@ func (t *task) MustGetSignature() (string, fail.Error) {
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (t *task) GetSignature() string {
-    if t == nil {
-        return ""
-    }
-
     theId, xerr := t.MustGetSignature()
     if xerr != nil {
         return ""
@@ -267,7 +270,7 @@ func (t *task) GetSignature() string {
 
 // GetStatus returns the current task status
 func (t *task) GetStatus() (TaskStatus, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return 0, fail.InvalidInstanceError()
     }
 
@@ -278,7 +281,7 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 
 // GetContext returns the context associated to the task
 func (t *task) GetContext() (context.Context, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
@@ -290,7 +293,7 @@ func (t *task) GetContext() (context.Context, fail.Error) {
 // SetID allows to specify task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
 func (t *task) SetID(id string) fail.Error {
-    if t == nil {
+    if t.IsNull() {
         return fail.InvalidInstanceError()
     }
     if id == "" {
@@ -308,7 +311,7 @@ func (t *task) SetID(id string) fail.Error {
 
 // Start runs in goroutine the function with parameters
 func (t *task) Start(action TaskAction, params TaskParameters) (Task, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
     return t.StartWithTimeout(action, params, 0)
@@ -318,7 +321,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, fail.Error
 // If timeout happens, error returned will be ErrTimeout
 // This function is useful when you know at the time you use it there will be a timeout to apply.
 func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
@@ -349,7 +352,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 
 // StartInSubtask runs in a subtask goroutine the function with parameters
 func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
@@ -369,7 +372,7 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, f
 
 // controller controls the start, termination and possibly abortion of the action
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) fail.Error {
-    if t == nil {
+    if t.IsNull() {
         return fail.InvalidInstanceError()
     }
 
@@ -496,7 +499,7 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 
 // Run starts task, waits its completion then return the error code
 func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
@@ -510,7 +513,7 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, fail.E
 
 // RunInSubtask starts a subtask, waits its completion then return the error code
 func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResult, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
     if action == nil {
@@ -527,7 +530,7 @@ func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResul
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
@@ -567,7 +570,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If task still running, returns (false, nil)
 func (t *task) TryWait() (bool, TaskResult, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return false, nil, fail.InvalidInstanceError()
     }
 
@@ -603,7 +606,7 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return false, nil, fail.InvalidInstanceError()
     }
 
@@ -648,7 +651,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 // A call of this method doesn't actually stop the running task if there is one; a subsequent
 // call of Wait() is still needed
 func (t *task) Abort() (err fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return fail.InvalidInstanceError()
     }
 
@@ -687,19 +690,19 @@ func (t *task) Abort() (err fail.Error) {
     return nil
 }
 
-// ErrAborted tells if the task is aborted
+// Aborted tells if the task is aborted
 func (t *task) Aborted() bool {
-    if t != nil {
-        t.mu.Lock()
-        defer t.mu.Unlock()
-        return t.status == ABORTED
+    if !t.IsNull() {
+        return false
     }
-    return false
+    t.mu.Lock()
+    defer t.mu.Unlock()
+    return t.status == ABORTED
 }
 
 // Abortable tells if task can be aborted
 func (t *task) Abortable() (bool, fail.Error) {
-    if t == nil {
+    if t.IsNull() {
         return false, fail.InvalidInstanceError()
     }
 
@@ -710,9 +713,10 @@ func (t *task) Abortable() (bool, fail.Error) {
 
 // IgnoreAbortSignal can be use to disable the effect of Abort()
 func (t *task) IgnoreAbortSignal(ignore bool) fail.Error {
-    if t == nil {
+    if t.IsNull() {
         return fail.InvalidInstanceError()
     }
+
     t.mu.Lock()
     defer t.mu.Unlock()
 

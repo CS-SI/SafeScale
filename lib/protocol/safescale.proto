@@ -618,13 +618,53 @@ message ClusterIdentity {
     string name = 1;
     ClusterComplexity complexity = 2;
     ClusterFlavor flavor = 3;
-    SshConfig ssh_config = 4;
-    string admin_password = 5;
+    string admin_password = 4;
+    //SshConfig ssh_config = 4;
+    string private_key = 5;
+}
+
+message ClusterDefaults{
+    HostSizing gateway_sizing = 1;
+    HostSizing master_sizing = 2;
+    HostSizing node_sizing = 3;
+    string Image = 4;
+}
+
+message ClusterControlplane{
+    VirtualIp vip = 1;
+}
+
+message ClusterComposite{
+    repeated string tenants = 1;
+}
+
+message ClusterNetwork{
+    string network_id = 1;
+    string cidr = 2;
+    string domain = 3;
+    string gateway_id = 4;
+    string gateway_ip = 5;
+    string secondary_gateway_id = 6;
+    string secondary_gateway_ip = 7;
+    string default_route_ip = 8;
+    string primary_public_ip = 9;
+    string secondary_public_ip = 10;
+    string endpoint_ip = 11;
+    //ClusterNetworkState network_state = 12;      // ???
+    // repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
 }
 
 message ClusterResponse {
     ClusterIdentity identity = 1;
-    repeated string properties = 2;
+    ClusterNetwork network = 2;
+    repeated Host masters = 3;
+    repeated Host nodes = 4;
+    FeatureListResponse disabled_features = 5;
+    FeatureListResponse installed_features = 6;
+    ClusterDefaults defaults = 7;
+    ClusterState state = 8;
+    ClusterComposite composite = 9;
+    ClusterControlplane controlplane = 10;
 }
 
 message ClusterNodeListResponse {

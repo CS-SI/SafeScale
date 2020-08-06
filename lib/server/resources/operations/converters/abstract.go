@@ -290,3 +290,26 @@ func VolumeSpeedFromAbstractToProtocol(in volumespeed.Enum) protocol.VolumeSpeed
         return protocol.VolumeSpeed_VS_HDD
     }
 }
+
+// ClusterIdentityFromAbstractToProtocol converts an abstract.ClusterIdentity to protocol.ClusterIdentity
+func ClusterIdentityFromAbstractToProtocol(in abstract.ClusterIdentity) *protocol.ClusterIdentity {
+    return &protocol.ClusterIdentity{
+        Name:          in.Name,
+        Complexity:    protocol.ClusterComplexity(in.Complexity),
+        Flavor:        protocol.ClusterFlavor(in.Flavor),
+        AdminPassword: in.AdminPassword,
+    }
+}
+
+// ClusterListFromAbstractToProtocol converts list of cluster identity to protocol.ClusterListResponse
+func ClusterListFromAbstractToProtocol(in []abstract.ClusterIdentity) *protocol.ClusterListResponse {
+    out := &protocol.ClusterListResponse{}
+    out.Clusters = make([]*protocol.ClusterResponse, len(in), 0)
+    for _, v := range in {
+        cr := &protocol.ClusterResponse{
+            Identity: ClusterIdentityFromAbstractToProtocol(v),
+        }
+        out.Clusters = append(out.Clusters, cr)
+    }
+    return out
+}

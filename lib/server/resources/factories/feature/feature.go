@@ -67,7 +67,7 @@ import (
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 func New(task concurrency.Task, name string) (resources.Feature, error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if name == "" {
@@ -92,7 +92,7 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
 func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if name == "" {

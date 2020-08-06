@@ -80,7 +80,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 
 // LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
 func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
-    if task == nil {
+    if task.IsNull() {
         return nil, fail.InvalidParameterError("task", "cannot be nil")
     }
     if svc.IsNull() {
@@ -176,7 +176,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
     if b == nil {
         return fail.InvalidInstanceError()
     }
-    if task == nil {
+    if task.IsNull() {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
     if name == "" {
