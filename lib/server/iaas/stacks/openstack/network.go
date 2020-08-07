@@ -103,7 +103,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
             network, innerErr = networks.Create(s.NetworkClient, opts).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, fail.Prepend(xerr, "failed to create network '%s'", req.Name)
@@ -117,7 +117,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
                     innerErr := networks.Delete(s.NetworkClient, network.ID).ExtractErr()
                     return NormalizeError(innerErr)
                 },
-                2*temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
             if derr != nil {
                 logrus.Errorf("failed to delete network '%s': %v", req.Name, derr)
@@ -171,7 +171,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
             })
             return NormalizeError(r.Err)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         switch xerr.(type) {
@@ -216,7 +216,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
             network, innerErr = networks.Get(s.NetworkClient, id).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         switch xerr.(type) {
@@ -299,7 +299,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
             )
             return innerErr
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -328,7 +328,7 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
             network, innerErr = networks.Get(s.NetworkClient, id).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         logrus.Errorf("failed to get network '%s': %+v", id, xerr)
@@ -355,7 +355,7 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
             innerErr := networks.Delete(s.NetworkClient, id).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         xerr = fail.Prepend(xerr, "failed to delete network '%s'", network.Name)
@@ -523,7 +523,7 @@ func (s *Stack) listSubnets(netID string) (_ []Subnet, xerr fail.Error) {
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return []Subnet{}, xerr
@@ -563,7 +563,7 @@ func (s *Stack) deleteSubnet(id string) (xerr fail.Error) {
                     err := subnets.Delete(s.NetworkClient, id).ExtractErr()
                     return NormalizeError(err)
                 },
-                2*temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
             switch innerXErr.(type) {
             case *fail.ErrInvalidRequest:
@@ -624,7 +624,7 @@ func (s *Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
             router, innerErr = routers.Create(s.NetworkClient, opts).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -665,7 +665,7 @@ func (s *Stack) ListRouters() ([]Router, fail.Error) {
             )
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     return ns, xerr
 }
@@ -677,7 +677,7 @@ func (s *Stack) deleteRouter(id string) fail.Error {
             innerErr := routers.Delete(s.NetworkClient, id).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -690,7 +690,7 @@ func (s *Stack) addSubnetToRouter(routerID string, subnetID string) fail.Error {
             }).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -703,7 +703,7 @@ func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Er
             }).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -715,7 +715,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
             allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -751,7 +751,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, f
             port, innerErr = ports.Create(s.NetworkClient, options).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -790,7 +790,7 @@ func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error
             vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return xerr
@@ -813,7 +813,7 @@ func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error
                 _, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
                 return NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             return xerr
@@ -840,7 +840,7 @@ func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.E
             vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return xerr
@@ -864,7 +864,7 @@ func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.E
                 _, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
                 return NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             return xerr
@@ -893,6 +893,6 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
             innerErr := ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }

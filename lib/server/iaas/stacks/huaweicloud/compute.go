@@ -246,7 +246,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
                 flavorID, innerErr = flavors.IDFromName(sc, opts.FlavorName)
                 return openstack.NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             return nil, xerr
@@ -425,7 +425,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                     }
                     return openstack.NormalizeError(innerErr)
                 },
-                2*temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
             if innerXErr != nil {
                 return innerXErr
@@ -718,7 +718,7 @@ func (s *Stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversi
             })
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return networks, addrs, "", "", xerr
@@ -784,7 +784,7 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
             })
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -822,7 +822,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                         }).ExtractErr()
                         return openstack.NormalizeError(err)
                     },
-                    2*temporal.GetDefaultDelay(),
+                    temporal.GetCommunicationTimeout(),
                 )
                 if retryErr != nil {
                     return retryErr
@@ -834,7 +834,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                         err := floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
                         return openstack.NormalizeError(err)
                     },
-                    2*temporal.GetDefaultDelay(),
+                    temporal.GetCommunicationTimeout(),
                 )
                 if retryErr != nil {
                     return retryErr
@@ -854,7 +854,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                         innerErr := servers.Delete(s.Stack.ComputeClient, ahf.Core.ID).ExtractErr()
                         return openstack.NormalizeError(innerErr)
                     },
-                    2*temporal.GetDefaultDelay(),
+                    temporal.GetCommunicationTimeout(),
                 )
                 if innerRetryErr != nil {
                     switch innerRetryErr.(type) {
@@ -880,7 +880,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                                 host, innerErr = servers.Get(s.Stack.ComputeClient, hostRef).Extract()
                                 return openstack.NormalizeError(innerErr)
                             },
-                            2*temporal.GetDefaultDelay(),
+                            temporal.GetCommunicationTimeout(),
                         )
                         if commRetryErr == nil {
                             if toHostState(host.Status) == hoststate.ERROR {
@@ -896,7 +896,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                         }
                         return commRetryErr
                     },
-                    temporal.GetContextTimeout(),
+                    temporal.GetCommunicationTimeout(),
                 )
                 if innerRetryErr != nil {
                     if _, ok := innerRetryErr.(*retry.ErrTimeout); ok {
@@ -946,7 +946,7 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fai
             })
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -1016,7 +1016,7 @@ func (s *Stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
             _, innerErr := ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return commRetryErr
@@ -1040,7 +1040,7 @@ func (s *Stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
             _, innerErr := ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return commRetryErr
@@ -1082,7 +1082,7 @@ func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error
             })
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, fail.Prepend(commRetryErr, "failed to list OpenStack Interfaces of host '%s'", host.Core.Name)

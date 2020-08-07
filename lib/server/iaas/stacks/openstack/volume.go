@@ -126,7 +126,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
                 }).Extract()
                 return NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             break
@@ -154,7 +154,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
                 }).Extract()
                 return NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             break
@@ -197,7 +197,7 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
             vol, innerErr = volumesv2.Get(s.VolumeClient, id).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         switch xerr.(type) {
@@ -249,7 +249,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil || len(vs) == 0 {
         return nil, xerr
@@ -275,7 +275,7 @@ func (s *Stack) DeleteVolume(id string) fail.Error {
 
     var (
         timeout = temporal.GetBigDelay()
-        commDelay = 2*temporal.GetDefaultDelay()
+        commDelay = temporal.GetCommunicationTimeout()
     )
 
     return retry.WhileUnsuccessfulDelay5Seconds(
@@ -320,7 +320,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
             }).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return "", xerr
@@ -348,7 +348,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
             va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -393,7 +393,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return []abstract.VolumeAttachment{}, xerr
@@ -420,6 +420,6 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
             innerErr := volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
