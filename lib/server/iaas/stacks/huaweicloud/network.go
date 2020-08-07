@@ -130,7 +130,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
         derr := s.DeleteVPC(vpc.ID)
         if derr != nil {
             logrus.Warnf("Error deleting VPC: %v", derr)
-            commRetryErr.AddConsequence(derr)
+            _ = commRetryErr.AddConsequence(derr)
         }
         return nil, fail.Prepend(commRetryErr, "failed to find OpenStack router of VPC")
     }

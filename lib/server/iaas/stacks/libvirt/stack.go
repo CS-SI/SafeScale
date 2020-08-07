@@ -1,4 +1,5 @@
 // +build libvirt
+
 /*
  * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
@@ -33,7 +34,7 @@ type Stack struct {
     AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) fail.Error {
+func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) fail.Error {
     return fail.NotImplementedError("WaitHostReady not implemented yet!") // FIXME: Technical debt
 }
 
