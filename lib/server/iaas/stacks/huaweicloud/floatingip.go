@@ -151,7 +151,7 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
             r.Err = err
             return openstack.NormalizeError(err)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -186,7 +186,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
             })
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -232,7 +232,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
             _, innerErr := s.Stack.Driver.Request("POST", url, &opts)
             return openstack.NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -258,7 +258,7 @@ func (s *Stack) DeleteFloatingIP(id string) fail.Error {
             err := r.ExtractErr()
             return openstack.NormalizeError(err)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -281,7 +281,7 @@ func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Err
             _, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
             return openstack.NormalizeError(r.ExtractErr())
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -304,6 +304,6 @@ func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Er
             _, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
             return openstack.NormalizeError(r.ExtractErr())
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }

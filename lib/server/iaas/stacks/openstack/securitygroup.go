@@ -49,7 +49,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, fail.Error) 
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -84,7 +84,7 @@ func (s *Stack) addRuleToSecurityGroup(groupID string, rule secrules.CreateOpts)
             _, err := secrules.Create(s.NetworkClient, rule).Extract()
             return NormalizeError(err)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 

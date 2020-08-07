@@ -70,7 +70,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
             identity, innerErr = gcos.NewIdentityV3(stack.Driver, gophercloud.EndpointOpts{})
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -91,7 +91,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
             allProjects, innerErr = projects.ExtractProjects(allPages)
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
