@@ -107,7 +107,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
             _, err = s.Stack.Driver.Request("POST", url, &opts)
             return openstack.NormalizeError(err)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, fail.Prepend(commRetryErr, "query to create VPC failed")
@@ -124,7 +124,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
             router, innerErr = routers.Get(s.Stack.NetworkClient, vpc.ID).Extract()
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         derr := s.DeleteVPC(vpc.ID)
@@ -170,7 +170,7 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, fail.Er
             network, innerErr = networks.Get(s.Stack.NetworkClient, router.NetworkID).Extract()
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, fail.Prepend(commRetryErr, "failed to get information of binded network")
@@ -192,7 +192,7 @@ func (s *Stack) GetVPC(id string) (*VPC, fail.Error) {
             r.Err = err
             return openstack.NormalizeError(err)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -366,7 +366,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
             })
             return openstack.NormalizeError(r.Err)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         switch commRetryErr.(type) {
@@ -542,7 +542,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
             _, innerErr := s.Stack.Driver.Request("POST", url, &opts)
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         switch commRetryErr.(type) { // nolint
@@ -582,7 +582,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Er
                     _, err = s.Stack.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
                     return openstack.NormalizeError(err)
                 },
-                temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
             if commRetryErr == nil {
                 subnet, err = respGet.Extract()
@@ -622,7 +622,7 @@ func (s *Stack) listSubnets() ([]subnets.Subnet, fail.Error) {
             })
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -646,7 +646,7 @@ func (s *Stack) getSubnet(id string) (*subnets.Subnet, fail.Error) {
             subnet, innerErr = r.Extract()
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -687,7 +687,7 @@ func (s *Stack) deleteSubnet(id string) fail.Error {
                     }
                     return nil
                 },
-                temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
         },
         retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostCleanupTimeout())),
