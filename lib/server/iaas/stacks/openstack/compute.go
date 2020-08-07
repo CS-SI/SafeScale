@@ -72,7 +72,7 @@ func (s *Stack) ListRegions() (list []string, xerr fail.Error) {
             allPages, innerErr = regions.List(s.ComputeClient, listOpts).AllPages()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return results, xerr
@@ -105,7 +105,7 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) 
             allPages, innerErr = az.List(s.ComputeClient).AllPages()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -187,7 +187,7 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
             img, innerErr = images.Get(s.ComputeClient, id).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nullImage, xerr
@@ -217,7 +217,7 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fa
             flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nullTemplate, xerr
@@ -267,7 +267,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         switch xerr.(type) {
@@ -355,7 +355,7 @@ func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nullList, xerr
@@ -380,7 +380,7 @@ func (s *Stack) DeleteKeyPair(id string) fail.Error {
             innerErr = keypairs.Delete(s.ComputeClient, id).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return xerr
@@ -639,7 +639,7 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
             })
             return NormalizeError(r.Err)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nullAhc, xerr
@@ -784,7 +784,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                     }).Extract()
                     return NormalizeError(innerErr)
                 },
-                2*temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
             if innerErr != nil {
                 if server != nil {
@@ -793,7 +793,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                             err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
                             return NormalizeError(err)
                         },
-                        2*temporal.GetDefaultDelay(),
+                        temporal.GetCommunicationTimeout(),
                     )
                     if derr != nil {
                         logrus.Errorf("cleaning up on failure: %s", derr.Error())
@@ -826,7 +826,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                             err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
                             return NormalizeError(err)
                         },
-                        2*temporal.GetDefaultDelay(),
+                        temporal.GetCommunicationTimeout(),
                     )
                     if derr != nil {
                         logrus.Errorf("cleaning up on failure: %s", derr.Error())
@@ -898,7 +898,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                 }).Extract()
                 return NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             return nullAhf, nullUdc, xerr
@@ -913,7 +913,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                         innerErr = floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
                         return NormalizeError(innerErr)
                     },
-                    2*temporal.GetDefaultDelay(),
+                    temporal.GetCommunicationTimeout(),
                 )
                 if derr != nil {
                     logrus.Errorf("Error deleting Floating IP: %v", derr)
@@ -930,7 +930,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
                 }).ExtractErr()
                 return NormalizeError(innerErr)
             },
-            2*temporal.GetDefaultDelay(),
+            temporal.GetCommunicationTimeout(),
         )
         if xerr != nil {
             return nullAhf, nullUdc, xerr
@@ -971,7 +971,7 @@ func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error
             allPages, innerErr = servers.List(s.ComputeClient, nil).AllPages()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return "", xerr
@@ -1058,7 +1058,7 @@ func (s *Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.En
                     server, innerErr = servers.Get(s.ComputeClient, ahf.Core.ID).Extract()
                     return NormalizeError(innerErr)
                 },
-                2*temporal.GetDefaultDelay(),
+                temporal.GetCommunicationTimeout(),
             )
             if innerXErr != nil {
                 // FIXME: review this code, NormalizeError should return a standardized and usable error instance
@@ -1196,7 +1196,7 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     return hostList, xerr
 }
@@ -1223,7 +1223,7 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Erro
             })
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return nil, xerr
@@ -1278,7 +1278,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                     func() error {
                         return NormalizeError(servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr())
                     },
-                    2*temporal.GetDefaultDelay(),
+                    temporal.GetCommunicationTimeout(),
                 )
                 if innerXErr != nil {
                     switch innerXErr.(type) {
@@ -1310,7 +1310,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
                                 }
                                 return NormalizeError(err)
                             },
-                            2*temporal.GetDefaultDelay(),
+                            temporal.GetCommunicationTimeout(),
                         )
                         switch innerXErr.(type) {
                         case *fail.ErrNotFound:
@@ -1365,7 +1365,7 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
             innerErr := startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -1390,7 +1390,7 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
             }
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 
@@ -1411,7 +1411,7 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
             innerErr := startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
             return NormalizeError(innerErr)
         },
-        2*temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
 }
 

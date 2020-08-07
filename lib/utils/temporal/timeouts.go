@@ -42,6 +42,9 @@ const (
     // DefaultConnectionTimeout is the default connection timeout
     DefaultConnectionTimeout = 30 * time.Second
 
+    // defaultCommunicationTimeout is the default timeout for HTTP communication with Provider
+    defaultCommunicationTimeout = 3 * time.Minute
+
     // DefaultExecutionTimeout is the default linux command operation timeout
     DefaultExecutionTimeout = 5 * time.Minute
 
@@ -120,6 +123,11 @@ func GetConnectionTimeout() time.Duration {
 // GetExecutionTimeout ...
 func GetExecutionTimeout() time.Duration {
     return GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", DefaultExecutionTimeout)
+}
+
+// GetCommunicationTimeout ...
+func GetCommunicationTimeout() time.Duration {
+    return GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", defaultCommunicationTimeout)
 }
 
 // GetLongOperationTimeout ...

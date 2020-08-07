@@ -111,7 +111,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
             vol, innerErr = volumes.Create(s.Stack.VolumeClient, opts).Extract()
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
@@ -143,7 +143,7 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
             vol, innerErr = volumes.Get(s.Stack.VolumeClient, id).Extract()
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         switch commRetryErr.(type) {
@@ -193,7 +193,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
             })
             return openstack.NormalizeError(innerErr)
         },
-        temporal.GetDefaultDelay(),
+        temporal.GetCommunicationTimeout(),
     )
     if commRetryErr != nil {
         return nil, commRetryErr
