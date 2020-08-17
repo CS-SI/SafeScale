@@ -86,6 +86,8 @@ type Content struct {
 	Tags map[string]map[string][]string
 	// IsPrimaryGateway tells if the host is a primary gateway
 	IsPrimaryGateway bool
+	// UsesVIP tells if VIP feature is activated
+	UsesVIP bool
 	// PrivateVIP contains the private IP of the VIP instance if it exists
 	PublicVIP string // VPL: change to EndpointIP
 	// PrivateVIP contains the private IP of the VIP instance if it exists
