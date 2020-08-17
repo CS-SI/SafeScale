@@ -313,7 +313,7 @@ func (handler *NetworkHandler) Create(
 		"request": primaryRequest,
 		"sizing":  sizing,
 		"primary": true,
-		"nokeep": !keeponfailure,
+		"nokeep":  !keeponfailure,
 	})
 	if err != nil {
 		return nil, err
@@ -335,7 +335,7 @@ func (handler *NetworkHandler) Create(
 			"request": secondaryRequest,
 			"sizing":  sizing,
 			"primary": false,
-			"nokeep": !keeponfailure,
+			"nokeep":  !keeponfailure,
 		})
 		if err != nil {
 			return nil, err
@@ -619,6 +619,8 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 		}
 	}
 
+	userData.UsesVIP = request.Network.VIP != nil
+
 	// Binds gateway to VIP if primary
 	if primary && request.Network.VIP != nil {
 		err = handler.service.BindHostToVIP(request.Network.VIP, gw.ID)
@@ -630,6 +632,9 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 		userData.DefaultRouteIP = gw.GetPrivateIP()
 		// userData.EndpointIP = request.Network.VIP.PublicIP
 	} else {
+		if request.Network.VIP != nil {
+			userData.PrivateVIP = request.Network.VIP.PrivateIP
+		}
 		userData.DefaultRouteIP = gw.GetPrivateIP()
 	}
 	userData.IsPrimaryGateway = primary
