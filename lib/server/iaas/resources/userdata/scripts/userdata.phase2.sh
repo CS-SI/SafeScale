@@ -100,10 +100,10 @@ reset_fw() {
     {{- if or .PublicIP .IsGateway }}
     [[ -z ${PU_IF} ]] && {
         $FWCMD --zone=public --add-source=${PU_IP}/32 || return 1
-        $FWCMD --set-default-zone=public || return 1
+        $FWCMD --set-default-zone=public; rc=$?; [ $rc -gt 0 && $rc -ne 16 ] && return 1
     }
     {{- else }}
-    $FWCMDnop --set-default-zone=trusted || return 1
+    $FWCMDnop --set-default-zone=trusted; rc=$?; [ $rc -gt 0 && $rc -ne 16 ] && return 1
     {{- end }}
     # Attach LAN interfaces to zone trusted
     [[ ! -z ${PR_IFs} ]] && {
