@@ -17,41 +17,41 @@
 package firewall
 
 import (
-	"sync"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/system/firewall.obsolete/policy"
+    "github.com/CS-SI/SafeScale/lib/system/firewall.obsolete/policy"
 )
 
 // Chain ...
 type Chain struct {
-	Name   string
-	Policy policy.Enum
-	Rules  []Rule
-	lock   sync.RWMutex
+    Name   string
+    Policy policy.Enum
+    Rules  []Rule
+    lock   sync.RWMutex
 }
 
 // Add appends a rule at the end in the chain
 func (c *Chain) Add(rule Rule) *Chain {
-	c.lock.Lock()
-	c.Rules = append(c.Rules, rule)
-	c.lock.Unlock()
-	return c
+    c.lock.Lock()
+    c.Rules = append(c.Rules, rule)
+    c.lock.Unlock()
+    return c
 }
 
 // Insert adds a rule at the beginning of the chain
 func (c *Chain) Insert(rule Rule) *Chain {
-	c.lock.Lock()
-	c.Rules = append([]Rule{rule}, c.Rules...)
-	c.lock.Unlock()
-	return c
+    c.lock.Lock()
+    c.Rules = append([]Rule{rule}, c.Rules...)
+    c.lock.Unlock()
+    return c
 }
 
 // Remove a rule from the chain
 func (c *Chain) Remove(rule Rule) *Chain {
-	return c
+    return c
 }
 
 // RemoveIndex removes a rule by its index in the chain
 func (c *Chain) RemoveIndex(idx uint) *Chain {
-	return c
+    return c
 }

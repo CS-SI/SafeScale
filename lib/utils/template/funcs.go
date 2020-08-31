@@ -17,65 +17,65 @@
 package template
 
 import (
-	"reflect"
-	txttmpl "text/template"
+    "reflect"
+    txttmpl "text/template"
 
-	"github.com/Masterminds/sprig"
+    "github.com/Masterminds/sprig"
 )
 
 // FuncMap defines the custom functions to be used in templates
 var FuncMap = txttmpl.FuncMap{
-	"inc":      func(i int) int { return i + 1 },
-	"empty":    empty,
-	"notempty": func(given interface{}) bool { return !empty(given) },
+    "inc":      func(i int) int { return i + 1 },
+    "empty":    empty,
+    "notempty": func(given interface{}) bool { return !empty(given) },
 }
 
 func empty(param interface{}) bool {
-	g := reflect.ValueOf(param)
-	if !g.IsValid() {
-		return true
-	}
+    g := reflect.ValueOf(param)
+    if !g.IsValid() {
+        return true
+    }
 
-	// Basically adapted from text/template.isTrue
-	switch g.Kind() {
-	default:
-		return g.IsNil()
-	case reflect.Array, reflect.Slice, reflect.Map, reflect.String:
-		return g.Len() == 0
-	case reflect.Bool:
-		return !g.Bool()
-	case reflect.Complex64, reflect.Complex128:
-		return g.Complex() == 0
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return g.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return g.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return g.Float() == 0
-	case reflect.Struct:
-		return false
-	}
+    // Basically adapted from text/template.isTrue
+    switch g.Kind() {
+    default:
+        return g.IsNil()
+    case reflect.Array, reflect.Slice, reflect.Map, reflect.String:
+        return g.Len() == 0
+    case reflect.Bool:
+        return !g.Bool()
+    case reflect.Complex64, reflect.Complex128:
+        return g.Complex() == 0
+    case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+        return g.Int() == 0
+    case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+        return g.Uint() == 0
+    case reflect.Float32, reflect.Float64:
+        return g.Float() == 0
+    case reflect.Struct:
+        return false
+    }
 }
 
 // MergeFuncs merges the template functions passed as parameter with FuncMap content
 // If overwrite is true, will overwrite any existing entry
 func MergeFuncs(funcs map[string]interface{}, overwrite bool) map[string]interface{} {
-	out := sprig.FuncMap()
-	for k, v := range FuncMap {
-		out[k] = v
-	}
-	if funcs != nil {
-		// targetMap := make(map[string]interface{})
-		for k, v := range funcs {
-			out[k] = v
-		}
+    out := sprig.FuncMap()
+    for k, v := range FuncMap {
+        out[k] = v
+    }
+    if funcs != nil {
+        // targetMap := make(map[string]interface{})
+        for k, v := range funcs {
+            out[k] = v
+        }
 
-		for k, v := range FuncMap {
-			_, ok := out[k]
-			if !ok || overwrite {
-				out[k] = v
-			}
-		}
-	}
-	return out
+        for k, v := range FuncMap {
+            _, ok := out[k]
+            if !ok || overwrite {
+                out[k] = v
+            }
+        }
+    }
+    return out
 }

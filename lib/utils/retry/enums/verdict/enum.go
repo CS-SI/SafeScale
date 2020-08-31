@@ -22,10 +22,10 @@ package verdict
 type Enum int
 
 const (
-	// Done tells the arbiter decided the last retry succeeded
-	Done Enum = iota
-	// Retry tells the arbiter decided to execute the next retry
-	Retry
-	// Abort tells the arbiter decided something wrong occurred; the Action must stop with error
-	Abort
+    // Done tells the arbiter decided the last retry succeeded
+    Done Enum = iota
+    // Retry tells the arbiter decided to execute the next retry
+    Retry
+    // Abort tells the arbiter decided something wrong occurred; the Action must stop with error
+    Abort
 )

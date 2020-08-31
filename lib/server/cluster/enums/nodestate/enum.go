@@ -22,10 +22,10 @@ package nodestate
 type Enum int
 
 const (
-	// Started the node is started and available
-	Started Enum = iota
-	// Disabled the node is started but not available to take load
-	Disabled
-	// Stopped the node is stopped
-	Stopped
+    // Started the node is started and available
+    Started Enum = iota
+    // Disabled the node is started but not available to take load
+    Disabled
+    // Stopped the node is stopped
+    Stopped
 )

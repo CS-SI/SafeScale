@@ -17,13 +17,14 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+    "context"
+    "fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageAPI
@@ -32,38 +33,38 @@ import (
 
 // ImageAPI defines API to manipulate images
 type ImageAPI interface {
-	List(ctx context.Context, all bool) ([]resources.Image, error)
-	Select(ctx context.Context, osfilter string) (*resources.Image, error)
-	Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
+    List(ctx context.Context, all bool) ([]resources.Image, error)
+    Select(ctx context.Context, osfilter string) (*resources.Image, error)
+    Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
 }
 
 // ImageHandler image service
 type ImageHandler struct {
-	service iaas.Service
+    service iaas.Service
 }
 
 // NewImageHandler creates an host service
 func NewImageHandler(svc iaas.Service) ImageAPI {
-	return &ImageHandler{
-		service: svc,
-	}
+    return &ImageHandler{
+        service: svc,
+    }
 }
 
 // List returns the image list
 func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
-	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	return handler.service.ListImages(all)
+    return handler.service.ListImages(all)
 }
 
 // Select selects the image that best fits osname
 func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) {
-	return nil, nil
+    return nil, nil
 }
 
 // Filter filters the images that do not fit osname
 func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) {
-	return nil, nil
+    return nil, nil
 }

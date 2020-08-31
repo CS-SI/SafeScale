@@ -19,5 +19,5 @@ package aws
 import "github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 func (s *Stack) createSecurityGroup(vpcID string, name string) (string, error) {
-	return "", scerr.NotImplementedError("createSecurityGroup() not implemented yet") // FIXME Technical debt
+    return "", scerr.NotImplementedError("createSecurityGroup() not implemented yet") // FIXME Technical debt
 }

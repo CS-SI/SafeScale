@@ -22,10 +22,10 @@ package serialize
 
 // Property is the interface each Property must satisfy
 type Property interface {
-	// Content allows to access real data from property
-	Content() data.Clonable
-	// Clone allows to duplicate Property
-	Clone() Property
-	// Replace allows to replace Property with data from source
-	Replace(Property) Property
+    // Content allows to access real data from property
+    Content() data.Clonable
+    // Clone allows to duplicate Property
+    Clone() Property
+    // Replace allows to replace Property with data from source
+    Replace(Property) Property
 }

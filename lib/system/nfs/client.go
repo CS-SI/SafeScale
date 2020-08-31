@@ -17,51 +17,51 @@
 package nfs
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/CS-SI/SafeScale/lib/system"
+    "github.com/CS-SI/SafeScale/lib/system"
 )
 
 // Client defines the structure of a Client object
 type Client struct {
-	// SshConfig contains ssh connection configuration
-	SSHConfig *system.SSHConfig
+    // SshConfig contains ssh connection configuration
+    SSHConfig *system.SSHConfig
 }
 
 // NewNFSClient creates a new NFS client instance
 func NewNFSClient(sshconfig *system.SSHConfig) (*Client, error) {
-	if sshconfig == nil {
-		return nil, fmt.Errorf("invalid parameter: 'sshconfig' cannot be nil")
-	}
+    if sshconfig == nil {
+        return nil, fmt.Errorf("invalid parameter: 'sshconfig' cannot be nil")
+    }
 
-	client := &Client{
-		SSHConfig: sshconfig,
-	}
-	return client, nil
+    client := &Client{
+        SSHConfig: sshconfig,
+    }
+    return client, nil
 }
 
 // Install installs NFS client on remote host
 func (c *Client) Install() error {
-	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install NFS client")
+    retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+    return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to install NFS client")
 }
 
 // Mount defines a mount of a remote share and mount it
 func (c *Client) Mount(export string, mountPoint string, withCache bool) error {
-	data := map[string]interface{}{
-		"Export":      export,
-		"MountPoint":  mountPoint,
-		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
-	}
-	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_mount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
+    data := map[string]interface{}{
+        "Export":      export,
+        "MountPoint":  mountPoint,
+        "cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
+    }
+    retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_mount.sh", data)
+    return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to mount remote NFS share")
 }
 
 // Unmount a nfs share from NFS server
 func (c *Client) Unmount(export string) error {
-	data := map[string]interface{}{
-		"Export": export,
-	}
-	retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_unmount.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
+    data := map[string]interface{}{
+        "Export": export,
+    }
+    retcode, stdout, stderr, err := executeScript(*c.SSHConfig, "nfs_client_share_unmount.sh", data)
+    return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unmount remote NFS share")
 }

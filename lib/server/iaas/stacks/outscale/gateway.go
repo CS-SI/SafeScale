@@ -17,75 +17,79 @@
 package outscale
 
 import (
-	"fmt"
-	"strings"
+    "fmt"
+    "strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+    propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+    "github.com/CS-SI/SafeScale/lib/utils"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	userData := userdata.NewContent()
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
+    *resources.Host, *userdata.Content, error,
+) {
+    if s == nil {
+        return nil, nil, scerr.InvalidInstanceError()
+    }
+    userData := userdata.NewContent()
 
-	// Ensure network exists
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
-	if gwname == "" {
-		gwname = "gw-" + req.Network.Name
-	}
+    // Ensure network exists
+    if req.Network == nil {
+        return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+    }
+    gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
+    if gwname == "" {
+        gwname = "gw-" + req.Network.Name
+    }
 
-	password, err := utils.GeneratePassword(16)
-	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("failed to generate password: %s", err.Error()))
-	}
-	hostReq := resources.HostRequest{
-		ImageID:      req.ImageID,
-		KeyPair:      req.KeyPair,
-		HostName:     req.Name,
-		ResourceName: gwname,
-		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
-		PublicIP:     true,
-		Password:     password,
-	}
-	if sizing != nil && sizing.MinDiskSize > 0 {
-		hostReq.DiskSize = sizing.MinDiskSize
-	}
-	host, userData, err := s.CreateHost(hostReq)
-	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
-	}
-	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-		hostSizingV1 := clonable.(*propsv1.HostSizing)
-		hostSizingV1.Template = req.TemplateID
-		return nil
-	})
-	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
-	}
-	return host, userData, nil
+    password, err := utils.GeneratePassword(16)
+    if err != nil {
+        return nil, userData, scerr.Wrap(err, fmt.Sprintf("failed to generate password: %s", err.Error()))
+    }
+    hostReq := resources.HostRequest{
+        ImageID:      req.ImageID,
+        KeyPair:      req.KeyPair,
+        HostName:     req.Name,
+        ResourceName: gwname,
+        TemplateID:   req.TemplateID,
+        Networks:     []*resources.Network{req.Network},
+        PublicIP:     true,
+        Password:     password,
+    }
+    if sizing != nil && sizing.MinDiskSize > 0 {
+        hostReq.DiskSize = sizing.MinDiskSize
+    }
+    host, userData, err := s.CreateHost(hostReq)
+    if err != nil {
+        return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
+    }
+    // Updates Host Property propsv1.HostSizing
+    err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
+        func(clonable data.Clonable) error {
+            hostSizingV1 := clonable.(*propsv1.HostSizing)
+            hostSizingV1.Template = req.TemplateID
+            return nil
+        },
+    )
+    if err != nil {
+        return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
+    }
+    return host, userData, nil
 }
 
 // DeleteGateway delete the public gateway of a private network
 func (s *Stack) DeleteGateway(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
+    if s == nil {
+        return scerr.InvalidInstanceError()
+    }
+    if id == "" {
+        return scerr.InvalidParameterError("id", "cannot be empty string")
+    }
 
-	return s.DeleteHost(id)
+    return s.DeleteHost(id)
 }

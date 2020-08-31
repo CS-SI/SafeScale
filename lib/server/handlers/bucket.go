@@ -17,231 +17,232 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"regexp"
+    "context"
+    "fmt"
+    "regexp"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers BucketAPI
 
 // BucketAPI defines API to manipulate buckets
 type BucketAPI interface {
-	List(context.Context) ([]string, error)
-	Create(context.Context, string) error
-	Delete(context.Context, string) error
-	Destroy(context.Context, string) error
-	Inspect(context.Context, string) (*resources.Bucket, error)
-	Mount(context.Context, string, string, string) error
-	Unmount(context.Context, string, string) error
+    List(context.Context) ([]string, error)
+    Create(context.Context, string) error
+    Delete(context.Context, string) error
+    Destroy(context.Context, string) error
+    Inspect(context.Context, string) (*resources.Bucket, error)
+    Mount(context.Context, string, string, string) error
+    Unmount(context.Context, string, string) error
 }
 
 // BucketHandler bucket service
 type BucketHandler struct {
-	service iaas.Service
+    service iaas.Service
 }
 
 // NewBucketHandler creates a Bucket service
 func NewBucketHandler(svc iaas.Service) BucketAPI {
-	return &BucketHandler{service: svc}
+    return &BucketHandler{service: svc}
 }
 
 // List retrieves all available buckets
 func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) {
-	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
+    if handler == nil {
+        return nil, scerr.InvalidInstanceError()
+    }
 
-	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	rv, err = handler.service.ListBuckets(objectstorage.RootPath)
-	return rv, err
+    rv, err = handler.service.ListBuckets(objectstorage.RootPath)
+    return rv, err
 }
 
 // Create a bucket
 func (handler *BucketHandler) Create(ctx context.Context, name string) (err error) {
-	if handler == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
-	}
+    if handler == nil {
+        return scerr.InvalidInstanceError()
+    }
+    if name == "" {
+        return scerr.InvalidParameterError("name", "cannot be empty string")
+    }
 
-	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	bucket, err := handler.service.GetBucket(name)
-	if err != nil {
-		if err.Error() != "not found" {
-			return err
-		}
-	}
-	if bucket != nil {
-		return resources.ResourceDuplicateError("bucket", name)
-	}
-	_, err = handler.service.CreateBucket(name)
-	if err != nil {
-		return err
-	}
-	return nil
+    bucket, err := handler.service.GetBucket(name)
+    if err != nil {
+        if err.Error() != "not found" {
+            return err
+        }
+    }
+    if bucket != nil {
+        return resources.ResourceDuplicateError("bucket", name)
+    }
+    _, err = handler.service.CreateBucket(name)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 // Destroy a bucket, clear then delete
 func (handler *BucketHandler) Destroy(ctx context.Context, name string) (err error) {
-	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	err = handler.service.ClearBucket(name, "/", "")
-	if err != nil {
-		return err
-	}
+    err = handler.service.ClearBucket(name, "/", "")
+    if err != nil {
+        return err
+    }
 
-	err = handler.service.DeleteBucket(name)
-	if err != nil {
-		return err
-	}
-	return nil
+    err = handler.service.DeleteBucket(name)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 // Delete a bucket
 func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
-	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	err = handler.service.DeleteBucket(name)
-	if err != nil {
-		return err
-	}
-	return nil
+    err = handler.service.DeleteBucket(name)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 // Inspect a bucket
 func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
-	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	b, err := handler.service.GetBucket(name)
-	if err != nil {
-		if err.Error() == "not found" {
-			return nil, resources.ResourceNotFoundError("bucket", name)
-		}
-		return nil, err
-	}
-	mb = &resources.Bucket{
-		Name: b.GetName(),
-	}
-	return mb, nil
+    b, err := handler.service.GetBucket(name)
+    if err != nil {
+        if err.Error() == "not found" {
+            return nil, resources.ResourceNotFoundError("bucket", name)
+        }
+        return nil, err
+    }
+    mb = &resources.Bucket{
+        Name: b.GetName(),
+    }
+    return mb, nil
 }
 
 // Mount a bucket on an host on the given mount point
 func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, path string) (err error) {
-	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	// Check bucket existence
-	_, err = handler.service.GetBucket(bucketName)
-	if err != nil {
-		return err
-	}
+    // Check bucket existence
+    _, err = handler.service.GetBucket(bucketName)
+    if err != nil {
+        return err
+    }
 
-	// Get Host ID
-	hostHandler := NewHostHandler(handler.service)
-	host, err := hostHandler.Inspect(ctx, hostName)
-	if err != nil {
-		return fmt.Errorf("no host found with name or id '%s'", hostName)
-	}
+    // Get Host ID
+    hostHandler := NewHostHandler(handler.service)
+    host, err := hostHandler.Inspect(ctx, hostName)
+    if err != nil {
+        return fmt.Errorf("no host found with name or id '%s'", hostName)
+    }
 
-	// Create mount point
-	mountPoint := path
-	if path == resources.DefaultBucketMountPoint {
-		mountPoint = resources.DefaultBucketMountPoint + bucketName
-	}
+    // Create mount point
+    mountPoint := path
+    if path == resources.DefaultBucketMountPoint {
+        mountPoint = resources.DefaultBucketMountPoint + bucketName
+    }
 
-	authOpts, _ := handler.service.GetAuthenticationOptions()
-	authurlCfg, _ := authOpts.Config("AuthUrl")
-	authurl := authurlCfg.(string)
-	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
-	tenantCfg, _ := authOpts.Config("TenantName")
-	tenant := tenantCfg.(string)
-	loginCfg, _ := authOpts.Config("Login")
-	login := loginCfg.(string)
-	passwordCfg, _ := authOpts.Config("Password")
-	password := passwordCfg.(string)
-	regionCfg, _ := authOpts.Config("Region")
-	region := regionCfg.(string)
+    authOpts, _ := handler.service.GetAuthenticationOptions()
+    authurlCfg, _ := authOpts.Config("AuthUrl")
+    authurl := authurlCfg.(string)
+    authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
+    tenantCfg, _ := authOpts.Config("TenantName")
+    tenant := tenantCfg.(string)
+    loginCfg, _ := authOpts.Config("Login")
+    login := loginCfg.(string)
+    passwordCfg, _ := authOpts.Config("Password")
+    password := passwordCfg.(string)
+    regionCfg, _ := authOpts.Config("Region")
+    region := regionCfg.(string)
 
-	objStorageProtocol := handler.service.GetType()
-	if objStorageProtocol == "swift" {
-		objStorageProtocol = "swiftks"
-	}
+    objStorageProtocol := handler.service.GetType()
+    if objStorageProtocol == "swift" {
+        objStorageProtocol = "swiftks"
+    }
 
-	data := struct {
-		Bucket     string
-		Tenant     string
-		Login      string
-		Password   string
-		AuthURL    string
-		Region     string
-		MountPoint string
-		Protocol   string
-	}{
-		Bucket:     bucketName,
-		Tenant:     tenant,
-		Login:      login,
-		Password:   password,
-		AuthURL:    authurl,
-		Region:     region,
-		MountPoint: mountPoint,
-		Protocol:   objStorageProtocol,
-	}
+    data := struct {
+        Bucket     string
+        Tenant     string
+        Login      string
+        Password   string
+        AuthURL    string
+        Region     string
+        MountPoint string
+        Protocol   string
+    }{
+        Bucket:     bucketName,
+        Tenant:     tenant,
+        Login:      login,
+        Password:   password,
+        AuthURL:    authurl,
+        Region:     region,
+        MountPoint: mountPoint,
+        Protocol:   objStorageProtocol,
+    }
 
-	rerr := exec(ctx, "mount_object_storage.sh", data, host.ID, handler.service)
-	return rerr
+    rerr := exec(ctx, "mount_object_storage.sh", data, host.ID, handler.service)
+    return rerr
 }
 
 // Unmount a bucket
 func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
-	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	// Check bucket existence
-	_, err = handler.Inspect(ctx, bucketName)
-	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return err
-		}
-		return err
-	}
+    // Check bucket existence
+    _, err = handler.Inspect(ctx, bucketName)
+    if err != nil {
+        if _, ok := err.(scerr.ErrNotFound); ok {
+            return err
+        }
+        return err
+    }
 
-	// Get Host ID
-	hostHandler := NewHostHandler(handler.service)
-	host, err := hostHandler.Inspect(ctx, hostName)
-	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return err
-		}
-		return err
-	}
+    // Get Host ID
+    hostHandler := NewHostHandler(handler.service)
+    host, err := hostHandler.Inspect(ctx, hostName)
+    if err != nil {
+        if _, ok := err.(scerr.ErrNotFound); ok {
+            return err
+        }
+        return err
+    }
 
-	data := struct {
-		Bucket string
-	}{
-		Bucket: bucketName,
-	}
+    data := struct {
+        Bucket string
+    }{
+        Bucket: bucketName,
+    }
 
-	rerr := exec(ctx, "umount_object_storage.sh", data, host.ID, handler.service)
-	return rerr
+    rerr := exec(ctx, "umount_object_storage.sh", data, host.ID, handler.service)
+    return rerr
 }

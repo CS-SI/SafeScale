@@ -17,486 +17,496 @@
 package gcp
 
 import (
-	"context"
-	"fmt"
-	"strconv"
-	"strings"
+    "context"
+    "fmt"
+    "strconv"
+    "strings"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
+    "github.com/davecgh/go-spew/spew"
+    "github.com/sirupsen/logrus"
+    "google.golang.org/api/compute/v1"
+    "google.golang.org/api/googleapi"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+    propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
+    if s == nil {
+        return nil, scerr.InvalidInstanceError()
+    }
 
-	// disable subnetwork auto-creation
-	ne := compute.Network{
-		Name:                  s.GcpConfig.NetworkName,
-		AutoCreateSubnetworks: false,
-		ForceSendFields:       []string{"AutoCreateSubnetworks"},
-	}
+    // disable subnetwork auto-creation
+    ne := compute.Network{
+        Name:                  s.GcpConfig.NetworkName,
+        AutoCreateSubnetworks: false,
+        ForceSendFields:       []string{"AutoCreateSubnetworks"},
+    }
 
-	compuService := s.ComputeService
+    compuService := s.ComputeService
 
-	recreateSafescaleNetwork := true
-	recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
-	if recnet != nil && err == nil {
-		recreateSafescaleNetwork = false
-	} else if err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok {
-			if gerr.Code != 404 {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
-	}
+    recreateSafescaleNetwork := true
+    recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
+    if recnet != nil && err == nil {
+        recreateSafescaleNetwork = false
+    } else if err != nil {
+        if gerr, ok := err.(*googleapi.Error); ok {
+            if gerr.Code != 404 {
+                return nil, err
+            }
+        } else {
+            return nil, err
+        }
+    }
 
-	if recreateSafescaleNetwork {
-		opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectID, &ne).Context(context.Background()).Do()
-		if err != nil {
-			return nil, err
-		}
+    if recreateSafescaleNetwork {
+        opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectID, &ne).Context(context.Background()).Do()
+        if err != nil {
+            return nil, err
+        }
 
-		oco := OpContext{
-			Operation:    opp,
-			ProjectID:    s.GcpConfig.ProjectID,
-			Service:      compuService,
-			DesiredState: "DONE",
-		}
+        oco := OpContext{
+            Operation:    opp,
+            ProjectID:    s.GcpConfig.ProjectID,
+            Service:      compuService,
+            DesiredState: "DONE",
+        }
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-		if err != nil {
-			return nil, err
-		}
-	}
+        err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	necreated, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
-	if err != nil {
-		return nil, err
-	}
+    necreated, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
+    if err != nil {
+        return nil, err
+    }
 
-	net := resources.NewNetwork()
-	net.ID = strconv.FormatUint(necreated.Id, 10)
-	net.Name = necreated.Name
+    net := resources.NewNetwork()
+    net.ID = strconv.FormatUint(necreated.Id, 10)
+    net.Name = necreated.Name
 
-	// Create subnetwork
+    // Create subnetwork
 
-	theRegion := s.GcpConfig.Region
+    theRegion := s.GcpConfig.Region
 
-	subnetReq := compute.Subnetwork{
-		IpCidrRange: req.CIDR,
-		Name:        req.Name,
-		Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
-		Region:      theRegion,
-	}
+    subnetReq := compute.Subnetwork{
+        IpCidrRange: req.CIDR,
+        Name:        req.Name,
+        Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
+        Region:      theRegion,
+    }
 
-	opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
-	if err != nil {
-		return nil, err
-	}
+    opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
+    if err != nil {
+        return nil, err
+    }
 
-	oco := OpContext{
-		Operation:    opp,
-		ProjectID:    s.GcpConfig.ProjectID,
-		Service:      compuService,
-		DesiredState: "DONE",
-	}
+    oco := OpContext{
+        Operation:    opp,
+        ProjectID:    s.GcpConfig.ProjectID,
+        Service:      compuService,
+        DesiredState: "DONE",
+    }
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-	if err != nil {
-		return nil, err
-	}
+    err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+    if err != nil {
+        return nil, err
+    }
 
-	gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, theRegion, req.Name).Do()
-	if err != nil {
-		return nil, err
-	}
+    gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, theRegion, req.Name).Do()
+    if err != nil {
+        return nil, err
+    }
 
-	// FIXME Add properties and GatewayID
-	subnet := resources.NewNetwork()
-	subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
-	subnet.Name = gcpSubNet.Name
-	subnet.CIDR = gcpSubNet.IpCidrRange
-	subnet.IPVersion = ipversion.IPv4
+    // FIXME Add properties and GatewayID
+    subnet := resources.NewNetwork()
+    subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
+    subnet.Name = gcpSubNet.Name
+    subnet.CIDR = gcpSubNet.IpCidrRange
+    subnet.IPVersion = ipversion.IPv4
 
-	buildNewRule := true
-	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, gcpSubNet.Name)
+    buildNewRule := true
+    firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, gcpSubNet.Name)
 
-	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
-	if fws != nil && err == nil {
-		buildNewRule = false
-	} else if err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok {
-			if gerr.Code != 404 {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
-	}
+    fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
+    if fws != nil && err == nil {
+        buildNewRule = false
+    } else if err != nil {
+        if gerr, ok := err.(*googleapi.Error); ok {
+            if gerr.Code != 404 {
+                return nil, err
+            }
+        } else {
+            return nil, err
+        }
+    }
 
-	if buildNewRule {
-		fiw := compute.Firewall{
-			Allowed: []*compute.FirewallAllowed{
-				{
-					IPProtocol: "all",
-				},
-			},
-			Direction:    "INGRESS",
-			Disabled:     false,
-			Name:         firewallRuleName,
-			Network:      fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
-			Priority:     999,
-			SourceRanges: []string{"0.0.0.0/0"},
-		}
+    if buildNewRule {
+        fiw := compute.Firewall{
+            Allowed: []*compute.FirewallAllowed{
+                {
+                    IPProtocol: "all",
+                },
+            },
+            Direction:    "INGRESS",
+            Disabled:     false,
+            Name:         firewallRuleName,
+            Network:      fmt.Sprintf(
+                "https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID,
+                s.GcpConfig.NetworkName,
+            ),
+            Priority:     999,
+            SourceRanges: []string{"0.0.0.0/0"},
+        }
 
-		opp, err = compuService.Firewalls.Insert(s.GcpConfig.ProjectID, &fiw).Do()
-		if err != nil {
-			return nil, err
-		}
-		oco = OpContext{
-			Operation:    opp,
-			ProjectID:    s.GcpConfig.ProjectID,
-			Service:      compuService,
-			DesiredState: "DONE",
-		}
+        opp, err = compuService.Firewalls.Insert(s.GcpConfig.ProjectID, &fiw).Do()
+        if err != nil {
+            return nil, err
+        }
+        oco = OpContext{
+            Operation:    opp,
+            ProjectID:    s.GcpConfig.ProjectID,
+            Service:      compuService,
+            DesiredState: "DONE",
+        }
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-		if err != nil {
-			return nil, err
-		}
-	}
+        err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
+        if err != nil {
+            return nil, err
+        }
+    }
 
-	// FIXME Replace project name "safescale", use network name from configuration
-	buildNewNATRule := true
-	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, gcpSubNet.Name)
+    // FIXME Replace project name "safescale", use network name from configuration
+    buildNewNATRule := true
+    natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, gcpSubNet.Name)
 
-	rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
-	if rfs != nil && err == nil {
-		buildNewNATRule = false
-	} else if err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok {
-			if gerr.Code != 404 {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
-	}
+    rfs, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
+    if rfs != nil && err == nil {
+        buildNewNATRule = false
+    } else if err != nil {
+        if gerr, ok := err.(*googleapi.Error); ok {
+            if gerr.Code != 404 {
+                return nil, err
+            }
+        } else {
+            return nil, err
+        }
+    }
 
-	if buildNewNATRule {
-		route := &compute.Route{
-			DestRange:       "0.0.0.0/0",
-			Name:            natRuleName,
-			Network:         fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
-			NextHopInstance: fmt.Sprintf("projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectID, s.GcpConfig.Zone, req.Name),
-			Priority:        800,
-			Tags:            []string{fmt.Sprintf("no-ip-%s", gcpSubNet.Name)},
-		}
-		opp, err := compuService.Routes.Insert(s.GcpConfig.ProjectID, route).Do()
-		if err != nil {
-			return nil, err
-		}
-		oco = OpContext{
-			Operation:    opp,
-			ProjectID:    s.GcpConfig.ProjectID,
-			Service:      compuService,
-			DesiredState: "DONE",
-		}
+    if buildNewNATRule {
+        route := &compute.Route{
+            DestRange:       "0.0.0.0/0",
+            Name:            natRuleName,
+            Network:         fmt.Sprintf(
+                "https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID,
+                s.GcpConfig.NetworkName,
+            ),
+            NextHopInstance: fmt.Sprintf("projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectID, s.GcpConfig.Zone, req.Name),
+            Priority:        800,
+            Tags:            []string{fmt.Sprintf("no-ip-%s", gcpSubNet.Name)},
+        }
+        opp, err := compuService.Routes.Insert(s.GcpConfig.ProjectID, route).Do()
+        if err != nil {
+            return nil, err
+        }
+        oco = OpContext{
+            Operation:    opp,
+            ProjectID:    s.GcpConfig.ProjectID,
+            Service:      compuService,
+            DesiredState: "DONE",
+        }
 
-		err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-		if err != nil {
-			return nil, err
-		}
+        err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+        if err != nil {
+            return nil, err
+        }
 
-	}
+    }
 
-	// FIXME Validation before return...
-	return subnet, nil
+    // FIXME Validation before return...
+    return subnet, nil
 }
 
 // GetNetwork returns the network identified by ref (id or name)
 func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
+    if s == nil {
+        return nil, scerr.InvalidInstanceError()
+    }
 
-	nets, err := s.ListNetworks()
-	if err != nil {
-		return nil, err
-	}
-	for _, net := range nets {
-		if net.ID == ref {
-			return net, nil
-		}
-	}
+    nets, err := s.ListNetworks()
+    if err != nil {
+        return nil, err
+    }
+    for _, net := range nets {
+        if net.ID == ref {
+            return net, nil
+        }
+    }
 
-	return nil, resources.ResourceNotFoundError("network", ref)
+    return nil, resources.ResourceNotFoundError("network", ref)
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
 func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
+    if s == nil {
+        return nil, scerr.InvalidInstanceError()
+    }
 
-	nets, err := s.ListNetworks()
-	if err != nil {
-		return nil, err
-	}
-	for _, net := range nets {
-		if net.Name == ref {
-			return net, nil
-		}
-	}
+    nets, err := s.ListNetworks()
+    if err != nil {
+        return nil, err
+    }
+    for _, net := range nets {
+        if net.Name == ref {
+            return net, nil
+        }
+    }
 
-	return nil, resources.ResourceNotFoundError("network", ref)
+    return nil, resources.ResourceNotFoundError("network", ref)
 }
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
+    if s == nil {
+        return nil, scerr.InvalidInstanceError()
+    }
 
-	var networks []*resources.Network
+    var networks []*resources.Network
 
-	compuService := s.ComputeService
+    compuService := s.ComputeService
 
-	token := ""
-	for paginate := true; paginate; {
-		resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
-		if err != nil {
-			return networks, scerr.Errorf(fmt.Sprintf("cannot list networks ...: %s", err), err)
-		}
+    token := ""
+    for paginate := true; paginate; {
+        resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
+        if err != nil {
+            return networks, scerr.Errorf(fmt.Sprintf("cannot list networks ...: %s", err), err)
+        }
 
-		for _, nett := range resp.Items {
-			newNet := resources.NewNetwork()
-			newNet.Name = nett.Name
-			newNet.ID = strconv.FormatUint(nett.Id, 10)
-			newNet.CIDR = nett.IPv4Range
+        for _, nett := range resp.Items {
+            newNet := resources.NewNetwork()
+            newNet.Name = nett.Name
+            newNet.ID = strconv.FormatUint(nett.Id, 10)
+            newNet.CIDR = nett.IPv4Range
 
-			networks = append(networks, newNet)
-		}
-		token := resp.NextPageToken
-		paginate = token != ""
-	}
+            networks = append(networks, newNet)
+        }
+        token := resp.NextPageToken
+        paginate = token != ""
+    }
 
-	token = ""
-	for paginate := true; paginate; {
-		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
-		if err != nil {
-			return networks, scerr.Errorf(fmt.Sprintf("cannot list subnetworks ...: %s", err), err)
-		}
+    token = ""
+    for paginate := true; paginate; {
+        resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
+        if err != nil {
+            return networks, scerr.Errorf(fmt.Sprintf("cannot list subnetworks ...: %s", err), err)
+        }
 
-		for _, nett := range resp.Items {
-			newNet := resources.NewNetwork()
-			newNet.Name = nett.Name
-			newNet.ID = strconv.FormatUint(nett.Id, 10)
-			newNet.CIDR = nett.IpCidrRange
+        for _, nett := range resp.Items {
+            newNet := resources.NewNetwork()
+            newNet.Name = nett.Name
+            newNet.ID = strconv.FormatUint(nett.Id, 10)
+            newNet.CIDR = nett.IpCidrRange
 
-			networks = append(networks, newNet)
-		}
-		token := resp.NextPageToken
-		paginate = token != ""
-	}
+            networks = append(networks, newNet)
+        }
+        token := resp.NextPageToken
+        paginate = token != ""
+    }
 
-	return networks, nil
+    return networks, nil
 }
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) (err error) {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
+    if s == nil {
+        return scerr.InvalidInstanceError()
+    }
 
-	theNetwork, err := s.GetNetwork(ref)
-	if err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok {
-			if gerr.Code != 404 {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
+    theNetwork, err := s.GetNetwork(ref)
+    if err != nil {
+        if gerr, ok := err.(*googleapi.Error); ok {
+            if gerr.Code != 404 {
+                return err
+            }
+        } else {
+            return err
+        }
+    }
 
-	if theNetwork == nil {
-		return scerr.Errorf(fmt.Sprintf("delete network failed: unexpected nil network when looking for [%s]", ref), err)
-	}
+    if theNetwork == nil {
+        return scerr.Errorf(fmt.Sprintf("delete network failed: unexpected nil network when looking for [%s]", ref), err)
+    }
 
-	if !theNetwork.OK() {
-		logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
-	}
+    if !theNetwork.OK() {
+        logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
+    }
 
-	compuService := s.ComputeService
-	subnetwork, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, theNetwork.Name).Do()
-	if err != nil {
-		return err
-	}
+    compuService := s.ComputeService
+    subnetwork, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, theNetwork.Name).Do()
+    if err != nil {
+        return err
+    }
 
-	opp, err := compuService.Subnetworks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, subnetwork.Name).Do()
-	if err != nil {
-		return err
-	}
+    opp, err := compuService.Subnetworks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, subnetwork.Name).Do()
+    if err != nil {
+        return err
+    }
 
-	oco := OpContext{
-		Operation:    opp,
-		ProjectID:    s.GcpConfig.ProjectID,
-		Service:      compuService,
-		DesiredState: "DONE",
-	}
+    oco := OpContext{
+        Operation:    opp,
+        ProjectID:    s.GcpConfig.ProjectID,
+        Service:      compuService,
+        DesiredState: "DONE",
+    }
 
-	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrTimeout:
-			logrus.Warnf("Timeout waiting for subnetwork deletion")
-			return err
-		default:
-			return err
-		}
-	}
+    err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+    if err != nil {
+        switch err.(type) {
+        case scerr.ErrTimeout:
+            logrus.Warnf("Timeout waiting for subnetwork deletion")
+            return err
+        default:
+            return err
+        }
+    }
 
-	// Delete routes and firewall
-	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
-	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
-	if fws != nil && err == nil {
-		opp, operr := compuService.Firewalls.Delete(s.GcpConfig.ProjectID, firewallRuleName).Do()
-		if operr == nil {
-			oco := OpContext{
-				Operation:    opp,
-				ProjectID:    s.GcpConfig.ProjectID,
-				Service:      compuService,
-				DesiredState: "DONE",
-			}
+    // Delete routes and firewall
+    firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
+    fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
+    if fws != nil && err == nil {
+        opp, operr := compuService.Firewalls.Delete(s.GcpConfig.ProjectID, firewallRuleName).Do()
+        if operr == nil {
+            oco := OpContext{
+                Operation:    opp,
+                ProjectID:    s.GcpConfig.ProjectID,
+                Service:      compuService,
+                DesiredState: "DONE",
+            }
 
-			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-			if operr != nil {
-				logrus.Warn(operr)
-			}
-		}
-	}
-	if err != nil {
-		logrus.Warn(err)
-	}
+            operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+            if operr != nil {
+                logrus.Warn(operr)
+            }
+        }
+    }
+    if err != nil {
+        logrus.Warn(err)
+    }
 
-	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
-	nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
-	if nws != nil && err == nil {
-		opp, operr := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
-		if operr == nil {
-			oco := OpContext{
-				Operation:    opp,
-				ProjectID:    s.GcpConfig.ProjectID,
-				Service:      compuService,
-				DesiredState: "DONE",
-			}
+    natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
+    nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
+    if nws != nil && err == nil {
+        opp, operr := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
+        if operr == nil {
+            oco := OpContext{
+                Operation:    opp,
+                ProjectID:    s.GcpConfig.ProjectID,
+                Service:      compuService,
+                DesiredState: "DONE",
+            }
 
-			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-			if operr != nil {
-				logrus.Warn(operr)
-			}
-		}
-	}
-	if err != nil {
-		logrus.Warn(err)
-	}
+            operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+            if operr != nil {
+                logrus.Warn(operr)
+            }
+        }
+    }
+    if err != nil {
+        logrus.Warn(err)
+    }
 
-	return nil
+    return nil
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
+    *resources.Host, *userdata.Content, error,
+) {
+    if s == nil {
+        return nil, nil, scerr.InvalidInstanceError()
+    }
+    if req.Network == nil {
+        return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+    }
 
-	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
-	if gwname == "" {
-		gwname = "gw-" + req.Network.Name
-	}
+    gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
+    if gwname == "" {
+        gwname = "gw-" + req.Network.Name
+    }
 
-	hostReq := resources.HostRequest{
-		ImageID:      req.ImageID,
-		KeyPair:      req.KeyPair,
-		HostName:     req.Name,
-		ResourceName: gwname,
-		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
-		PublicIP:     true,
-	}
-	if sizing != nil && sizing.MinDiskSize > 0 {
-		hostReq.DiskSize = sizing.MinDiskSize
-	}
-	host, userData, err := s.CreateHost(hostReq)
-	if err != nil {
-		switch err.(type) {
-		case scerr.ErrInvalidRequest:
-			return nil, userData, err
-		default:
-			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
-		}
-	}
+    hostReq := resources.HostRequest{
+        ImageID:      req.ImageID,
+        KeyPair:      req.KeyPair,
+        HostName:     req.Name,
+        ResourceName: gwname,
+        TemplateID:   req.TemplateID,
+        Networks:     []*resources.Network{req.Network},
+        PublicIP:     true,
+    }
+    if sizing != nil && sizing.MinDiskSize > 0 {
+        hostReq.DiskSize = sizing.MinDiskSize
+    }
+    host, userData, err := s.CreateHost(hostReq)
+    if err != nil {
+        switch err.(type) {
+        case scerr.ErrInvalidRequest:
+            return nil, userData, err
+        default:
+            return nil, userData, scerr.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
+        }
+    }
 
-	// Updates Host Property propsv1.HostSizing
-	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-		hostSizingV1 := clonable.(*propsv1.HostSizing)
-		hostSizingV1.Template = req.TemplateID
-		return nil
-	})
-	if err != nil {
-		return nil, userData, err
-	}
+    // Updates Host Property propsv1.HostSizing
+    err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
+        func(clonable data.Clonable) error {
+            hostSizingV1 := clonable.(*propsv1.HostSizing)
+            hostSizingV1.Template = req.TemplateID
+            return nil
+        },
+    )
+    if err != nil {
+        return nil, userData, err
+    }
 
-	return host, userData, err
+    return host, userData, err
 }
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (s *Stack) DeleteGateway(ref string) error {
-	return s.DeleteHost(ref)
+    return s.DeleteHost(ref)
 }
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
+    return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+    return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
+    return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
+    return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
+    return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
 }

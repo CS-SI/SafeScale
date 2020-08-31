@@ -17,105 +17,105 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeRequest represents a volume request
 type VolumeRequest struct {
-	Name   string           `json:"name,omitempty"`
-	Size   int              `json:"size,omitempty"`
-	Speed  volumespeed.Enum `json:"speed,omitempty"`
-	InLVM  bool             `json:"lvm,omitempty"`
-	SizeVU int              `json:"sizevu,omitempty"`
+    Name   string           `json:"name,omitempty"`
+    Size   int              `json:"size,omitempty"`
+    Speed  volumespeed.Enum `json:"speed,omitempty"`
+    InLVM  bool             `json:"lvm,omitempty"`
+    SizeVU int              `json:"sizevu,omitempty"`
 }
 
 // Volume represents a block volume
 type Volume struct {
-	ID     string           `json:"id,omitempty"`
-	Name   string           `json:"name,omitempty"`
-	Size   int              `json:"size,omitempty"`
-	Speed  volumespeed.Enum `json:"speed,omitempty"`
-	State  volumestate.Enum `json:"state,omitempty"`
-	SizeVU int              `json:"sizevu,omitempty"`
+    ID     string           `json:"id,omitempty"`
+    Name   string           `json:"name,omitempty"`
+    Size   int              `json:"size,omitempty"`
+    Speed  volumespeed.Enum `json:"speed,omitempty"`
+    State  volumestate.Enum `json:"state,omitempty"`
+    SizeVU int              `json:"sizevu,omitempty"`
 
-	// FIXME SizeVU is a new parameter, is not initialized
+    // FIXME SizeVU is a new parameter, is not initialized
 
-	ManagedByLVM bool `json:"managedbyLVM,omitempty"`
-	Formatted    bool `json:"formatted,omitempty"`
+    ManagedByLVM bool `json:"managedbyLVM,omitempty"`
+    Formatted    bool `json:"formatted,omitempty"`
 
-	LVM []*Volume `json:"lvolumes,omitempty"`
-	PVM []*Volume `json:"pvolumes,omitempty"`
+    LVM []*Volume `json:"lvolumes,omitempty"`
+    PVM []*Volume `json:"pvolumes,omitempty"`
 
-	Properties *serialize.JSONProperties `json:"properties,omitempty"`
+    Properties *serialize.JSONProperties `json:"properties,omitempty"`
 }
 
 // NewVolume ...
 func NewVolume() *Volume {
-	return &Volume{
-		LVM:        []*Volume{},
-		PVM:        []*Volume{},
-		Properties: serialize.NewJSONProperties("resources.volume"),
-	}
+    return &Volume{
+        LVM:        []*Volume{},
+        PVM:        []*Volume{},
+        Properties: serialize.NewJSONProperties("resources.volume"),
+    }
 }
 
 // OK ...
 func (v *Volume) OK() bool {
-	result := true
-	result = result && v.ID != ""
-	result = result && v.Name != ""
-	result = result && v.Size != 0
-	result = result && v.Properties != nil
-	return result
+    result := true
+    result = result && v.ID != ""
+    result = result && v.Name != ""
+    result = result && v.Size != 0
+    result = result && v.Properties != nil
+    return result
 }
 
 // Serialize serializes Host instance into bytes (output json code)
 func (v *Volume) Serialize() ([]byte, error) {
-	return serialize.ToJSON(v)
+    return serialize.ToJSON(v)
 }
 
 // Deserialize reads json code and restores an Host
 func (v *Volume) Deserialize(buf []byte) error {
-	if v.Properties == nil {
-		v.Properties = serialize.NewJSONProperties("resources.volume")
-	} else {
-		v.Properties.SetModule("resources.volume")
-	}
-	err := serialize.FromJSON(buf, v)
-	if err != nil {
-		return err
-	}
+    if v.Properties == nil {
+        v.Properties = serialize.NewJSONProperties("resources.volume")
+    } else {
+        v.Properties.SetModule("resources.volume")
+    }
+    err := serialize.FromJSON(buf, v)
+    if err != nil {
+        return err
+    }
 
-	return nil
+    return nil
 }
 
 // VolumeAttachmentRequest represents a volume attachment request
 type VolumeAttachmentRequest struct {
-	Name     string `json:"name,omitempty"`
-	VolumeID string `json:"volume_id,omitempty"`
-	HostID   string `json:"host_id,omitempty"`
+    Name     string `json:"name,omitempty"`
+    VolumeID string `json:"volume_id,omitempty"`
+    HostID   string `json:"host_id,omitempty"`
 }
 
 // VolumeAttachment represents a volume attachment
 type VolumeAttachment struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	VolumeID   string `json:"volume,omitempty"`
-	ServerID   string `json:"host,omitempty"`
-	Device     string `json:"device,omitempty"`
-	MountPoint string `json:"mountpoint,omitempty"`
-	Format     string `json:"format,omitempty"`
+    ID         string `json:"id,omitempty"`
+    Name       string `json:"name,omitempty"`
+    VolumeID   string `json:"volume,omitempty"`
+    ServerID   string `json:"host,omitempty"`
+    Device     string `json:"device,omitempty"`
+    MountPoint string `json:"mountpoint,omitempty"`
+    Format     string `json:"format,omitempty"`
 }
 
 func (va VolumeAttachment) OK() bool {
-	result := true
-	result = result && va.ID != ""
-	result = result && va.Name != ""
-	result = result && va.VolumeID != ""
-	result = result && va.ServerID != ""
-	result = result && va.Device != ""
-	result = result && va.MountPoint != ""
-	result = result && va.Format != ""
-	return result
+    result := true
+    result = result && va.ID != ""
+    result = result && va.Name != ""
+    result = result && va.VolumeID != ""
+    result = result && va.ServerID != ""
+    result = result && va.Device != ""
+    result = result && va.MountPoint != ""
+    result = result && va.Format != ""
+    return result
 }

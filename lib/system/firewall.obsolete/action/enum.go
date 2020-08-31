@@ -22,10 +22,10 @@ package action
 type Enum int
 
 const (
-	_ Enum = iota
-	Accept
-	Drop
-	Reject
-	Queue
-	Return
+    _ Enum = iota
+    Accept
+    Drop
+    Reject
+    Queue
+    Return
 )

@@ -17,201 +17,201 @@
 package client
 
 import (
-	"strings"
-	"sync"
-	"time"
+    "strings"
+    "sync"
+    "time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/system"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    pb "github.com/CS-SI/SafeScale/lib"
+    srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/system"
+    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // var sshCfgCache = cache.NewMapCache()
 
 // host is the safescale client part handling hosts
 type host struct {
-	// session is not used currently
-	session *Session
+    // session is not used currently
+    session *Session
 }
 
 // List ...
 func (h *host) List(all bool, timeout time.Duration) (*pb.HostList, error) {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.List(ctx, &pb.HostListRequest{All: all})
+    return service.List(ctx, &pb.HostListRequest{All: all})
 }
 
 // Inspect ...
 func (h *host) Inspect(name string, timeout time.Duration) (*pb.Host, error) {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.Inspect(ctx, &pb.Reference{Name: name})
+    return service.Inspect(ctx, &pb.Reference{Name: name})
 
 }
 
 // Get host status
 func (h *host) Status(name string, timeout time.Duration) (*pb.HostStatus, error) {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.Status(ctx, &pb.Reference{Name: name})
+    return service.Status(ctx, &pb.Reference{Name: name})
 }
 
 // Reboots host
 func (h *host) Reboot(name string, timeout time.Duration) error {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return err
+    }
 
-	_, err = service.Reboot(ctx, &pb.Reference{Name: name})
-	return err
+    _, err = service.Reboot(ctx, &pb.Reference{Name: name})
+    return err
 }
 
 // Start host
 func (h *host) Start(name string, timeout time.Duration) error {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return err
+    }
 
-	_, err = service.Start(ctx, &pb.Reference{Name: name})
-	return err
+    _, err = service.Start(ctx, &pb.Reference{Name: name})
+    return err
 }
 
 func (h *host) Stop(name string, timeout time.Duration) error {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return err
+    }
 
-	_, err = service.Stop(ctx, &pb.Reference{Name: name})
-	return err
+    _, err = service.Stop(ctx, &pb.Reference{Name: name})
+    return err
 }
 
 // Create ...
 func (h *host) Create(def *pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
-	if def == nil {
-		return nil, scerr.InvalidParameterError("def", "cannot be nil")
-	}
+    if def == nil {
+        return nil, scerr.InvalidParameterError("def", "cannot be nil")
+    }
 
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.Create(ctx, def)
+    return service.Create(ctx, def)
 }
 
 // Delete deletes several hosts at the same time in goroutines
 func (h *host) Delete(names []string, timeout time.Duration) error {
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return err
+    }
 
-	var (
-		mutex sync.Mutex
-		wg    sync.WaitGroup
-		errs  []string
-	)
+    var (
+        mutex sync.Mutex
+        wg    sync.WaitGroup
+        errs  []string
+    )
 
-	hostDeleter := func(aname string) {
-		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
-		if err != nil {
-			mutex.Lock()
-			errs = append(errs, err.Error())
-			mutex.Unlock()
-		}
-	}
+    hostDeleter := func(aname string) {
+        defer wg.Done()
+        _, err := service.Delete(ctx, &pb.Reference{Name: aname})
+        if err != nil {
+            mutex.Lock()
+            errs = append(errs, err.Error())
+            mutex.Unlock()
+        }
+    }
 
-	wg.Add(len(names))
-	for _, target := range names {
-		go hostDeleter(target)
-	}
-	wg.Wait()
+    wg.Add(len(names))
+    for _, target := range names {
+        go hostDeleter(target)
+    }
+    wg.Wait()
 
-	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
-	}
-	return nil
+    if len(errs) > 0 {
+        return clitools.ExitOnRPC(strings.Join(errs, ", "))
+    }
+    return nil
 }
 
 // SSHConfig ...
 func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
-	// if anon, ok := sshCfgCache.Get(name); ok {
-	// 	return anon.(*system.SSHConfig), nil
-	// }
+    // if anon, ok := sshCfgCache.Get(name); ok {
+    // 	return anon.(*system.SSHConfig), nil
+    // }
 
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	pbSSHCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
-	if err != nil {
-		return nil, err
-	}
-	sshCfg := srvutils.ToSystemSSHConfig(pbSSHCfg)
-	// if err == nil {
-	// 	nerr := sshCfgCache.Set(name, sshCfg)
-	// 	if nerr != nil {
-	// 		return sshCfg, nerr
-	// 	}
-	// }
-	return sshCfg, err
+    pbSSHCfg, err := service.SSH(ctx, &pb.Reference{Name: name})
+    if err != nil {
+        return nil, err
+    }
+    sshCfg := srvutils.ToSystemSSHConfig(pbSSHCfg)
+    // if err == nil {
+    // 	nerr := sshCfgCache.Set(name, sshCfg)
+    // 	if nerr != nil {
+    // 		return sshCfg, nerr
+    // 	}
+    // }
+    return sshCfg, err
 }
 
 func (h *host) Resize(def *pb.HostDefinition, duration time.Duration) (*pb.Host, error) {
-	if def == nil {
-		return nil, scerr.InvalidParameterError("def", "cannot be nil")
-	}
+    if def == nil {
+        return nil, scerr.InvalidParameterError("def", "cannot be nil")
+    }
 
-	h.session.Connect()
-	defer h.session.Disconnect()
-	service := pb.NewHostServiceClient(h.session.connection)
-	ctx, err := srvutils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    h.session.Connect()
+    defer h.session.Disconnect()
+    service := pb.NewHostServiceClient(h.session.connection)
+    ctx, err := srvutils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.Resize(ctx, def)
+    return service.Resize(ctx, def)
 }
