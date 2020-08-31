@@ -20,7 +20,6 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "math"
     "os"
     "os/exec"
@@ -29,6 +28,8 @@ import (
     "strings"
     txttmpl "text/template"
     "time"
+
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
 
     rice "github.com/GeertJohan/go.rice"
     "github.com/sirupsen/logrus"
@@ -81,7 +82,9 @@ var (
 
 // Makers ...
 type Makers struct {
-    MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)    // returns masterCount, pruvateNodeCount, publicNodeCount
+    MinimumRequiredServers      func(task concurrency.Task, b Foreman) (
+        int, int, int,
+    )                                                                                     // returns masterCount, pruvateNodeCount, publicNodeCount
     DefaultGatewaySizing        func(task concurrency.Task, b Foreman) *pb.HostDefinition // sizing of Gateway(s)
     DefaultMasterSizing         func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of master(s)
     DefaultNodeSizing           func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of node(s)
@@ -152,7 +155,9 @@ func (b *foreman) ExecuteScript(
     data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
     data["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
     data["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
-    data["TemplatePullImagesTimeout"] = strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1)
+    data["TemplatePullImagesTimeout"] = strings.Replace(
+        (2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
+    )
 
     path, err := uploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
     if err != nil {
@@ -180,13 +185,17 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
             state = clusterstate.Nominal
         }
 
-        metaErr := b.cluster.UpdateMetadata(task, func() error {
-            // Cluster created and configured successfully
-            return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-                clonable.(*clusterpropsv1.State).State = state
-                return nil
-            })
-        })
+        metaErr := b.cluster.UpdateMetadata(
+            task, func() error {
+                // Cluster created and configured successfully
+                return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(
+                    func(clonable data.Clonable) error {
+                        clonable.(*clusterpropsv1.State).State = state
+                        return nil
+                    },
+                )
+            },
+        )
 
         if metaErr != nil {
             err = scerr.AddConsequence(err, metaErr)
@@ -393,58 +402,68 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     b.cluster.Identity.Complexity = req.Complexity
     b.cluster.Identity.Keypair = kp
     b.cluster.Identity.AdminPassword = cladmPassword
-    err = b.cluster.UpdateMetadata(task, func() error {
-        err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
-            defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-            defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(gatewaysDef.Sizing)
-            defaultsV2.MasterSizing = srvutils.FromPBHostSizing(mastersDef.Sizing)
-            defaultsV2.NodeSizing = srvutils.FromPBHostSizing(nodesDef.Sizing)
-            defaultsV2.Image = imageID
-            return nil
-        })
-        if err != nil {
-            return err
-        }
-
-        err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.State).State = clusterstate.Creating
-            return nil
-        })
-        if err != nil {
-            return err
-        }
-
-        err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
-            return nil
-        })
-        if err != nil {
-            return err
-        }
-
-        return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
-            networkV2 := clonable.(*clusterpropsv2.Network)
-            networkV2.NetworkID = req.NetworkID
-            networkV2.CIDR = req.CIDR
-            networkV2.GatewayID = primaryGateway.ID
-            networkV2.GatewayIP = primaryGateway.GetPrivateIP()
-            if !gwFailoverDisabled {
-                networkV2.SecondaryGatewayID = secondaryGateway.ID
-                networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
-                networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
-                // VPL: no public IP on VIP yet...
-                // networkV2.EndpointIP = network.VirtualIp.PublicIp
-                networkV2.EndpointIP = primaryGateway.GetPublicIP()
-                networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
-                networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
-            } else {
-                networkV2.DefaultRouteIP = primaryGateway.GetPrivateIP()
-                networkV2.EndpointIP = primaryGateway.GetPublicIP()
-                networkV2.PrimaryPublicIP = networkV2.EndpointIP
+    err = b.cluster.UpdateMetadata(
+        task, func() error {
+            err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(
+                func(clonable data.Clonable) error {
+                    defaultsV2 := clonable.(*clusterpropsv2.Defaults)
+                    defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(gatewaysDef.Sizing)
+                    defaultsV2.MasterSizing = srvutils.FromPBHostSizing(mastersDef.Sizing)
+                    defaultsV2.NodeSizing = srvutils.FromPBHostSizing(nodesDef.Sizing)
+                    defaultsV2.Image = imageID
+                    return nil
+                },
+            )
+            if err != nil {
+                return err
             }
-            return nil
-        })
-    })
+
+            err = b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.State).State = clusterstate.Creating
+                    return nil
+                },
+            )
+            if err != nil {
+                return err
+            }
+
+            err = b.cluster.GetProperties(task).LockForWrite(property.CompositeV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.Composite).Tenants = []string{req.Tenant}
+                    return nil
+                },
+            )
+            if err != nil {
+                return err
+            }
+
+            return b.cluster.GetProperties(task).LockForWrite(property.NetworkV2).ThenUse(
+                func(clonable data.Clonable) error {
+                    networkV2 := clonable.(*clusterpropsv2.Network)
+                    networkV2.NetworkID = req.NetworkID
+                    networkV2.CIDR = req.CIDR
+                    networkV2.GatewayID = primaryGateway.ID
+                    networkV2.GatewayIP = primaryGateway.GetPrivateIP()
+                    if !gwFailoverDisabled {
+                        networkV2.SecondaryGatewayID = secondaryGateway.ID
+                        networkV2.SecondaryGatewayIP = secondaryGateway.GetPrivateIP()
+                        networkV2.DefaultRouteIP = network.VirtualIp.PrivateIp
+                        // VPL: no public IP on VIP yet...
+                        // networkV2.EndpointIP = network.VirtualIp.PublicIp
+                        networkV2.EndpointIP = primaryGateway.GetPublicIP()
+                        networkV2.PrimaryPublicIP = primaryGateway.GetPublicIP()
+                        networkV2.SecondaryPublicIP = secondaryGateway.GetPublicIP()
+                    } else {
+                        networkV2.DefaultRouteIP = primaryGateway.GetPrivateIP()
+                        networkV2.EndpointIP = primaryGateway.GetPublicIP()
+                        networkV2.PrimaryPublicIP = networkV2.EndpointIP
+                    }
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return err
     }
@@ -490,11 +509,13 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     if err != nil {
         return err
     }
-    mastersTask, err = mastersTask.Start(b.taskCreateMasters, data.Map{
-        "count":     masterCount,
-        "masterDef": mastersDef,
-        "nokeep":    !req.KeepOnFailure,
-    })
+    mastersTask, err = mastersTask.Start(
+        b.taskCreateMasters, data.Map{
+            "count":     masterCount,
+            "masterDef": mastersDef,
+            "nokeep":    !req.KeepOnFailure,
+        },
+    )
     if err != nil {
         return err
     }
@@ -503,12 +524,14 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
     if err != nil {
         return err
     }
-    privateNodesTask, err = privateNodesTask.Start(b.taskCreateNodes, data.Map{
-        "count":   privateNodeCount,
-        "public":  false,
-        "nodeDef": nodesDef,
-        "nokeep":  !req.KeepOnFailure,
-    })
+    privateNodesTask, err = privateNodesTask.Start(
+        b.taskCreateNodes, data.Map{
+            "count":   privateNodeCount,
+            "public":  false,
+            "nodeDef": nodesDef,
+            "nokeep":  !req.KeepOnFailure,
+        },
+    )
     if err != nil {
         return err
     }
@@ -636,11 +659,13 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
     // At the end, configure cluster as a whole
     logrus.Debugf("Starting cluster configuration...")
-    err = b.configureCluster(task, data.Map{
-        "Request":          req,
-        "PrimaryGateway":   primaryGateway,
-        "SecondaryGateway": secondaryGateway,
-    })
+    err = b.configureCluster(
+        task, data.Map{
+            "Request":          req,
+            "PrimaryGateway":   primaryGateway,
+            "SecondaryGateway": secondaryGateway,
+        },
+    )
     if err != nil {
         return err
     }
@@ -657,12 +682,16 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
     // Updates metadata
-    err = cluster.UpdateMetadata(task, func() error {
-        return cluster.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.State).State = clusterstate.Removed
-            return nil
-        })
-    })
+    err = cluster.UpdateMetadata(
+        task, func() error {
+            return cluster.Properties.LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.State).State = clusterstate.Removed
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return err
     }
@@ -747,15 +776,19 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
     cluster.RLock(task)
     networkID := ""
     if cluster.Properties.Lookup(property.NetworkV2) {
-        err = cluster.Properties.LockForRead(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
-            networkID = clonable.(*clusterpropsv2.Network).NetworkID
-            return nil
-        })
+        err = cluster.Properties.LockForRead(property.NetworkV2).ThenUse(
+            func(clonable data.Clonable) error {
+                networkID = clonable.(*clusterpropsv2.Network).NetworkID
+                return nil
+            },
+        )
     } else {
-        err = cluster.Properties.LockForRead(property.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-            networkID = clonable.(*clusterpropsv1.Network).NetworkID
-            return nil
-        })
+        err = cluster.Properties.LockForRead(property.NetworkV1).ThenUse(
+            func(clonable data.Clonable) error {
+                networkID = clonable.(*clusterpropsv1.Network).NetworkID
+                return nil
+            },
+        )
     }
     cluster.RUnlock(task)
     if err != nil {
@@ -811,15 +844,21 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
         if err != nil {
             return err
         }
-        err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
-            nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
-            if nAttached > 0 {
-                return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
-            }
-            return nil
-        })
+        err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(
+            func(clonable data.Clonable) error {
+                nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
+                if nAttached > 0 {
+                    return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+                }
+                return nil
+            },
+        )
         if err != nil {
-            return scerr.InvalidRequestError(fmt.Sprintf("cannot delete %s '%s' because of attached volumes: %v", what, host.Name, err))
+            return scerr.InvalidRequestError(
+                fmt.Sprintf(
+                    "cannot delete %s '%s' because of attached volumes: %v", what, host.Name, err,
+                ),
+            )
         }
     }
     return nil
@@ -836,7 +875,7 @@ func complementHostDefinition(req *pb.HostDefinition, def *pb.HostDefinition) *p
         return def
     }
 
-    //finalDef := srvutils.ClonePBHostDefinition(req)
+    // finalDef := srvutils.ClonePBHostDefinition(req)
     finalDef := req.Clone()
     if finalDef.Sizing == nil {
         finalDef.Sizing = srvutils.ClonePBHostSizing(def.Sizing)
@@ -893,10 +932,12 @@ func (b *foreman) getState(task concurrency.Task) (clusterstate.Enum, error) {
     }
 
     var stateV1 clusterstate.Enum
-    err := b.cluster.GetProperties(task).LockForRead(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-        stateV1 = clonable.(*clusterpropsv1.State).State
-        return nil
-    })
+    err := b.cluster.GetProperties(task).LockForRead(property.StateV1).ThenUse(
+        func(clonable data.Clonable) error {
+            stateV1 = clonable.(*clusterpropsv1.State).State
+            return nil
+        },
+    )
     if err != nil {
         return clusterstate.Unknown, err
     }
@@ -1076,12 +1117,17 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
             return fmt.Errorf("failed to get metadata of host: %s", err.Error())
         }
         if joinCmd == "" {
-            retcode, _, _, err := clientSSH.Run(hostID, "docker swarm init && docker node update "+host.Name+" --label-add safescale.host.role=master",
-                outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+            retcode, _, _, err := clientSSH.Run(
+                hostID, "docker swarm init && docker node update "+host.Name+" --label-add safescale.host.role=master",
+                outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+            )
             if err != nil || retcode != 0 {
                 return fmt.Errorf("failed to init docker swarm")
             }
-            retcode, token, stderr, err := clientSSH.Run(hostID, "docker swarm join-token manager -q", outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+            retcode, token, stderr, err := clientSSH.Run(
+                hostID, "docker swarm join-token manager -q", outputs.COLLECT, client.DefaultConnectionTimeout,
+                client.DefaultExecutionTimeout,
+            )
             if err != nil || retcode != 0 {
                 return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
             }
@@ -1089,7 +1135,9 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
             joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
         } else {
             masterJoinCmd := joinCmd + " && docker node update " + host.Name + " --label-add safescale.host.role=master"
-            retcode, _, stderr, err := clientSSH.Run(hostID, masterJoinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+            retcode, _, stderr, err := clientSSH.Run(
+                hostID, masterJoinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+            )
             if err != nil || retcode != 0 {
                 return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
             }
@@ -1117,35 +1165,47 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
         if err != nil {
             return fmt.Errorf("failed to get metadata of host: %s", err.Error())
         }
-        retcode, _, stderr, err := clientSSH.Run(hostID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+        retcode, _, stderr, err := clientSSH.Run(
+            hostID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+        )
         if err != nil || retcode != 0 {
             return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
         }
         labelCmd := "docker node update " + host.Name + " --label-add safescale.host.role=node"
-        retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+        retcode, _, stderr, err = clientSSH.Run(
+            selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+        )
         if err != nil || retcode != 0 {
             return fmt.Errorf("failed to label swarm worker '%s' as node: %s", host.Name, stderr)
         }
     }
 
     // Join gateways in Docker Swarm as workers
-    retcode, _, stderr, err := clientSSH.Run(primaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+    retcode, _, stderr, err := clientSSH.Run(
+        primaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+    )
     if err != nil || retcode != 0 {
         return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
     }
     labelCmd := "docker node update " + primaryGateway.Name + " --label-add safescale.host.role=gateway"
-    retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+    retcode, _, stderr, err = clientSSH.Run(
+        selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+    )
     if err != nil || retcode != 0 {
         return fmt.Errorf("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.Name, stderr)
     }
 
     if secondaryGateway != nil {
-        retcode, _, stderr, err := clientSSH.Run(secondaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+        retcode, _, stderr, err := clientSSH.Run(
+            secondaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+        )
         if err != nil || retcode != 0 {
             return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
         }
         labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=gateway"
-        retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+        retcode, _, stderr, err = clientSSH.Run(
+            selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+        )
         if err != nil || retcode != 0 {
             return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
         }
@@ -1164,7 +1224,9 @@ func (b *foreman) getSwarmJoinCommand(task concurrency.Task, selectedMaster *pb.
         memberType = "manager"
     }
     tokenCmd := fmt.Sprintf("docker swarm join-token %s -q", memberType)
-    retcode, token, stderr, err := clientInstance.SSH.Run(selectedMaster.Id, tokenCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+    retcode, token, stderr, err := clientInstance.SSH.Run(
+        selectedMaster.Id, tokenCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+    )
     if err != nil || retcode != 0 {
         return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
     }
@@ -1200,7 +1262,9 @@ func uploadTemplateToFile(
     data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
     data["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
     data["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
-    data["TemplatePullImagesTimeout"] = strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1)
+    data["TemplatePullImagesTimeout"] = strings.Replace(
+        (2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
+    )
 
     dataBuffer := bytes.NewBufferString("")
     err = tmplCmd.Execute(dataBuffer, data)
@@ -1241,10 +1305,12 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
         if err != nil {
             break
         }
-        subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
-            "index": i + 1,
-            "host":  host,
-        })
+        subtask, err = subtask.Start(
+            b.taskConfigureNode, data.Map{
+                "index": i + 1,
+                "host":  host,
+            },
+        )
         if err != nil {
             break
         }
@@ -1305,12 +1371,16 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
             return err
         }
 
-        retcode, _, stderr, err := clientSSH.Run(pbHost.Id, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+        retcode, _, stderr, err := clientSSH.Run(
+            pbHost.Id, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+        )
         if err != nil || retcode != 0 {
             return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
         }
         nodeLabel := "docker node update " + pbHost.Name + " --label-add safescale.host.role=node"
-        retcode, _, stderr, err = clientSSH.Run(selectedMaster.Id, nodeLabel, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+        retcode, _, stderr, err = clientSSH.Run(
+            selectedMaster.Id, nodeLabel, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+        )
         if err != nil || retcode != 0 {
             return fmt.Errorf("failed to add label to docker Swarm worker '%s': %s", pbHost.Name, stderr)
         }
@@ -1407,7 +1477,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
     // Check worker is member of the Swarm
     cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
-    retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+    retcode, _, _, err := clientSSH.Run(
+        selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+    )
     if err != nil {
         return err
     }
@@ -1417,7 +1489,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
     }
     // node is a worker in the Swarm: 1st ask worker to leave Swarm
     cmd = "docker swarm leave"
-    retcode, _, stderr, err := clientSSH.Run(pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+    retcode, _, stderr, err := clientSSH.Run(
+        pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+    )
     if err != nil {
         return err
     }
@@ -1429,7 +1503,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
     cmd = fmt.Sprintf("docker node ls --format \"{{.Status}}\" --filter \"name=%s\" | grep -i down", pbHost.Name)
     retryErr := retry.WhileUnsuccessfulDelay5Seconds(
         func() error {
-            retcode, _, _, err := clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+            retcode, _, _, err := clientSSH.Run(
+                selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+            )
             if err != nil {
                 return err
             }
@@ -1451,7 +1527,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 
     // 3rd, ask master to remove node from Swarm
     cmd = fmt.Sprintf("docker node rm %s", pbHost.Name)
-    retcode, _, stderr, err = clientSSH.Run(selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout)
+    retcode, _, stderr, err = clientSSH.Run(
+        selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+    )
     if err != nil {
         return err
     }
@@ -1462,7 +1540,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 }
 
 // installNodeRequirements ...
-func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string) (err error) {
+func (b *foreman) installNodeRequirements(
+    task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string,
+) (err error) {
     if b.makers.GetTemplateBox == nil {
         return scerr.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
     }
@@ -1575,9 +1655,13 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
         if suffix != "" {
             cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
             cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-            retcode, stdout, stderr, err := client.New().SSH.Run(pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout())
+            retcode, stdout, stderr, err := client.New().SSH.Run(
+                pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout(),
+            )
             if err != nil {
-                msg := fmt.Sprintf("failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error())
+                msg := fmt.Sprintf(
+                    "failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error(),
+                )
                 logrus.Errorf(utils.Capitalize(msg))
                 return fmt.Errorf(msg)
             }
@@ -1639,7 +1723,9 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType node
 
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     if t == nil {
         t, err = concurrency.VoidTask()
         if err != nil {
@@ -1694,7 +1780,9 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     // Convert parameters
     gw, ok := params.(*pb.Host)
     if !ok {
@@ -1725,7 +1813,9 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     // Convert parameters
     p := params.(data.Map)
     count := p["count"].(int)
@@ -1754,12 +1844,14 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
         if err != nil {
             return nil, err
         }
-        subtask, err = subtask.Start(b.taskCreateMaster, data.Map{
-            "index":     i + 1,
-            "masterDef": def,
-            "timeout":   timeout,
-            "nokeep":    nokeep,
-        })
+        subtask, err = subtask.Start(
+            b.taskCreateMaster, data.Map{
+                "index":     i + 1,
+                "masterDef": def,
+                "timeout":   timeout,
+                "nokeep":    nokeep,
+            },
+        )
         if err != nil {
             return nil, err
         }
@@ -1783,7 +1875,9 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     // Convert parameters
     p := params.(data.Map)
     index := p["index"].(int)
@@ -1791,7 +1885,9 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
     timeout := p["timeout"].(time.Duration)
     nokeep := p["nokeep"].(bool)
 
-    tracer := debug.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true).GoingIn()
+    tracer := debug.NewTracer(
+        t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true,
+    ).GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1804,7 +1900,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
         return nil, err
     }
 
-    //hostDef := srvutils.ClonePBHostDefinition(def)
+    // hostDef := srvutils.ClonePBHostDefinition(def)
     hostDef := def.Clone()
     hostDef.Name, err = b.buildHostname(t, "master", nodetype.Master)
     if err != nil {
@@ -1818,18 +1914,22 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
     }
 
     // Updates cluster metadata to keep track of the host we will create
-    err = b.cluster.UpdateMetadata(t, func() error {
-        // Locks for write the NodesV1 extension...
-        return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-            nodesV1 := clonable.(*clusterpropsv1.Nodes)
-            // Update swarmCluster definition in Object Storage
-            node := &clusterpropsv1.Node{
-                Name: hostDef.Name,
-            }
-            nodesV1.Masters = append(nodesV1.Masters, node)
-            return nil
-        })
-    })
+    err = b.cluster.UpdateMetadata(
+        t, func() error {
+            // Locks for write the NodesV1 extension...
+            return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                    // Update swarmCluster definition in Object Storage
+                    node := &clusterpropsv1.Node{
+                        Name: hostDef.Name,
+                    }
+                    nodesV1.Masters = append(nodesV1.Masters, node)
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return nil, err
     }
@@ -1837,14 +1937,18 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
     // Starting from here, if an error occurs and nokeep is true, deletes master from cluster metadata
     defer func() {
         if err != nil && nokeep {
-            derr := b.cluster.UpdateMetadata(t, func() error {
-                return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
-                    // Update swarmCluster definition in Object Storage
-                    _, innerErr := deleteNodeFromListByName(nodesV1.Masters, hostDef.Name)
-                    return innerErr
-                })
-            })
+            derr := b.cluster.UpdateMetadata(
+                t, func() error {
+                    return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+                        func(clonable data.Clonable) error {
+                            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                            // Update swarmCluster definition in Object Storage
+                            _, innerErr := deleteNodeFromListByName(nodesV1.Masters, hostDef.Name)
+                            return innerErr
+                        },
+                    )
+                },
+            )
             if derr != nil {
                 err = scerr.AddConsequence(err, derr)
             }
@@ -1873,22 +1977,26 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
     }()
 
     // Updates cluster metadata to update node information corresponding to created host, before testing if an error occurred during the creation
-    err = b.cluster.UpdateMetadata(t, func() error {
-        // Locks for write the NodesV1 extension...
-        return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-            nodesV1 := clonable.(*clusterpropsv1.Nodes)
-            // Update cluster definition in Object Storage
-            found, idx := findNodeByName(nodesV1.Masters, pbHost.Name)
-            if !found {
-                return scerr.NotFoundError(fmt.Sprintf("failed to update node named '%s'", pbHost.Name))
-            }
-            node := nodesV1.Masters[idx]
-            node.ID = pbHost.Id
-            node.PrivateIP = pbHost.PrivateIp
-            node.PublicIP = pbHost.PublicIp
-            return nil
-        })
-    })
+    err = b.cluster.UpdateMetadata(
+        t, func() error {
+            // Locks for write the NodesV1 extension...
+            return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                    // Update cluster definition in Object Storage
+                    found, idx := findNodeByName(nodesV1.Masters, pbHost.Name)
+                    if !found {
+                        return scerr.NotFoundError(fmt.Sprintf("failed to update node named '%s'", pbHost.Name))
+                    }
+                    node := nodesV1.Masters[idx]
+                    node.ID = pbHost.Id
+                    node.PrivateIP = pbHost.PrivateIp
+                    node.PublicIP = pbHost.PublicIp
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return nil, client.DecorateError(err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false)
     }
@@ -1910,7 +2018,9 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
     defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1935,10 +2045,12 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
         if err != nil {
             return nil, err
         }
-        subtask, err = subtask.Start(b.taskConfigureMaster, data.Map{
-            "index": i + 1,
-            "host":  host,
-        })
+        subtask, err = subtask.Start(
+            b.taskConfigureMaster, data.Map{
+                "index": i + 1,
+                "host":  host,
+            },
+        )
         if err != nil {
             return nil, err
         }
@@ -1956,13 +2068,17 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
         return nil, fmt.Errorf(strings.Join(errs, "\n"))
     }
 
-    logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, temporal.FormatDuration(time.Since(started)))
+    logrus.Debugf(
+        "[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, temporal.FormatDuration(time.Since(started)),
+    )
     return nil, nil
 }
 
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     if b == nil {
         return nil, scerr.InvalidInstanceError()
     }
@@ -2005,7 +2121,9 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     if b == nil {
         return nil, scerr.InvalidInstanceError()
     }
@@ -2061,13 +2179,15 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
         if err != nil {
             return nil, err
         }
-        subtask, err = subtask.Start(b.taskCreateNode, data.Map{
-            "index": i,
-            // "type":    nodetype.Node,
-            "nodeDef": def,
-            "timeout": timeout,
-            "nokeep":  nokeep,
-        })
+        subtask, err = subtask.Start(
+            b.taskCreateNode, data.Map{
+                "index": i,
+                // "type":    nodetype.Node,
+                "nodeDef": def,
+                "timeout": timeout,
+                "nokeep":  nokeep,
+            },
+        )
         if err != nil {
             return nil, err
         }
@@ -2139,7 +2259,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
     }
 
     // Create the host
-    //hostDef := srvutils.ClonePBHostDefinition(def)
+    // hostDef := srvutils.ClonePBHostDefinition(def)
     hostDef := def.Clone()
     hostDef.Name, err = b.buildHostname(t, "node", nodetype.Node)
     if err != nil {
@@ -2157,18 +2277,22 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
     }
 
     // Updates cluster metadata to keep track of the host we will create
-    err = b.cluster.UpdateMetadata(t, func() error {
-        // Locks for write the NodesV1 extension...
-        return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-            nodesV1 := clonable.(*clusterpropsv1.Nodes)
-            // Update swarmCluster definition in Object Storage
-            node := &clusterpropsv1.Node{
-                Name: hostDef.Name,
-            }
-            nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-            return nil
-        })
-    })
+    err = b.cluster.UpdateMetadata(
+        t, func() error {
+            // Locks for write the NodesV1 extension...
+            return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                    // Update swarmCluster definition in Object Storage
+                    node := &clusterpropsv1.Node{
+                        Name: hostDef.Name,
+                    }
+                    nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return nil, err
     }
@@ -2176,14 +2300,18 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
     // Starting from here, if an error occurs and nokeep is set, deletes node from cluster metadata
     defer func() {
         if err != nil && nokeep {
-            derr := b.cluster.UpdateMetadata(t, func() error {
-                return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
-                    // Update swarmCluster definition in Object Storage
-                    _, innerErr := deleteNodeFromListByName(nodesV1.PrivateNodes, hostDef.Name)
-                    return innerErr
-                })
-            })
+            derr := b.cluster.UpdateMetadata(
+                t, func() error {
+                    return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+                        func(clonable data.Clonable) error {
+                            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                            // Update swarmCluster definition in Object Storage
+                            _, innerErr := deleteNodeFromListByName(nodesV1.PrivateNodes, hostDef.Name)
+                            return innerErr
+                        },
+                    )
+                },
+            )
             if derr != nil {
                 err = scerr.AddConsequence(err, derr)
             }
@@ -2191,7 +2319,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
     }()
 
     clientHost := client.New().Host
-    //var node *clusterpropsv1.Node
+    // var node *clusterpropsv1.Node
     pbHost, err := clientHost.Create(hostDef, timeout)
     if err != nil {
         return nil, err
@@ -2208,22 +2336,26 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
     }()
 
     // host created, update cluster metadata
-    err = b.cluster.UpdateMetadata(t, func() error {
-        // Locks for write the NodesV1 extension...
-        return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-            nodesV1 := clonable.(*clusterpropsv1.Nodes)
-            // Updates the new node information
-            found, idx := findNodeByName(nodesV1.PrivateNodes, pbHost.Name)
-            if !found {
-                return scerr.NotFoundError(fmt.Sprintf("failed to find node with name '%s'", pbHost.Name))
-            }
-            node := nodesV1.PrivateNodes[idx]
-            node.ID = pbHost.Id
-            node.PrivateIP = pbHost.PrivateIp
-            node.PublicIP = pbHost.PublicIp
-            return nil
-        })
-    })
+    err = b.cluster.UpdateMetadata(
+        t, func() error {
+            // Locks for write the NodesV1 extension...
+            return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                    // Updates the new node information
+                    found, idx := findNodeByName(nodesV1.PrivateNodes, pbHost.Name)
+                    if !found {
+                        return scerr.NotFoundError(fmt.Sprintf("failed to find node with name '%s'", pbHost.Name))
+                    }
+                    node := nodesV1.PrivateNodes[idx]
+                    node.ID = pbHost.Id
+                    node.PrivateIP = pbHost.PrivateIp
+                    node.PublicIP = pbHost.PublicIp
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         logrus.Warnf("error writing cluster metadata of '%s'", pbHost.Id)
         return nil, client.DecorateError(err, fmt.Sprintf("[%s] creation failed: %s", hostLabel, err.Error()), true)
@@ -2248,7 +2380,9 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (task concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (
+    task concurrency.TaskResult, err error,
+) {
     clusterName := b.cluster.GetIdentity(t).Name
 
     tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
@@ -2281,10 +2415,12 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
         if err != nil {
             return nil, err
         }
-        subtask, err = subtask.Start(b.taskConfigureNode, data.Map{
-            "index": i + 1,
-            "host":  pbHost,
-        })
+        subtask, err = subtask.Start(
+            b.taskConfigureNode, data.Map{
+                "index": i + 1,
+                "host":  pbHost,
+            },
+        )
         if err != nil {
             return nil, err
         }
@@ -2311,7 +2447,9 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (
+    result concurrency.TaskResult, err error,
+) {
     // Convert parameters
     p := params.(data.Map)
     index := p["index"].(int)
@@ -2454,10 +2592,12 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
     if err != nil {
         return err
     }
-    results, err := feat.Add(target, install.Variables{
-        "Username": "cladm",
-        "Password": adminPassword,
-    }, install.Settings{})
+    results, err := feat.Add(
+        target, install.Variables{
+            "Username": "cladm",
+            "Password": adminPassword,
+        }, install.Settings{},
+    )
     if err != nil {
         return err
     }
@@ -2510,10 +2650,12 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 
     disabled := false
     b.cluster.RLock(task)
-    err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
-        _, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
-        return nil
-    })
+    err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            _, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
+            return nil
+        },
+    )
     b.cluster.RUnlock(task)
     if err != nil {
         return err
@@ -2547,10 +2689,12 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 
     disabled := false
     b.cluster.RLock(task)
-    err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
-        _, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
-        return nil
-    })
+    err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            _, disabled = clonable.(*clusterpropsv1.Features).Disabled["proxycache"]
+            return nil
+        },
+    )
     b.cluster.RUnlock(task)
     if err != nil {
         return err
@@ -2611,18 +2755,20 @@ func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType nod
 
     // Locks for write the manager extension...
     b.cluster.Lock(task)
-    outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes)
-        switch nodeType {
-        case nodetype.Node:
-            nodesV1.PrivateLastIndex++
-            index = nodesV1.PrivateLastIndex
-        case nodetype.Master:
-            nodesV1.MasterLastIndex++
-            index = nodesV1.MasterLastIndex
-        }
-        return nil
-    })
+    outerErr := b.cluster.GetProperties(task).LockForWrite(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+            switch nodeType {
+            case nodetype.Node:
+                nodesV1.PrivateLastIndex++
+                index = nodesV1.PrivateLastIndex
+            case nodetype.Master:
+                nodesV1.MasterLastIndex++
+                index = nodesV1.MasterLastIndex
+            }
+            return nil
+        },
+    )
     b.cluster.Unlock(task)
     if outerErr != nil {
         return "", outerErr

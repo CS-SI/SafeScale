@@ -17,65 +17,65 @@
 package flavor
 
 import (
-	"fmt"
-	"strings"
+    "fmt"
+    "strings"
 )
 
 // Enum represents the flavor of a cluster, in other words what technology is used behind the scene
 type Enum int
 
 const (
-	_ Enum = iota
-	// DCOS managed cluster
-	DCOS
-	// K8S for a pure Kubernetes cluster
-	K8S
-	// SWARM for a pure docker swarm cluster
-	SWARM
-	// BOH for a "Bunch Of Hosts", without cluster management
-	BOH
-	// OHPC for a OpenHPC cluster
-	OHPC
+    _ Enum = iota
+    // DCOS managed cluster
+    DCOS
+    // K8S for a pure Kubernetes cluster
+    K8S
+    // SWARM for a pure docker swarm cluster
+    SWARM
+    // BOH for a "Bunch Of Hosts", without cluster management
+    BOH
+    // OHPC for a OpenHPC cluster
+    OHPC
 )
 
 var (
-	stringMap = map[string]Enum{
-		"dcos":  DCOS,
-		"k8s":   K8S,
-		"swarm": SWARM,
-		"boh":   BOH,
-		"ohpc":  OHPC,
-	}
+    stringMap = map[string]Enum{
+        "dcos":  DCOS,
+        "k8s":   K8S,
+        "swarm": SWARM,
+        "boh":   BOH,
+        "ohpc":  OHPC,
+    }
 
-	enumMap = map[Enum]string{
-		DCOS:  "DCOS",
-		K8S:   "K8S",
-		SWARM: "SWARM",
-		BOH:   "BOH",
-		OHPC:  "OHPC",
-	}
+    enumMap = map[Enum]string{
+        DCOS:  "DCOS",
+        K8S:   "K8S",
+        SWARM: "SWARM",
+        BOH:   "BOH",
+        OHPC:  "OHPC",
+    }
 )
 
 // Parse returns a Enum corresponding to the string parameter
 // If the string doesn't correspond to any Enum, returns an error (nil otherwise)
 // This function is intended to be used to parse user input.
 func Parse(v string) (Enum, error) {
-	var (
-		e  Enum
-		ok bool
-	)
-	lowered := strings.ToLower(v)
-	if e, ok = stringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Flavor matching with '%s'", v)
-	}
-	return e, nil
+    var (
+        e  Enum
+        ok bool
+    )
+    lowered := strings.ToLower(v)
+    if e, ok = stringMap[lowered]; !ok {
+        return e, fmt.Errorf("failed to find a Flavor matching with '%s'", v)
+    }
+    return e, nil
 
 }
 
 // String returns a string representation of an Enum
 func (e Enum) String() string {
-	if str, found := enumMap[e]; found {
-		return str
-	}
-	panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
+    if str, found := enumMap[e]; found {
+        return str
+    }
+    panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
 }

@@ -19,38 +19,38 @@ package safescale
 
 // Clone makes a copy of HostSizing
 func (x *HostSizing) Clone() *HostSizing {
-	if x == nil {
-		return &HostSizing{}
-	}
-	return &HostSizing{
-		MinCpuCount: x.MinCpuCount,
-		MaxCpuCount: x.MaxCpuCount,
-		MinRamSize:  x.MinRamSize,
-		MaxRamSize:  x.MaxRamSize,
-		MinDiskSize: x.MinDiskSize,
-		GpuCount:    x.GpuCount,
-		MinCpuFreq:  x.MinCpuFreq,
-	}
+    if x == nil {
+        return &HostSizing{}
+    }
+    return &HostSizing{
+        MinCpuCount: x.MinCpuCount,
+        MaxCpuCount: x.MaxCpuCount,
+        MinRamSize:  x.MinRamSize,
+        MaxRamSize:  x.MaxRamSize,
+        MinDiskSize: x.MinDiskSize,
+        GpuCount:    x.GpuCount,
+        MinCpuFreq:  x.MinCpuFreq,
+    }
 }
 
 // Clone makes a copy of a HostDefinition
 func (x *HostDefinition) Clone() *HostDefinition {
-	if x == nil {
-		return &HostDefinition{}
-	}
-	return &HostDefinition{
-		Name:          x.Name,
-		Network:       x.Network,
-		CpuCount:      x.CpuCount,
-		Ram:           x.Ram,
-		Disk:          x.Disk,
-		ImageId:       x.ImageId,
-		Public:        x.Public,
-		GpuCount:      x.GpuCount,
-		CpuFreq:       x.CpuFreq,
-		Force:         x.Force,
-		Sizing:        x.Sizing.Clone(),
-		Domain:        x.Domain,
-		KeepOnFailure: x.KeepOnFailure,
-	}
+    if x == nil {
+        return &HostDefinition{}
+    }
+    return &HostDefinition{
+        Name:          x.Name,
+        Network:       x.Network,
+        CpuCount:      x.CpuCount,
+        Ram:           x.Ram,
+        Disk:          x.Disk,
+        ImageId:       x.ImageId,
+        Public:        x.Public,
+        GpuCount:      x.GpuCount,
+        CpuFreq:       x.CpuFreq,
+        Force:         x.Force,
+        Sizing:        x.Sizing.Clone(),
+        Domain:        x.Domain,
+        KeepOnFailure: x.KeepOnFailure,
+    }
 }

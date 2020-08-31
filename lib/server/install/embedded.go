@@ -17,13 +17,13 @@
 package install
 
 import (
-	"bytes"
-	"fmt"
+    "bytes"
+    "fmt"
 
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/spf13/viper"
+    rice "github.com/GeertJohan/go.rice"
+    "github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
+    "github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 //go:generate rice embed-go
@@ -31,525 +31,525 @@ import (
 const featureFileExt = ".yml"
 
 var (
-	templateBox *rice.Box
-	// emptyParams = map[string]interface{}{}
+    templateBox *rice.Box
+    // emptyParams = map[string]interface{}{}
 
-	availableEmbeddedMap = map[method.Enum]map[string]*Feature{}
-	allEmbeddedMap       = map[string]*Feature{}
-	allEmbedded          []*Feature
+    availableEmbeddedMap = map[method.Enum]map[string]*Feature{}
+    allEmbeddedMap       = map[string]*Feature{}
+    allEmbedded          []*Feature
 )
 
 // loadSpecFile returns the content of the spec file of the feature named 'name'
 func loadSpecFile(name string) (string, *viper.Viper, error) {
-	if templateBox == nil {
-		var err error
-		templateBox, err = rice.FindBox("../../../features")
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to open embedded feature specification folder: %s", err.Error())
-		}
-	}
-	name += featureFileExt
-	tmplString, err := templateBox.String(name)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
-	}
+    if templateBox == nil {
+        var err error
+        templateBox, err = rice.FindBox("../../../features")
+        if err != nil {
+            return "", nil, fmt.Errorf("failed to open embedded feature specification folder: %s", err.Error())
+        }
+    }
+    name += featureFileExt
+    tmplString, err := templateBox.String(name)
+    if err != nil {
+        return "", nil, fmt.Errorf("failed to read embedded feature speficication file '%s': %s", name, err.Error())
+    }
 
-	v := viper.New()
-	v.SetConfigType("yaml")
-	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
-	if err != nil {
-		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': %s", name, err.Error())
-	}
+    v := viper.New()
+    v.SetConfigType("yaml")
+    err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
+    if err != nil {
+        return "", nil, fmt.Errorf("syntax error in feature specification file '%s': %s", name, err.Error())
+    }
 
-	// Validating content...
-	if !v.IsSet("feature") {
-		return "", nil, fmt.Errorf("feature specification file '%s' must begin with 'feature:'", name)
-	}
-	if !v.IsSet("feature.install") {
-		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'install'", name)
-	}
-	if len(v.GetStringMap("feature.install")) == 0 {
-		return "", nil, fmt.Errorf("syntax error in feature specification file '%s': 'install' defines no method", name)
-	}
-	return name, v, nil
+    // Validating content...
+    if !v.IsSet("feature") {
+        return "", nil, fmt.Errorf("feature specification file '%s' must begin with 'feature:'", name)
+    }
+    if !v.IsSet("feature.install") {
+        return "", nil, fmt.Errorf("syntax error in feature specification file '%s': missing 'install'", name)
+    }
+    if len(v.GetStringMap("feature.install")) == 0 {
+        return "", nil, fmt.Errorf("syntax error in feature specification file '%s': 'install' defines no method", name)
+    }
+    return name, v, nil
 }
 
 // dockerFeature ...
 func dockerFeature() *Feature {
-	name := "docker"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "docker"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // certificateAuthorityFeature ...
 func certificateAuthorityFeature() *Feature {
-	name := "certificateauthority"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "certificateauthority"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // ntpServerFeature ...
 func ntpServerFeature() *Feature {
-	name := "ntpserver"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "ntpserver"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // ntpServerFeature ...
 func ntpClientFeature() *Feature {
-	name := "ntpclient"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "ntpclient"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // ansibleFeature from official repos ...
 func ansibleFeature() *Feature {
-	name := "ansible"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "ansible"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // postgresql4platformFeature feature. ...
 func postgresql4platformFeature() *Feature {
-	name := "postgresql4platform"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "postgresql4platform"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // nVidiaDockerFeature ...
 func nVidiaDockerFeature() *Feature {
-	name := "nvidiadocker"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "nvidiadocker"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // kubernetesFeature ...
 func kubernetesFeature() *Feature {
-	name := "kubernetes"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "kubernetes"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // elasticsearchFeature ...
 func elasticsearchFeature() *Feature {
-	name := "elasticsearch"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "elasticsearch"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // logstashFeature ...
 func logstashFeature() *Feature {
-	name := "logstash"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "logstash"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // k8shelm2Feature ...
 func k8shelm2Feature() *Feature {
-	name := "k8s.helm2"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "k8s.helm2"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // sparkmaster4platformFeature ...
 func sparkmaster4platformFeature() *Feature {
-	name := "sparkmaster4platform"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "sparkmaster4platform"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // remoteDesktopFeature ...
 func remoteDesktopFeature() *Feature {
-	name := "remotedesktop"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "remotedesktop"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // mpichBuildFeature ...
 func mpichBuildFeature() *Feature {
-	name := "mpich-build"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "mpich-build"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // ohpcSlurmMasterFeature ...
 func ohpcSlurmMasterFeature() *Feature {
-	name := "ohpc-slurm-master"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "ohpc-slurm-master"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // ohpcSlurmNodeFeature ...
 func ohpcSlurmNodeFeature() *Feature {
-	name := "ohpc-slurm-node"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "ohpc-slurm-node"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // proxycacheServerFeature ...
 func proxycacheServerFeature() *Feature {
-	name := "proxycache-server"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "proxycache-server"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // proxycacheClientFeature ...
 func proxycacheClientFeature() *Feature {
-	name := "proxycache-client"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "proxycache-client"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // apacheIgniteFeature ...
 func apacheIgniteFeature() *Feature {
-	name := "apache-ignite"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "apache-ignite"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // metricbeatFeature ...
 func metricbeatFeature() *Feature {
-	name := "metricbeat"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "metricbeat"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // elastalertFeature ...
 func elastalertFeature() *Feature {
-	name := "elastalert"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "elastalert"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // heartbeatFeature ...
 func heartbeatFeature() *Feature {
-	name := "heartbeat"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "heartbeat"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // filebeatFeature ...
 func filebeatFeature() *Feature {
-	name := "filebeat"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "filebeat"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // packetbeatFeature ...
 func packetbeatFeature() *Feature {
-	name := "packetbeat"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "packetbeat"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // postgres4gatewayFeature ...
 func postgres4gatewayFeature() *Feature {
-	name := "postgres4gateway"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "postgres4gateway"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // edgeproxy4networkFeature ...
 func edgeproxy4networkFeature() *Feature {
-	name := "edgeproxy4network"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "edgeproxy4network"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // keycloak4platformFeature ...
 func keycloak4platformFeature() *Feature {
-	name := "keycloak4platform"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "keycloak4platform"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // kibanaFeature ...
 func kibanaFeature() *Feature {
-	name := "kibana"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "kibana"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // elassandraFeature ...
 func elassandraFeature() *Feature {
-	name := "elassandra"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "elassandra"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // consul4platformFeature ...
 func consul4platformFeature() *Feature {
-	name := "consul4platform"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "consul4platform"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // monitoring4platformFeature ...
 func monitoring4platformFeature() *Feature {
-	name := "monitoring4platform"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "monitoring4platform"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }
 
 // geoserverFeature ...
 func geoserverFeature() *Feature {
-	name := "geoserver"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
+    name := "geoserver"
+    filename, specs, err := loadSpecFile(name)
+    if err != nil {
+        panic(err.Error())
+    }
+    return &Feature{
+        displayName: name,
+        fileName:    filename,
+        embedded:    true,
+        specs:       specs,
+    }
 }

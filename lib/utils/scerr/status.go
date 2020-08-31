@@ -4,7 +4,7 @@ import "fmt"
 
 // ErrorLike interface
 type ErrorLike interface {
-	IsError() bool
+    IsError() bool
 }
 
 // func iserror(err error) bool {
@@ -20,45 +20,45 @@ type ErrorLike interface {
 
 // Status interface
 type Status interface {
-	Message() string
-	Cause() error
-	IsError() bool
+    Message() string
+    Cause() error
+    IsError() bool
 }
 
 type status struct {
-	success bool
-	message string
-	cause   error
+    success bool
+    message string
+    cause   error
 }
 
 // WrapErr ...
 func WrapErr(err error, msg string) Status {
-	return &status{
-		success: false,
-		message: msg,
-		cause:   err,
-	}
+    return &status{
+        success: false,
+        message: msg,
+        cause:   err,
+    }
 }
 
 // Success ..
 func Success(msg string, args ...interface{}) Status {
-	return &status{
-		success: true,
-		message: fmt.Sprintf(msg, args...),
-	}
+    return &status{
+        success: true,
+        message: fmt.Sprintf(msg, args...),
+    }
 }
 
 // Message ...
 func (stat *status) Message() string {
-	return stat.message
+    return stat.message
 }
 
 // Cause ...
 func (stat *status) Cause() error {
-	return stat.cause
+    return stat.cause
 }
 
 // IsError ...
 func (stat *status) IsError() bool {
-	return stat.cause != nil || !stat.success
+    return stat.cause != nil || !stat.success
 }

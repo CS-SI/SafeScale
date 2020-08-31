@@ -18,9 +18,10 @@ package control
 
 import (
     "fmt"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
     "strings"
     "time"
+
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
 
     log "github.com/sirupsen/logrus"
 
@@ -124,16 +125,18 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 
     c.Lock(task)
 
-    err = c.Properties.LockForWrite(property.FeaturesV1).ThenUse(func(clonable data.Clonable) error {
-        featuresV1 := clonable.(*clusterpropsv1.Features)
-        // VPL: For now, always disable addition of feature proxycache
-        featuresV1.Disabled["proxycache"] = struct{}{}
-        // ENDVPL
-        for k := range req.DisabledDefaultFeatures {
-            featuresV1.Disabled[k] = struct{}{}
-        }
-        return nil
-    })
+    err = c.Properties.LockForWrite(property.FeaturesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            featuresV1 := clonable.(*clusterpropsv1.Features)
+            // VPL: For now, always disable addition of feature proxycache
+            featuresV1.Disabled["proxycache"] = struct{}{}
+            // ENDVPL
+            for k := range req.DisabledDefaultFeatures {
+                featuresV1.Disabled[k] = struct{}{}
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to store disabled feature: %v", err)
         return err
@@ -218,23 +221,27 @@ func (c *Controller) GetNetworkConfig(task concurrency.Task) (_ clusterpropsv2.N
 
     c.RLock(task)
     if c.Properties.Lookup(property.NetworkV2) {
-        _ = c.Properties.LockForRead(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
-            config = *(clonable.(*clusterpropsv2.Network))
-            return nil
-        })
+        _ = c.Properties.LockForRead(property.NetworkV2).ThenUse(
+            func(clonable data.Clonable) error {
+                config = *(clonable.(*clusterpropsv2.Network))
+                return nil
+            },
+        )
     } else {
-        _ = c.Properties.LockForRead(property.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-            networkV1 := clonable.(*clusterpropsv1.Network)
-            config = clusterpropsv2.Network{
-                NetworkID:      networkV1.NetworkID,
-                CIDR:           networkV1.CIDR,
-                GatewayID:      networkV1.GatewayID,
-                GatewayIP:      networkV1.GatewayIP,
-                DefaultRouteIP: networkV1.GatewayIP,
-                EndpointIP:     networkV1.PublicIP,
-            }
-            return nil
-        })
+        _ = c.Properties.LockForRead(property.NetworkV1).ThenUse(
+            func(clonable data.Clonable) error {
+                networkV1 := clonable.(*clusterpropsv1.Network)
+                config = clusterpropsv2.Network{
+                    NetworkID:      networkV1.NetworkID,
+                    CIDR:           networkV1.CIDR,
+                    GatewayID:      networkV1.GatewayID,
+                    GatewayIP:      networkV1.GatewayIP,
+                    DefaultRouteIP: networkV1.GatewayIP,
+                    EndpointIP:     networkV1.PublicIP,
+                }
+                return nil
+            },
+        )
     }
     c.RUnlock(task)
     return config, nil
@@ -254,10 +261,12 @@ func (c *Controller) CountNodes(task concurrency.Task) (_ uint, err error) {
     var count uint
 
     c.RLock(task)
-    err = c.GetProperties(task).LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        count = uint(len(clonable.(*clusterpropsv1.Nodes).PrivateNodes))
-        return nil
-    })
+    err = c.GetProperties(task).LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            count = uint(len(clonable.(*clusterpropsv1.Nodes).PrivateNodes))
+            return nil
+        },
+    )
     c.RUnlock(task)
     if err != nil {
         log.Debugf("failed to count nodes: %v", err)
@@ -275,10 +284,12 @@ func (c *Controller) ListMasters(task concurrency.Task) []*clusterpropsv1.Node {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        list = clonable.(*clusterpropsv1.Nodes).Masters
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            list = clonable.(*clusterpropsv1.Nodes).Masters
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of master names: %v", err)
     }
@@ -295,13 +306,15 @@ func (c *Controller) ListMasterNames(task concurrency.Task) []string {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes).Masters
-        for _, v := range nodesV1 {
-            list = append(list, v.Name)
-        }
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes).Masters
+            for _, v := range nodesV1 {
+                list = append(list, v.Name)
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of master names: %v", err)
     }
@@ -318,13 +331,15 @@ func (c *Controller) ListMasterIDs(task concurrency.Task) []string {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes).Masters
-        for _, v := range nodesV1 {
-            list = append(list, v.ID)
-        }
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes).Masters
+            for _, v := range nodesV1 {
+                list = append(list, v.ID)
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of master IDs: %v", err) // FIXME Don't hide errors, return them
     }
@@ -341,13 +356,15 @@ func (c *Controller) ListMasterIPs(task concurrency.Task) []string {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes).Masters
-        for _, v := range nodesV1 {
-            list = append(list, v.PrivateIP)
-        }
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes).Masters
+            for _, v := range nodesV1 {
+                list = append(list, v.PrivateIP)
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of master IPs: %v", err)
     }
@@ -363,10 +380,12 @@ func (c *Controller) ListNodes(task concurrency.Task) []*clusterpropsv1.Node {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        list = clonable.(*clusterpropsv1.Nodes).PrivateNodes
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            list = clonable.(*clusterpropsv1.Nodes).PrivateNodes
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of node IDs: %v", err)
     }
@@ -383,13 +402,15 @@ func (c *Controller) ListNodeNames(task concurrency.Task) []string {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes).PrivateNodes
-        for _, v := range nodesV1 {
-            list = append(list, v.Name)
-        }
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes).PrivateNodes
+            for _, v := range nodesV1 {
+                list = append(list, v.Name)
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of node IDs: %v", err)
     }
@@ -406,13 +427,15 @@ func (c *Controller) ListNodeIDs(task concurrency.Task) []string {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes).PrivateNodes
-        for _, v := range nodesV1 {
-            list = append(list, v.ID)
-        }
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes).PrivateNodes
+            for _, v := range nodesV1 {
+                list = append(list, v.ID)
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of node IDs: %v", err)
     }
@@ -428,13 +451,15 @@ func (c *Controller) ListNodeIPs(task concurrency.Task) []string {
     c.RLock(task)
     defer c.RUnlock(task)
 
-    err := c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes).PrivateNodes
-        for _, v := range nodesV1 {
-            list = append(list, v.PrivateIP)
-        }
-        return nil
-    })
+    err := c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes).PrivateNodes
+            for _, v := range nodesV1 {
+                list = append(list, v.PrivateIP)
+            }
+            return nil
+        },
+    )
     if err != nil {
         log.Errorf("failed to get list of node IP addresses: %v", err)
     }
@@ -461,14 +486,16 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
     defer c.RUnlock(task)
 
     found := false
-    err = c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes)
-        // found, _ := findNodeByID(nodesV1.PublicNodes, hostID)
-        // if !found {
-        found, _ = findNodeByID(nodesV1.PrivateNodes, hostID)
-        // }
-        return nil
-    })
+    err = c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+            // found, _ := findNodeByID(nodesV1.PublicNodes, hostID)
+            // if !found {
+            found, _ = findNodeByID(nodesV1.PrivateNodes, hostID)
+            // }
+            return nil
+        },
+    )
     if err != nil {
         return nil, err
     }
@@ -488,10 +515,12 @@ func (c *Controller) SearchNode(task concurrency.Task, hostID string) bool {
     defer c.RUnlock(task)
 
     found := false
-    _ = c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        found, _ = findNodeByID(clonable.(*clusterpropsv1.Nodes).PrivateNodes, hostID)
-        return nil
-    })
+    _ = c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            found, _ = findNodeByID(clonable.(*clusterpropsv1.Nodes).PrivateNodes, hostID)
+            return nil
+        },
+    )
     return found
 }
 
@@ -722,7 +751,9 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
     return hosts[0], nil
 }
 
-func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task concurrency.Task) (_ string, _ *pb.HostDefinition, err error) {
+func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task concurrency.Task) (
+    _ string, _ *pb.HostDefinition, err error,
+) {
     if c == nil {
         return "", nil, scerr.InvalidInstanceError()
     }
@@ -738,28 +769,36 @@ func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task co
     properties := c.GetProperties(task)
     if !properties.Lookup(property.DefaultsV2) {
         // If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
-        err := properties.LockForRead(property.DefaultsV1).ThenUse(func(clonable data.Clonable) error {
-            defaultsV1 := clonable.(*clusterpropsv1.Defaults)
-            return c.UpdateMetadata(task, func() error {
-                return properties.LockForWrite(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
-                    defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-                    convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
-                    return nil
-                })
-            })
-        })
+        err := properties.LockForRead(property.DefaultsV1).ThenUse(
+            func(clonable data.Clonable) error {
+                defaultsV1 := clonable.(*clusterpropsv1.Defaults)
+                return c.UpdateMetadata(
+                    task, func() error {
+                        return properties.LockForWrite(property.DefaultsV2).ThenUse(
+                            func(clonable data.Clonable) error {
+                                defaultsV2 := clonable.(*clusterpropsv2.Defaults)
+                                convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
+                                return nil
+                            },
+                        )
+                    },
+                )
+            },
+        )
         if err != nil {
             return "", nodeDef, err
         }
     }
 
-    err = properties.LockForRead(property.DefaultsV2).ThenUse(func(clonable data.Clonable) error {
-        defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-        sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
-        nodeDef.Sizing = sizing
-        hostImage = defaultsV2.Image
-        return nil
-    })
+    err = properties.LockForRead(property.DefaultsV2).ThenUse(
+        func(clonable data.Clonable) error {
+            defaultsV2 := clonable.(*clusterpropsv2.Defaults)
+            sizing := srvutils.ToPBHostSizing(defaultsV2.NodeSizing)
+            nodeDef.Sizing = sizing
+            hostImage = defaultsV2.Image
+            return nil
+        },
+    )
     if err != nil {
         return "", nodeDef, err
     }
@@ -815,13 +854,15 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
         if err != nil {
             return nil, err
         }
-        subtask, err = subtask.Start(c.foreman.taskCreateNode, data.Map{
-            "index": i + 1,
-            // "type":    nodeType,
-            "nodeDef": nodeDef,
-            "timeout": timeout,
-            "nokeep":  true,
-        })
+        subtask, err = subtask.Start(
+            c.foreman.taskCreateNode, data.Map{
+                "index": i + 1,
+                // "type":    nodeType,
+                "nodeDef": nodeDef,
+                "timeout": timeout,
+                "nokeep":  true,
+            },
+        )
         if err != nil {
             log.Warnf("failure creating node: %v", err)
             creationFailed = true
@@ -884,7 +925,9 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
     }()
 
     if len(errors) > 0 {
-        err = fmt.Errorf("errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)), strings.Join(errors, "\n"))
+        err = fmt.Errorf(
+            "errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)), strings.Join(errors, "\n"),
+        )
         return nil, err
     }
 
@@ -942,12 +985,14 @@ func (c *Controller) GetState(task concurrency.Task) (state clusterstate.Enum, e
     var collectInterval time.Duration
 
     c.RLock(task)
-    err = c.Properties.LockForRead(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-        stateV1 := clonable.(*clusterpropsv1.State)
-        collectInterval = stateV1.StateCollectInterval
-        state = stateV1.State
-        return nil
-    })
+    err = c.Properties.LockForRead(property.StateV1).ThenUse(
+        func(clonable data.Clonable) error {
+            stateV1 := clonable.(*clusterpropsv1.State)
+            collectInterval = stateV1.StateCollectInterval
+            state = stateV1.State
+            return nil
+        },
+    )
     c.RUnlock(task)
     if err != nil {
         return 0, err
@@ -977,14 +1022,18 @@ func (c *Controller) ForceGetState(task concurrency.Task) (state clusterstate.En
         return clusterstate.Unknown, err
     }
 
-    err = c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            stateV1 := clonable.(*clusterpropsv1.State)
-            stateV1.State = state
-            c.lastStateCollection = time.Now()
-            return nil
-        })
-    })
+    err = c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    stateV1 := clonable.(*clusterpropsv1.State)
+                    stateV1.State = state
+                    c.lastStateCollection = time.Now()
+                    return nil
+                },
+            )
+        },
+    )
     return state, err
 }
 
@@ -1006,33 +1055,37 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 
     // Removes master from cluster metadata
     var master *clusterpropsv1.Node
-    err = c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+    err = c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.NodesV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
 
-            //found, idx := findNodeByID(nodesV1.Masters, hostID)
-            //if !found {
-            //	return resources.ResourceNotFoundError("host", hostID)
-            //}
-            //master = nodesV1.Masters[idx]
-            //if idx < len(nodesV1.Masters)-1 {
-            //	nodesV1.Masters = append(nodesV1.Masters[:idx], nodesV1.Masters[idx+1:]...)
-            //} else {
-            //	nodesV1.Masters = nodesV1.Masters[:idx]
-            //}
-            var innerErr error
-            master, innerErr = deleteNodeFromListByID(nodesV1.Masters, hostID)
-            if innerErr != nil {
-                switch innerErr.(type) {
-                case scerr.ErrNotFound:
-                    return resources.ResourceNotFoundError("host", hostID)
-                default:
-                    return err
-                }
-            }
-            return nil
-        })
-    })
+                    // found, idx := findNodeByID(nodesV1.Masters, hostID)
+                    // if !found {
+                    //	return resources.ResourceNotFoundError("host", hostID)
+                    // }
+                    // master = nodesV1.Masters[idx]
+                    // if idx < len(nodesV1.Masters)-1 {
+                    //	nodesV1.Masters = append(nodesV1.Masters[:idx], nodesV1.Masters[idx+1:]...)
+                    // } else {
+                    //	nodesV1.Masters = nodesV1.Masters[:idx]
+                    // }
+                    var innerErr error
+                    master, innerErr = deleteNodeFromListByID(nodesV1.Masters, hostID)
+                    if innerErr != nil {
+                        switch innerErr.(type) {
+                        case scerr.ErrNotFound:
+                            return resources.ResourceNotFoundError("host", hostID)
+                        default:
+                            return err
+                        }
+                    }
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return err
     }
@@ -1040,13 +1093,17 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
     // Starting from here, restore master in cluster metadata if exiting with error
     defer func() {
         if err != nil {
-            derr := c.UpdateMetadata(task, func() error {
-                return c.Properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
-                    nodesV1.Masters = append(nodesV1.Masters, master)
-                    return nil
-                })
-            })
+            derr := c.UpdateMetadata(
+                task, func() error {
+                    return c.Properties.LockForWrite(property.NodesV1).ThenUse(
+                        func(clonable data.Clonable) error {
+                            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                            nodesV1.Masters = append(nodesV1.Masters, master)
+                            return nil
+                        },
+                    )
+                },
+            )
             if derr != nil {
                 log.Errorf("failed to restore node ownership in cluster")
             }
@@ -1080,11 +1137,13 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 
     // Removed reference of the node from cluster metadata
     c.RLock(task)
-    err = c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes)
-        node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
-        return nil
-    })
+    err = c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+            node = nodesV1.PrivateNodes[len(nodesV1.PrivateNodes)-1]
+            return nil
+        },
+    )
     c.RUnlock(task)
     if err != nil {
         return err
@@ -1123,18 +1182,20 @@ func (c *Controller) DeleteSpecificNode(task concurrency.Task, hostID string, se
     )
 
     c.RLock(task)
-    err = c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes)
-        var (
-            idx   int
-            found bool
-        )
-        if found, idx = findNodeByID(nodesV1.PrivateNodes, hostID); !found {
-            return scerr.NotFoundError(fmt.Sprintf("failed to find node '%s'", hostID))
-        }
-        node = nodesV1.PrivateNodes[idx]
-        return nil
-    })
+    err = c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+            var (
+                idx   int
+                found bool
+            )
+            if found, idx = findNodeByID(nodesV1.PrivateNodes, hostID); !found {
+                return scerr.NotFoundError(fmt.Sprintf("failed to find node '%s'", hostID))
+            }
+            node = nodesV1.PrivateNodes[idx]
+            return nil
+        },
+    )
     c.RUnlock(task)
     if err != nil {
         return err
@@ -1194,37 +1255,43 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
         if err != nil {
             return err
         }
-        err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
-            nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
-            if nAttached > 0 {
-                return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
-            }
-            return nil
-        })
+        err = host.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(
+            func(clonable data.Clonable) error {
+                nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
+                if nAttached > 0 {
+                    return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+                }
+                return nil
+            },
+        )
         if err != nil {
             return scerr.InvalidRequestError(fmt.Sprintf("cannot delete node '%s' because of attached volumes: %v", host.Name, err))
         }
     }
 
     // Removes node from cluster metadata (done before really deleting node to prevent operations on the node in parallel)
-    err = c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-            nodesV1 := clonable.(*clusterpropsv1.Nodes)
-            var innerErr error
-            node, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
-            if innerErr != nil {
-                return err
-            }
-            //length := len(nodesV1.PrivateNodes)
-            //_, idx := findNodeByID(nodesV1.PrivateNodes, node.ID)
-            //if idx < length-1 {
-            //    nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
-            //} else {
-            //    nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
-            //}
-            return nil
-        })
-    })
+    err = c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.NodesV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                    var innerErr error
+                    node, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
+                    if innerErr != nil {
+                        return err
+                    }
+                    // length := len(nodesV1.PrivateNodes)
+                    // _, idx := findNodeByID(nodesV1.PrivateNodes, node.ID)
+                    // if idx < length-1 {
+                    //    nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
+                    // } else {
+                    //    nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
+                    // }
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return err
     }
@@ -1232,13 +1299,17 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
     // Starting from here, restore node in cluster metadata if exiting with error
     defer func() {
         if err != nil && hostExist {
-            derr := c.UpdateMetadata(task, func() error {
-                return c.Properties.LockForWrite(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-                    nodesV1 := clonable.(*clusterpropsv1.Nodes)
-                    nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-                    return nil
-                })
-            })
+            derr := c.UpdateMetadata(
+                task, func() error {
+                    return c.Properties.LockForWrite(property.NodesV1).ThenUse(
+                        func(clonable data.Clonable) error {
+                            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+                            nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+                            return nil
+                        },
+                    )
+                },
+            )
             if derr != nil {
                 log.Errorf("failed to restore node ownership in cluster")
             }
@@ -1317,12 +1388,16 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
     }
 
     // Updates metadata to mark the cluster as Stopping
-    err = c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.State).State = clusterstate.Stopping
-            return nil
-        })
-    })
+    err = c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.State).State = clusterstate.Stopping
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return err
     }
@@ -1335,29 +1410,35 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
         gatewayID, secondaryGatewayID string
     )
     c.RLock(task)
-    err = c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes)
-        masters = nodesV1.Masters
-        nodes = nodesV1.PrivateNodes
-        return nil
-    })
+    err = c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+            masters = nodesV1.Masters
+            nodes = nodesV1.PrivateNodes
+            return nil
+        },
+    )
     c.RUnlock(task)
     if err != nil {
         return fmt.Errorf("failed to get list of hosts: %v", err)
     }
     c.RLock(task)
     if c.Properties.Lookup(property.NetworkV2) {
-        err = c.Properties.LockForRead(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
-            networkV2 := clonable.(*clusterpropsv2.Network)
-            gatewayID = networkV2.GatewayID
-            secondaryGatewayID = networkV2.SecondaryGatewayID
-            return nil
-        })
+        err = c.Properties.LockForRead(property.NetworkV2).ThenUse(
+            func(clonable data.Clonable) error {
+                networkV2 := clonable.(*clusterpropsv2.Network)
+                gatewayID = networkV2.GatewayID
+                secondaryGatewayID = networkV2.SecondaryGatewayID
+                return nil
+            },
+        )
     } else {
-        err = c.Properties.LockForRead(property.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-            gatewayID = clonable.(*clusterpropsv1.Network).GatewayID
-            return nil
-        })
+        err = c.Properties.LockForRead(property.NetworkV1).ThenUse(
+            func(clonable data.Clonable) error {
+                gatewayID = clonable.(*clusterpropsv1.Network).GatewayID
+                return nil
+            },
+        )
     }
     c.RUnlock(task)
     if err != nil {
@@ -1391,12 +1472,16 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
     }
 
     // Updates metadata to mark the cluster as Stopped
-    return c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.State).State = clusterstate.Stopped
-            return nil
-        })
-    })
+    return c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.State).State = clusterstate.Stopped
+                    return nil
+                },
+            )
+        },
+    )
 }
 
 func (c *Controller) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
@@ -1414,7 +1499,11 @@ func (c *Controller) taskStopHost(task concurrency.Task, params concurrency.Task
     case hoststate.STOPPED, hoststate.STOPPING:
         return nil, nil
     case hoststate.ERROR, hoststate.TERMINATED:
-        return nil, scerr.InvalidRequestError(fmt.Sprintf("cannot stop host '%s' due to its current state: %s", hostID, state.String()))
+        return nil, scerr.InvalidRequestError(
+            fmt.Sprintf(
+                "cannot stop host '%s' due to its current state: %s", hostID, state.String(),
+            ),
+        )
     default:
         return nil, c.service.StopHost(params.(string))
     }
@@ -1448,12 +1537,16 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
     }
 
     // Updates metadata to mark the cluster as Starting
-    err = c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.State).State = clusterstate.Starting
-            return nil
-        })
-    })
+    err = c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.State).State = clusterstate.Starting
+                    return nil
+                },
+            )
+        },
+    )
     if err != nil {
         return err
     }
@@ -1465,29 +1558,35 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
         gatewayID, secondaryGatewayID string
     )
     c.RLock(task)
-    err = c.Properties.LockForRead(property.NodesV1).ThenUse(func(clonable data.Clonable) error {
-        nodesV1 := clonable.(*clusterpropsv1.Nodes)
-        masters = nodesV1.Masters
-        nodes = nodesV1.PrivateNodes
-        return nil
-    })
+    err = c.Properties.LockForRead(property.NodesV1).ThenUse(
+        func(clonable data.Clonable) error {
+            nodesV1 := clonable.(*clusterpropsv1.Nodes)
+            masters = nodesV1.Masters
+            nodes = nodesV1.PrivateNodes
+            return nil
+        },
+    )
     c.RUnlock(task)
     if err != nil {
         return fmt.Errorf("failed to get list of hosts: %v", err)
     }
     c.RLock(task)
     if c.Properties.Lookup(property.NetworkV2) {
-        err = c.Properties.LockForRead(property.NetworkV2).ThenUse(func(clonable data.Clonable) error {
-            networkV2 := clonable.(*clusterpropsv2.Network)
-            gatewayID = networkV2.GatewayID
-            secondaryGatewayID = networkV2.SecondaryGatewayID
-            return nil
-        })
+        err = c.Properties.LockForRead(property.NetworkV2).ThenUse(
+            func(clonable data.Clonable) error {
+                networkV2 := clonable.(*clusterpropsv2.Network)
+                gatewayID = networkV2.GatewayID
+                secondaryGatewayID = networkV2.SecondaryGatewayID
+                return nil
+            },
+        )
     } else {
-        err = c.Properties.LockForRead(property.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-            gatewayID = clonable.(*clusterpropsv1.Network).GatewayID
-            return nil
-        })
+        err = c.Properties.LockForRead(property.NetworkV1).ThenUse(
+            func(clonable data.Clonable) error {
+                gatewayID = clonable.(*clusterpropsv1.Network).GatewayID
+                return nil
+            },
+        )
     }
     c.RUnlock(task)
     if err != nil {
@@ -1517,12 +1616,16 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
     }
 
     // Updates metadata to mark the cluster as Stopped
-    return c.UpdateMetadata(task, func() error {
-        return c.Properties.LockForWrite(property.StateV1).ThenUse(func(clonable data.Clonable) error {
-            clonable.(*clusterpropsv1.State).State = clusterstate.Nominal
-            return nil
-        })
-    })
+    return c.UpdateMetadata(
+        task, func() error {
+            return c.Properties.LockForWrite(property.StateV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    clonable.(*clusterpropsv1.State).State = clusterstate.Nominal
+                    return nil
+                },
+            )
+        },
+    )
 }
 
 func (c *Controller) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
@@ -1540,7 +1643,11 @@ func (c *Controller) taskStartHost(task concurrency.Task, params concurrency.Tas
     case hoststate.STARTED, hoststate.STARTING:
         return nil, nil
     case hoststate.ERROR, hoststate.TERMINATED:
-        return nil, scerr.InvalidRequestError(fmt.Sprintf("cannot stop host '%s' due to its current state: %s", hostID, state.String()))
+        return nil, scerr.InvalidRequestError(
+            fmt.Sprintf(
+                "cannot stop host '%s' due to its current state: %s", hostID, state.String(),
+            ),
+        )
     default:
         return nil, c.service.StartHost(hostID)
     }

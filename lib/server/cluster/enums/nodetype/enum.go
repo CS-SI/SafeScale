@@ -22,10 +22,10 @@ package nodetype
 type Enum int
 
 const (
-	// Gateway to represent a gateway node
-	Gateway Enum = iota
-	// Master to represent a master node
-	Master
-	// Node to represent a working node
-	Node
+    // Gateway to represent a gateway node
+    Gateway Enum = iota
+    // Master to represent a master node
+    Master
+    // Node to represent a working node
+    Node
 )

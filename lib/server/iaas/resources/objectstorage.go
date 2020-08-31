@@ -1,4 +1,3 @@
-/*
  * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,71 +16,71 @@
 package resources
 
 import (
-	"fmt"
-	"io"
-	"time"
+    "fmt"
+    "io"
+    "time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 )
 
 // Bucket describes a Bucket
 type Bucket struct {
-	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
-	Host       string `json:"host,omitempty"`
-	MountPoint string `json:"mountPoint,omitempty"`
-	// NbItems    int    `json:"nbitems,omitempty"`
+    ID         string `json:"id,omitempty"`
+    Name       string `json:"name,omitempty"`
+    Host       string `json:"host,omitempty"`
+    MountPoint string `json:"mountPoint,omitempty"`
+    // NbItems    int    `json:"nbitems,omitempty"`
 }
 
 // Object object to put in a container
 type Object struct {
-	ID            string                       `json:"id,omitempty"`
-	Name          string                       `json:"name,omitempty"`
-	DeleteAt      time.Time                    `json:"delete_at,omitempty"`
-	Date          time.Time                    `json:"date,omitempty"`
-	ContentType   string                       `json:"content_type,omitempty"`
-	ContentLength int64                        `json:"content_length,omitempty"`
-	Content       io.ReadSeeker                `json:"content,omitempty"`
-	Size          int64                        `json:"size,omitempty"`
-	Metadata      objectstorage.ObjectMetadata `json:"metadata,omitempty"`
-	LastModified  time.Time                    `json:"last_modified,omitempty"`
-	ETag          string                       `json:"etag,omitempty"`
+    ID            string                       `json:"id,omitempty"`
+    Name          string                       `json:"name,omitempty"`
+    DeleteAt      time.Time                    `json:"delete_at,omitempty"`
+    Date          time.Time                    `json:"date,omitempty"`
+    ContentType   string                       `json:"content_type,omitempty"`
+    ContentLength int64                        `json:"content_length,omitempty"`
+    Content       io.ReadSeeker                `json:"content,omitempty"`
+    Size          int64                        `json:"size,omitempty"`
+    Metadata      objectstorage.ObjectMetadata `json:"metadata,omitempty"`
+    LastModified  time.Time                    `json:"last_modified,omitempty"`
+    ETag          string                       `json:"etag,omitempty"`
 }
 
 // ObjectFilter filter object
 type ObjectFilter struct {
-	Path   string `json:"path,omitempty"`
-	Prefix string `json:"prefix,omitempty"`
+    Path   string `json:"path,omitempty"`
+    Prefix string `json:"prefix,omitempty"`
 }
 
 // Range Defines a range of bytes
 type Range struct {
-	From *int `json:"from,omitempty"`
-	To   *int `json:"to,omitempty"`
+    From *int `json:"from,omitempty"`
+    To   *int `json:"to,omitempty"`
 }
 
 // NewRange creates a range
 func NewRange(from, to int) Range {
-	return Range{&from, &to}
+    return Range{&from, &to}
 }
 
 // OK ...
 func (r *Range) OK() bool {
-	result := true
-	result = result && r.From != nil
-	result = result && r.To != nil
-	return result
+    result := true
+    result = result && r.From != nil
+    result = result && r.To != nil
+    return result
 }
 
 func (r Range) String() string {
-	if r.From != nil && r.To != nil {
-		return fmt.Sprintf("%d-%d", *r.From, *r.To)
-	}
-	if r.From != nil {
-		return fmt.Sprintf("%d-", *r.From)
-	}
-	if r.To != nil {
-		return fmt.Sprintf("%d", *r.To)
-	}
-	return ""
+    if r.From != nil && r.To != nil {
+        return fmt.Sprintf("%d-%d", *r.From, *r.To)
+    }
+    if r.From != nil {
+        return fmt.Sprintf("%d-", *r.From)
+    }
+    if r.To != nil {
+        return fmt.Sprintf("%d", *r.To)
+    }
+    return ""
 }

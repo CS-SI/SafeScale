@@ -17,17 +17,17 @@
 package cli
 
 import (
-	"bufio"
-	"fmt"
-	"os"
-	"strings"
+    "bufio"
+    "fmt"
+    "os"
+    "strings"
 )
 
 // UserConfirmed asks user to confirm
 func UserConfirmed(msg string) bool {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("%s ? (y/N): ", msg)
-	resp, _ := reader.ReadString('\n')
-	resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
-	return resp == "y"
+    reader := bufio.NewReader(os.Stdin)
+    fmt.Printf("%s ? (y/N): ", msg)
+    resp, _ := reader.ReadString('\n')
+    resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
+    return resp == "y"
 }

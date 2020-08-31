@@ -17,39 +17,39 @@
 package firewall
 
 import (
-	"fmt"
-	"sync"
+    "fmt"
+    "sync"
 
-	"github.com/CS-SI/SafeScale/lib/system/firewall.obsolete/policy"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/system/firewall.obsolete/policy"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Table defines a table of the firewall
 type Table struct {
-	Name   string
-	Chains map[string]*Chain
-	lock   sync.RWMutex
+    Name   string
+    Chains map[string]*Chain
+    lock   sync.RWMutex
 }
 
 // NewChain creates a new
 func (t *Table) NewChain(name string, p policy.Enum) *Chain {
-	chain := Chain{
-		Name:   name,
-		Policy: p,
-	}
-	t.Chains[name] = &chain
-	return &chain
+    chain := Chain{
+        Name:   name,
+        Policy: p,
+    }
+    t.Chains[name] = &chain
+    return &chain
 }
 
 // Chain returns the chain named 'name'
 func (t *Table) Chain(name string) (*Chain, error) {
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty!")
-	}
-	var chain *Chain
-	var found bool
-	if chain, found = t.Chains[name]; !found {
-		return nil, fmt.Errorf("table '%s' doesn't contain a chain '%s'", t.Name, name)
-	}
-	return chain, nil
+    if name == "" {
+        return nil, scerr.InvalidParameterError("name", "cannot be empty!")
+    }
+    var chain *Chain
+    var found bool
+    if chain, found = t.Chains[name]; !found {
+        return nil, fmt.Errorf("table '%s' doesn't contain a chain '%s'", t.Name, name)
+    }
+    return chain, nil
 }

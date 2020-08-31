@@ -17,373 +17,386 @@
 package utils
 
 import (
-	"math"
+    "math"
 
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    pb "github.com/CS-SI/SafeScale/lib"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+    propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+    "github.com/CS-SI/SafeScale/lib/system"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ToPBSshConfig converts a system.SSHConfig into a SshConfig
 func ToPBSshConfig(from *system.SSHConfig) *pb.SshConfig {
-	var gw *pb.SshConfig
-	if from.GatewayConfig != nil {
-		gw = ToPBSshConfig(from.GatewayConfig)
-	}
-	return &pb.SshConfig{
-		Gateway:    gw,
-		Host:       from.Host,
-		Port:       int32(from.Port),
-		PrivateKey: from.PrivateKey,
-		User:       from.User,
-	}
+    var gw *pb.SshConfig
+    if from.GatewayConfig != nil {
+        gw = ToPBSshConfig(from.GatewayConfig)
+    }
+    return &pb.SshConfig{
+        Gateway:    gw,
+        Host:       from.Host,
+        Port:       int32(from.Port),
+        PrivateKey: from.PrivateKey,
+        User:       from.User,
+    }
 }
 
 // ToSystemSSHConfig converts a pb.SshConfig into a system.SSHConfig
 func ToSystemSSHConfig(from *pb.SshConfig) *system.SSHConfig {
-	if from.Host == "" {
-		logrus.Error(scerr.DecorateWithCallTrace("invalid parameter content:", "from.Host", "cannot be empty string"))
-	}
-	var gw *system.SSHConfig
-	if from.Gateway != nil {
-		gw = ToSystemSSHConfig(from.Gateway)
-	}
-	return &system.SSHConfig{
-		User:          from.User,
-		Host:          from.Host,
-		PrivateKey:    from.PrivateKey,
-		Port:          int(from.Port),
-		GatewayConfig: gw,
-	}
+    if from.Host == "" {
+        logrus.Error(scerr.DecorateWithCallTrace("invalid parameter content:", "from.Host", "cannot be empty string"))
+    }
+    var gw *system.SSHConfig
+    if from.Gateway != nil {
+        gw = ToSystemSSHConfig(from.Gateway)
+    }
+    return &system.SSHConfig{
+        User:          from.User,
+        Host:          from.Host,
+        PrivateKey:    from.PrivateKey,
+        Port:          int(from.Port),
+        GatewayConfig: gw,
+    }
 }
 
 // ToPBVolume converts an api.Volume to a *Volume
 func ToPBVolume(in *resources.Volume) *pb.Volume {
-	return &pb.Volume{
-		Id:    in.ID,
-		Name:  in.Name,
-		Size:  int32(in.Size),
-		Speed: pb.VolumeSpeed(in.Speed),
-	}
+    return &pb.Volume{
+        Id:    in.ID,
+        Name:  in.Name,
+        Size:  int32(in.Size),
+        Speed: pb.VolumeSpeed(in.Speed),
+    }
 }
 
 // ToPBVolumeAttachment converts an api.Volume to a *Volume
 func ToPBVolumeAttachment(in *resources.VolumeAttachment) *pb.VolumeAttachment {
-	return &pb.VolumeAttachment{
-		Volume:    &pb.Reference{Id: in.VolumeID},
-		Host:      &pb.Reference{Id: in.ServerID},
-		MountPath: in.MountPoint,
-		Device:    in.Device,
-	}
+    return &pb.VolumeAttachment{
+        Volume:    &pb.Reference{Id: in.VolumeID},
+        Host:      &pb.Reference{Id: in.ServerID},
+        MountPath: in.MountPoint,
+        Device:    in.Device,
+    }
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
 func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount) *pb.VolumeInfo {
-	pbvi := &pb.VolumeInfo{
-		Id:    volume.ID,
-		Name:  volume.Name,
-		Size:  int32(volume.Size),
-		Speed: pb.VolumeSpeed(volume.Speed),
-	}
-	if len(mounts) > 0 {
-		for k, mount := range mounts {
-			pbvi.Host = &pb.Reference{Name: k}
-			pbvi.MountPath = mount.Path
-			pbvi.Device = mount.Device
-			pbvi.Format = mount.FileSystem
+    pbvi := &pb.VolumeInfo{
+        Id:    volume.ID,
+        Name:  volume.Name,
+        Size:  int32(volume.Size),
+        Speed: pb.VolumeSpeed(volume.Speed),
+    }
+    if len(mounts) > 0 {
+        for k, mount := range mounts {
+            pbvi.Host = &pb.Reference{Name: k}
+            pbvi.MountPath = mount.Path
+            pbvi.Device = mount.Device
+            pbvi.Format = mount.FileSystem
 
-			break
-		}
-	}
-	return pbvi
+            break
+        }
+    }
+    return pbvi
 }
 
 // ToPBBucketList convert a list of string into a *ContainerLsit
 func ToPBBucketList(in []string) *pb.BucketList {
-	var buckets []*pb.Bucket
-	for _, name := range in {
-		buckets = append(buckets, &pb.Bucket{Name: name})
-	}
-	return &pb.BucketList{
-		Buckets: buckets,
-	}
+    var buckets []*pb.Bucket
+    for _, name := range in {
+        buckets = append(buckets, &pb.Bucket{Name: name})
+    }
+    return &pb.BucketList{
+        Buckets: buckets,
+    }
 }
 
 // ToPBBucketMountPoint convert a Bucket into a BucketMountingPoint
 func ToPBBucketMountPoint(in *resources.Bucket) *pb.BucketMountingPoint {
-	return &pb.BucketMountingPoint{
-		Bucket: in.Name,
-		Path:   in.MountPoint,
-		Host:   &pb.Reference{Name: in.Host},
-	}
+    return &pb.BucketMountingPoint{
+        Bucket: in.Name,
+        Path:   in.MountPoint,
+        Host:   &pb.Reference{Name: in.Host},
+    }
 }
 
 // ToPBShare convert a share from model to protocolbuffer format
 func ToPBShare(hostName string, share *propsv1.HostShare) *pb.ShareDefinition {
-	return &pb.ShareDefinition{
-		Id:   share.ID,
-		Name: share.Name,
-		Host: &pb.Reference{Name: hostName},
-		Path: share.Path,
-		Type: "nfs",
-	}
+    return &pb.ShareDefinition{
+        Id:   share.ID,
+        Name: share.Name,
+        Host: &pb.Reference{Name: hostName},
+        Path: share.Path,
+        Type: "nfs",
+    }
 }
 
 // ToPBShareMount convert share mount on host to protocolbuffer format
 func ToPBShareMount(shareName string, hostName string, mount *propsv1.HostRemoteMount) *pb.ShareMountDefinition {
-	return &pb.ShareMountDefinition{
-		Share: &pb.Reference{Name: shareName},
-		Host:  &pb.Reference{Name: hostName},
-		Path:  mount.Path,
-		Type:  mount.FileSystem,
-	}
+    return &pb.ShareMountDefinition{
+        Share: &pb.Reference{Name: shareName},
+        Host:  &pb.Reference{Name: hostName},
+        Path:  mount.Path,
+        Type:  mount.FileSystem,
+    }
 }
 
 // ToPBShareMountList converts share mounts to protocol buffer
 func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[string]*propsv1.HostRemoteMount) *pb.ShareMountList {
-	var pbMounts []*pb.ShareMountDefinition
-	for k, v := range mounts {
-		pbMounts = append(pbMounts, &pb.ShareMountDefinition{
-			Host:  &pb.Reference{Name: k},
-			Share: &pb.Reference{Name: share.Name},
-			Path:  v.Path,
-			Type:  "nfs",
-		})
-	}
-	return &pb.ShareMountList{
-		Share:     ToPBShare(hostName, share),
-		MountList: pbMounts,
-	}
+    var pbMounts []*pb.ShareMountDefinition
+    for k, v := range mounts {
+        pbMounts = append(
+            pbMounts, &pb.ShareMountDefinition{
+                Host:  &pb.Reference{Name: k},
+                Share: &pb.Reference{Name: share.Name},
+                Path:  v.Path,
+                Type:  "nfs",
+            },
+        )
+    }
+    return &pb.ShareMountList{
+        Share:     ToPBShare(hostName, share),
+        MountList: pbMounts,
+    }
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
 func ToPBHost(in *resources.Host) *pb.Host {
-	var (
-		hostNetworkV1 *propsv1.HostNetwork
-		hostSizingV1  *propsv1.HostSizing
-		hostVolumesV1 *propsv1.HostVolumes
-		volumes       []string
-	)
+    var (
+        hostNetworkV1 *propsv1.HostNetwork
+        hostSizingV1  *propsv1.HostSizing
+        hostVolumesV1 *propsv1.HostVolumes
+        volumes       []string
+    )
 
-	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-		hostNetworkV1 = clonable.(*propsv1.HostNetwork)
-		return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
-			hostSizingV1 = clonable.(*propsv1.HostSizing)
-			return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(func(clonable data.Clonable) error {
-				hostVolumesV1 = clonable.(*propsv1.HostVolumes)
-				for k := range hostVolumesV1.VolumesByName {
-					volumes = append(volumes, k)
-				}
-				return nil
-			})
-		})
-	})
-	if err != nil {
-		return nil
-	}
-	return &pb.Host{
-		Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
-		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
-		GatewayId:           hostNetworkV1.DefaultGatewayID,
-		Id:                  in.ID,
-		PublicIp:            in.GetPublicIP(),
-		PrivateIp:           in.GetPrivateIP(),
-		Name:                in.Name,
-		PrivateKey:          in.PrivateKey,
-		Password:            in.Password,
-		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
-		State:               pb.HostState(in.LastState),
-		AttachedVolumeNames: volumes,
-	}
+    err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(
+        func(clonable data.Clonable) error {
+            hostNetworkV1 = clonable.(*propsv1.HostNetwork)
+            return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(
+                func(clonable data.Clonable) error {
+                    hostSizingV1 = clonable.(*propsv1.HostSizing)
+                    return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(
+                        func(clonable data.Clonable) error {
+                            hostVolumesV1 = clonable.(*propsv1.HostVolumes)
+                            for k := range hostVolumesV1.VolumesByName {
+                                volumes = append(volumes, k)
+                            }
+                            return nil
+                        },
+                    )
+                },
+            )
+        },
+    )
+    if err != nil {
+        return nil
+    }
+    return &pb.Host{
+        Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
+        Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
+        GatewayId:           hostNetworkV1.DefaultGatewayID,
+        Id:                  in.ID,
+        PublicIp:            in.GetPublicIP(),
+        PrivateIp:           in.GetPrivateIP(),
+        Name:                in.Name,
+        PrivateKey:          in.PrivateKey,
+        Password:            in.Password,
+        Ram:                 hostSizingV1.AllocatedSize.RAMSize,
+        State:               pb.HostState(in.LastState),
+        AttachedVolumeNames: volumes,
+    }
 }
 
 // ToPBHostDefinition ...
 func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
-	return &pb.HostDefinition{
-		ImageId: in.ImageID,
-		Sizing: &pb.HostSizing{
-			MinCpuCount: int32(in.Cores),
-			MaxCpuCount: int32(in.Cores),
-			MinRamSize:  in.RAMSize,
-			MaxRamSize:  in.RAMSize,
-			MinDiskSize: int32(in.DiskSize),
-			GpuCount:    int32(in.GPUNumber),
-			MinCpuFreq:  in.CPUFreq,
-		},
-	}
+    return &pb.HostDefinition{
+        ImageId: in.ImageID,
+        Sizing: &pb.HostSizing{
+            MinCpuCount: int32(in.Cores),
+            MaxCpuCount: int32(in.Cores),
+            MinRamSize:  in.RAMSize,
+            MaxRamSize:  in.RAMSize,
+            MinDiskSize: int32(in.DiskSize),
+            GpuCount:    int32(in.GPUNumber),
+            MinCpuFreq:  in.CPUFreq,
+        },
+    }
 }
 
 // ToPBGatewayDefinition converts a resources.HostDefinition tp .GatewayDefinition
 func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
-	return &pb.GatewayDefinition{
-		Cpu:      int32(in.Cores),
-		Ram:      in.RAMSize,
-		Disk:     int32(in.DiskSize),
-		ImageId:  in.ImageID,
-		GpuCount: int32(in.GPUNumber),
-		GpuType:  in.GPUType,
-	}
+    return &pb.GatewayDefinition{
+        Cpu:      int32(in.Cores),
+        Ram:      in.RAMSize,
+        Disk:     int32(in.DiskSize),
+        ImageId:  in.ImageID,
+        GpuCount: int32(in.GPUNumber),
+        GpuType:  in.GPUType,
+    }
 }
 
 // FromPBHostDefinitionToPBGatewayDefinition converts a pb.HostDefinition to pb.GatewayDefinition
 func FromPBHostDefinitionToPBGatewayDefinition(in *pb.HostDefinition) *pb.GatewayDefinition {
-	if in == nil {
-		return &pb.GatewayDefinition{}
-	}
+    if in == nil {
+        return &pb.GatewayDefinition{}
+    }
 
-	def := &pb.GatewayDefinition{
-		ImageId:  in.ImageId,
-		Cpu:      in.CpuCount,
-		Ram:      in.Ram,
-		Disk:     in.Disk,
-		GpuCount: in.GpuCount,
-		Sizing:   &pb.HostSizing{
-			MinCpuCount: in.Sizing.MinCpuCount,
-			MaxCpuCount: in.Sizing.MaxCpuCount,
-			MinRamSize: in.Sizing.MinRamSize,
-			MaxRamSize: in.Sizing.MaxRamSize,
-			MinDiskSize: in.Sizing.MinDiskSize,
-			GpuCount: in.Sizing.GpuCount,
-			MinCpuFreq: in.Sizing.MinCpuFreq,
-		},
-	}
-	return def
+    def := &pb.GatewayDefinition{
+        ImageId:  in.ImageId,
+        Cpu:      in.CpuCount,
+        Ram:      in.Ram,
+        Disk:     in.Disk,
+        GpuCount: in.GpuCount,
+        Sizing: &pb.HostSizing{
+            MinCpuCount: in.Sizing.MinCpuCount,
+            MaxCpuCount: in.Sizing.MaxCpuCount,
+            MinRamSize:  in.Sizing.MinRamSize,
+            MaxRamSize:  in.Sizing.MaxRamSize,
+            MinDiskSize: in.Sizing.MinDiskSize,
+            GpuCount:    in.Sizing.GpuCount,
+            MinCpuFreq:  in.Sizing.MinCpuFreq,
+        },
+    }
+    return def
 }
 
 // ToHostStatus ...
 func ToHostStatus(in *resources.Host) *pb.HostStatus {
-	return &pb.HostStatus{
-		Name:   in.Name,
-		Status: pb.HostState(in.LastState).String(),
-	}
+    return &pb.HostStatus{
+        Name:   in.Name,
+        Status: pb.HostState(in.LastState).String(),
+    }
 }
 
 // ToPBHostTemplate convert an template from api to protocolbuffer format
 func ToPBHostTemplate(in *resources.HostTemplate) *pb.HostTemplate {
-	return &pb.HostTemplate{
-		Id:       in.ID,
-		Name:     in.Name,
-		Cores:    int32(in.Cores),
-		Ram:      int32(in.RAMSize),
-		Disk:     int32(in.DiskSize),
-		GpuCount: int32(in.GPUNumber),
-		GpuType:  in.GPUType,
-	}
+    return &pb.HostTemplate{
+        Id:       in.ID,
+        Name:     in.Name,
+        Cores:    int32(in.Cores),
+        Ram:      int32(in.RAMSize),
+        Disk:     int32(in.DiskSize),
+        GpuCount: int32(in.GPUNumber),
+        GpuType:  in.GPUType,
+    }
 }
 
 // ToPBImage convert an image from api to protocolbuffer format
 func ToPBImage(in *resources.Image) *pb.Image {
-	return &pb.Image{
-		Id:   in.ID,
-		Name: in.Name,
-	}
+    return &pb.Image{
+        Id:   in.ID,
+        Name: in.Name,
+    }
 }
 
 // ToPBNetwork convert a network from api to protocolbuffer format
 func ToPBNetwork(in *resources.Network) *pb.Network {
-	var pbVIP *pb.VirtualIp
-	if in.VIP != nil {
-		pbVIP = ToPBVirtualIP(*in.VIP)
-	}
-	return &pb.Network{
-		Id:                 in.ID,
-		Name:               in.Name,
-		Cidr:               in.CIDR,
-		GatewayId:          in.GatewayID,
-		SecondaryGatewayId: in.SecondaryGatewayID,
-		VirtualIp:          pbVIP,
-		Failover:           in.SecondaryGatewayID != "",
-	}
+    var pbVIP *pb.VirtualIp
+    if in.VIP != nil {
+        pbVIP = ToPBVirtualIP(*in.VIP)
+    }
+    return &pb.Network{
+        Id:                 in.ID,
+        Name:               in.Name,
+        Cidr:               in.CIDR,
+        GatewayId:          in.GatewayID,
+        SecondaryGatewayId: in.SecondaryGatewayID,
+        VirtualIp:          pbVIP,
+        Failover:           in.SecondaryGatewayID != "",
+    }
 }
 
 // ToPBFileList convert a list of file names from api to protocolbuffer FileList format
 func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, fileBuckets [][]string) *pb.FileList {
-	var files []*pb.File
-	nbFiles := int(math.Min(math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))), float64(len(fileBuckets))))
-	for i := 0; i < nbFiles; i++ {
-		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
-	}
-	return &pb.FileList{Files: files}
+    var files []*pb.File
+    nbFiles := int(
+        math.Min(
+            math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))),
+            float64(len(fileBuckets)),
+        ),
+    )
+    for i := 0; i < nbFiles; i++ {
+        files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
+    }
+    return &pb.FileList{Files: files}
 }
 
 // ToPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
 func ToPBHostSizing(src resources.SizingRequirements) *pb.HostSizing {
-	return &pb.HostSizing{
-		MinCpuCount: int32(src.MinCores),
-		MaxCpuCount: int32(src.MaxCores),
-		MinCpuFreq:  src.MinFreq,
-		GpuCount:    int32(src.MinGPU),
-		MinRamSize:  src.MinRAMSize,
-		MaxRamSize:  src.MaxRAMSize,
-		MinDiskSize: int32(src.MinDiskSize),
-	}
+    return &pb.HostSizing{
+        MinCpuCount: int32(src.MinCores),
+        MaxCpuCount: int32(src.MaxCores),
+        MinCpuFreq:  src.MinFreq,
+        GpuCount:    int32(src.MinGPU),
+        MinRamSize:  src.MinRAMSize,
+        MaxRamSize:  src.MaxRAMSize,
+        MinDiskSize: int32(src.MinDiskSize),
+    }
 }
 
 // FromPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
 func FromPBHostSizing(src *pb.HostSizing) resources.SizingRequirements {
-	return resources.SizingRequirements{
-		MinCores:    int(src.MinCpuCount),
-		MaxCores:    int(src.MaxCpuCount),
-		MinFreq:     src.MinCpuFreq,
-		MinGPU:      int(src.GpuCount),
-		MinRAMSize:  src.MinRamSize,
-		MaxRAMSize:  src.MaxRamSize,
-		MinDiskSize: int(src.MinDiskSize),
-	}
+    return resources.SizingRequirements{
+        MinCores:    int(src.MinCpuCount),
+        MaxCores:    int(src.MaxCpuCount),
+        MinFreq:     src.MinCpuFreq,
+        MinGPU:      int(src.GpuCount),
+        MinRAMSize:  src.MinRamSize,
+        MaxRAMSize:  src.MaxRamSize,
+        MinDiskSize: int(src.MinDiskSize),
+    }
 }
 
 // ToPBVirtualIP converts a resources.VirtualIP to a pb.VirtualIp
 func ToPBVirtualIP(src resources.VirtualIP) *pb.VirtualIp {
-	dest := &pb.VirtualIp{
-		Id:        src.ID,
-		NetworkId: src.NetworkID,
-		PrivateIp: src.PrivateIP,
-		PublicIp:  src.PublicIP,
-	}
-	dest.Hosts = make([]string, len(src.Hosts))
-	copy(dest.Hosts, src.Hosts)
-	return dest
+    dest := &pb.VirtualIp{
+        Id:        src.ID,
+        NetworkId: src.NetworkID,
+        PrivateIp: src.PrivateIP,
+        PublicIp:  src.PublicIP,
+    }
+    dest.Hosts = make([]string, len(src.Hosts))
+    copy(dest.Hosts, src.Hosts)
+    return dest
 }
 
 // ClonePBHostSizing ...
 func ClonePBHostSizing(in *pb.HostSizing) *pb.HostSizing {
-	if in == nil {
-		return &pb.HostSizing{}
-	}
-	return &pb.HostSizing{
-		MinCpuCount: in.MinCpuCount,
-		MaxCpuCount: in.MaxCpuCount,
-		MinRamSize: in.MinRamSize,
-		MaxRamSize: in.MaxRamSize,
-		MinDiskSize: in.MinDiskSize,
-		GpuCount: in.GpuCount,
-		MinCpuFreq: in.MinCpuFreq,
-	}
+    if in == nil {
+        return &pb.HostSizing{}
+    }
+    return &pb.HostSizing{
+        MinCpuCount: in.MinCpuCount,
+        MaxCpuCount: in.MaxCpuCount,
+        MinRamSize:  in.MinRamSize,
+        MaxRamSize:  in.MaxRamSize,
+        MinDiskSize: in.MinDiskSize,
+        GpuCount:    in.GpuCount,
+        MinCpuFreq:  in.MinCpuFreq,
+    }
 }
 
 // ClonePBHostDefinition ...
 func ClonePBHostDefinition(in *pb.HostDefinition) *pb.HostDefinition {
-	if in == nil {
-		return &pb.HostDefinition{}
-	}
-	return &pb.HostDefinition{
-		Name: in.Name,
-		Network: in.Network,
-		CpuCount: in.CpuCount,
-		Ram: in.Ram,
-		Disk: in.Disk,
-		ImageId: in.ImageId,
-		Public: in.Public,
-		GpuCount: in.GpuCount,
-		CpuFreq: in.CpuFreq,
-		Force: in.Force,
-		Sizing: ClonePBHostSizing(in.Sizing),
-		Domain: in.Domain,
-	}
+    if in == nil {
+        return &pb.HostDefinition{}
+    }
+    return &pb.HostDefinition{
+        Name:     in.Name,
+        Network:  in.Network,
+        CpuCount: in.CpuCount,
+        Ram:      in.Ram,
+        Disk:     in.Disk,
+        ImageId:  in.ImageId,
+        Public:   in.Public,
+        GpuCount: in.GpuCount,
+        CpuFreq:  in.CpuFreq,
+        Force:    in.Force,
+        Sizing:   ClonePBHostSizing(in.Sizing),
+        Domain:   in.Domain,
+    }
 }

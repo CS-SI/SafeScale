@@ -17,187 +17,187 @@
 package main
 
 import (
-	"fmt"
-	"net"
-	"os"
-	"os/signal"
-	"path"
-	"runtime"
-	"strconv"
-	"strings"
-	"syscall"
+    "fmt"
+    "net"
+    "os"
+    "os/signal"
+    "path"
+    "runtime"
+    "strconv"
+    "strings"
+    "syscall"
 
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+    "github.com/sirupsen/logrus"
+    "github.com/urfave/cli"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/reflection"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/listeners"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+    pb "github.com/CS-SI/SafeScale/lib"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/listeners"
+    "github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	_ "github.com/CS-SI/SafeScale/lib/server"
+    _ "github.com/CS-SI/SafeScale/lib/server"
 )
 
 var profileCloseFunc = func() {}
 
 func cleanup(onAbort bool) {
-	fmt.Println("cleanup")
-	profileCloseFunc()
-	os.Exit(0)
+    fmt.Println("cleanup")
+    profileCloseFunc()
+    os.Exit(0)
 }
 
 // *** MAIN ***
 func work(version string) {
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		cleanup(true)
-	}()
+    c := make(chan os.Signal)
+    signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+    go func() {
+        <-c
+        cleanup(true)
+    }()
 
-	logrus.Infoln("Checking configuration")
-	_, err := iaas.GetTenantNames()
-	if err != nil {
-		logrus.Fatalf(err.Error())
-	}
+    logrus.Infoln("Checking configuration")
+    _, err := iaas.GetTenantNames()
+    if err != nil {
+        logrus.Fatalf(err.Error())
+    }
 
-	safescaledPort := 50051
+    safescaledPort := 50051
 
-	// DEV VAR
-	if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
-		num, err := strconv.Atoi(portCandidate)
-		if err == nil {
-			safescaledPort = num
-		}
-	}
+    // DEV VAR
+    if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
+        num, err := strconv.Atoi(portCandidate)
+        if err == nil {
+            safescaledPort = num
+        }
+    }
 
-	// DEV VAR
-	suffix := ""
-	if suffixCandidate := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffixCandidate != "" {
-		suffix = suffixCandidate
-	}
+    // DEV VAR
+    suffix := ""
+    if suffixCandidate := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffixCandidate != "" {
+        suffix = suffixCandidate
+    }
 
-	envVars := os.Environ()
-	for _, envVar := range envVars {
-		if strings.HasPrefix(envVar, "SAFESCALE") {
-			logrus.Infof("Using %s", envVar)
-		}
-	}
+    envVars := os.Environ()
+    for _, envVar := range envVars {
+        if strings.HasPrefix(envVar, "SAFESCALE") {
+            logrus.Infof("Using %s", envVar)
+        }
+    }
 
-	logrus.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", safescaledPort, suffix)
+    logrus.Infof("Starting server, listening at port: %d, using metadata suffix: [%s]", safescaledPort, suffix)
 
-	lis, err := net.Listen("tcp", ":"+strconv.Itoa(safescaledPort))
-	if err != nil {
-		logrus.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
+    lis, err := net.Listen("tcp", ":"+strconv.Itoa(safescaledPort))
+    if err != nil {
+        logrus.Fatalf("failed to listen: %v", err)
+    }
+    s := grpc.NewServer()
 
-	logrus.Infoln("Registering services")
-	pb.RegisterBucketServiceServer(s, &listeners.BucketListener{})
-	// pb.RegisterDataServiceServer(s, &listeners.DataListener{})
-	pb.RegisterHostServiceServer(s, &listeners.HostListener{})
-	pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
-	pb.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
-	pb.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
-	pb.RegisterShareServiceServer(s, &listeners.ShareListener{})
-	pb.RegisterSshServiceServer(s, &listeners.SSHListener{})
-	pb.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
-	pb.RegisterTenantServiceServer(s, &listeners.TenantListener{})
-	pb.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
+    logrus.Infoln("Registering services")
+    pb.RegisterBucketServiceServer(s, &listeners.BucketListener{})
+    // pb.RegisterDataServiceServer(s, &listeners.DataListener{})
+    pb.RegisterHostServiceServer(s, &listeners.HostListener{})
+    pb.RegisterImageServiceServer(s, &listeners.ImageListener{})
+    pb.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
+    pb.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
+    pb.RegisterShareServiceServer(s, &listeners.ShareListener{})
+    pb.RegisterSshServiceServer(s, &listeners.SSHListener{})
+    pb.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
+    pb.RegisterTenantServiceServer(s, &listeners.TenantListener{})
+    pb.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
 
-	// logrus.Println("Initializing service factory")
-	// commands.InitServiceFactory()
+    // logrus.Println("Initializing service factory")
+    // commands.InitServiceFactory()
 
-	// Register reflection service on gRPC server.
-	reflection.Register(s)
+    // Register reflection service on gRPC server.
+    reflection.Register(s)
 
-	fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
-	if err := s.Serve(lis); err != nil {
-		logrus.Fatalf("Failed to serve: %v", err)
-	}
+    fmt.Printf("Safescaled version: %s\nReady to serve :-)\n", version)
+    if err := s.Serve(lis); err != nil {
+        logrus.Fatalf("Failed to serve: %v", err)
+    }
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+    runtime.GOMAXPROCS(runtime.NumCPU())
 
-	app := cli.NewApp()
-	app.Name = "safescaled"
-	app.Usage = "safescaled [OPTIONS]"
-	app.Version = Version + ", build " + Revision + " compiled with "+runtime.Version()+ " (" + BuildDate + ")"
+    app := cli.NewApp()
+    app.Name = "safescaled"
+    app.Usage = "safescaled [OPTIONS]"
+    app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
 
-	app.Authors = []cli.Author{
-		cli.Author{
-			Name:  "CS-SI",
-			Email: "safescale@c-s.fr",
-		},
-	}
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version, V",
-		Usage: "Print program version",
-	}
+    app.Authors = []cli.Author{
+        cli.Author{
+            Name:  "CS-SI",
+            Email: "safescale@c-s.fr",
+        },
+    }
+    cli.VersionFlag = cli.BoolFlag{
+        Name:  "version, V",
+        Usage: "Print program version",
+    }
 
-	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "Increase verbosity",
-		},
-		cli.BoolFlag{
-			Name:  "debug, d",
-			Usage: "Show debug information",
-		},
-		cli.StringFlag{
-			Name:  "profile",
-			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
-			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
-		},
-		// cli.IntFlag{
-		// 	Name:  "port, p",
-		// 	Usage: "Bind to specified port `PORT`",
-		// 	Value: 50051,
-		// },
-	}
+    app.Flags = []cli.Flag{
+        cli.BoolFlag{
+            Name:  "verbose, v",
+            Usage: "Increase verbosity",
+        },
+        cli.BoolFlag{
+            Name:  "debug, d",
+            Usage: "Show debug information",
+        },
+        cli.StringFlag{
+            Name:  "profile",
+            Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
+            // TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
+        },
+        // cli.IntFlag{
+        // 	Name:  "port, p",
+        // 	Usage: "Bind to specified port `PORT`",
+        // 	Value: 50051,
+        // },
+    }
 
-	app.Before = func(c *cli.Context) error {
-		// Sets profiling
-		if c.IsSet("profile") {
-			what := c.String("profile")
-			profileCloseFunc = debug.Profile(what)
-		}
+    app.Before = func(c *cli.Context) error {
+        // Sets profiling
+        if c.IsSet("profile") {
+            what := c.String("profile")
+            profileCloseFunc = debug.Profile(what)
+        }
 
-		if strings.Contains(path.Base(os.Args[0]), "-cover") {
-			logrus.SetLevel(logrus.TraceLevel)
-			utils.Verbose = true
-		} else {
-			logrus.SetLevel(logrus.WarnLevel)
-		}
+        if strings.Contains(path.Base(os.Args[0]), "-cover") {
+            logrus.SetLevel(logrus.TraceLevel)
+            utils.Verbose = true
+        } else {
+            logrus.SetLevel(logrus.WarnLevel)
+        }
 
-		if c.GlobalBool("verbose") {
-			logrus.SetLevel(logrus.InfoLevel)
-			utils.Verbose = true
-		}
-		if c.GlobalBool("debug") {
-			if c.GlobalBool("verbose") {
-				logrus.SetLevel(logrus.TraceLevel)
-			} else {
-				logrus.SetLevel(logrus.DebugLevel)
-			}
-			utils.Debug = true
-		}
-		return nil
-	}
+        if c.GlobalBool("verbose") {
+            logrus.SetLevel(logrus.InfoLevel)
+            utils.Verbose = true
+        }
+        if c.GlobalBool("debug") {
+            if c.GlobalBool("verbose") {
+                logrus.SetLevel(logrus.TraceLevel)
+            } else {
+                logrus.SetLevel(logrus.DebugLevel)
+            }
+            utils.Debug = true
+        }
+        return nil
+    }
 
-	app.Action = func(c *cli.Context) error {
-		work(app.Version)
-		return nil
-	}
+    app.Action = func(c *cli.Context) error {
+        work(app.Version)
+        return nil
+    }
 
-	err := app.Run(os.Args)
-	if err != nil {
-		logrus.Error(err)
-	}
+    err := app.Run(os.Args)
+    if err != nil {
+        logrus.Error(err)
+    }
 
-	cleanup(false)
+    cleanup(false)
 }

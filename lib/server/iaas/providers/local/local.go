@@ -1,4 +1,4 @@
-//+build libvirt
+// +build libvirt
 
 /*
  * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
@@ -19,54 +19,54 @@
 package local
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+    providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+    libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 )
 
 // provider is the provider implementation of the local provider
 type provider struct {
-	*libStack.Stack
+    *libStack.Stack
 
-	tenantParameters map[string]interface{}
+    tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of local provider
 func New() providerapi.Provider {
-	return &provider{}
+    return &provider{}
 }
 
-//AuthOptions fields are the union of those recognized by each identity implementation and provider.
+// AuthOptions fields are the union of those recognized by each identity implementation and provider.
 type AuthOptions struct {
 }
 
 // CfgOptions configuration options
 type CfgOptions struct {
-	// MetadataBucketName contains the name of the bucket storing metadata
-	MetadataBucketName string
-	// Name of the default network of the provider
-	ProviderNetwork string
-	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
-	AutoHostNetworkInterfaces bool
-	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
-	// if UseFloatingIP is true UseLayer3Networking must be true
-	UseLayer3Networking bool
-	// Local Path of the json file defining the images
-	ImagesJSONPath string
-	// Local Path of the json file defining the templates
-	TemplatesJSONPath string
-	// Local Path of the libvirt pool where all disks created by libvirt come from and are stored
-	LibvirtStorage string
-	// Connection identifier to the virtualisation device
-	URI string
+    // MetadataBucketName contains the name of the bucket storing metadata
+    MetadataBucketName string
+    // Name of the default network of the provider
+    ProviderNetwork string
+    // AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
+    AutoHostNetworkInterfaces bool
+    // UseLayer3Networking indicates if layer 3 networking features (router) can be used
+    // if UseFloatingIP is true UseLayer3Networking must be true
+    UseLayer3Networking bool
+    // Local Path of the json file defining the images
+    ImagesJSONPath string
+    // Local Path of the json file defining the templates
+    TemplatesJSONPath string
+    // Local Path of the libvirt pool where all disks created by libvirt come from and are stored
+    LibvirtStorage string
+    // Connection identifier to the virtualisation device
+    URI string
 }
 
 // &stacks.ConfigurationOptions{
@@ -77,119 +77,119 @@ type CfgOptions struct {
 
 // Build Create and initialize a ClientAPI
 func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
-	authOptions := stacks.AuthenticationOptions{}
-	localConfig := stacks.LocalConfiguration{}
-	config := stacks.ConfigurationOptions{}
+    authOptions := stacks.AuthenticationOptions{}
+    localConfig := stacks.LocalConfiguration{}
+    config := stacks.ConfigurationOptions{}
 
-	config.ProviderNetwork = "safescale"
-	config.AutoHostNetworkInterfaces = false
-	config.UseLayer3Networking = false
-	bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
-	}
-	config.MetadataBucket = bucketName
+    config.ProviderNetwork = "safescale"
+    config.AutoHostNetworkInterfaces = false
+    config.UseLayer3Networking = false
+    bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
+    if err != nil {
+        return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+    }
+    config.MetadataBucket = bucketName
 
-	// Add custom dns
-	// config.DNSList = []string{"1.1.1.1"}
+    // Add custom dns
+    // config.DNSList = []string{"1.1.1.1"}
 
-	compute, _ := params["compute"].(map[string]interface{})
+    compute, _ := params["compute"].(map[string]interface{})
 
-	operatorUsername := resources.DefaultUser
-	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
-		}
-	}
-	config.OperatorUsername = operatorUsername
+    operatorUsername := resources.DefaultUser
+    if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
+        operatorUsername = operatorUsernameIf.(string)
+        if operatorUsername == "" {
+            logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+            operatorUsername = resources.DefaultUser
+        }
+    }
+    config.OperatorUsername = operatorUsername
 
-	uri, found := compute["uri"].(string)
-	if !found {
-		return nil, fmt.Errorf("uri is not set")
-	}
-	imagesJSONPath, found := compute["imagesJSONPath"].(string)
-	if !found {
-		return nil, fmt.Errorf("imagesJsonPath is not set")
-	}
-	templatesJSONPath, found := compute["templatesJSONPath"].(string)
-	if !found {
-		return nil, fmt.Errorf("templatesJsonPath is not set")
-	}
-	libvirtStorage, found := compute["libvirtStorage"].(string)
-	if !found {
-		return nil, fmt.Errorf("libvirtStorage is not set")
-	}
+    uri, found := compute["uri"].(string)
+    if !found {
+        return nil, fmt.Errorf("uri is not set")
+    }
+    imagesJSONPath, found := compute["imagesJSONPath"].(string)
+    if !found {
+        return nil, fmt.Errorf("imagesJsonPath is not set")
+    }
+    templatesJSONPath, found := compute["templatesJSONPath"].(string)
+    if !found {
+        return nil, fmt.Errorf("templatesJsonPath is not set")
+    }
+    libvirtStorage, found := compute["libvirtStorage"].(string)
+    if !found {
+        return nil, fmt.Errorf("libvirtStorage is not set")
+    }
 
-	localConfig.ImagesJSONPath = imagesJSONPath
-	localConfig.TemplatesJSONPath = templatesJSONPath
-	localConfig.LibvirtStorage = libvirtStorage
-	localConfig.URI = uri
+    localConfig.ImagesJSONPath = imagesJSONPath
+    localConfig.TemplatesJSONPath = templatesJSONPath
+    localConfig.LibvirtStorage = libvirtStorage
+    localConfig.URI = uri
 
-	libvirtStack, err := libStack.New(authOptions, localConfig, config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create a new libvirt Stack : %v", err)
-	}
+    libvirtStack, err := libStack.New(authOptions, localConfig, config)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create a new libvirt Stack : %v", err)
+    }
 
-	localProvider := &provider{
-		Stack:            libvirtStack,
-		tenantParameters: params,
-	}
+    localProvider := &provider{
+        Stack:            libvirtStack,
+        tenantParameters: params,
+    }
 
-	return localProvider, nil
+    return localProvider, nil
 }
 
 // GetAuthOpts returns authentification options as a Config
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
-	cfg := resources.ConfigMap{}
-	cfg.Set("Region", "Local")
-	return cfg, nil
+    cfg := resources.ConfigMap{}
+    cfg.Set("Region", "Local")
+    return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
-	config := resources.ConfigMap{}
+    config := resources.ConfigMap{}
 
-	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
-	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
-	config.Set("MetadataBucketName", p.Config.MetadataBucket)
-	config.Set("ProviderNetwork", p.Config.ProviderNetwork)
-	config.Set("OperatorUsername", p.Config.OperatorUsername)
-	config.Set("ProviderName", p.GetName())
+    config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
+    config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
+    config.Set("MetadataBucketName", p.Config.MetadataBucket)
+    config.Set("ProviderNetwork", p.Config.ProviderNetwork)
+    config.Set("OperatorUsername", p.Config.OperatorUsername)
+    config.Set("ProviderName", p.GetName())
 
-	return config, nil
+    return config, nil
 }
 
 func (p *provider) GetName() string {
-	return "local"
+    return "local"
 }
 
 // ListImages ...
 func (p *provider) ListImages(all bool) ([]resources.Image, error) {
-	return p.Stack.ListImages()
+    return p.Stack.ListImages()
 }
 
 // ListTemplates ...
 func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
-	return p.Stack.ListTemplates()
+    return p.Stack.ListTemplates()
 }
 
 func (p *provider) ListAvailabilityZones() (map[string]bool, error) {
-	return p.Stack.ListAvailabilityZones()
+    return p.Stack.ListAvailabilityZones()
 }
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p *provider) GetTenantParameters() map[string]interface{} {
-	return p.tenantParameters
+    return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
-	return providers.Capabilities{}
+    return providers.Capabilities{}
 }
 
 func init() {
-	// log.Debug("Registering local provider")
-	iaas.Register("local", &provider{})
+    // log.Debug("Registering local provider")
+    iaas.Register("local", &provider{})
 }

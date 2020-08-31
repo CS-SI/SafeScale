@@ -41,7 +41,7 @@ type tracer struct {
 
 const (
     unknownFunction = "<unknown function>"
-    unknownFile = "<unknown file>"
+    unknownFile     = "<unknown file>"
 )
 
 // newTracer creates a new tracer instance

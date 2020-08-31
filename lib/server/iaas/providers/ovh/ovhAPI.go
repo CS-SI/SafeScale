@@ -17,56 +17,57 @@
 package ovh
 
 import (
-	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "fmt"
 
-	"github.com/ovh/go-ovh/ovh"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+
+    "github.com/ovh/go-ovh/ovh"
 )
 
 func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, error) {
-	authOpts, err := p.GetAuthenticationOptions()
-	if err != nil {
-		return nil, err
-	}
+    authOpts, err := p.GetAuthenticationOptions()
+    if err != nil {
+        return nil, err
+    }
 
-	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
-	if alternateAPIApplicationKey == "" {
-		return nil, fmt.Errorf("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
-	}
-	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
-	if alternateAPIApplicationSecret == "" {
-		return nil, fmt.Errorf("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
-	}
-	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
-	if alternateAPIConsumerKey == "" {
-		return nil, fmt.Errorf("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
-	}
+    alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
+    if alternateAPIApplicationKey == "" {
+        return nil, fmt.Errorf("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
+    }
+    alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
+    if alternateAPIApplicationSecret == "" {
+        return nil, fmt.Errorf("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
+    }
+    alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
+    if alternateAPIConsumerKey == "" {
+        return nil, fmt.Errorf("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
+    }
 
-	client, err := ovh.NewClient(
-		"ovh-eu",
-		alternateAPIApplicationKey,
-		alternateAPIApplicationSecret,
-		alternateAPIConsumerKey,
-	)
-	if err != nil {
-		return nil, err
-	}
+    client, err := ovh.NewClient(
+        "ovh-eu",
+        alternateAPIApplicationKey,
+        alternateAPIApplicationSecret,
+        alternateAPIConsumerKey,
+    )
+    if err != nil {
+        return nil, err
+    }
 
-	var result interface{}
-	switch httpCode {
-	case "GET":
-		if err := client.Get(url, &result); err != nil {
-			return nil, err
-		}
-	case "PUT":
-		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME Technical debt
-	case "POST":
-		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME Technical debt
-	case "DELETE":
-		return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME Technical debt
-	default:
-		return nil, fmt.Errorf("unexpected HTTP code : %s", httpCode)
-	}
+    var result interface{}
+    switch httpCode {
+    case "GET":
+        if err := client.Get(url, &result); err != nil {
+            return nil, err
+        }
+    case "PUT":
+        return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME Technical debt
+    case "POST":
+        return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME Technical debt
+    case "DELETE":
+        return nil, scerr.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME Technical debt
+    default:
+        return nil, fmt.Errorf("unexpected HTTP code : %s", httpCode)
+    }
 
-	return result, nil
+    return result, nil
 }

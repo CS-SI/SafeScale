@@ -17,7 +17,7 @@
 package huaweicloud
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // // createTCPRules creates TCP rules to configure the default security group
@@ -204,7 +204,7 @@ import (
 // The default security group opens all TCP, UDP, ICMP ports
 // Security is managed individually on each host using a linux firewall
 func (s *Stack) InitDefaultSecurityGroup() error {
-	s.Stack.DefaultSecurityGroupName = stacks.DefaultSecurityGroupName + "." + s.authOpts.VPCName
-	s.Stack.DefaultSecurityGroupDescription = "Default security group for VPC " + s.authOpts.VPCName
-	return s.Stack.InitDefaultSecurityGroup()
+    s.Stack.DefaultSecurityGroupName = stacks.DefaultSecurityGroupName + "." + s.authOpts.VPCName
+    s.Stack.DefaultSecurityGroupDescription = "Default security group for VPC " + s.authOpts.VPCName
+    return s.Stack.InitDefaultSecurityGroup()
 }

@@ -16,156 +16,168 @@
 package listeners_test
 
 import (
-	"context"
-	"errors"
-	"testing"
+    "context"
+    "errors"
+    "testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/mock"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/listeners"
+    pb "github.com/CS-SI/SafeScale/lib"
+    "github.com/CS-SI/SafeScale/lib/server/handlers"
+    "github.com/CS-SI/SafeScale/lib/server/iaas"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+    "github.com/CS-SI/SafeScale/lib/server/listeners"
 )
 
 type MyMockedVolService struct {
-	mock.Mock
-	err error
+    mock.Mock
+    err error
 }
 
 func (m *MyMockedVolService) Create(name string, size int, speed volumespeed.Enum) (*resources.Volume, error) {
-	m.Called(name, size, speed)
+    m.Called(name, size, speed)
 
-	return &resources.Volume{Name: name,
-		Size:  size,
-		Speed: speed}, m.err
+    return &resources.Volume{
+        Name: name,
+        Size:  size,
+        Speed: speed,
+    }, m.err
 }
 func (m *MyMockedVolService) Delete(name string) error {
-	return nil
+    return nil
 }
 func (m *MyMockedVolService) List() ([]resources.Volume, error) {
-	return nil, nil
+    return nil, nil
 }
 func (m *MyMockedVolService) Attach(volume string, host string, path string, format string) error {
-	return nil
+    return nil
 }
 func (m *MyMockedVolService) Detach(volume string, host string) error {
-	return nil
+    return nil
 }
 func (m *MyMockedVolService) Get(ref string) (*resources.Volume, error) {
-	return &resources.Volume{}, nil
+    return &resources.Volume{}, nil
 }
 
 func TestCreate(t *testing.T) {
-	// ARRANGE
-	myMockedVolService := &MyMockedVolService{}
-	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return()
-	// Mock VolumeServiceCreator
-	old := listeners.VolumeHandler
-	defer func() { listeners.VolumeHandler = old }()
+    // ARRANGE
+    myMockedVolService := &MyMockedVolService{}
+    myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return()
+    // Mock VolumeServiceCreator
+    old := listeners.VolumeHandler
+    defer func() { listeners.VolumeHandler = old }()
 
-	listeners.VolumeHandler = func(svc iaas.Service) handlers.VolumeAPI {
-		return nil
-		// TODO Fix this test
-		// return myMockedVolService
-	}
+    listeners.VolumeHandler = func(svc iaas.Service) handlers.VolumeAPI {
+        return nil
+        // TODO Fix this test
+        // return myMockedVolService
+    }
 
-	// Mock GetCurrentTenant
-	oldGetCurrentTeant := listeners.GetCurrentTenant
-	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
-	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return &listeners.Tenant{}
-	}
+    // Mock GetCurrentTenant
+    oldGetCurrentTeant := listeners.GetCurrentTenant
+    defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
+    listeners.GetCurrentTenant = func() *listeners.Tenant {
+        return &listeners.Tenant{}
+    }
 
-	underTest := &listeners.VolumeListener{}
+    underTest := &listeners.VolumeListener{}
 
-	// FIXME Rebuild mocks (nil context not allowed)
-	t.Skip()
+    // FIXME Rebuild mocks (nil context not allowed)
+    t.Skip()
 
-	// ACT
-	_, err := underTest.Create(context.TODO(), &pb.VolumeDefinition{
-		Speed: pb.VolumeSpeed_SSD,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// ASSERT
-	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.SSD)
+    // ACT
+    _, err := underTest.Create(
+        context.TODO(), &pb.VolumeDefinition{
+            Speed: pb.VolumeSpeed_SSD,
+        },
+    )
+    if err != nil {
+        t.Fatal(err)
+    }
+    // ASSERT
+    myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.SSD)
 
-	_, err = underTest.Create(context.TODO(), &pb.VolumeDefinition{
-		Speed: pb.VolumeSpeed_HDD,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+    _, err = underTest.Create(
+        context.TODO(), &pb.VolumeDefinition{
+            Speed: pb.VolumeSpeed_HDD,
+        },
+    )
+    if err != nil {
+        t.Fatal(err)
+    }
 
-	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.HDD)
-	_, err = underTest.Create(context.TODO(), &pb.VolumeDefinition{
-		Speed: pb.VolumeSpeed_COLD,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.COLD)
+    myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.HDD)
+    _, err = underTest.Create(
+        context.TODO(), &pb.VolumeDefinition{
+            Speed: pb.VolumeSpeed_COLD,
+        },
+    )
+    if err != nil {
+        t.Fatal(err)
+    }
+    myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.COLD)
 }
 
 func TestCreate_Err(t *testing.T) {
-	// ARRANGE
-	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
-	myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fake Error"))
-	// Mock VolumeServiceCreator
-	old := listeners.VolumeHandler
-	defer func() { listeners.VolumeHandler = old }()
+    // ARRANGE
+    myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
+    myMockedVolService.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.New("fake Error"))
+    // Mock VolumeServiceCreator
+    old := listeners.VolumeHandler
+    defer func() { listeners.VolumeHandler = old }()
 
-	listeners.VolumeHandler = func(api iaas.Service) handlers.VolumeAPI {
-		// TODO Fix this test
-		return nil
-		// return myMockedVolService
-	}
+    listeners.VolumeHandler = func(api iaas.Service) handlers.VolumeAPI {
+        // TODO Fix this test
+        return nil
+        // return myMockedVolService
+    }
 
-	// Mock GetCurrentTenant
-	oldGetCurrentTeant := listeners.GetCurrentTenant
-	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
-	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return &listeners.Tenant{}
-	}
+    // Mock GetCurrentTenant
+    oldGetCurrentTeant := listeners.GetCurrentTenant
+    defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
+    listeners.GetCurrentTenant = func() *listeners.Tenant {
+        return &listeners.Tenant{}
+    }
 
-	underTest := &listeners.VolumeListener{}
+    underTest := &listeners.VolumeListener{}
 
-	// FIXME Rebuild mocks (nil context not allowed)
-	t.Skip()
+    // FIXME Rebuild mocks (nil context not allowed)
+    t.Skip()
 
-	// ACT
-	_, err := underTest.Create(context.TODO(), &pb.VolumeDefinition{
-		Speed: pb.VolumeSpeed_SSD,
-	})
-	// ASSERT
-	myMockedVolService.AssertExpectations(t)
-	assert.NotNil(t, err)
+    // ACT
+    _, err := underTest.Create(
+        context.TODO(), &pb.VolumeDefinition{
+            Speed: pb.VolumeSpeed_SSD,
+        },
+    )
+    // ASSERT
+    myMockedVolService.AssertExpectations(t)
+    assert.NotNil(t, err)
 }
 
 func TestCreate_Err_NoTenantSet(t *testing.T) {
-	// ARRANGE
-	// Mock GetCurrentTenant
-	oldGetCurrentTeant := listeners.GetCurrentTenant
-	defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
-	listeners.GetCurrentTenant = func() *listeners.Tenant {
-		return nil
-	}
-	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
-	underTest := &listeners.VolumeListener{}
+    // ARRANGE
+    // Mock GetCurrentTenant
+    oldGetCurrentTeant := listeners.GetCurrentTenant
+    defer func() { listeners.GetCurrentTenant = oldGetCurrentTeant }()
+    listeners.GetCurrentTenant = func() *listeners.Tenant {
+        return nil
+    }
+    myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
+    underTest := &listeners.VolumeListener{}
 
-	// FIXME Rebuild mocks (nil context not allowed)
-	t.Skip()
+    // FIXME Rebuild mocks (nil context not allowed)
+    t.Skip()
 
-	// ACT
-	_, err := underTest.Create(context.TODO(), &pb.VolumeDefinition{
-		Speed: pb.VolumeSpeed_SSD,
-	})
-	// ASSERT
-	myMockedVolService.AssertNotCalled(t, "Create")
-	assert.EqualError(t, err, "No tenant set")
+    // ACT
+    _, err := underTest.Create(
+        context.TODO(), &pb.VolumeDefinition{
+            Speed: pb.VolumeSpeed_SSD,
+        },
+    )
+    // ASSERT
+    myMockedVolService.AssertNotCalled(t, "Create")
+    assert.EqualError(t, err, "No tenant set")
 }

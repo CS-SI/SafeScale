@@ -17,64 +17,64 @@
 package utils
 
 import (
-	"context"
-	"sync"
-	"time"
+    "context"
+    "sync"
+    "time"
 
-	uuid "github.com/satori/go.uuid"
-	"google.golang.org/grpc/metadata"
+    uuid "github.com/satori/go.uuid"
+    "google.golang.org/grpc/metadata"
 )
 
 var (
-	clientRPCUUID       uuid.UUID
-	uuidSet             bool
-	mutexContextManager sync.Mutex
+    clientRPCUUID       uuid.UUID
+    uuidSet             bool
+    mutexContextManager sync.Mutex
 )
 
 // --------------------- CLIENT ---------------------------------
 
 // GetContext ...
 func GetContext(storeUUID bool) (context.Context, error) {
-	clientContext := context.Background()
-	aUUID, err := generateUUID(storeUUID)
-	if err != nil {
-		return nil, err
-	}
-	clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", aUUID)
-	return clientContext, nil
+    clientContext := context.Background()
+    aUUID, err := generateUUID(storeUUID)
+    if err != nil {
+        return nil, err
+    }
+    clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", aUUID)
+    return clientContext, nil
 }
 
 // GetTimeoutContext return a context for grpc commands
 func GetTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc, error) {
-	// Contact the server and print out its response.
+    // Contact the server and print out its response.
 
-	aContext, err := GetContext(true)
-	if err != nil {
-		return nil, nil, err
-	}
+    aContext, err := GetContext(true)
+    if err != nil {
+        return nil, nil, err
+    }
 
-	ctx, cancel := context.WithTimeout(aContext, timeout)
-	return ctx, cancel, nil
+    ctx, cancel := context.WithTimeout(aContext, timeout)
+    return ctx, cancel, nil
 }
 
 // GetUUID ...
 func GetUUID() string {
-	mutexContextManager.Lock()
-	defer mutexContextManager.Unlock()
-	return clientRPCUUID.String()
+    mutexContextManager.Lock()
+    defer mutexContextManager.Unlock()
+    return clientRPCUUID.String()
 }
 
 // generateUUID ...
 func generateUUID(store bool) (string, error) {
-	mutexContextManager.Lock()
-	defer mutexContextManager.Unlock()
-	newUUID, err := uuid.NewV4()
-	if err != nil {
-		return "", err
-	}
-	if store {
-		uuidSet = true
-		clientRPCUUID = newUUID
-	}
-	return newUUID.String(), nil
+    mutexContextManager.Lock()
+    defer mutexContextManager.Unlock()
+    newUUID, err := uuid.NewV4()
+    if err != nil {
+        return "", err
+    }
+    if store {
+        uuidSet = true
+        clientRPCUUID = newUUID
+    }
+    return newUUID.String(), nil
 }

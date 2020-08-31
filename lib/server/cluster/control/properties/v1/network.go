@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Network ...
@@ -27,36 +27,36 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with updated/additional fields
 type Network struct {
-	NetworkID string `json:"network_id"` // contains the ID of the network
-	GatewayID string `json:"gateway_id"`
-	GatewayIP string `json:"gateway_ip"` // contains the private IP address of the gateway
-	PublicIP  string `json:"public_ip"`  // contains the IP address to reach the cluster (== PublicIP of gateway)
-	CIDR      string `json:"cidr"`       // the network CIDR
+    NetworkID string `json:"network_id"` // contains the ID of the network
+    GatewayID string `json:"gateway_id"`
+    GatewayIP string `json:"gateway_ip"` // contains the private IP address of the gateway
+    PublicIP  string `json:"public_ip"`  // contains the IP address to reach the cluster (== PublicIP of gateway)
+    CIDR      string `json:"cidr"`       // the network CIDR
 }
 
 func newNetwork() *Network {
-	return &Network{}
+    return &Network{}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (n *Network) Content() data.Clonable {
-	return n
+    return n
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (n *Network) Clone() data.Clonable {
-	return newNetwork().Replace(n)
+    return newNetwork().Replace(n)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (n *Network) Replace(p data.Clonable) data.Clonable {
-	*n = *p.(*Network)
-	return n
+    *n = *p.(*Network)
+    return n
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", property.NetworkV1, &Network{})
+    serialize.PropertyTypeRegistry.Register("clusters", property.NetworkV1, &Network{})
 }

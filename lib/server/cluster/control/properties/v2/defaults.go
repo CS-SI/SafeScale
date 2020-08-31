@@ -17,10 +17,10 @@
 package propertiesv2
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Defaults stores default information about cluster
@@ -29,39 +29,39 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with updated/additional fields
 type Defaults struct {
-	// GatewaySizing keeps the default node sizing
-	GatewaySizing resources.SizingRequirements `json:"gateway_sizing"`
-	// MasterSizing keeps the default node sizing
-	MasterSizing resources.SizingRequirements `json:"master_sizing"`
-	// NodeSizing keeps the default node sizing
-	NodeSizing resources.SizingRequirements `json:"node_sizing"`
-	// Image keeps the default Linux image to use
-	Image string `json:"image"`
+    // GatewaySizing keeps the default node sizing
+    GatewaySizing resources.SizingRequirements `json:"gateway_sizing"`
+    // MasterSizing keeps the default node sizing
+    MasterSizing resources.SizingRequirements `json:"master_sizing"`
+    // NodeSizing keeps the default node sizing
+    NodeSizing resources.SizingRequirements `json:"node_sizing"`
+    // Image keeps the default Linux image to use
+    Image string `json:"image"`
 }
 
 func newDefaults() *Defaults {
-	return &Defaults{}
+    return &Defaults{}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (d *Defaults) Content() data.Clonable {
-	return d
+    return d
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (d *Defaults) Clone() data.Clonable {
-	return newDefaults().Replace(d)
+    return newDefaults().Replace(d)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (d *Defaults) Replace(p data.Clonable) data.Clonable {
-	*d = *p.(*Defaults)
-	return d
+    *d = *p.(*Defaults)
+    return d
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("clusters", property.DefaultsV2, &Defaults{})
+    serialize.PropertyTypeRegistry.Register("clusters", property.DefaultsV2, &Defaults{})
 }

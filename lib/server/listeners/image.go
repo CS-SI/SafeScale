@@ -17,17 +17,18 @@
 package listeners
 
 import (
-	"context"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+    "context"
 
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/sirupsen/logrus"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
+
+    pb "github.com/CS-SI/SafeScale/lib"
+    "github.com/CS-SI/SafeScale/lib/server/handlers"
+    srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ImageHandler ...
@@ -40,36 +41,36 @@ type ImageListener struct{}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *pb.ImageList, err error) {
-	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
-	}
+    if s == nil {
+        return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+    }
 
-	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+    tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+    defer tracer.OnExitTrace()()
+    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "List Images"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	}
+    ctx, cancelFunc := context.WithCancel(ctx)
+    if err := srvutils.JobRegister(ctx, cancelFunc, "List Images"); err == nil {
+        defer srvutils.JobDeregister(ctx)
+    }
 
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		logrus.Info("Can't list images: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot list images: no tenant set")
-	}
+    tenant := GetCurrentTenant()
+    if tenant == nil {
+        logrus.Info("Can't list images: no tenant set")
+        return nil, status.Errorf(codes.FailedPrecondition, "cannot list images: no tenant set")
+    }
 
-	handler := ImageHandler(currentTenant.Service)
-	images, err := handler.List(ctx, in.GetAll())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, getUserMessage(err))
-	}
+    handler := ImageHandler(currentTenant.Service)
+    images, err := handler.List(ctx, in.GetAll())
+    if err != nil {
+        return nil, status.Errorf(codes.Internal, getUserMessage(err))
+    }
 
-	// Map resources.Image to pb.Image
-	var pbImages []*pb.Image
-	for _, image := range images {
-		pbImages = append(pbImages, srvutils.ToPBImage(&image))
-	}
-	rv := &pb.ImageList{Images: pbImages}
-	return rv, nil
+    // Map resources.Image to pb.Image
+    var pbImages []*pb.Image
+    for _, image := range images {
+        pbImages = append(pbImages, srvutils.ToPBImage(&image))
+    }
+    rv := &pb.ImageList{Images: pbImages}
+    return rv, nil
 }

@@ -1,53 +1,53 @@
 package install
 
 import (
-	log "github.com/sirupsen/logrus"
+    log "github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
-	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
+    "github.com/CS-SI/SafeScale/lib/server/install/enums/action"
+    "github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 // dcosInstaller is an installer using script to add and remove a feature
 type dcosInstaller struct{}
 
 func (i *dcosInstaller) GetName() string {
-	return "dcos"
+    return "dcos"
 }
 
 // Check checks if the feature is installed
 func (i *dcosInstaller) Check(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	worker, err := newWorker(c, t, method.DCOS, action.Check, nil)
-	if err != nil {
-		return nil, err
-	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		log.Println(err.Error())
-		return nil, err
-	}
+    worker, err := newWorker(c, t, method.DCOS, action.Check, nil)
+    if err != nil {
+        return nil, err
+    }
+    err = worker.CanProceed(s)
+    if err != nil {
+        log.Println(err.Error())
+        return nil, err
+    }
 
-	// Replaces variables in normalized script
-	v["options"] = ""
+    // Replaces variables in normalized script
+    v["options"] = ""
 
-	return worker.Proceed(v, s)
+    return worker.Proceed(v, s)
 }
 
 // Add installs the feature in a DCOS cluster
 func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Results, error) {
-	worker, err := newWorker(c, t, method.DCOS, action.Add, nil)
-	if err != nil {
-		return nil, err
-	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		log.Println(err.Error())
-		return nil, err
-	}
+    worker, err := newWorker(c, t, method.DCOS, action.Add, nil)
+    if err != nil {
+        return nil, err
+    }
+    err = worker.CanProceed(s)
+    if err != nil {
+        log.Println(err.Error())
+        return nil, err
+    }
 
-	// Replaces variables in normalized script
-	v["options"] = ""
+    // Replaces variables in normalized script
+    v["options"] = ""
 
-	return worker.Proceed(v, s)
+    return worker.Proceed(v, s)
 }
 
 // Remove uninstalls the feature using the RemoveScript script
@@ -58,23 +58,23 @@ func (i *dcosInstaller) Add(c *Feature, t Target, v Variables, s Settings) (Resu
 //   of failures on what parts
 func (i *dcosInstaller) Remove(c *Feature, t Target, v Variables, s Settings) (Results, error) {
 
-	worker, err := newWorker(c, t, method.DCOS, action.Remove, nil)
-	if err != nil {
-		return nil, err
-	}
-	err = worker.CanProceed(s)
-	if err != nil {
-		log.Println(err.Error())
-		return nil, err
-	}
+    worker, err := newWorker(c, t, method.DCOS, action.Remove, nil)
+    if err != nil {
+        return nil, err
+    }
+    err = worker.CanProceed(s)
+    if err != nil {
+        log.Println(err.Error())
+        return nil, err
+    }
 
-	// Replaces variables in normalized script
-	v["options"] = ""
+    // Replaces variables in normalized script
+    v["options"] = ""
 
-	return worker.Proceed(v, s)
+    return worker.Proceed(v, s)
 }
 
 // NewDcosInstaller creates a new instance of Installer using DCOS
 func NewDcosInstaller() Installer {
-	return &dcosInstaller{}
+    return &dcosInstaller{}
 }

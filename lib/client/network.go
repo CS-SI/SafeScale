@@ -17,143 +17,145 @@
 package client
 
 import (
-	"strings"
-	"sync"
-	"time"
+    "strings"
+    "sync"
+    "time"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    pb "github.com/CS-SI/SafeScale/lib"
+    "github.com/CS-SI/SafeScale/lib/server/utils"
+    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // network is the part of safescale client handling Network
 type network struct {
-	// session is not used currently
-	session *Session
+    // session is not used currently
+    session *Session
 }
 
 // List ...
 func (n *network) List(all bool, timeout time.Duration) (*pb.NetworkList, error) {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := pb.NewNetworkServiceClient(n.session.connection)
+    ctx, err := utils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.List(ctx, &pb.NetworkListRequest{
-		All: all,
-	})
+    return service.List(
+        ctx, &pb.NetworkListRequest{
+            All: all,
+        },
+    )
 }
 
 // Delete deletes several networks at the same time in goroutines
 func (n *network) Delete(names []string, timeout time.Duration) error {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
-	}
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := pb.NewNetworkServiceClient(n.session.connection)
+    ctx, err := utils.GetContext(true)
+    if err != nil {
+        return err
+    }
 
-	var (
-		mutex sync.Mutex
-		wg    sync.WaitGroup
-		errs  []string
-	)
+    var (
+        mutex sync.Mutex
+        wg    sync.WaitGroup
+        errs  []string
+    )
 
-	networkDeleter := func(aname string) {
-		defer wg.Done()
-		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
+    networkDeleter := func(aname string) {
+        defer wg.Done()
+        _, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
-		if err != nil {
-			mutex.Lock()
-			defer mutex.Unlock()
-			errs = append(errs, err.Error())
-		}
-	}
+        if err != nil {
+            mutex.Lock()
+            defer mutex.Unlock()
+            errs = append(errs, err.Error())
+        }
+    }
 
-	wg.Add(len(names))
-	for _, target := range names {
-		go networkDeleter(target)
-	}
-	wg.Wait()
+    wg.Add(len(names))
+    for _, target := range names {
+        go networkDeleter(target)
+    }
+    wg.Wait()
 
-	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
-	}
-	return nil
+    if len(errs) > 0 {
+        return clitools.ExitOnRPC(strings.Join(errs, ", "))
+    }
+    return nil
 }
 
 // Delete deletes several networks at the same time in goroutines
 func (n *network) Destroy(names []string, timeout time.Duration) error {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return err
-	}
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := pb.NewNetworkServiceClient(n.session.connection)
+    ctx, err := utils.GetContext(true)
+    if err != nil {
+        return err
+    }
 
-	var (
-		mutex sync.Mutex
-		wg    sync.WaitGroup
-		errs  []string
-	)
+    var (
+        mutex sync.Mutex
+        wg    sync.WaitGroup
+        errs  []string
+    )
 
-	networkDeleter := func(aname string) {
-		defer wg.Done()
-		_, err := service.Destroy(ctx, &pb.Reference{Name: aname})
+    networkDeleter := func(aname string) {
+        defer wg.Done()
+        _, err := service.Destroy(ctx, &pb.Reference{Name: aname})
 
-		if err != nil {
-			mutex.Lock()
-			defer mutex.Unlock()
-			errs = append(errs, err.Error())
-		}
-	}
+        if err != nil {
+            mutex.Lock()
+            defer mutex.Unlock()
+            errs = append(errs, err.Error())
+        }
+    }
 
-	wg.Add(len(names))
-	for _, target := range names {
-		go networkDeleter(target)
-	}
-	wg.Wait()
+    wg.Add(len(names))
+    for _, target := range names {
+        go networkDeleter(target)
+    }
+    wg.Wait()
 
-	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
-	}
-	return nil
+    if len(errs) > 0 {
+        return clitools.ExitOnRPC(strings.Join(errs, ", "))
+    }
+    return nil
 }
 
 // Inspect ...
 func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, error) {
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := pb.NewNetworkServiceClient(n.session.connection)
+    ctx, err := utils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.Inspect(ctx, &pb.Reference{Name: name})
+    return service.Inspect(ctx, &pb.Reference{Name: name})
 
 }
 
 // Create ...
 func (n *network) Create(def *pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
-	if def == nil {
-		return nil, scerr.InvalidParameterError("def", "cannot be nil")
-	}
+    if def == nil {
+        return nil, scerr.InvalidParameterError("def", "cannot be nil")
+    }
 
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
-	ctx, err := utils.GetContext(true)
-	if err != nil {
-		return nil, err
-	}
+    n.session.Connect()
+    defer n.session.Disconnect()
+    service := pb.NewNetworkServiceClient(n.session.connection)
+    ctx, err := utils.GetContext(true)
+    if err != nil {
+        return nil, err
+    }
 
-	return service.Create(ctx, def)
+    return service.Create(ctx, def)
 
 }

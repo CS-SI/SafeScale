@@ -17,71 +17,75 @@
 package main
 
 import (
-	"fmt"
-	"runtime"
+    "fmt"
+    "runtime"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+    "github.com/CS-SI/SafeScale/lib/utils/scerr"
 
-	"github.com/sirupsen/logrus"
+    "github.com/sirupsen/logrus"
 
-	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/cluster"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/control"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
-	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+    pb "github.com/CS-SI/SafeScale/lib"
+    "github.com/CS-SI/SafeScale/lib/server/cluster"
+    "github.com/CS-SI/SafeScale/lib/server/cluster/control"
+    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
+    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
 // Run runs the deployment
 func Run() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+    runtime.GOMAXPROCS(runtime.NumCPU())
 
-	clusterName := "test-cluster"
-	instance, err := cluster.Load(concurrency.RootTask(), clusterName)
+    clusterName := "test-cluster"
+    instance, err := cluster.Load(concurrency.RootTask(), clusterName)
 
-	if _, ok := err.(scerr.ErrNotFound); ok {
-		logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
-		cinstance, cerr := cluster.Create(concurrency.RootTask(), control.Request{
-			Name:       clusterName,
-			Complexity: complexity.Small,
-			// Complexity: complexity.Normal,
-			// Complexity: complexity.Large,
-			CIDR:   "192.168.0.0/28",
-			Flavor: flavor.DCOS,
-		})
-		if cerr != nil {
-			fmt.Printf("failed to create cluster: %s\n", cerr.Error())
-			return
-		}
-		instance = cinstance
-	} else if err != nil {
-		fmt.Printf("failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
-		return
-	}
+    if _, ok := err.(scerr.ErrNotFound); ok {
+        logrus.Warnf("Cluster '%s' not found, creating it (this will take a while)\n", clusterName)
+        cinstance, cerr := cluster.Create(
+            concurrency.RootTask(), control.Request{
+                Name:       clusterName,
+                Complexity: complexity.Small,
+                // Complexity: complexity.Normal,
+                // Complexity: complexity.Large,
+                CIDR:   "192.168.0.0/28",
+                Flavor: flavor.DCOS,
+            },
+        )
+        if cerr != nil {
+            fmt.Printf("failed to create cluster: %s\n", cerr.Error())
+            return
+        }
+        instance = cinstance
+    } else if err != nil {
+        fmt.Printf("failed to load cluster '%s' parameters: %s\n", clusterName, err.Error())
+        return
+    }
 
-	state, err := instance.GetState(concurrency.RootTask())
-	if err != nil {
-		fmt.Println("failed to get cluster state.")
-		return
-	}
-	fmt.Printf("Cluster state: %s\n", state.String())
+    state, err := instance.GetState(concurrency.RootTask())
+    if err != nil {
+        fmt.Println("failed to get cluster state.")
+        return
+    }
+    fmt.Printf("Cluster state: %s\n", state.String())
 
-	// Creates a Private Agent Node
-	_, err = instance.AddNode(concurrency.RootTask(), &pb.HostDefinition{
-		Sizing: &pb.HostSizing{
-			MinCpuCount: 2,
-			MaxCpuCount: 4,
-			MinRamSize:  7.0,
-			MaxRamSize:  16.0,
-			MinDiskSize: 60,
-		},
-	})
-	if err != nil {
-		fmt.Printf("failed to create Private Agent Node: %s\n", err.Error())
-		return
-	}
+    // Creates a Private Agent Node
+    _, err = instance.AddNode(
+        concurrency.RootTask(), &pb.HostDefinition{
+            Sizing: &pb.HostSizing{
+                MinCpuCount: 2,
+                MaxCpuCount: 4,
+                MinRamSize:  7.0,
+                MaxRamSize:  16.0,
+                MinDiskSize: 60,
+            },
+        },
+    )
+    if err != nil {
+        fmt.Printf("failed to create Private Agent Node: %s\n", err.Error())
+        return
+    }
 }
 
 func main() {
-	Run()
+    Run()
 }

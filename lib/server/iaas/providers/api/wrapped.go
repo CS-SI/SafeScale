@@ -2,6 +2,6 @@ package api
 
 // WrappedProvider ...
 type WrappedProvider struct {
-	InnerProvider Provider
-	Name          string
+    InnerProvider Provider
+    Name          string
 }

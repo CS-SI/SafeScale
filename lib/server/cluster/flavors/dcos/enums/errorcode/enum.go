@@ -17,117 +17,117 @@
 package errorcode
 
 import (
-	"fmt"
-	"strings"
+    "fmt"
+    "strings"
 )
 
 type Enum int
 
 const (
-	_ Enum = iota
+    _ Enum = iota
 
-	DcosInstallDownload
-	DcosInstallExecution
-	DcosConfigGeneratorDownload
-	DcosGenerateConfig
-	DcosCliDownload
-	DockerNginxDownload
-	DockerNginxStart
-	DockerProxyBuild
-	DockerProxyStart
-	DockerGuacamoleBuild
-	DockerPyInstall
-	DockerInstall
-	DockerComposeDownload
-	DockerComposeConfig
-	DockerComposeExecution
-	DesktopInstall
-	DesktopStart
-	DesktopTimeout
-	GuacamoleImageDownload
-	KubectlDownload
-	SystemUpdate
-	ToolsInstall
-	PipInstall
+    DcosInstallDownload
+    DcosInstallExecution
+    DcosConfigGeneratorDownload
+    DcosGenerateConfig
+    DcosCliDownload
+    DockerNginxDownload
+    DockerNginxStart
+    DockerProxyBuild
+    DockerProxyStart
+    DockerGuacamoleBuild
+    DockerPyInstall
+    DockerInstall
+    DockerComposeDownload
+    DockerComposeConfig
+    DockerComposeExecution
+    DesktopInstall
+    DesktopStart
+    DesktopTimeout
+    GuacamoleImageDownload
+    KubectlDownload
+    SystemUpdate
+    ToolsInstall
+    PipInstall
 
-	// NextErrorCode is the next error code usable
-	NextErrorCode
+    // NextErrorCode is the next error code usable
+    NextErrorCode
 )
 
 var (
-	StringMap = map[string]Enum{
-		"DcosInstallDownload":         DcosInstallDownload,
-		"DcosInstallExecution":        DcosInstallExecution,
-		"DcosConfigGeneratorDownload": DcosConfigGeneratorDownload,
-		"DcosGenerateConfig":          DcosGenerateConfig,
-		"DcosCliDownload":             DcosCliDownload,
-		"DockerNginxDownload":         DockerNginxDownload,
-		"DockerNginxStart":            DockerNginxStart,
-		"DockerProxyBuild":            DockerProxyBuild,
-		"DockerProxyStart":            DockerProxyStart,
-		"DockerGuacamoleBuild":        DockerGuacamoleBuild,
-		"DockerPyInstall":             DockerPyInstall,
-		"DockerInstall":               DockerInstall,
-		"DockerComposeDownload":       DockerComposeDownload,
-		"DockerComposeConfig":         DockerComposeConfig,
-		"DockerComposeExecution":      DockerComposeExecution,
-		"DesktopInstall":              DesktopInstall,
-		"DesktopStart":                DesktopStart,
-		"DesktopTimeout":              DesktopTimeout,
-		"GuacamoleImageDownload":      GuacamoleImageDownload,
-		"KubectlDownload":             KubectlDownload,
-		"SystemUpdate":                SystemUpdate,
-		"ToolsInstall":                ToolsInstall,
-		"PipInstall":                  PipInstall,
-	}
+    StringMap = map[string]Enum{
+        "DcosInstallDownload":         DcosInstallDownload,
+        "DcosInstallExecution":        DcosInstallExecution,
+        "DcosConfigGeneratorDownload": DcosConfigGeneratorDownload,
+        "DcosGenerateConfig":          DcosGenerateConfig,
+        "DcosCliDownload":             DcosCliDownload,
+        "DockerNginxDownload":         DockerNginxDownload,
+        "DockerNginxStart":            DockerNginxStart,
+        "DockerProxyBuild":            DockerProxyBuild,
+        "DockerProxyStart":            DockerProxyStart,
+        "DockerGuacamoleBuild":        DockerGuacamoleBuild,
+        "DockerPyInstall":             DockerPyInstall,
+        "DockerInstall":               DockerInstall,
+        "DockerComposeDownload":       DockerComposeDownload,
+        "DockerComposeConfig":         DockerComposeConfig,
+        "DockerComposeExecution":      DockerComposeExecution,
+        "DesktopInstall":              DesktopInstall,
+        "DesktopStart":                DesktopStart,
+        "DesktopTimeout":              DesktopTimeout,
+        "GuacamoleImageDownload":      GuacamoleImageDownload,
+        "KubectlDownload":             KubectlDownload,
+        "SystemUpdate":                SystemUpdate,
+        "ToolsInstall":                ToolsInstall,
+        "PipInstall":                  PipInstall,
+    }
 
-	enumMap = map[Enum]string{
-		DcosInstallDownload:         "DcosInstallDownload",
-		DcosInstallExecution:        "DcosInstallExecution",
-		DcosConfigGeneratorDownload: "DcosConfigGeneratorDownload",
-		DcosGenerateConfig:          "DcosGenerateConfig",
-		DcosCliDownload:             "DcosCliDownload",
-		DockerNginxDownload:         "DockerNginxDownload",
-		DockerNginxStart:            "DockerNginxStart",
-		DockerProxyBuild:            "DockerProxyBuild",
-		DockerProxyStart:            "DockerProxyStart",
-		DockerGuacamoleBuild:        "DockerGuacamoleBuild",
-		DockerPyInstall:             "DockerPyInstall",
-		DockerInstall:               "DockerInstall",
-		DockerComposeDownload:       "DockerComposeDownload",
-		DockerComposeConfig:         "DockerComposeConfig",
-		DockerComposeExecution:      "DockerComposeExecution",
-		DesktopInstall:              "DesktopInstall",
-		DesktopStart:                "DesktopStart",
-		DesktopTimeout:              "DesktopTimeout",
-		GuacamoleImageDownload:      "GuacamoleImageDownload",
-		KubectlDownload:             "KubectlDownload",
-		SystemUpdate:                "SystemUpdate",
-		ToolsInstall:                "ToolsInstall",
-		PipInstall:                  "PipInstall",
-	}
+    enumMap = map[Enum]string{
+        DcosInstallDownload:         "DcosInstallDownload",
+        DcosInstallExecution:        "DcosInstallExecution",
+        DcosConfigGeneratorDownload: "DcosConfigGeneratorDownload",
+        DcosGenerateConfig:          "DcosGenerateConfig",
+        DcosCliDownload:             "DcosCliDownload",
+        DockerNginxDownload:         "DockerNginxDownload",
+        DockerNginxStart:            "DockerNginxStart",
+        DockerProxyBuild:            "DockerProxyBuild",
+        DockerProxyStart:            "DockerProxyStart",
+        DockerGuacamoleBuild:        "DockerGuacamoleBuild",
+        DockerPyInstall:             "DockerPyInstall",
+        DockerInstall:               "DockerInstall",
+        DockerComposeDownload:       "DockerComposeDownload",
+        DockerComposeConfig:         "DockerComposeConfig",
+        DockerComposeExecution:      "DockerComposeExecution",
+        DesktopInstall:              "DesktopInstall",
+        DesktopStart:                "DesktopStart",
+        DesktopTimeout:              "DesktopTimeout",
+        GuacamoleImageDownload:      "GuacamoleImageDownload",
+        KubectlDownload:             "KubectlDownload",
+        SystemUpdate:                "SystemUpdate",
+        ToolsInstall:                "ToolsInstall",
+        PipInstall:                  "PipInstall",
+    }
 )
 
 // Parse returns a Enum corresponding to the string parameter
 // If the string doesn't correspond to any Enum, returns an error (nil otherwise)
 // This function is intended to be used to parse user input.
 func Parse(v string) (Enum, error) {
-	var (
-		e  Enum
-		ok bool
-	)
-	lowered := strings.ToLower(v)
-	if e, ok = StringMap[lowered]; !ok {
-		return e, fmt.Errorf("failed to find a Flavor matching with '%s'", v)
-	}
-	return e, nil
+    var (
+        e  Enum
+        ok bool
+    )
+    lowered := strings.ToLower(v)
+    if e, ok = StringMap[lowered]; !ok {
+        return e, fmt.Errorf("failed to find a Flavor matching with '%s'", v)
+    }
+    return e, nil
 
 }
 
 // String returns a string representation of an Enum
 func (e Enum) String() string {
-	if str, found := enumMap[e]; found {
-		return str
-	}
-	panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
+    if str, found := enumMap[e]; found {
+        return str
+    }
+    panic(fmt.Sprintf("failed to find a string matching with Flavor '%d'!", e))
 }
