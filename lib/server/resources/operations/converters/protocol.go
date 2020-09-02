@@ -126,7 +126,7 @@ func NFSExportOptionsFromProtocolToString(in *protocol.NFSExportOptions) string 
 }
 
 // ClusterRequestFromProtocolToAbstract ...
-func ClusterRequestFromProtocolToAbstract(in protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, xerr fail.Error) {
+func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ abstract.ClusterRequest, xerr fail.Error) {
     nullCR := abstract.ClusterRequest{}
 
     var (

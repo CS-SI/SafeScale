@@ -942,11 +942,13 @@ func (c *cluster) Bootstrap(task concurrency.Task) (xerr fail.Error) {
 
 // Browse walks through cluster folder and executes a callback for each entry
 func (c *cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error {
-    if c.IsNull() {
+    // c cannot be nil but can be Null value
+    // this means we can call Browse() on a new (as returned by NewCluster()) instance without first loading it
+    if c == nil {
         return fail.InvalidInstanceError()
     }
     if task.IsNull() {
-        return fail.InvalidParameterError("task", "cannot be nil")
+        return fail.InvalidParameterError("task", "cannot be null")
     }
     if callback == nil {
         return fail.InvalidParameterError("callback", "cannot be nil")
