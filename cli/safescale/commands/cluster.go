@@ -127,23 +127,23 @@ var clusterListCommand = &cli.Command{
     },
 }
 
-// formatClusterConfig...
-func formatClusterConfig(value interface{}, detailed bool) map[string]interface{} {
-    core, _ := value.(map[string]interface{}) // FIXME Unnoticed panic
-
-    delete(core, "keypair")
+// formatClusterConfig removes unneeded entry from config
+func formatClusterConfig(config map[string]interface{}, detailed bool) map[string]interface{} {
+    delete(config, "keypair")
     if !detailed {
-        delete(core, "admin_login")
-        delete(core, "admin_password")
-        delete(core, "defaults")
-        delete(core, "features")
-        delete(core, "default_route_ip")
-        delete(core, "primary_gateway_ip")
-        delete(core, "secondary_gateway_ip")
-        delete(core, "network_id")
-        delete(core, "nodes")
+        delete(config, "admin_login")
+        delete(config, "admin_password")
+        delete(config, "defaults")
+        delete(config, "features")
+        delete(config, "default_route_ip")
+        delete(config, "primary_gateway_ip")
+        delete(config, "secondary_gateway_ip")
+        delete(config, "network_id")
+        delete(config, "nodes")
+        delete(config, "ssh_private_key")
+        delete(config, "last_state")
     }
-    return core
+    return config
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
@@ -197,9 +197,9 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
     result := map[string]interface{}{
         "name":             c.GetIdentity().GetName(),
         "flavor":           c.GetIdentity().GetFlavor(),
-        "flavor_label":     c.GetIdentity().GetFlavor().String(),
+        "flavor_label":     clusterflavor.Enum(c.GetIdentity().GetFlavor()).String(),
         "complexity":       c.GetIdentity().GetComplexity(),
-        "complexity_label": c.GetIdentity().GetComplexity().String(),
+        "complexity_label": clustercomplexity.Enum(c.GetIdentity().GetComplexity()).String(),
         "admin_login":      "cladm",
         "admin_password":   c.GetIdentity().GetAdminPassword(),
         // "keypair":        c.GetIdentity().GetSshConfig().GetPrivateKey(),
@@ -260,22 +260,32 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 
     // Add information not directly in cluster GetConfig()
     // TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-    disabled := result["features"].(map[string]interface{})["disabled"].(map[string]string)
-    if _, ok := disabled["remotedesktop"]; !ok {
-        remoteDesktops := map[string][]string{}
-        urlFmt := "https://%s/_platform/remotedesktop/%s/"
-        for _, v := range result["nodes"].(map[string]interface{})["masters"].(map[string]interface{}) {
-            urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.(string))}
-            if sgwpubip != "" {
-                // VPL: no public VIP IP yet, so don't repeat primary gateway public IP
-                // urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
-                urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.(string)))
+    found := false
+    if c.DisabledFeatures != nil && len(c.DisabledFeatures.Features) > 0 {
+        for _, v := range c.DisabledFeatures.Features {
+            if v.Name == "remotedesktop" {
+                found = true
+                break
             }
-            remoteDesktops[v.(string)] = urls
         }
-        result["remote_desktop"] = remoteDesktops
-    } else {
-        result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.", clusterName)
+        if !found {
+            remoteDesktops := map[string][]string{}
+            const urlFmt = "https://%s/_platform/remotedesktop/%s/"
+            for _, v := range nodes["masters"] {
+                urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.Name)}
+                if sgwpubip != "" {
+                    // VPL: no public VIP IP yet, so don't repeat primary gateway public IP
+                    // urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
+                    urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.Name))
+                }
+                remoteDesktops[v.Name] = urls
+            }
+            result["remote_desktop"] = remoteDesktops
+        }
+    }
+    if found {
+        result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.",
+                    clusterName)
     }
 
     return result, nil

@@ -106,7 +106,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
         return nil, xerr
     }
 
-    req, xerr := converters.ClusterRequestFromProtocolToAbstract(*in)
+    req, xerr := converters.ClusterRequestFromProtocolToAbstract(in)
     if xerr != nil {
         return nil, xerr
     }

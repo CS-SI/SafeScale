@@ -129,7 +129,8 @@ func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 
 // Deserialize reads json code and reinstantiates an Host
 func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
-    if i.IsNull() {
+    // i cannot be nil, but can be null value (which will be filled by this method)
+    if i == nil {
         return fail.InvalidInstanceError()
     }
 

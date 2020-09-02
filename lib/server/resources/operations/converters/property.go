@@ -73,13 +73,16 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 // 	return out
 // }
 
-func ClusterControlplaneFromPropertyToProtocol(in  propertiesv1.ClusterControlplane) *protocol.ClusterControlplane {
-    out := protocol.ClusterControlplane{
-        Vip: VirtualIPFromAbstractToProtocol(*in.VirtualIP),
+// ClusterControlplaneFromPropertyToProtocol does what the name says
+func ClusterControlplaneFromPropertyToProtocol(in propertiesv1.ClusterControlplane) *protocol.ClusterControlplane {
+    out := protocol.ClusterControlplane{}
+    if in.VirtualIP != nil {
+        out.Vip = VirtualIPFromAbstractToProtocol(*in.VirtualIP)
     }
     return &out
 }
 
+// ClusterCompositeFromPropertyTo Protocol does what the name says
 func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *protocol.ClusterComposite {
     out := protocol.ClusterComposite{}
     out.Tenants = make([]string, len(in.Tenants))
