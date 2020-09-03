@@ -167,7 +167,6 @@ feature:
                             else
                                 cat > /etc/docker/daemon.json <<-EOF
                             {
-                                "iptables": false,
                                 "exec-opts": [
                                     "native.cgroupdriver=${DRIVER}"
                                 ],
