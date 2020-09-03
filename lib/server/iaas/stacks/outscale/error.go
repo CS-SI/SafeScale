@@ -37,6 +37,8 @@ func normalizeError(err error) fail.Error {
             switch model.Errors[0].Code {
             case "1":
                 return fail.NotAuthenticatedError("user is not authenticated")
+            case "4019":
+                return fail.InvalidRequestError("invalid device name")
             case "4045":
                 return fail.InvalidRequestError("invalid CIDR")
             case "5057":
