@@ -2,10 +2,7 @@ package outscale
 
 import (
     "fmt"
-
     "github.com/antihax/optional"
-
-    "github.com/outscale-dev/osc-sdk-go/osc"
 
     "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
     "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
@@ -13,6 +10,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/retry"
     "github.com/CS-SI/SafeScale/lib/utils/scerr"
     "github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/outscale-dev/osc-sdk-go/osc"
 )
 
 // CreateVolume creates a block volume
@@ -42,11 +40,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volu
         SubregionName: s.Options.Compute.Subregion,
         VolumeType:    s.volumeType(request.Speed),
     }
-    res, _, err := s.client.VolumeApi.CreateVolume(
-        s.auth, &osc.CreateVolumeOpts{
-            CreateVolumeRequest: optional.NewInterface(createVolumeRequest),
-        },
-    )
+    res, _, err := s.client.VolumeApi.CreateVolume(s.auth, &osc.CreateVolumeOpts{
+        CreateVolumeRequest: optional.NewInterface(createVolumeRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -66,11 +62,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volu
         }
     }()
 
-    err = s.setResourceTags(
-        res.Volume.VolumeId, map[string]string{
-            "name": request.Name,
-        },
-    )
+    err = s.setResourceTags(res.Volume.VolumeId, map[string]string{
+        "name": request.Name,
+    })
     if err != nil {
         return nil, err
     }
@@ -127,18 +121,16 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
     if s == nil {
         return scerr.InvalidInstanceError()
     }
-    err := retry.WhileUnsuccessfulDelay5SecondsTimeout(
-        func() error {
-            vol, err := s.GetVolume(volumeID)
-            if err != nil {
-                return scerr.Errorf("", err)
-            }
-            if vol.State != state {
-                return scerr.Errorf("wrong state", nil)
-            }
-            return nil
-        }, temporal.GetHostTimeout(),
-    )
+    err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
+        vol, err := s.GetVolume(volumeID)
+        if err != nil {
+            return scerr.Errorf("", err)
+        }
+        if vol.State != state {
+            return scerr.Errorf("wrong state", nil)
+        }
+        return nil
+    }, temporal.GetHostTimeout())
     return err
 }
 
@@ -155,11 +147,9 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
             VolumeIds: []string{id},
         },
     }
-    res, _, err := s.client.VolumeApi.ReadVolumes(
-        s.auth, &osc.ReadVolumesOpts{
-            ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-        },
-    )
+    res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+        ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -195,11 +185,9 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
             SubregionNames: []string{subregion},
         },
     }
-    res, _, err := s.client.VolumeApi.ReadVolumes(
-        s.auth, &osc.ReadVolumesOpts{
-            ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-        },
-    )
+    res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+        ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -231,11 +219,9 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
             SubregionNames: []string{subregion},
         },
     }
-    res, _, err := s.client.VolumeApi.ReadVolumes(
-        s.auth, &osc.ReadVolumesOpts{
-            ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-        },
-    )
+    res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+        ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -264,11 +250,9 @@ func (s *Stack) DeleteVolume(id string) error {
     deleteVolumeRequest := osc.DeleteVolumeRequest{
         VolumeId: id,
     }
-    _, _, err := s.client.VolumeApi.DeleteVolume(
-        s.auth, &osc.DeleteVolumeOpts{
-            DeleteVolumeRequest: optional.NewInterface(deleteVolumeRequest),
-        },
-    )
+    _, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &osc.DeleteVolumeOpts{
+        DeleteVolumeRequest: optional.NewInterface(deleteVolumeRequest),
+    })
     return normalizeError(err)
 }
 
@@ -323,11 +307,9 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
         VmId:       request.HostID,
         VolumeId:   request.VolumeID,
     }
-    _, _, err = s.client.VolumeApi.LinkVolume(
-        s.auth, &osc.LinkVolumeOpts{
-            LinkVolumeRequest: optional.NewInterface(linkVolumeRequest),
-        },
-    )
+    _, _, err = s.client.VolumeApi.LinkVolume(s.auth, &osc.LinkVolumeOpts{
+        LinkVolumeRequest: optional.NewInterface(linkVolumeRequest),
+    })
     if err != nil {
         return "", normalizeError(err)
     }
@@ -350,11 +332,9 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
             VolumeIds: []string{id},
         },
     }
-    res, _, err := s.client.VolumeApi.ReadVolumes(
-        s.auth, &osc.ReadVolumesOpts{
-            ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-        },
-    )
+    res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
+        ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -419,11 +399,9 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
     unlinkVolumeRequest := osc.UnlinkVolumeRequest{
         VolumeId: id,
     }
-    _, _, err := s.client.VolumeApi.UnlinkVolume(
-        s.auth, &osc.UnlinkVolumeOpts{
-            UnlinkVolumeRequest: optional.NewInterface(unlinkVolumeRequest),
-        },
-    )
+    _, _, err := s.client.VolumeApi.UnlinkVolume(s.auth, &osc.UnlinkVolumeOpts{
+        UnlinkVolumeRequest: optional.NewInterface(unlinkVolumeRequest),
+    })
     if err != nil {
         return normalizeError(err)
     }

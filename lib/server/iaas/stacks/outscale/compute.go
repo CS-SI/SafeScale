@@ -28,8 +28,6 @@ import (
     "github.com/antihax/optional"
     "github.com/sirupsen/logrus"
 
-    "github.com/outscale-dev/osc-sdk-go/osc"
-
     "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
     "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
     "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
@@ -40,6 +38,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/retry"
     "github.com/CS-SI/SafeScale/lib/utils/scerr"
     "github.com/CS-SI/SafeScale/lib/utils/temporal"
+    "github.com/outscale-dev/osc-sdk-go/osc"
 )
 
 func normalizeImageName(name string) string {
@@ -73,15 +72,13 @@ func (s *Stack) ListImages(bool) ([]resources.Image, error) {
     }
     var images []resources.Image
     for _, omi := range res.Images {
-        images = append(
-            images, resources.Image{
-                Description: omi.Description,
-                ID:          omi.ImageId,
-                Name:        normalizeImageName(omi.ImageName),
-                URL:         omi.FileLocation,
-                StorageType: omi.RootDeviceType,
-            },
-        )
+        images = append(images, resources.Image{
+            Description: omi.Description,
+            ID:          omi.ImageId,
+            Name:        normalizeImageName(omi.ImageName),
+            URL:         omi.FileLocation,
+            StorageType: omi.RootDeviceType,
+        })
     }
     return images, nil
 }
@@ -112,11 +109,9 @@ func (s *Stack) cpuFreq(perf int) float32 {
 }
 
 func parseSizing(s string) (cpus, ram, perf int, err error) {
-    tokens := strings.FieldsFunc(
-        s, func(r rune) bool {
-            return r == 'c' || r == 'r' || r == 'p' || r == 'g'
-        },
-    )
+    tokens := strings.FieldsFunc(s, func(r rune) bool {
+        return r == 'c' || r == 'r' || r == 'p' || r == 'g'
+    })
 
     if len(tokens) < 2 {
         return 0, 0, 0, scerr.InconsistentError("error parsing sizing string")
@@ -143,11 +138,9 @@ func parseSizing(s string) (cpus, ram, perf int, err error) {
 }
 
 func parseGPU(s string) (gpus int, gpuType string, err error) {
-    tokens := strings.FieldsFunc(
-        s, func(r rune) bool {
-            return r == 'g' || r == 't'
-        },
-    )
+    tokens := strings.FieldsFunc(s, func(r rune) bool {
+        return r == 'g' || r == 't'
+    })
     if len(tokens) < 2 {
         err = scerr.InvalidParameterError("id", "malformed id")
         return
@@ -210,18 +203,16 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
                     break
                 }
                 name := gpuTemplateName(0, cpu, ram, perf, 0, "")
-                templates = append(
-                    templates, resources.HostTemplate{
-                        DiskSize: 0,
-                        Name:     name,
-                        Cores:    cpu,
-                        RAMSize:  float32(ram),
-                        ID:       name,
+                templates = append(templates, resources.HostTemplate{
+                    DiskSize: 0,
+                    Name:     name,
+                    Cores:    cpu,
+                    RAMSize:  float32(ram),
+                    ID:       name,
 
-                        CPUFreq:   s.cpuFreq(perf),
-                        GPUNumber: 0,
-                    },
-                )
+                    CPUFreq:   s.cpuFreq(perf),
+                    GPUNumber: 0,
+                })
             }
 
         }
@@ -240,18 +231,16 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
                     }
                     //
                     name := gpuTemplateName(3, cpu, ram, perf, gpu, "nvidia-k2")
-                    templates = append(
-                        templates, resources.HostTemplate{
-                            DiskSize:  0,
-                            Name:      name,
-                            Cores:     cpu,
-                            RAMSize:   float32(ram),
-                            CPUFreq:   s.cpuFreq(perf),
-                            ID:        name,
-                            GPUNumber: gpu,
-                            GPUType:   "nvidia-k2",
-                        },
-                    )
+                    templates = append(templates, resources.HostTemplate{
+                        DiskSize:  0,
+                        Name:      name,
+                        Cores:     cpu,
+                        RAMSize:   float32(ram),
+                        CPUFreq:   s.cpuFreq(perf),
+                        ID:        name,
+                        GPUNumber: gpu,
+                        GPUType:   "nvidia-k2",
+                    })
                 }
 
             }
@@ -270,18 +259,16 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
                     }
                     //
                     name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p6")
-                    templates = append(
-                        templates, resources.HostTemplate{
-                            DiskSize:  0,
-                            Name:      name,
-                            Cores:     cpu,
-                            RAMSize:   float32(ram),
-                            CPUFreq:   s.cpuFreq(perf),
-                            ID:        name,
-                            GPUNumber: gpu,
-                            GPUType:   "nvidia-p6",
-                        },
-                    )
+                    templates = append(templates, resources.HostTemplate{
+                        DiskSize:  0,
+                        Name:      name,
+                        Cores:     cpu,
+                        RAMSize:   float32(ram),
+                        CPUFreq:   s.cpuFreq(perf),
+                        ID:        name,
+                        GPUNumber: gpu,
+                        GPUType:   "nvidia-p6",
+                    })
                 }
             }
         }
@@ -299,18 +286,16 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
                     }
                     //
                     name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p100")
-                    templates = append(
-                        templates, resources.HostTemplate{
-                            DiskSize:  0,
-                            Name:      name,
-                            Cores:     cpu,
-                            RAMSize:   float32(ram),
-                            CPUFreq:   s.cpuFreq(perf),
-                            ID:        name,
-                            GPUNumber: gpu,
-                            GPUType:   "nvidia-p100",
-                        },
-                    )
+                    templates = append(templates, resources.HostTemplate{
+                        DiskSize:  0,
+                        Name:      name,
+                        Cores:     cpu,
+                        RAMSize:   float32(ram),
+                        CPUFreq:   s.cpuFreq(perf),
+                        ID:        name,
+                        GPUNumber: gpu,
+                        GPUType:   "nvidia-p100",
+                    })
                 }
             }
         }
@@ -334,18 +319,14 @@ func (s *Stack) GetImage(id string) (_ *resources.Image, err error) {
         }
     }()
 
-    res, _, err := s.client.ImageApi.ReadImages(
-        s.auth, &osc.ReadImagesOpts{
-            ReadImagesRequest: optional.NewInterface(
-                osc.ReadImagesRequest{
-                    DryRun: false,
-                    Filters: osc.FiltersImage{
-                        ImageIds: []string{id},
-                    },
-                },
-            ),
-        },
-    )
+    res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
+        ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
+            DryRun: false,
+            Filters: osc.FiltersImage{
+                ImageIds: []string{id},
+            },
+        }),
+    })
     if err != nil {
         return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get image '%s'", id))
     }
@@ -430,11 +411,9 @@ func (s *Stack) createNIC(request *resources.HostRequest, net *resources.Network
         SubnetId:         net.ID,
         SecurityGroupIds: []string{group.SecurityGroupId},
     }
-    res, _, err := s.client.NicApi.CreateNic(
-        s.auth, &osc.CreateNicOpts{
-            CreateNicRequest: optional.NewInterface(nicRequest),
-        },
-    )
+    res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
+        CreateNicRequest: optional.NewInterface(nicRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -483,11 +462,9 @@ func (s *Stack) deleteNic(nic *osc.Nic) error {
     request := osc.DeleteNicRequest{
         NicId: nic.NicId,
     }
-    _, _, err := s.client.NicApi.DeleteNic(
-        s.auth, &osc.DeleteNicOpts{
-            DeleteNicRequest: optional.NewInterface(request),
-        },
-    )
+    _, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
+        DeleteNicRequest: optional.NewInterface(request),
+    })
     return normalizeError(err)
 }
 
@@ -529,21 +506,19 @@ func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
     if s == nil {
         return scerr.InvalidInstanceError()
     }
-    err := retry.WhileUnsuccessfulDelay5SecondsTimeout(
-        func() error {
-            hostState, err := s.hostState(hostID)
-            if err != nil {
-                return scerr.Errorf("", err)
-            }
-            if state != hostState {
-                return scerr.Errorf("wrong state", nil)
-            }
-            if state == hoststate.ERROR {
-                return scerr.AbortedError("host in error state", err)
-            }
-            return nil
-        }, temporal.GetHostCreationTimeout(),
-    )
+    err := retry.WhileUnsuccessfulDelay5SecondsTimeout(func() error {
+        hostState, err := s.hostState(hostID)
+        if err != nil {
+            return scerr.Errorf("", err)
+        }
+        if state != hostState {
+            return scerr.Errorf("wrong state", nil)
+        }
+        if state == hoststate.ERROR {
+            return scerr.AbortedError("host in error state", err)
+        }
+        return nil
+    }, temporal.GetHostCreationTimeout())
     return err
 }
 
@@ -570,11 +545,9 @@ func (s *Stack) addNICS(request *resources.HostRequest, vmID string) ([]osc.Nic,
                 NicId:        nic.NicId,
                 DeviceNumber: int32(i + 1),
             }
-            _, _, err := s.client.NicApi.LinkNic(
-                s.auth, &osc.LinkNicOpts{
-                    LinkNicRequest: optional.NewInterface(nicRequest),
-                },
-            )
+            _, _, err := s.client.NicApi.LinkNic(s.auth, &osc.LinkNicOpts{
+                LinkNicRequest: optional.NewInterface(nicRequest),
+            })
             if err != nil {
                 logrus.Errorf("Error attaching NIC %s to VM %s: %v", nic.NicId, vmID, err)
                 return nil, err
@@ -599,34 +572,26 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
     var flexibleGpus []osc.FlexibleGpu
     var createErr error
     for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
-        resCreate, _, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(
-            s.auth, &osc.CreateFlexibleGpuOpts{
-                CreateFlexibleGpuRequest: optional.NewInterface(
-                    osc.CreateFlexibleGpuRequest{
-                        DeleteOnVmDeletion: true,
-                        Generation:         "",
-                        ModelName:          tpl.GPUType,
-                        SubregionName:      s.Options.Compute.Subregion,
-                    },
-                ),
-            },
-        )
+        resCreate, _, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
+            CreateFlexibleGpuRequest: optional.NewInterface(osc.CreateFlexibleGpuRequest{
+                DeleteOnVmDeletion: true,
+                Generation:         "",
+                ModelName:          tpl.GPUType,
+                SubregionName:      s.Options.Compute.Subregion,
+            }),
+        })
         if err != nil {
             createErr = err
             break
         }
         flexibleGpus = append(flexibleGpus, resCreate.FlexibleGpu)
-        _, _, err = s.client.FlexibleGpuApi.LinkFlexibleGpu(
-            s.auth, &osc.LinkFlexibleGpuOpts{
-                LinkFlexibleGpuRequest: optional.NewInterface(
-                    osc.LinkFlexibleGpuRequest{
-                        DryRun:        false,
-                        FlexibleGpuId: resCreate.FlexibleGpu.FlexibleGpuId,
-                        VmId:          vmID,
-                    },
-                ),
-            },
-        )
+        _, _, err = s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &osc.LinkFlexibleGpuOpts{
+            LinkFlexibleGpuRequest: optional.NewInterface(osc.LinkFlexibleGpuRequest{
+                DryRun:        false,
+                FlexibleGpuId: resCreate.FlexibleGpu.FlexibleGpuId,
+                VmId:          vmID,
+            }),
+        })
         if err != nil {
             createErr = normalizeError(err)
             break
@@ -634,16 +599,12 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
     }
     if createErr != nil {
         for _, gpu := range flexibleGpus {
-            _, _, _ = s.client.FlexibleGpuApi.DeleteFlexibleGpu(
-                s.auth, &osc.DeleteFlexibleGpuOpts{
-                    DeleteFlexibleGpuRequest: optional.NewInterface(
-                        osc.DeleteFlexibleGpuRequest{
-                            DryRun:        false,
-                            FlexibleGpuId: gpu.FlexibleGpuId,
-                        },
-                    ),
-                },
-            )
+            _, _, _ = s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &osc.DeleteFlexibleGpuOpts{
+                DeleteFlexibleGpuRequest: optional.NewInterface(osc.DeleteFlexibleGpuRequest{
+                    DryRun:        false,
+                    FlexibleGpuId: gpu.FlexibleGpuId,
+                }),
+            })
         }
     }
     return createErr
@@ -653,13 +614,11 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) (err erro
     if request.DiskSize == 0 {
         return nil
     }
-    v, err := s.CreateVolume(
-        resources.VolumeRequest{
-            Name:  fmt.Sprintf("vol-%s", request.HostName),
-            Size:  request.DiskSize,
-            Speed: s.Options.Compute.DefaultVolumeSpeed,
-        },
-    )
+    v, err := s.CreateVolume(resources.VolumeRequest{
+        Name:  fmt.Sprintf("vol-%s", request.HostName),
+        Size:  request.DiskSize,
+        Speed: s.Options.Compute.DefaultVolumeSpeed,
+    })
     if err != nil {
         return normalizeError(err)
     }
@@ -675,20 +634,16 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) (err erro
         }
     }()
 
-    err = s.setResourceTags(
-        v.ID, map[string]string{
-            "DeleteWithVM": "true",
-        },
-    )
+    err = s.setResourceTags(v.ID, map[string]string{
+        "DeleteWithVM": "true",
+    })
     if err != nil {
         return err
     }
-    _, err = s.CreateVolumeAttachment(
-        resources.VolumeAttachmentRequest{
-            HostID:   vmID,
-            VolumeID: v.ID,
-        },
-    )
+    _, err = s.CreateVolumeAttachment(resources.VolumeAttachmentRequest{
+        HostID:   vmID,
+        VolumeID: v.ID,
+    })
     if err != nil {
         return err
     }
@@ -718,20 +673,16 @@ func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, error) {
         NicId:      nic.NicId,
         PublicIpId: resIP.PublicIp.PublicIpId,
     }
-    _, _, err = s.client.PublicIpApi.LinkPublicIp(
-        s.auth, &osc.LinkPublicIpOpts{
-            LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest),
-        },
+    _, _, err = s.client.PublicIpApi.LinkPublicIp(s.auth, &osc.LinkPublicIpOpts{
+        LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest)},
     )
     if err != nil {
         deletePublicIpRequest := osc.DeletePublicIpRequest{
             PublicIpId: resIP.PublicIp.PublicIpId,
         }
-        _, _, err := s.client.PublicIpApi.DeletePublicIp(
-            s.auth, &osc.DeletePublicIpOpts{
-                DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-            },
-        )
+        _, _, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+            DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
+        })
         if err != nil {
             logrus.Warnf("Cannot delete public ip %s: %v", resIP.PublicIp.PublicIpId, normalizeError(err))
             return nil, normalizeError(err)
@@ -742,78 +693,72 @@ func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, error) {
 
 func (s *Stack) setHostProperties(host *resources.Host, networks []*resources.Network, vm *osc.Vm, nics []osc.Nic) error {
     // Updates Host Property propsv1.HostDescription
-    err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
-        func(clonable data.Clonable) error {
-            hpDescriptionV1 := clonable.(*propertiesv1.HostDescription)
-            hpDescriptionV1.Created = time.Now()
-            hpDescriptionV1.Updated = time.Now()
-            return nil
-        },
-    )
+    err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(func(clonable data.Clonable) error {
+        hpDescriptionV1 := clonable.(*propertiesv1.HostDescription)
+        hpDescriptionV1.Created = time.Now()
+        hpDescriptionV1.Updated = time.Now()
+        return nil
+    })
     if err != nil {
         return err
     }
 
     // Updates Host Property propsv1.HostSizing
-    err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
-        func(clonable data.Clonable) error {
-            hpSizingV1 := clonable.(*propertiesv1.HostSizing)
-            vmType, err := s.GetTemplate(vm.VmType)
-            if err != nil {
-                return err
+    err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+        hpSizingV1 := clonable.(*propertiesv1.HostSizing)
+        vmType, err := s.GetTemplate(vm.VmType)
+        if err != nil {
+            return err
+        }
+        if hpSizingV1.AllocatedSize == nil {
+            hpSizingV1.AllocatedSize = &propertiesv1.HostSize{
+                Cores:     vmType.Cores,
+                CPUFreq:   vmType.CPUFreq,
+                DiskSize:  vmType.DiskSize,
+                GPUNumber: vmType.GPUNumber,
+                GPUType:   vmType.GPUType,
+                RAMSize:   vmType.RAMSize,
             }
-            if hpSizingV1.AllocatedSize == nil {
-                hpSizingV1.AllocatedSize = &propertiesv1.HostSize{
-                    Cores:     vmType.Cores,
-                    CPUFreq:   vmType.CPUFreq,
-                    DiskSize:  vmType.DiskSize,
-                    GPUNumber: vmType.GPUNumber,
-                    GPUType:   vmType.GPUType,
-                    RAMSize:   vmType.RAMSize,
-                }
-            }
-            return nil
-        },
-    )
+        }
+        return nil
+    })
     if err != nil {
         return err
     }
 
     // Updates Host Property propsv1.HostNetwork
-    return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(
-        func(clonable data.Clonable) error {
-            hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-            hostNetworkV1.PublicIPv4 = vm.PublicIp
-            // networks contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
-            // indexed on network ID. Tries to convert if possible, if we already have correspondance
-            // between network ID and network Name in Host definition
-            networksByID := map[string]string{}
-            networksByName := map[string]string{}
-            ipv4Addresses := map[string]string{}
-            ipv6Addresses := map[string]string{}
-            for i, net := range networks {
-                nic := nics[i]
-                networksByID[net.ID] = net.Name
-                networksByName[net.Name] = net.ID
-                ipv4Addresses[net.ID] = func() string {
-                    for _, addr := range nic.PrivateIps {
-                        if addr.IsPrimary {
-                            return addr.PrivateIp
-                        }
+    return host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+        hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+        hostNetworkV1.PublicIPv4 = vm.PublicIp
+        // networks contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
+        // indexed on network ID. Tries to convert if possible, if we already have correspondance
+        // between network ID and network Name in Host definition
+        networksByID := map[string]string{}
+        networksByName := map[string]string{}
+        ipv4Addresses := map[string]string{}
+        ipv6Addresses := map[string]string{}
+        for i, net := range networks {
+            nic := nics[i]
+            networksByID[net.ID] = net.Name
+            networksByName[net.Name] = net.ID
+            ipv4Addresses[net.ID] = func() string {
+                for _, addr := range nic.PrivateIps {
+                    if addr.IsPrimary {
+                        return addr.PrivateIp
                     }
-                    return ""
-                }()
-            }
+                }
+                return ""
+            }()
+        }
 
-            hostNetworkV1.NetworksByID = networksByID
-            hostNetworkV1.NetworksByName = networksByName
-            // IPvxAddresses are here indexed by names... At least we have them...
-            hostNetworkV1.IPv4Addresses = ipv4Addresses
-            hostNetworkV1.IPv6Addresses = ipv6Addresses
+        hostNetworkV1.NetworksByID = networksByID
+        hostNetworkV1.NetworksByName = networksByName
+        // IPvxAddresses are here indexed by names... At least we have them...
+        hostNetworkV1.IPv4Addresses = ipv4Addresses
+        hostNetworkV1.IPv6Addresses = ipv6Addresses
 
-            return nil
-        },
-    )
+        return nil
+    })
 }
 
 func (s *Stack) initHostProperties(request *resources.HostRequest, host *resources.Host) error {
@@ -841,42 +786,38 @@ func (s *Stack) initHostProperties(request *resources.HostRequest, host *resourc
     host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
     host.Password = request.Password
 
-    err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(
-        func(clonable data.Clonable) error {
-            hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-            hostNetworkV1.DefaultNetworkID = func() string {
-                if defaultNet == nil {
-                    return ""
-                }
-                return defaultNet.ID
-            }()
-            hostNetworkV1.DefaultGatewayID = defaultGatewayID
-            hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
-            hostNetworkV1.IsGateway = isGateway
-            return nil
-        },
-    )
+    err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
+        hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
+        hostNetworkV1.DefaultNetworkID = func() string {
+            if defaultNet == nil {
+                return ""
+            }
+            return defaultNet.ID
+        }()
+        hostNetworkV1.DefaultGatewayID = defaultGatewayID
+        hostNetworkV1.DefaultGatewayPrivateIP = request.DefaultRouteIP
+        hostNetworkV1.IsGateway = isGateway
+        return nil
+    })
     if err != nil {
         return err
     }
 
     // Adds Host property SizingV1
-    return host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
-        func(clonable data.Clonable) error {
-            hostSizingV1 := clonable.(*propertiesv1.HostSizing)
-            // Note: from there, no idea what was the RequestedSize; caller will have to complement this information
-            hostSizingV1.Template = request.TemplateID
-            hostSizingV1.AllocatedSize = &propertiesv1.HostSize{
-                Cores:     template.Cores,
-                CPUFreq:   template.CPUFreq,
-                RAMSize:   template.RAMSize,
-                DiskSize:  template.DiskSize,
-                GPUNumber: template.GPUNumber,
-                GPUType:   template.GPUType,
-            }
-            return nil
-        },
-    )
+    return host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
+        hostSizingV1 := clonable.(*propertiesv1.HostSizing)
+        // Note: from there, no idea what was the RequestedSize; caller will have to complement this information
+        hostSizingV1.Template = request.TemplateID
+        hostSizingV1.AllocatedSize = &propertiesv1.HostSize{
+            Cores:     template.Cores,
+            CPUFreq:   template.CPUFreq,
+            RAMSize:   template.RAMSize,
+            DiskSize:  template.DiskSize,
+            GPUNumber: template.GPUNumber,
+            GPUType:   template.GPUType,
+        }
+        return nil
+    })
 }
 
 func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, error) {
@@ -904,19 +845,17 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
     }
     userData := userdata.NewContent()
     if request.DefaultGateway == nil && !request.PublicIP {
-        return nil, userData, resources.ResourceInvalidRequestError(
-            "host creation", "cannot create a host without public IP or without attached network",
-        )
+        return nil, userData, resources.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
     }
 
-    // keyPair, err := s.getOrCreateKeypair(request)
-    // if err != nil {
+    //keyPair, err := s.getOrCreateKeypair(request)
+    //if err != nil {
     //	return nil, userData, err
-    // }
-    // defer func() {
+    //}
+    //defer func() {
     //	_ = s.DeleteKeyPair(keyPair.ID)
-    // }()
-    // request.KeyPair = keyPair
+    //}()
+    //request.KeyPair = keyPair
     password, err := s.getOrCreatePassword(request)
     request.Password = password
     if err != nil {
@@ -952,7 +891,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
     buf.WriteString(patchSSH)
 
     // Import keypair to create host
-    creationKeyPair, err := resources.NewKeyPair(request.ResourceName + "_install")
+    creationKeyPair, err := resources.NewKeyPair(request.ResourceName+"_install")
     if err != nil {
         return nil, nil, err
     }
@@ -978,11 +917,21 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
         },
         KeypairName: creationKeyPair.Name,
     }
-    resVM, _, err := s.client.VmApi.CreateVms(
-        s.auth, &osc.CreateVmsOpts{
-            CreateVmsRequest: optional.NewInterface(vmsRequest),
-        },
-    )
+    if request.DiskSize > 0 {
+        vmsRequest.BlockDeviceMappings = []osc.BlockDeviceMappingVmCreation{
+            {
+                Bsu: osc.BsuToCreate{
+                    DeleteOnVmDeletion: true,
+                    VolumeSize: int32(request.DiskSize),
+                    VolumeType: s.volumeType(s.Options.Compute.DefaultVolumeSpeed),
+                },
+                DeviceName: "vda",
+            },
+        }
+    }
+    resVM, _, err := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
+        CreateVmsRequest: optional.NewInterface(vmsRequest),
+    })
     if err != nil {
         return nil, userData, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to create host '%s'", request.ResourceName))
     }
@@ -1042,11 +991,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
     if err != nil {
         return nil, userData, err
     }
-    err = s.setResourceTags(
-        vm.VmId, map[string]string{
-            "name": request.ResourceName,
-        },
-    )
+    err = s.setResourceTags(vm.VmId, map[string]string{
+        "name": request.ResourceName,
+    })
     if err != nil {
         return nil, userData, err
     }
@@ -1093,11 +1040,9 @@ func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
             VmIds: []string{vmID},
         },
     }
-    vm, _, err := s.client.VmApi.ReadVms(
-        s.auth, &osc.ReadVmsOpts{
-            ReadVmsRequest: optional.NewInterface(readVmsRequest),
-        },
-    )
+    vm, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
+        ReadVmsRequest: optional.NewInterface(readVmsRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -1114,11 +1059,9 @@ func (s *Stack) deleteHost(id string) error {
     request := osc.DeleteVmsRequest{
         VmIds: []string{id},
     }
-    _, _, err := s.client.VmApi.DeleteVms(
-        s.auth, &osc.DeleteVmsOpts{
-            DeleteVmsRequest: optional.NewInterface(request),
-        },
-    )
+    _, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
+        DeleteVmsRequest: optional.NewInterface(request),
+    })
     if err != nil {
         return normalizeError(err)
     }
@@ -1136,11 +1079,9 @@ func (s *Stack) DeleteHost(id string) error {
     readPublicIpsRequest := osc.ReadPublicIpsRequest{
         Filters: osc.FiltersPublicIp{VmIds: []string{id}},
     }
-    res, _, err := s.client.PublicIpApi.ReadPublicIps(
-        s.auth, &osc.ReadPublicIpsOpts{
-            ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
-        },
-    )
+    res, _, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
+        ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
+    })
     if err != nil {
         logrus.Errorf("Unable to read public IPs of vm %s", id)
     }
@@ -1160,11 +1101,9 @@ func (s *Stack) DeleteHost(id string) error {
         deletePublicIpRequest := osc.DeletePublicIpRequest{
             PublicIpId: ip.PublicIpId,
         }
-        _, _, err = s.client.PublicIpApi.DeletePublicIp(
-            s.auth, &osc.DeletePublicIpOpts{
-                DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-            },
-        )
+        _, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+            DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
+        })
         if err != nil { // continue to delete even if error
             lastErr = nil
             logrus.Errorf("Unable to delete public IP %s of vm %s", ip.PublicIpId, id)
@@ -1249,18 +1188,14 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
     if s == nil {
         return nil, scerr.InvalidInstanceError()
     }
-    res, _, err := s.client.VmApi.ReadVms(
-        s.auth, &osc.ReadVmsOpts{
-            ReadVmsRequest: optional.NewInterface(
-                osc.ReadVmsRequest{
-                    DryRun: false,
-                    Filters: osc.FiltersVm{
-                        Tags: []string{fmt.Sprintf("name=%s", name)},
-                    },
-                },
-            ),
-        },
-    )
+    res, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
+        ReadVmsRequest: optional.NewInterface(osc.ReadVmsRequest{
+            DryRun: false,
+            Filters: osc.FiltersVm{
+                Tags: []string{fmt.Sprintf("name=%s", name)},
+            },
+        }),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
@@ -1331,11 +1266,9 @@ func (s *Stack) StopHost(id string) error {
         VmIds:     []string{id},
         ForceStop: true,
     }
-    _, _, err := s.client.VmApi.StopVms(
-        s.auth, &osc.StopVmsOpts{
-            StopVmsRequest: optional.NewInterface(stopVmsRequest),
-        },
-    )
+    _, _, err := s.client.VmApi.StopVms(s.auth, &osc.StopVmsOpts{
+        StopVmsRequest: optional.NewInterface(stopVmsRequest),
+    })
     return normalizeError(err)
 }
 
@@ -1350,11 +1283,9 @@ func (s *Stack) StartHost(id string) error {
     startVmsRequest := osc.StartVmsRequest{
         VmIds: []string{id},
     }
-    _, _, err := s.client.VmApi.StartVms(
-        s.auth, &osc.StartVmsOpts{
-            StartVmsRequest: optional.NewInterface(startVmsRequest),
-        },
-    )
+    _, _, err := s.client.VmApi.StartVms(s.auth, &osc.StartVmsOpts{
+        StartVmsRequest: optional.NewInterface(startVmsRequest),
+    })
     return normalizeError(err)
 }
 
@@ -1369,11 +1300,9 @@ func (s *Stack) RebootHost(id string) error {
     rebootVmsRequest := osc.RebootVmsRequest{
         VmIds: []string{id},
     }
-    _, _, err := s.client.VmApi.RebootVms(
-        s.auth, &osc.RebootVmsOpts{
-            RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
-        },
-    )
+    _, _, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
+        RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
+    })
     return normalizeError(err)
 }
 
@@ -1406,11 +1335,9 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
         VmType: t,
         // VmType: request.,
     }
-    _, _, err := s.client.VmApi.UpdateVm(
-        s.auth, &osc.UpdateVmOpts{
-            UpdateVmRequest: optional.NewInterface(updateVmRequest),
-        },
-    )
+    _, _, err := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
+        UpdateVmRequest: optional.NewInterface(updateVmRequest),
+    })
     if err != nil {
         return nil, normalizeError(err)
     }
