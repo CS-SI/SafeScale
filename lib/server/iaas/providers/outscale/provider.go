@@ -74,13 +74,13 @@ func getList(m map[string]interface{}, key string) []string {
 }
 
 func volumeSpeed(s string) volumespeed.Enum {
-    if s == "COLD" {
-        return volumespeed.COLD
-    }
-    if s == "COLD" {
-        return volumespeed.SSD
-    }
-    return volumespeed.HDD
+	if s == "COLD" {
+		return volumespeed.COLD
+	}
+	if s == "SSD" {
+		return volumespeed.SSD
+	}
+	return volumespeed.HDD
 
 }
 
