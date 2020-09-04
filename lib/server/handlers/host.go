@@ -1031,7 +1031,8 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 }
 
 // Inspect returns the host identified by ref, ref can be the name or the id
-// If not found, returns (nil, nil)
+// If not found, returns (nil, *fail.ErrNotFound)
+// On any other error, returns (host, error)
 func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
     tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
     defer tracer.OnExitTrace()()
@@ -1059,7 +1060,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
         0,
     )
     if err != nil {
-        return nil, err
+        return host, err
     }
     if host == nil {
         return nil, fmt.Errorf("failure inspecting host [%s]", ref)
