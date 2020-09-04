@@ -479,6 +479,12 @@ func (handler *NetworkHandler) Create(
     primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.GetPrivateIP()
     primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.GetPublicIP()
     if failover {
+        keepalivedPassword, err := utils.GeneratePassword(16)
+        if err != nil {
+            return nil, fmt.Errorf("error creating network: failed to generate keepalived password: %v", err)
+        }
+        primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
         primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.GetPrivateIP()
         primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.GetPublicIP()
 
@@ -490,6 +496,7 @@ func (handler *NetworkHandler) Create(
         secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
         secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
         secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
+        secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
     }
 
     // Starts gateway(s) installation
