@@ -90,9 +90,10 @@ type Content struct {
     // UsesVIP tells if VIP feature is activated
     UsesVIP bool
     // PrivateVIP contains the private IP of the VIP instance if it exists
-    PublicVIP string // VPL: change to EndpointIP
+    PublicVIP string // VPL: TODO: change to EndpointIP
     // PrivateVIP contains the private IP of the VIP instance if it exists
-    PrivateVIP string // VPL: change to DefaultRouteIP
+    PrivateVIP string // VPL: TODO: change to DefaultRouteIP
+    GatewayHAKeepalivedPassword string
 
     ProviderName     string
     BuildSubnetworks bool
