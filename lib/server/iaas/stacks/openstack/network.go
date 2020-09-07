@@ -737,11 +737,16 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, f
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
 
+    asg, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+    if xerr != nil {
+        return nil, xerr
+    }
+
     var port *ports.Port
-    xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+    xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
         func() (innerErr error) {
             asu := true
-            sg := []string{s.SecurityGroup.ID}
+            sg := []string{asg.ID}
             options := ports.CreateOpts{
                 NetworkID:      networkID,
                 AdminStateUp:   &asu,

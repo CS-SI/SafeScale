@@ -741,3 +741,65 @@ service FeatureService {
     rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
     rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}
 }
+
+// SecurityGroup services
+
+enum SecurityGroupRuleDirection {
+    SGRD_UNKNOWN = 0;
+    SGRD_INGRESS = 1;
+    SGRD_EGRESS = 2;
+}
+
+enum SecurityGroupRuleAction {
+    SGRA_UNKNOWN = 0;
+    SGRA_ALLOW = 1;
+    SGRA_DENY = 2;
+}
+
+enum SecurityGroupRuleEtherType {
+    SGRET_UNKNOWN = 0;
+    SGRET_IPV4 = 4;
+    SGRET_IPV6 = 6;
+}
+
+message SecurityGroupRule {
+    string id = 1;
+    string description = 2;
+    SecurityGroupRuleEtherType ether_type = 3;
+    SecurityGroupRuleDirection direction = 4;
+    string protocol = 5;
+    uint32 port_from = 6;
+    uint32 port_to = 7;
+    string cidr = 8;
+    SecurityGroupRuleAction action = 9;
+}
+
+message SecurityGroupRuleRequest {
+    Reference group = 1;
+    SecurityGroupRule rule = 2;
+}
+
+message SecurityGroupRequest {
+    string name = 1;
+    repeated SecurityGroupRule rules = 2;
+}
+
+message SecurityGroupResponse {
+    string id = 1;
+    string name = 2;
+    SecurityGroupRule rules = 3;
+}
+
+message SecurityGroupListResponse {
+    repeated SecurityGroupResponse list = 1;
+}
+
+service SecurityGroupService {
+    rpc List(google.protobuf.Empty) returns (SecurityGroupListResponse){}
+    rpc Create(SecurityGroupRequest) returns (google.protobuf.Empty){}
+    rpc Inspect(Reference) returns (SecurityGroupResponse){}
+    rpc AddRule(SecurityGroupRuleRequest) returns (google.protobuf.Empty){}
+    rpc ChangeRule(SecurityGroupRuleRequest) returns (google.protobuf.Empty){}
+    rpc RemoveRule(SecurityGroupRuleRequest) returns (google.protobuf.Empty){}
+    rpc Sanitize(SecurityGroupRequest) returns (google.protobuf.Empty){}
+}

@@ -14,36 +14,15 @@
  * limitations under the License.
  */
 
-package ipversion
-
-import (
-    "net"
-    "strings"
-)
+package securitygroupruleaction
 
 //go:generate stringer -type=Enum
 
-// Enum is an enum defining IP versions
-type Enum int
+// Enum represents the action of a SecurityGroup rule (allow or deny access)
+type Enum uint8
 
 const (
-    Unknown = iota
-    // IPv4 is IP v4 version
-    IPv4 Enum = 4
-    // IPv6 is IP v6 version
-    IPv6 Enum = 6
+    UNKNOWN Enum = iota
+    ALLOW // to allow access when rule match
+    DENY  // to deny access when rule match
 )
-
-// Is checks the version of a IP address in string representation
-func (i Enum) Is(str string) bool {
-    ip := net.ParseIP(str)
-    isV6 := ip != nil && strings.Contains(str, ":")
-    switch i {
-    case IPv4:
-        return !isV6
-    case IPv6:
-        return isV6
-    default:
-        return false
-    }
-}

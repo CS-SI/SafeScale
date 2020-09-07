@@ -354,6 +354,11 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
         return nil, userData, xerr
     }
 
+    asg, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+    if xerr != nil {
+        return nil, userData, xerr
+    }
+
     // Defines boot disk
     bootdiskOpts := blockDevice{
         SourceType:          exbfv.SourceImage,
@@ -371,7 +376,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
     }
     srvOpts := serverCreateOpts{
         Name:             request.ResourceName,
-        SecurityGroups:   []string{s.SecurityGroup.Name},
+        SecurityGroups:   []string{asg.Name},
         Networks:         nets,
         FlavorRef:        request.TemplateID,
         UserData:         userDataPhase1,

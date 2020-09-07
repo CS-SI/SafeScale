@@ -45,10 +45,13 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []abstract.Image, err fail.Error) {
+func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     compuService := s.ComputeService
 
@@ -56,10 +59,15 @@ func (s *Stack) ListImages() (images []abstract.Image, err fail.Error) {
 
     families := []string{"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud", "suse-sap-cloud"}
 
+    var (
+        err error
+        resp *compute.ImageList
+    )
+
     for _, family := range families {
         token := ""
         for paginate := true; paginate; {
-            resp, err := compuService.Images.List(family).Filter("deprecated.replacement ne .*images.*").PageToken(token).Do()
+            resp, err = compuService.Images.List(family).Filter("deprecated.replacement ne .*images.*").PageToken(token).Do()
             if err != nil {
                 logrus.Warnf("Can't list public images for project %q", family)
                 break
@@ -74,20 +82,23 @@ func (s *Stack) ListImages() (images []abstract.Image, err fail.Error) {
     }
 
     if len(images) == 0 {
-        return images, err
+        return images, normalizeError(err)
     }
 
     return images, nil
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
+func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
     if id == "" {
         return nil, fail.InvalidParameterError("id", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     images, err := s.ListImages()
     if err != nil {
@@ -106,18 +117,26 @@ func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err fail.Error) {
+func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(all=%v)", all).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     compuService := s.ComputeService
 
     templates = []abstract.HostTemplate{}
 
+    var (
+        err error
+        resp *compute.MachineTypeList
+    )
+
     token := ""
     for paginate := true; paginate; {
-        resp, err := compuService.MachineTypes.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+        resp, err = compuService.MachineTypes.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
         if err != nil {
             logrus.Warnf("Can't list public types...: %s", err)
             break
@@ -141,14 +160,14 @@ func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err 
     }
 
     if len(templates) == 0 {
-        return templates, err
+        return templates, normalizeError(err)
     }
 
     return templates, nil
 }
 
 // GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+func (s *Stack) GetTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -156,9 +175,12 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
         return nil, fail.InvalidParameterError("id", "cannot be empty string")
     }
 
-    templates, err := s.ListTemplates(true)
-    if err != nil {
-        return nil, err
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
+
+    templates, xerr := s.ListTemplates(true)
+    if xerr != nil {
+        return nil, xerr
     }
 
     for _, template := range templates {
@@ -173,7 +195,7 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
+func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -181,26 +203,9 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
 
-    // privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-    // publicKey := privateKey.PublicKey
-    // pub, _ := ssh.NewPublicKey(&publicKey)
-    // pubBytes := ssh.MarshalAuthorizedKey(pub)
-    // pubKey := string(pubBytes)
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
-    // priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-    // priKeyPem := pem.EncodeToMemory(
-    // 	&pem.Block{
-    // 		Type:  "RSA PRIVATE KEY",
-    // 		Bytes: priBytes,
-    // 	},
-    // )
-    // priKey := string(priKeyPem)
-    // return &resources.KeyPair{
-    // 	ID:         name,
-    // 	Name:       name,
-    // 	PublicKey:  pubKey,
-    // 	PrivateKey: priKey,
-    // }, nil
     return abstract.NewKeyPair(name)
 }
 
@@ -227,6 +232,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
         return nullAhf, nullUd, fail.InvalidInstanceError()
     }
 
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
     defer fail.OnPanic(&xerr)
 
     resourceName := request.ResourceName
@@ -455,7 +462,7 @@ func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durat
         return nullAhc, xerr
     }
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.gcp"), "(%s)", hostRef).Entering()
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering()
     defer tracer.Exiting()
     defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -604,23 +611,25 @@ func buildGcpMachine(
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
+    hostNull := abstract.NewHostFull()
     if s == nil {
-        return nil, fail.InvalidInstanceError()
+        return hostNull, fail.InvalidInstanceError()
     }
-
-    castedErr := xerr.(error)
-    defer fail.OnPanic(&castedErr)
-
-    hostComplete := abstract.NewHostFull()
 
     ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
     if xerr != nil {
         return nil, xerr
     }
     if ahf.Core.ID == "" {
-        return nil, fail.InvalidParameterError("hostParam", "hostParam must be an ID as a string, or an *abstract.HostCore or an *abstract.HostFull")
+        return hostNull, fail.InvalidParameterError("hostParam", "hostParam must be an ID as a string, or an *abstract.HostCore or an *abstract.HostFull")
     }
 
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering()
+    defer tracer.Exiting()
+    defer fail.OnExitLogError(&xerr)
+    defer fail.OnPanic(&xerr)
+
+    hostComplete := abstract.NewHostFull()
     gcpHost, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostRef).Do()
     if err != nil {
         return nil, fail.ToError(err)
@@ -735,13 +744,16 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
+func (s *Stack) GetHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
     if name == "" {
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     hosts, xerr := s.ListHosts(false)
     if xerr != nil {
@@ -766,6 +778,9 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
     if xerr != nil {
         return xerr
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     service := s.ComputeService
     projectID := s.GcpConfig.ProjectID
@@ -822,6 +837,9 @@ func (s *Stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) 
         return nil, fail.InvalidInstanceError()
     }
 
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(detailed=%v)", detailed).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
+
     var hostList abstract.HostList
     compuService := s.ComputeService
     token := ""
@@ -862,10 +880,13 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
-    ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+    ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
     if xerr != nil {
         return xerr
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     service := s.ComputeService
 
@@ -889,10 +910,13 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
-    ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+    ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
     if xerr != nil {
         return xerr
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     service := s.ComputeService
 
@@ -916,10 +940,13 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
-    ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+    ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
     if xerr != nil {
         return xerr
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     service := s.ComputeService
 
@@ -972,11 +999,14 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
+func (s *Stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
     zones := make(map[string]bool)
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     resp, err := s.ComputeService.Zones.List(s.GcpConfig.ProjectID).Do()
     if err != nil {
@@ -990,10 +1020,13 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 }
 
 // ListRegions ...
-func (s *Stack) ListRegions() ([]string, fail.Error) {
+func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     var regions []string
 
@@ -1008,4 +1041,22 @@ func (s *Stack) ListRegions() ([]string, fail.Error) {
     }
 
     return regions, nil
+}
+
+// BindSecurityGroupToHost ...
+func (s Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) (xerr fail.Error) {
+    // TODO: validate parameters
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
+
+    return fail.NotImplementedError("not yet implemented")
+}
+
+// UnbindSecurityGroupFromHost ...
+func (s Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) (xerr fail.Error) {
+    // TODO: validate parameters
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
+
+    return fail.NotImplementedError("not yet implemented")
 }

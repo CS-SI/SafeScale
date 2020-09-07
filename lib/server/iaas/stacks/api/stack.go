@@ -53,6 +53,17 @@ type Stack interface {
     // DeleteKeyPair deletes the key pair identified by id
     DeleteKeyPair(id string) fail.Error
 
+    // CreateSecurityGroup creates a security group
+    CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+    // InspectSecurityGroup returns information about a security group
+    InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+    // ClearSecurityGroup removes rules from group
+    ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+    // DeleteSecurityGroup deletes a security group and all its rules
+    DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error
+    // AddRuleToSecurityGroup adds a rule to an existing security group
+    AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+
     // CreateNetwork creates a network named name
     CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error)
     // GetNetwork returns the network identified by id
@@ -97,11 +108,14 @@ type Stack interface {
     StartHost(stacks.HostParameter) fail.Error
     // RebootHost reboots a host
     RebootHost(stacks.HostParameter) fail.Error
-    // Resize host
+    // ResizeHost resizes an host
     ResizeHost(stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
-
     // WaitHostReady waits until host defined in hostParam is reachable by SSH
     WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
+    // BindSecurityGroupToHost attaches a security group to an host
+    BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error
+    // UnbindSecurityGroupFromHost detaches a security group from an host
+    UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error
 
     // CreateVolume creates a block volume
     CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error)

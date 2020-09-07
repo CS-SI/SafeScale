@@ -33,6 +33,7 @@ import (
 
     "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
     "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
     "github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
@@ -66,6 +67,8 @@ type Service interface {
 
     // --- from interface iaas.Providers ---
     providers.Provider
+
+    LookupRuleInSecurityGroup(*abstract.SecurityGroup, abstract.SecurityGroupRule) (bool, fail.Error)
 
     // --- from interface objectstorage.Location ---
     objectstorage.Location
@@ -798,4 +801,9 @@ func InitializeBucket(svc service, location objectstorage.Location) fail.Error {
         return err
     }
     return nil
+}
+
+// LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
+func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) { // Make sure the group rules are up to date
+    return stacks.LookupRuleInSecurityGroup(asg, rule)
 }

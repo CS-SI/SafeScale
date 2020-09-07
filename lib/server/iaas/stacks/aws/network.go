@@ -27,6 +27,8 @@ import (
     "github.com/aws/aws-sdk-go/service/ec2"
 
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     // "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -65,7 +67,8 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
         return nil, fail.InvalidInstanceError()
     }
 
-    logrus.Warnf("CreateNetwork invocation")
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     var theVpc *ec2.Vpc
 
@@ -363,13 +366,16 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 }
 
 // GetNetwork ...
-func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
+func (s *Stack) GetNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
     if id == "" {
         return nil, fail.InvalidParameterError("id", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     nets, xerr := s.ListNetworks()
     if xerr != nil {
@@ -386,13 +392,16 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
+func (s *Stack) GetNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
     if name == "" {
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s')", name).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     nets, xerr := s.ListNetworks()
     if xerr != nil {
@@ -409,7 +418,14 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 }
 
 // ListNetworks ...
-func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
+func (s *Stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
+    if s == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
+
     out, err := s.EC2Service.DescribeVpcs(&ec2.DescribeVpcsInput{})
     if err != nil {
         return nil, normalizeError(err)
@@ -454,7 +470,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 }
 
 // DeleteNetwork ...
-func (s *Stack) DeleteNetwork(id string) fail.Error {
+func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
     if s == nil {
         return fail.InvalidInstanceError()
     }
@@ -462,7 +478,8 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
         return fail.InvalidParameterError("id", "cannot be empty string")
     }
 
-    logrus.Warnf("Beginning deletion of network: %s", id)
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     vpcnet, xerr := s.GetNetwork(id)
     if xerr != nil {

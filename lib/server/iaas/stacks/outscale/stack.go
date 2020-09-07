@@ -96,6 +96,13 @@ type Stack struct {
     VolumeSpeedsMap      map[string]volumespeed.Enum
     configurationOptions *stacks.ConfigurationOptions
     deviceNames          []string
+
+    // DefaultSecurityGroupName is the name of the default security groups
+    DefaultSecurityGroupName string
+    // DefaultSecurityGroupDescription contains a description for the default security groups
+    DefaultSecurityGroupDescription string
+    // SecurityGroup is an instance of the default security group
+    //SecurityGroup     *secgroups.SecGroup
 }
 
 // New creates a new Stack
@@ -127,6 +134,7 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
             2: 2.5,
             3: 2.0,
         },
+        DefaultSecurityGroupName: "default",
         deviceNames: deviceNames(),
         configurationOptions: &stacks.ConfigurationOptions{
             ProviderNetwork:           "",

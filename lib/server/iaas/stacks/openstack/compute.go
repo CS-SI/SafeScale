@@ -22,6 +22,7 @@ import (
     "time"
 
     "github.com/davecgh/go-spew/spew"
+    "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
     uuid "github.com/satori/go.uuid"
     "github.com/sirupsen/logrus"
 
@@ -756,7 +757,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
     }
     srvOpts := servers.CreateOpts{
         Name:             request.ResourceName,
-        SecurityGroups:   []string{s.SecurityGroup.Name},
+        SecurityGroups:   []string{s.DefaultSecurityGroupName},
         Networks:         nets,
         FlavorRef:        request.TemplateID,
         ImageRef:         request.ImageID,
@@ -1434,4 +1435,60 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
     // servers.Resize()
 
     return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
+}
+
+// BindSecurityGroupToHost binds a security group to a host
+func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    if s == nil {
+        return fail.InvalidInstanceError()
+    }
+    ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+    if xerr != nil {
+        return xerr
+    }
+
+    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+    if xerr != nil {
+        return xerr
+    }
+    asg, xerr = s.InspectSecurityGroup(asg)
+    if xerr != nil {
+        return xerr
+    }
+
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+            return NormalizeError(innerErr)
+        },
+        temporal.GetCommunicationTimeout(),
+    )
+}
+
+// UnbindSecurityGroupFromHost unbinds a security group from a host
+func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    if s == nil {
+        return fail.InvalidInstanceError()
+    }
+    ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+    if xerr != nil {
+        return xerr
+    }
+
+    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+    if xerr != nil {
+        return xerr
+    }
+    asg, xerr = s.InspectSecurityGroup(asg)
+    if xerr != nil {
+        return xerr
+    }
+
+    return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+        func() error {
+            innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+            return NormalizeError(innerErr)
+        },
+        temporal.GetCommunicationTimeout(),
+    )
 }

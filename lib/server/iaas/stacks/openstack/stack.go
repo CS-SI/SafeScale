@@ -19,7 +19,6 @@ package openstack
 import (
     "github.com/gophercloud/gophercloud"
     "github.com/gophercloud/gophercloud/openstack"
-    secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
     "github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
     "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -40,8 +39,8 @@ type Stack struct {
     DefaultSecurityGroupName string
     // DefaultSecurityGroupDescription contains a description for the default security groups
     DefaultSecurityGroupDescription string
-    // SecurityGroup is an instance of the default security group
-    SecurityGroup     *secgroups.SecGroup
+    // // SecurityGroup is an instance of the default security group
+    // SecurityGroup     *abstract.SecurityGroup
     ProviderNetworkID string
 
     // versions contains the last version supported for each service

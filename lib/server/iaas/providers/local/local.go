@@ -186,6 +186,11 @@ func (p *provider) GetCapabilities() providers.Capabilities {
     return providers.Capabilities{}
 }
 
+// AddRuleToSecurityGroup adds a rule to a security group
+func (p *provider) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGroupRule) fail.Error {
+    return fail.NotImplementedError()
+}
+
 func init() {
     // log.Debug("Registering local provider")
     iaas.Register("local", &provider{})

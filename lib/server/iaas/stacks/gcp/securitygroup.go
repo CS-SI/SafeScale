@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package aws
+package gcp
 
 import (
     "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -23,10 +23,6 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
-
-func (s *Stack) createSecurityGroup(vpcID string, name string) (string, fail.Error) {
-    return "", fail.NotImplementedError("createSecurityGroup() not implemented yet") // FIXME: Technical debt
-}
 
 // ListSecurityGroup lists existing security groups
 func (s Stack) ListSecurityGroup() ([]*abstract.SecurityGroup, fail.Error) {

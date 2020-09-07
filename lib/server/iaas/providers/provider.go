@@ -17,7 +17,7 @@
 package providers
 
 import (
-    stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -29,7 +29,7 @@ import (
 type Provider interface {
     Build(map[string]interface{}) (Provider, fail.Error)
 
-    stacks.Stack
+    api.Stack
 
     // ListImages lists available OS images
     ListImages(all bool) ([]abstract.Image, fail.Error)

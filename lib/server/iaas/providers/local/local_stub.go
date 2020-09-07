@@ -120,12 +120,6 @@ func (provider *provider) DeleteNetwork(id string) fail.Error {
     return gReport
 }
 
-// func (provider *provider) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
-// 	return nil, nil, gReport
-// }
-// func (provider *provider) DeleteGateway(string) fail.Error {
-// 	return gReport
-// }
 func (provider *provider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
     return nil, gReport
 }
@@ -208,6 +202,48 @@ func (provider *provider) GetTenantParameters() map[string]interface{} {
 // GetCapabilities returns the capabilities of the provider
 func (provider *provider) GetCapabilities() providers.Capabilities {
     return providers.Capabilities{}
+}
+
+
+// BindSecurityGroupToHost ...
+func (provider *provider) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return gReport
+}
+
+// UnbindSecurityGroupFromHost ...
+func (provider *provider) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return gReport
+}
+
+
+// ListSecurityGroup lists existing security groups
+func (provider *provider) ListSecurityGroup() ([]*abstract.SecurityGroup, fail.Error) {
+    return nil, gReport
+}
+
+// CreateSecurityGroup creates a security group
+func (provider *provider) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+    return nil, gReport
+}
+
+// DeleteSecurityGroup deletes a security group and its rules
+func (provider *provider) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+    return gReport
+}
+
+// InspectSecurityGroup returns information about a security group
+func (provider *provider) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+    return nil, gReport
+}
+
+// ClearSecurityGroup removes all rules but keep group
+func (provider *provider) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+    return nil, gReport
+}
+
+// AddRuleToSecurityGroup adds a rule to a security group
+func (provider *provider) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+    return nil, gReport
 }
 
 func init() {
