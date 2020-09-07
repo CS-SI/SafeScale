@@ -1003,3 +1003,13 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 func (s *Stack) ListRegions() ([]string, fail.Error) {
     return nil, fail.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
 }
+
+// BindSecurityGroupToHost ...
+func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return fail.NotImplementedError("not yet implemented")
+}
+
+// UnbindSecurityGroupFromHost ...
+func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return fail.NotImplementedError("not yet implemented")
+}

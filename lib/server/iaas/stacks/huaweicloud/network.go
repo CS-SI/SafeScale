@@ -738,7 +738,13 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
     asu := true
-    sg := []string{s.SecurityGroup.ID}
+
+    asg, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+    if xerr != nil {
+        return nil, xerr
+    }
+
+    sg := []string{asg.ID}
     options := ports.CreateOpts{
         NetworkID:      networkID,
         AdminStateUp:   &asu,

@@ -41,7 +41,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
         return nil, fail.InvalidInstanceError()
     }
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", req.Name).WithStopwatch().Entering()
     defer tracer.Exiting()
 
     // disable subnetwork auto-creation
@@ -243,6 +243,9 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
         return nil, fail.InvalidInstanceError()
     }
 
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     nets, xerr := s.ListNetworks()
     if xerr != nil {
         return nil, xerr
@@ -262,6 +265,9 @@ func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
         return nil, fail.InvalidInstanceError()
     }
 
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     nets, xerr := s.ListNetworks()
     if xerr != nil {
         return nil, xerr
@@ -280,6 +286,9 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     var networks []*abstract.Network
 
@@ -331,6 +340,9 @@ func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
     if s == nil {
         return fail.InvalidInstanceError()
     }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     theNetwork, xerr := s.GetNetwork(ref)
     if xerr != nil {
@@ -434,82 +446,84 @@ func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
     return nil
 }
 
-// // CreateGateway creates a public Gateway for a private network
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (_ *abstract.HostFull, _ *userdata.Content, err error) {
-// 	if s == nil {
-// 		return nil, nil, fail.InvalidInstanceError()
-// 	}
-// 	if req.Network == nil {
-// 		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
-// 	}
-//
-// 	defer fail.OnPanic(&err)
-//
-// 	gwname := req.Name
-// 	if gwname == "" {
-// 		gwname = "gw-" + req.Network.Name
-// 	}
-//
-// 	hostReq := abstract.HostRequest{
-// 		ImageID:      req.ImageID,
-// 		KeyPair:      req.KeyPair,
-// 		ResourceName: gwname,
-// 		TemplateID:   req.TemplateID,
-// 		Networks:     []*abstract.Network{req.Network},
-// 		PublicIP:     true,
-// 	}
-//
-// 	host, userData, err := s.CreateHost(hostReq)
-// 	if err != nil {
-// 		switch err.(type) {
-// 		case fail.ErrInvalidRequest:
-// 			return nil, userData, err
-// 		default:
-// 			return nil, userData, fail.Wrap(err, "error creating gateway")
-// 		}
-// 	}
-//
-// 	// VPL: Moved in objects.Host
-// 	// // Updates Host Property propertiesv1.HostSizing
-// 	// err = host.properties.Alter(HostProperty.SizingV1, func(v interface{}) error {
-// 	// 	hostSizingV1 := v.(*propertiesv1.HostSizing)
-// 	// 	hostSizingV1.Template = req.TemplateID
-// 	// 	return nil
-// 	// })
-// 	// if err != nil {
-// 	// 	return nil, userData, err
-// 	// }
-//
-// 	return host, userData, err
-// }
-//
-// // DeleteGateway delete the public gateway referenced by ref (id or name)
-// func (s *Stack) DeleteGateway(ref string) error {
-// 	return s.DeleteHost(ref)
-// }
 
 // CreateVIP creates a private virtual IP
-// If public is set to true,
 func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+    if s == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+    if networkID == "" {
+        return nil, fail.InvalidParameterError("networkID", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", networkID).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
+    if s == nil {
+        return fail.InvalidInstanceError()
+    }
+    if vip == nil {
+        return fail.InvalidParameterError("vip", "cannot be nil")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v)", vip).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+    if s == nil {
+        return fail.InvalidInstanceError()
+    }
+    if vip == nil {
+        return fail.InvalidParameterError("vip", "cannot be nil")
+    }
+    if hostID == "" {
+        return fail.InvalidParameterError("networkID", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v, %s)", vip, hostID).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+    if s == nil {
+        return fail.InvalidInstanceError()
+    }
+    if vip == nil {
+        return fail.InvalidParameterError("vip", "cannot be nil")
+    }
+    if hostID == "" {
+        return fail.InvalidParameterError("networkID", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v, %s)", vip, hostID).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-// DeleteVIP deletes the port corresponding to the VIP
+// DeleteVIP deletes the VIP
 func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
+    if s == nil {
+        return fail.InvalidInstanceError()
+    }
+    if vip == nil {
+        return fail.InvalidParameterError("vip", "cannot be nil")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v)", vip).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

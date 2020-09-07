@@ -14,36 +14,16 @@
  * limitations under the License.
  */
 
-package ipversion
+package gcp
 
 import (
-    "net"
-    "strings"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate stringer -type=Enum
-
-// Enum is an enum defining IP versions
-type Enum int
-
-const (
-    Unknown = iota
-    // IPv4 is IP v4 version
-    IPv4 Enum = 4
-    // IPv6 is IP v6 version
-    IPv6 Enum = 6
-)
-
-// Is checks the version of a IP address in string representation
-func (i Enum) Is(str string) bool {
-    ip := net.ParseIP(str)
-    isV6 := ip != nil && strings.Contains(str, ":")
-    switch i {
-    case IPv4:
-        return !isV6
-    case IPv6:
-        return isV6
-    default:
-        return false
+// normalizeError translates AWS error to SafeScale one
+func normalizeError(err error) fail.Error {
+    if err == nil {
+        return nil
     }
+    return fail.ToError(err)
 }

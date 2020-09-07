@@ -248,3 +248,13 @@ func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
     return stacks.AuthenticationOptions{}
 }
+
+// BindSecurityGroupToHost ...
+func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return gError
+}
+
+// UnbindSecurityGroupFromHost ...
+func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return gError
+}

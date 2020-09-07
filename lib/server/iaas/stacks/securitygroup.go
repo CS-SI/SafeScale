@@ -1,0 +1,183 @@
+/*
+ * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package stacks
+
+import (
+    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+// SecurityGroupParameter can represent a Security Group by a string as ID or an *abstract.SecurityGroup
+type SecurityGroupParameter interface{}
+
+// ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
+func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, _ fail.Error) {
+    asg = abstract.NewSecurityGroup("")
+    switch sgParam := sgParam.(type) {
+    case string:
+        if sgParam == "" {
+            return asg, fail.InvalidParameterError("sgaram", "cannot be empty string")
+        }
+        asg.ID = sgParam
+    case *abstract.SecurityGroup:
+        if sgParam.IsNull() {
+            return asg, fail.InvalidParameterError("sgParam", "cannot be *abstract.ScurityGroup null value")
+        }
+        asg = sgParam
+    default:
+        return asg, fail.InvalidParameterError("sgParam", "valid types are non-empty string or *abstract.SecurityGroup")
+    }
+    return asg, nil
+}
+
+// TCPRules creates TCP rules to configure the default security group
+// egress: allow all, ingress: allow ssh only
+func TCPRules() []abstract.SecurityGroupRule {
+    return []abstract.SecurityGroupRule{
+        // Ingress: allow SSH only
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.INGRESS,
+            PortFrom:  22,
+            PortTo:    22,
+            EtherType: ipversion.IPv4,
+            Protocol:  "tcp",
+            CIDR:      "0.0.0.0/0",
+        },
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.INGRESS,
+            PortFrom:  22,
+            PortTo:    22,
+            EtherType: ipversion.IPv6,
+            Protocol:  "tcp",
+            CIDR:      "::/0",
+        },
+
+        // Egress: allow everything
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.EGRESS,
+            PortFrom:  1,
+            PortTo:    65535,
+            EtherType: ipversion.IPv4,
+            Protocol:  "tcp",
+            CIDR:      "0.0.0.0/0",
+        },
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.EGRESS,
+            PortFrom:  1,
+            PortTo:    65535,
+            EtherType: ipversion.IPv4,
+            Protocol:  "tcp",
+            CIDR:      "::/0",
+        },
+    }
+}
+
+// UDPRules creates UDP rules to configure the default security group
+// egress: allow all, ingress: deny all
+func UDPRules() []abstract.SecurityGroupRule {
+    // // Inbound == ingress == coming from Outside
+    // rule := secrules.CreateOpts{
+    //     Direction:      secrules.DirIngress,
+    //     PortRangeMin:   1,
+    //     PortRangeMax:   65535,
+    //     EtherType:      secrules.EtherType4,
+    //     SecGroupID:     groupID,
+    //     Protocol:       secrules.ProtocolUDP,
+    //     RemoteIPPrefix: "0.0.0.0/0",
+    // }
+    // if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+    //     return xerr
+    // }
+    //
+    // rule.EtherType = secrules.EtherType6
+    // rule.RemoteIPPrefix = "::/0"
+    // if xerr := s.addRuleToSecurityGroup(groupID, rule); xerr != nil {
+    //     return xerr
+    // }
+
+    return []abstract.SecurityGroupRule{
+        // Outbound = egress == going to Outside
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.EGRESS,
+            PortFrom:  1,
+            PortTo:    65535,
+            EtherType: ipversion.IPv4,
+            Protocol:  "udp",
+            CIDR:      "0.0.0.0/0",
+        },
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.EGRESS,
+            PortFrom:  1,
+            PortTo:    65535,
+            EtherType: ipversion.IPv6,
+            Protocol:  "udp",
+            CIDR:      "::/0",
+        },
+    }
+}
+
+// ICMPRules creates ICMP rules inside the default security group
+// egress: allow all, ingress: allow all
+func ICMPRules() []abstract.SecurityGroupRule {
+    return []abstract.SecurityGroupRule{
+        // Inbound == ingress == coming from Outside
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.INGRESS,
+            EtherType: ipversion.IPv4,
+            Protocol:  "icmp",
+            CIDR:      "0.0.0.0/0",
+        },
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.INGRESS,
+            EtherType: ipversion.IPv6,
+            Protocol:  "icmp",
+            CIDR:      "::/0",
+        },
+        // Outbound = egress == going to Outside
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.EGRESS,
+            EtherType: ipversion.IPv4,
+            Protocol:  "icmp",
+            CIDR:      "0.0.0.0/0",
+        },
+        abstract.SecurityGroupRule{
+            Direction: securitygroupruledirection.EGRESS,
+            EtherType: ipversion.IPv6,
+            Protocol:  "icmp",
+            CIDR:      "::/0",
+        },
+    }
+}
+
+// LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
+func LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) {
+    if asg.IsNull() {
+        return false, fail.InvalidParameterError("asg", "cannot be *abstract.SecurityGroup null value")
+    }
+
+    var found bool
+    for _, presentRule := range asg.Rules {
+        presentRule.ID = ""   // presentRule rule has an ID, if we don't reset it, newRule.EqualTo will always fail
+        if rule.EqualTo(presentRule) {
+            found = true
+            break
+        }
+    }
+    return found, nil
+}

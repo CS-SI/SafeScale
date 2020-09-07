@@ -23,14 +23,19 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateVolume ...
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     v, err := s.EC2Service.CreateVolume(&ec2.CreateVolumeInput{
         Size:             aws.Int64(int64(request.Size)),
@@ -41,7 +46,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
         return nil, normalizeError(err)
     }
 
-    // FIXME Defer volume destruction
+    // FIXME: Defer volume destruction
 
     _, err = s.EC2Service.CreateTags(&ec2.CreateTagsInput{
         Resources: []*string{v.VolumeId},
@@ -68,13 +73,16 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 }
 
 // GetVolume ...
-func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
+func (s *Stack) GetVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
     if id == "" {
         return nil, fail.InvalidParameterError("id", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     out, err := s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{
         VolumeIds: []*string{aws.String(id)},
@@ -158,10 +166,13 @@ func toVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+func (s *Stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     out, err := s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
     if err != nil {
@@ -195,13 +206,16 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume ...
-func (s *Stack) DeleteVolume(id string) fail.Error {
+func (s *Stack) DeleteVolume(id string) (xerr fail.Error) {
     if s == nil {
         return fail.InvalidInstanceError()
     }
     if id == "" {
         return fail.InvalidParameterError("id", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     _, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{
         VolumeId: aws.String(id),
@@ -210,10 +224,13 @@ func (s *Stack) DeleteVolume(id string) fail.Error {
 }
 
 // CreateVolumeAttachment ...
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, xerr fail.Error) {
     if s == nil {
         return "", fail.InvalidInstanceError()
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     va, err := s.EC2Service.AttachVolume(&ec2.AttachVolumeInput{
         Device:     aws.String(request.Name),
@@ -227,7 +244,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment ...
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -237,6 +254,9 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
     if id == "" {
         return nil, fail.InvalidParameterError("id", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     out, err := s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{
         VolumeIds: []*string{aws.String(id)},
@@ -258,13 +278,16 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 }
 
 // ListVolumeAttachments ...
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
+func (s *Stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
     if serverID == "" {
         return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     out, err := s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{
         Filters: []*ec2.Filter{
@@ -291,7 +314,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 }
 
 // DeleteVolumeAttachment ...
-func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
+func (s *Stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
     if s == nil {
         return fail.InvalidInstanceError()
     }
@@ -301,6 +324,9 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
     if id == "" {
         return fail.InvalidParameterError("id", "cannot be empty string")
     }
+
+    defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s, %s)", serverID, id).WithStopwatch().Entering().Exiting()
+    defer fail.OnExitLogError(&xerr)
 
     _, err := s.EC2Service.DetachVolume(&ec2.DetachVolumeInput{
         InstanceId: aws.String(serverID),

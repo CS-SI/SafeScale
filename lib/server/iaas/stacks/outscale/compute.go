@@ -1382,3 +1382,13 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 
     return s.InspectHost(ahf.Core.ID)
 }
+
+// BindSecurityGroupToHost ...
+func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return fail.NotImplementedError("not yet implemented")
+}
+
+// UnbindSecurityGroupFromHost ...
+func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+    return fail.NotImplementedError("not yet implemented")
+}

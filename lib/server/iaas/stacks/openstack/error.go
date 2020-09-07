@@ -19,6 +19,7 @@ package openstack
 import (
     "encoding/json"
     "fmt"
+    "net/url"
     "reflect"
     "strings"
 
@@ -112,6 +113,8 @@ func NormalizeError(err error) fail.Error {
         return qualifyGophercloudResponseCode(&e)
     case *gophercloud.ErrUnexpectedResponseCode:
         return qualifyGophercloudResponseCode(e)
+    case *url.Error:
+        return fail.NewErrorWithCause(e)
     default:
         logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
         return fail.NewError("unhandled error received from provider: %s", err.Error())

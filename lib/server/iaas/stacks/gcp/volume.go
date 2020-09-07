@@ -26,6 +26,8 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+    "github.com/CS-SI/SafeScale/lib/utils/debug"
+    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -40,6 +42,11 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
+    // TODO: validate content of request
 
     selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
     if request.Speed == volumespeed.SSD {
@@ -100,6 +107,12 @@ func (s *Stack) GetVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+    if ref == "" {
+        return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
     if err != nil {
@@ -146,6 +159,9 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
         return nil, fail.InvalidInstanceError()
     }
 
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
     var volumes []abstract.Volume
 
     compuService := s.ComputeService
@@ -181,6 +197,12 @@ func (s *Stack) DeleteVolume(ref string) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
+    if ref == "" {
+        return fail.InvalidParameterError("ref", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     service := s.ComputeService
     op, err := s.ComputeService.Disks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
@@ -206,6 +228,11 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
     if s == nil {
         return "", fail.InvalidInstanceError()
     }
+
+    // TODO: validate request
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     service := s.ComputeService
 
@@ -245,12 +272,21 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s *Stack) GetVolumeAttachment(serverID, vaID string) (*abstract.VolumeAttachment, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+    if serverID == "" {
+        return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+    }
+    if vaID == "" {
+        return nil, fail.InvalidParameterError("vaID", "cannot be empty string")
+    }
 
-    dat := newGcpDiskAttachmentFromID(id)
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverID, vaID).WithStopwatch().Entering()
+    defer tracer.Exiting()
+
+    dat := newGcpDiskAttachmentFromID(vaID)
 
     gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, dat.hostName).Do()
     if err != nil {
@@ -263,7 +299,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
         if disk != nil {
             if disk.DeviceName == favoriteSlave {
                 vat := &abstract.VolumeAttachment{
-                    ID:       id,
+                    ID:       vaID,
                     Name:     dat.diskName,
                     VolumeID: dat.diskName,
                     ServerID: dat.hostName,
@@ -273,14 +309,23 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
         }
     }
 
-    return nil, abstract.ResourceNotFoundError("attachment", id)
+    return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
 // DeleteVolumeAttachment ...
-func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
+func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
     if s == nil {
         return fail.InvalidInstanceError()
     }
+    if serverID == "" {
+        return fail.InvalidParameterError("serverID", "cannot be empty string")
+    }
+    if vaID == "" {
+        return fail.InvalidParameterError("vaID", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverID, vaID).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     service := s.ComputeService
 
@@ -289,7 +334,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
         return fail.ToError(err)
     }
 
-    diskName := newGcpDiskAttachmentFromID(id).diskName
+    diskName := newGcpDiskAttachmentFromID(vaID).diskName
     gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, diskName).Do()
     if err != nil {
         return fail.ToError(err)
@@ -315,6 +360,12 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
+    if serverID == "" {
+        return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+    }
+
+    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverID).WithStopwatch().Entering()
+    defer tracer.Exiting()
 
     var vats []abstract.VolumeAttachment
 
