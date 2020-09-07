@@ -145,7 +145,6 @@ feature:
                             if [ "$(sfGetFact redhat_like)" = "1" ]; then
                                 cat > /etc/docker/daemon.json <<-EOF
                             {
-                                "iptables": false,
                                 "exec-opts": [
                                     "native.cgroupdriver=${DRIVER}"
                                 ],
