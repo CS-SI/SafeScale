@@ -30,8 +30,8 @@ import (
 
 var bucketCmdName = "bucket"
 
-// BucketCmd bucket command
-var BucketCmd = &cli.Command{
+// BucketCommand bucket command
+var BucketCommand = &cli.Command{
     Name:  "bucket",
     Usage: "bucket COMMAND",
     Subcommands: []*cli.Command{

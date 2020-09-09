@@ -39,8 +39,8 @@ import (
 
 var sshCmdName = "ssh"
 
-// SSHCmd ssh command
-var SSHCmd = &cli.Command{
+// SSHCommand ssh command
+var SSHCommand = &cli.Command{
     Name:  "ssh",
     Usage: "ssh COMMAND",
     Subcommands: []*cli.Command{

@@ -35,8 +35,8 @@ import (
 
 var hostCmdName = "host"
 
-// HostCmd command
-var HostCmd = &cli.Command{
+// HostCommand command
+var HostCommand = &cli.Command{
     Name:  hostCmdName,
     Usage: "host COMMAND",
     Subcommands: []*cli.Command{

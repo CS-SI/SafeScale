@@ -30,8 +30,8 @@ import (
 
 var imageCmdName = "image"
 
-// ImageCmd command
-var ImageCmd = &cli.Command{
+// ImageCommand command
+var ImageCommand = &cli.Command{
     Name:  "image",
     Usage: "image COMMAND",
     Subcommands: []*cli.Command{

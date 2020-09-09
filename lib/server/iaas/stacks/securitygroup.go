@@ -23,6 +23,11 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+const (
+    DefaultSecurityGroupName string = "safescale-default-sg"
+    DefaultSecurityGroupDescription string = "Default Security Group for SafeScale resources"
+)
+
 // SecurityGroupParameter can represent a Security Group by a string as ID or an *abstract.SecurityGroup
 type SecurityGroupParameter interface{}
 
@@ -46,12 +51,30 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
     return asg, nil
 }
 
-// TCPRules creates TCP rules to configure the default security group
+// LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
+func LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) {
+    if asg.IsNull() {
+        return false, fail.InvalidParameterError("asg", "cannot be *abstract.SecurityGroup null value")
+    }
+
+    var found bool
+    for _, presentRule := range asg.Rules {
+        presentRule.ID = ""   // presentRule rule has an ID, if we don't reset it, newRule.EqualTo will always fail
+        if rule.EqualTo(presentRule) {
+            found = true
+            break
+        }
+    }
+    return found, nil
+}
+
+// DefaultTCPRules creates TCP rules to configure the default security group
 // egress: allow all, ingress: allow ssh only
-func TCPRules() []abstract.SecurityGroupRule {
+func DefaultTCPRules() []abstract.SecurityGroupRule {
     return []abstract.SecurityGroupRule{
         // Ingress: allow SSH only
         abstract.SecurityGroupRule{
+            Description: "INGRESS: TCP4: Allow SSH",
             Direction: securitygroupruledirection.INGRESS,
             PortFrom:  22,
             PortTo:    22,
@@ -60,6 +83,7 @@ func TCPRules() []abstract.SecurityGroupRule {
             CIDR:      "0.0.0.0/0",
         },
         abstract.SecurityGroupRule{
+            Description: "INGRESS: TCP6: Allow SSH",
             Direction: securitygroupruledirection.INGRESS,
             PortFrom:  22,
             PortTo:    22,
@@ -70,6 +94,7 @@ func TCPRules() []abstract.SecurityGroupRule {
 
         // Egress: allow everything
         abstract.SecurityGroupRule{
+            Description: "EGRESS: TCP4: Allow everything",
             Direction: securitygroupruledirection.EGRESS,
             PortFrom:  1,
             PortTo:    65535,
@@ -78,19 +103,20 @@ func TCPRules() []abstract.SecurityGroupRule {
             CIDR:      "0.0.0.0/0",
         },
         abstract.SecurityGroupRule{
+            Description: "EGRESS: TCP6: Allow everything",
             Direction: securitygroupruledirection.EGRESS,
             PortFrom:  1,
             PortTo:    65535,
-            EtherType: ipversion.IPv4,
+            EtherType: ipversion.IPv6,
             Protocol:  "tcp",
             CIDR:      "::/0",
         },
     }
 }
 
-// UDPRules creates UDP rules to configure the default security group
+// DefaultUDPRules creates UDP rules to configure the default security group
 // egress: allow all, ingress: deny all
-func UDPRules() []abstract.SecurityGroupRule {
+func DefaultUDPRules() []abstract.SecurityGroupRule {
     // // Inbound == ingress == coming from Outside
     // rule := secrules.CreateOpts{
     //     Direction:      secrules.DirIngress,
@@ -114,6 +140,7 @@ func UDPRules() []abstract.SecurityGroupRule {
     return []abstract.SecurityGroupRule{
         // Outbound = egress == going to Outside
         abstract.SecurityGroupRule{
+            Description: "EGRESS: UDP4: Allow everything",
             Direction: securitygroupruledirection.EGRESS,
             PortFrom:  1,
             PortTo:    65535,
@@ -122,6 +149,7 @@ func UDPRules() []abstract.SecurityGroupRule {
             CIDR:      "0.0.0.0/0",
         },
         abstract.SecurityGroupRule{
+            Description: "EGRESS: UDP4: Allow everything",
             Direction: securitygroupruledirection.EGRESS,
             PortFrom:  1,
             PortTo:    65535,
@@ -132,18 +160,20 @@ func UDPRules() []abstract.SecurityGroupRule {
     }
 }
 
-// ICMPRules creates ICMP rules inside the default security group
+// DefaultICMPRules creates ICMP rules inside the default security group
 // egress: allow all, ingress: allow all
-func ICMPRules() []abstract.SecurityGroupRule {
+func DefaultICMPRules() []abstract.SecurityGroupRule {
     return []abstract.SecurityGroupRule{
         // Inbound == ingress == coming from Outside
         abstract.SecurityGroupRule{
+            Description: "INGRESS: ICMP4: Allow everything",
             Direction: securitygroupruledirection.INGRESS,
             EtherType: ipversion.IPv4,
             Protocol:  "icmp",
             CIDR:      "0.0.0.0/0",
         },
         abstract.SecurityGroupRule{
+            Description: "INGRESS: ICMP6: Allow everything",
             Direction: securitygroupruledirection.INGRESS,
             EtherType: ipversion.IPv6,
             Protocol:  "icmp",
@@ -151,12 +181,14 @@ func ICMPRules() []abstract.SecurityGroupRule {
         },
         // Outbound = egress == going to Outside
         abstract.SecurityGroupRule{
+            Description: "EGRESS: ICMP4: Allow everything",
             Direction: securitygroupruledirection.EGRESS,
             EtherType: ipversion.IPv4,
             Protocol:  "icmp",
             CIDR:      "0.0.0.0/0",
         },
         abstract.SecurityGroupRule{
+            Description: "EGRESS: ICMP6: Allow everything",
             Direction: securitygroupruledirection.EGRESS,
             EtherType: ipversion.IPv6,
             Protocol:  "icmp",
@@ -165,19 +197,3 @@ func ICMPRules() []abstract.SecurityGroupRule {
     }
 }
 
-// LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
-func LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) {
-    if asg.IsNull() {
-        return false, fail.InvalidParameterError("asg", "cannot be *abstract.SecurityGroup null value")
-    }
-
-    var found bool
-    for _, presentRule := range asg.Rules {
-        presentRule.ID = ""   // presentRule rule has an ID, if we don't reset it, newRule.EqualTo will always fail
-        if rule.EqualTo(presentRule) {
-            found = true
-            break
-        }
-    }
-    return found, nil
-}

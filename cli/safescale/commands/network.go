@@ -34,8 +34,8 @@ import (
 
 var networkCmdName = "network"
 
-// NetworkCmd command
-var NetworkCmd = &cli.Command{
+// NetworkCommand command
+var NetworkCommand = &cli.Command{
     Name:    "network",
     Aliases: []string{"net"},
     Usage:   "network COMMAND",

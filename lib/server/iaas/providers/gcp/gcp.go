@@ -135,19 +135,20 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
         ProviderName:     providerName,
     }
 
-    stack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
+    gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
     if xerr != nil {
         return nil, xerr
     }
     newP := &provider{
-        Stack:            stack,
+        Stack:            gcpStack,
         tenantParameters: params,
     }
 
-    // evalid := apiprovider.NewValidatedProvider(p, providerName)
-    etrace := providers.NewErrorTraceProvider(newP, providerName)
-    prov := providers.NewLoggedProvider(etrace, providerName)
-    return prov, nil
+    //evalid := providers.NewValidatedProvider(p, providerName)
+    //etrace := providers.NewErrorTraceProvider(newP, providerName)
+    //prov := providers.NewLoggedProvider(etrace, providerName)
+    //return prov, nil
+    return newP, nil
 }
 
 // GetAuthenticationOptions returns the auth options
