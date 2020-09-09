@@ -37,8 +37,8 @@ import (
 
 var shareCmdName = "share"
 
-// ShareCmd ssh command
-var ShareCmd = &cli.Command{
+// ShareCommand ssh command
+var ShareCommand = &cli.Command{
     Name:    "share",
     Aliases: []string{"nas"},
     Usage:   "share COMMAND",

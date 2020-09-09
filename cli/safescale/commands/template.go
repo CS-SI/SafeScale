@@ -30,8 +30,8 @@ import (
 
 var templateCmdName = "template"
 
-// TemplateCmd command
-var TemplateCmd = &cli.Command{
+// TemplateCommand command
+var TemplateCommand = &cli.Command{
     Name:  "template",
     Usage: "template COMMAND",
     Subcommands: []*cli.Command{

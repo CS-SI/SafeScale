@@ -17,9 +17,12 @@
 package abstract
 
 import (
+    "encoding/json"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruleaction"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // SecurityGroupRule represents a rule of a SecurityGroup
@@ -29,15 +32,15 @@ type SecurityGroupRule struct {
     EtherType   ipversion.Enum                  `json:"ether_type,omitempty"`  // IPv4 or IPv6
     Direction   securitygroupruledirection.Enum `json:"direction"`             // ingress (input) or egress (output)
     Protocol    string                          `json:"protocol,omitempty"`    // concerned protocol
-    FirstPort   uint16                          `json:"port_first,omitempty"`  // first port of the rule
-    LastPort    uint16                          `json:"port_last,omitempty"`   // last port of the rule
+    PortFrom    uint16                          `json:"port_from,omitempty"`   // first port of the rule
+    PortTo      uint16                          `json:"port_to,omitempty"`     // last port of the rule
     CIDR        string                          `json:"cidr"`                  // concerned CIDR (source or target depending of Direction)
     Action      securitygroupruleaction.Enum    `json:"action,omitempty"`      // action of the rule: ALLOW, DENY
 }
 
 // IsNull tells if the Security Group Rule is a null value
 func (sgr *SecurityGroupRule) IsNull() bool {
-    return sgr == nil || (sgr.ID == "" && sgr.Protocol == "" && sgr.FirstPort == 0)
+    return sgr == nil || (sgr.ID == "" && sgr.Protocol == "" && sgr.PortFrom == 0)
 }
 
 func (sgr *SecurityGroupRule) EqualTo(in SecurityGroupRule) bool {
@@ -69,3 +72,68 @@ func (sg *SecurityGroup) IsNull() bool {
 func NewSecurityGroup(name string) *SecurityGroup {
     return &SecurityGroup{Name: name}
 }
+
+// Clone does a deep-copy of the Host
+//
+// satisfies interface data.Clonable
+func (sg *SecurityGroup) Clone() data.Clonable {
+    if sg.IsNull() {
+        return sg
+    }
+    return NewSecurityGroup("").Replace(sg)
+}
+
+// Replace ...
+//
+// satisfies interface data.Clonable
+func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
+    if sg.IsNull() {
+        return sg
+    }
+
+    src := p.(*SecurityGroup)
+    *sg = *src
+    sg.Rules = make([]SecurityGroupRule, len(src.Rules))
+    copy(sg.Rules, src.Rules)
+    return sg
+}
+
+// Serialize serializes Host instance into bytes (output json code)
+func (sg *SecurityGroup) Serialize() ([]byte, fail.Error) {
+    if sg.IsNull() {
+        return nil, fail.InvalidInstanceError()
+    }
+
+    r, jserr := json.Marshal(sg)
+    if jserr != nil {
+        return nil, fail.NewError(jserr.Error())
+    }
+    return r, nil
+}
+
+// Deserialize reads json code and reinstantiates a SecurityGroup
+func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
+    if sg == nil {
+        return fail.InvalidInstanceError()
+    }
+
+    var panicErr error
+    defer func() {
+        if panicErr != nil {
+            xerr = fail.ToError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+        }
+    }()
+    defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
+
+    jserr := json.Unmarshal(buf, sg)
+    if jserr != nil {
+        switch jserr.(type) {
+        case *json.SyntaxError:
+            return fail.SyntaxError(jserr.Error())
+        default:
+            return fail.NewError(jserr.Error())
+        }
+    }
+    return nil
+}
+

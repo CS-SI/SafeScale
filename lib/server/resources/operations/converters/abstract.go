@@ -151,7 +151,7 @@ func VirtualIPFromAbstractToProtocol(in abstract.VirtualIP) *protocol.VirtualIp 
         PrivateIp: in.PrivateIP,
         PublicIp:  in.PublicIP,
     }
-    out.Hosts = make([]*protocol.Host, len(in.Hosts))
+    out.Hosts = make([]*protocol.Host, 0, len(in.Hosts))
     for _, i := range in.Hosts {
         out.Hosts = append(out.Hosts, HostCoreFromAbstractToProtocol(i))
     }
@@ -304,12 +304,32 @@ func ClusterIdentityFromAbstractToProtocol(in abstract.ClusterIdentity) *protoco
 // ClusterListFromAbstractToProtocol converts list of cluster identity to protocol.ClusterListResponse
 func ClusterListFromAbstractToProtocol(in []abstract.ClusterIdentity) *protocol.ClusterListResponse {
     out := &protocol.ClusterListResponse{}
-    out.Clusters = make([]*protocol.ClusterResponse, len(in), 0)
+    out.Clusters = make([]*protocol.ClusterResponse, 0, len(in))
+    //out.Clusters = []*protocol.ClusterResponse{}
     for _, v := range in {
         cr := &protocol.ClusterResponse{
             Identity: ClusterIdentityFromAbstractToProtocol(v),
         }
         out.Clusters = append(out.Clusters, cr)
+    }
+    return out
+}
+
+// SecurityGroupRulesFromAbstractToProtocol converts a []abstract.SecurityGroupRule to a []*protocol.SecurityGroupRule
+func SecurityGroupRulesFromAbstractToProtocol(in []abstract.SecurityGroupRule) []*protocol.SecurityGroupRule {
+    out := make([]*protocol.SecurityGroupRule, 0, len(in))
+    for _, v := range in {
+        rule := &protocol.SecurityGroupRule{
+            Id: v.ID,
+            Description: v.Description,
+            Direction: protocol.SecurityGroupRuleDirection(v.Direction),
+            Protocol: v.Protocol,
+            EtherType: protocol.SecurityGroupRuleEtherType(v.EtherType),
+            PortFrom: uint32(v.PortFrom),
+            PortTo: uint32(v.PortTo),
+            Cidr: v.CIDR,
+        }
+        out = append(out, rule)
     }
     return out
 }

@@ -781,13 +781,19 @@ message SecurityGroupRuleRequest {
 
 message SecurityGroupRequest {
     string name = 1;
-    repeated SecurityGroupRule rules = 2;
+    string description = 2;
+    repeated SecurityGroupRule rules = 3;
 }
 
 message SecurityGroupResponse {
     string id = 1;
     string name = 2;
-    SecurityGroupRule rules = 3;
+    string description = 3;
+    repeated SecurityGroupRule rules = 4;
+}
+
+message SecurityGroupListRequest{
+    bool all = 1;
 }
 
 message SecurityGroupListResponse {
@@ -795,11 +801,12 @@ message SecurityGroupListResponse {
 }
 
 service SecurityGroupService {
-    rpc List(google.protobuf.Empty) returns (SecurityGroupListResponse){}
-    rpc Create(SecurityGroupRequest) returns (google.protobuf.Empty){}
+    rpc List(SecurityGroupListRequest) returns (SecurityGroupListResponse){}
+    rpc Create(SecurityGroupRequest) returns (SecurityGroupResponse){}
     rpc Inspect(Reference) returns (SecurityGroupResponse){}
     rpc AddRule(SecurityGroupRuleRequest) returns (google.protobuf.Empty){}
-    rpc ChangeRule(SecurityGroupRuleRequest) returns (google.protobuf.Empty){}
-    rpc RemoveRule(SecurityGroupRuleRequest) returns (google.protobuf.Empty){}
-    rpc Sanitize(SecurityGroupRequest) returns (google.protobuf.Empty){}
+    rpc Clear(Reference) returns (google.protobuf.Empty){}
+    rpc Reset(Reference) returns (google.protobuf.Empty){}
+    rpc Delete(Reference) returns (google.protobuf.Empty){}
+    rpc Sanitize(Reference) returns (google.protobuf.Empty){}
 }

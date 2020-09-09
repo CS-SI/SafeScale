@@ -183,16 +183,20 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
         BuildSubnetworks: false, // FIXME AWS by default don't build subnetworks
     }
 
-    stack, err := aws.New(authOptions, awsConf, cfgOptions)
+    awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
     if err != nil {
         return nil, fail.ToError(err)
     }
+    newP := &provider{
+        Stack:            awsStack,
+        tenantParameters: params,
+    }
 
-    evalid := providers.NewValidatedProvider(&provider{stack, params}, providerName)
-    etrace := providers.NewErrorTraceProvider(evalid, providerName)
-    prov := providers.NewLoggedProvider(etrace, providerName)
-
-    return prov, nil
+    //evalid := providers.NewValidatedProvider(&provider{stack, params}, providerName)
+    //etrace := providers.NewErrorTraceProvider(evalid, providerName)
+    //prov := providers.NewLoggedProvider(etrace, providerName)
+    //return etrace, nil
+    return newP, nil
 }
 
 // GetAuthenticationOptions returns the auth options

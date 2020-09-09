@@ -169,35 +169,38 @@ func main() {
         return nil
     }
 
-    app.Commands = append(app.Commands, commands.NetworkCmd)
-    sort.Sort(cli.CommandsByName(commands.NetworkCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.NetworkCommand)
+    sort.Sort(cli.CommandsByName(commands.NetworkCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.TenantCmd)
-    sort.Sort(cli.CommandsByName(commands.TenantCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.TenantCommand)
+    sort.Sort(cli.CommandsByName(commands.TenantCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.HostCmd)
-    sort.Sort(cli.CommandsByName(commands.HostCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.HostCommand)
+    sort.Sort(cli.CommandsByName(commands.HostCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.VolumeCmd)
-    sort.Sort(cli.CommandsByName(commands.VolumeCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.VolumeCommand)
+    sort.Sort(cli.CommandsByName(commands.VolumeCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.SSHCmd)
-    sort.Sort(cli.CommandsByName(commands.SSHCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.SSHCommand)
+    sort.Sort(cli.CommandsByName(commands.SSHCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.BucketCmd)
-    sort.Sort(cli.CommandsByName(commands.BucketCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.BucketCommand)
+    sort.Sort(cli.CommandsByName(commands.BucketCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.ShareCmd)
-    sort.Sort(cli.CommandsByName(commands.ShareCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.ShareCommand)
+    sort.Sort(cli.CommandsByName(commands.ShareCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.ImageCmd)
-    sort.Sort(cli.CommandsByName(commands.ImageCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.ImageCommand)
+    sort.Sort(cli.CommandsByName(commands.ImageCommand.Subcommands))
 
-    app.Commands = append(app.Commands, commands.TemplateCmd)
-    sort.Sort(cli.CommandsByName(commands.TemplateCmd.Subcommands))
+    app.Commands = append(app.Commands, commands.TemplateCommand)
+    sort.Sort(cli.CommandsByName(commands.TemplateCommand.Subcommands))
 
     app.Commands = append(app.Commands, commands.ClusterCommand)
     sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
+
+    app.Commands = append(app.Commands, commands.SecurityGroupCommand)
+    sort.Sort(cli.CommandsByName(commands.SecurityGroupCommand.Subcommands))
 
     sort.Sort(cli.CommandsByName(app.Commands))
 

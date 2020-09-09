@@ -35,17 +35,18 @@ import (
 
 // Session units the different resources proposed by safescaled as safescale client
 type Session struct {
-    Bucket     bucket
-    Cluster    cluster
-    Host       host
-    Image      image
-    JobManager jobManager
-    Network    network
-    Share      share
-    SSH        ssh
-    Template   template
-    Tenant     tenant
-    Volume     volume
+    Bucket        bucket
+    Cluster       cluster
+    Host          host
+    Image         image
+    JobManager    jobManager
+    Network       network
+    SecurityGroup securityGroup
+    Share         share
+    SSH           ssh
+    Template      template
+    Tenant        tenant
+    Volume        volume
 
     server     string
     connection *grpc.ClientConn

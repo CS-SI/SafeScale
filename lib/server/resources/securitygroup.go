@@ -32,8 +32,6 @@ type SecurityGroup interface {
     AddRule(task concurrency.Task, rule *abstract.SecurityGroupRule) fail.Error                                      // returns true if the host is member of a cluster
     Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                      // ...
     Create(task concurrency.Task, rules []*abstract.SecurityGroupRule) fail.Error                                    // creates a new host and its metadata
-    Remove(task concurrency.Task)                                                                                    // deletes a security group and all its rules
-    RemoveRule(task concurrency.Task, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroupRule, fail.Error)    // removes a rule by name from SecurityGroup
     CheckConsistency(task concurrency.Task, ref string) fail.Error                                                   // tells if the security group described exists on Provider side with exact same parameters
     ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                                  // converts a SecurityGroup to equivalent gRPC message
 }

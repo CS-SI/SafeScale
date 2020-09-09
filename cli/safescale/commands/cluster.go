@@ -165,13 +165,15 @@ var clusterInspectCommand = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
 
-        cluster, xerr := clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
-        if xerr != nil {
-            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, xerr.Error()))
+        cluster, err := clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
         }
-        clusterConfig, xerr := outputClusterConfig(cluster)
-        if xerr != nil {
-            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+        clusterConfig, err := outputClusterConfig(cluster)
+        if err != nil {
+            err = fail.FromGRPCStatus(err)
+            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
         }
         return clitools.SuccessResponse(clusterConfig)
     },

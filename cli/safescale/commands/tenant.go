@@ -31,8 +31,8 @@ import (
 
 var tenantCmdName = "tenant"
 
-// TenantCmd command
-var TenantCmd = &cli.Command{
+// TenantCommand command
+var TenantCommand = &cli.Command{
     Name:  "tenant",
     Usage: "tenant COMMAND",
     Subcommands: []*cli.Command{
