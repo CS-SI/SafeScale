@@ -1,24 +1,24 @@
 package main
 
 import (
-    "testing"
+	"testing"
 
-    "github.com/CS-SI/SafeScale/integrationtests"
-    "github.com/CS-SI/SafeScale/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/integrationtests"
+	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 )
 
 func Test_Docker(t *testing.T) {
-    integrationtests.Docker(t, providers.LOCAL)
+	integrationtests.Docker(t, providers.LOCAL)
 }
 
 func Test_DockerNotGateway(t *testing.T) {
-    integrationtests.DockerNotGateway(t, providers.LOCAL)
+	integrationtests.DockerNotGateway(t, providers.LOCAL)
 }
 
 func Test_RemoteDesktop(t *testing.T) {
-    integrationtests.RemoteDesktop(t, providers.LOCAL)
+	integrationtests.RemoteDesktop(t, providers.LOCAL)
 }
 
 func Test_ReverseProxy(t *testing.T) {
-    integrationtests.ReverseProxy(t, providers.LOCAL)
+	integrationtests.ReverseProxy(t, providers.LOCAL)
 }

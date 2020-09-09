@@ -17,129 +17,129 @@
 package client
 
 import (
-    "time"
+	"time"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/utils"
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
-    googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // share is the part of the safescale client handilng Shares
 type share struct {
-    session *Session
+	session *Session
 }
 
 // Create ...
 func (n *share) Create(def *pb.ShareDefinition, timeout time.Duration) error {
-    if def == nil {
-        return scerr.InvalidParameterError("def", "cannot be nil")
-    }
-    n.session.Connect()
-    defer n.session.Disconnect()
-    service := pb.NewShareServiceClient(n.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	if def == nil {
+		return scerr.InvalidParameterError("def", "cannot be nil")
+	}
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Create(ctx, def)
-    if err != nil {
-        return DecorateError(err, "creation of share", true)
-    }
-    return nil
+	_, err = service.Create(ctx, def)
+	if err != nil {
+		return DecorateError(err, "creation of share", true)
+	}
+	return nil
 }
 
 // Delete deletes a share
 func (n *share) Delete(name string, timeout time.Duration) error {
-    n.session.Connect()
-    defer n.session.Disconnect()
-    service := pb.NewShareServiceClient(n.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Delete(ctx, &pb.Reference{Name: name})
-    if err != nil {
-        return DecorateError(err, "deletion of share", true)
-    }
-    return nil
+	_, err = service.Delete(ctx, &pb.Reference{Name: name})
+	if err != nil {
+		return DecorateError(err, "deletion of share", true)
+	}
+	return nil
 }
 
 // List ...
 func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
-    n.session.Connect()
-    defer n.session.Disconnect()
-    service := pb.NewShareServiceClient(n.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    list, err := service.List(ctx, &googleprotobuf.Empty{})
-    if err != nil {
-        return nil, DecorateError(err, "list of shares", true)
-    }
-    return list, nil
+	list, err := service.List(ctx, &googleprotobuf.Empty{})
+	if err != nil {
+		return nil, DecorateError(err, "list of shares", true)
+	}
+	return list, nil
 }
 
 // Mount ...
 func (n *share) Mount(def *pb.ShareMountDefinition, timeout time.Duration) error {
-    if def == nil {
-        return scerr.InvalidParameterError("def", "cannot be nil")
-    }
+	if def == nil {
+		return scerr.InvalidParameterError("def", "cannot be nil")
+	}
 
-    n.session.Connect()
-    defer n.session.Disconnect()
-    service := pb.NewShareServiceClient(n.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Mount(ctx, def)
-    if err != nil {
-        return DecorateError(err, "mount of share", true)
-    }
-    return nil
+	_, err = service.Mount(ctx, def)
+	if err != nil {
+		return DecorateError(err, "mount of share", true)
+	}
+	return nil
 }
 
 // Unmount ...
 func (n *share) Unmount(def *pb.ShareMountDefinition, timeout time.Duration) error {
-    if def == nil {
-        return scerr.InvalidParameterError("def", "cannot be nil")
-    }
+	if def == nil {
+		return scerr.InvalidParameterError("def", "cannot be nil")
+	}
 
-    n.session.Connect()
-    defer n.session.Disconnect()
-    service := pb.NewShareServiceClient(n.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Unmount(ctx, def)
-    if err != nil {
-        return DecorateError(err, "unmount of share", true)
-    }
-    return nil
+	_, err = service.Unmount(ctx, def)
+	if err != nil {
+		return DecorateError(err, "unmount of share", true)
+	}
+	return nil
 }
 
 // Inspect ...
 func (n *share) Inspect(name string, timeout time.Duration) (*pb.ShareMountList, error) {
-    n.session.Connect()
-    defer n.session.Disconnect()
-    service := pb.NewShareServiceClient(n.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewShareServiceClient(n.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    list, err := service.Inspect(ctx, &pb.Reference{Name: name})
-    if err != nil {
-        return nil, DecorateError(err, "inspection of share", true)
-    }
-    return list, nil
+	list, err := service.Inspect(ctx, &pb.Reference{Name: name})
+	if err != nil {
+		return nil, DecorateError(err, "inspection of share", true)
+	}
+	return list, nil
 }

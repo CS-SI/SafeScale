@@ -17,216 +17,216 @@
 package commands
 
 import (
-    "encoding/json"
+	"encoding/json"
 
-    "github.com/sirupsen/logrus"
-    "github.com/urfave/cli"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/client"
-    "github.com/CS-SI/SafeScale/lib/utils"
-    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-    "github.com/CS-SI/SafeScale/lib/utils/temporal"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var networkCmdName = "network"
 
 // NetworkCmd command
 var NetworkCmd = cli.Command{
-    Name:    "network",
-    Aliases: []string{"net"},
-    Usage:   "network COMMAND",
-    Subcommands: []cli.Command{
-        networkCreate,
-        networkDelete,
-        networkInspect,
-        networkList,
-    },
+	Name:    "network",
+	Aliases: []string{"net"},
+	Usage:   "network COMMAND",
+	Subcommands: []cli.Command{
+		networkCreate,
+		networkDelete,
+		networkInspect,
+		networkList,
+	},
 }
 
 var networkList = cli.Command{
-    Name:    "list",
-    Aliases: []string{"ls"},
-    Usage:   "List existing Networks (created by SafeScale)",
-    Flags: []cli.Flag{
-        cli.BoolFlag{
-            Name:  "all",
-            Usage: "List all Networks on tenant (not only those created by SafeScale)",
-        },
-    },
-    Action: func(c *cli.Context) error {
-        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
-        networks, err := client.New().Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
-        if err != nil {
-            return clitools.FailureResponse(
-                clitools.ExitOnRPC(
-                    utils.Capitalize(
-                        client.DecorateError(
-                            err, "list of networks", false,
-                        ).Error(),
-                    ),
-                ),
-            )
-        }
-        return clitools.SuccessResponse(networks.GetNetworks())
-    },
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "List existing Networks (created by SafeScale)",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "all",
+			Usage: "List all Networks on tenant (not only those created by SafeScale)",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		networks, err := client.New().Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		if err != nil {
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					utils.Capitalize(
+						client.DecorateError(
+							err, "list of networks", false,
+						).Error(),
+					),
+				),
+			)
+		}
+		return clitools.SuccessResponse(networks.GetNetworks())
+	},
 }
 
 var networkDelete = cli.Command{
-    Name:      "delete",
-    Aliases:   []string{"rm", "remove"},
-    Usage:     "delete Network",
-    ArgsUsage: "<Network_name> [<Network_name>...]",
-    Flags: []cli.Flag{
-        cli.BoolFlag{
-            Name:  "force, f",
-            Usage: "If used, deletes the network ignoring metadata discrepancies",
-        },
-    },
-    Action: func(c *cli.Context) error {
-        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
-        if c.NArg() < 1 {
-            _ = cli.ShowSubcommandHelp(c)
-            return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
-        }
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
+	Usage:     "delete Network",
+	ArgsUsage: "<Network_name> [<Network_name>...]",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If used, deletes the network ignoring metadata discrepancies",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() < 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Network_name>."))
+		}
 
-        destroy := c.Bool("force")
+		destroy := c.Bool("force")
 
-        var networkList []string
-        networkList = append(networkList, c.Args().First())
-        networkList = append(networkList, c.Args().Tail()...)
+		var networkList []string
+		networkList = append(networkList, c.Args().First())
+		networkList = append(networkList, c.Args().Tail()...)
 
-        if destroy {
-            err := client.New().Network.Destroy(networkList, temporal.GetExecutionTimeout())
-            if err != nil {
-                return clitools.FailureResponse(
-                    clitools.ExitOnRPC(
-                        utils.Capitalize(
-                            client.DecorateError(
-                                err, "deletion of network", false,
-                            ).Error(),
-                        ),
-                    ),
-                )
-            }
-        } else {
-            err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
-            if err != nil {
-                return clitools.FailureResponse(
-                    clitools.ExitOnRPC(
-                        utils.Capitalize(
-                            client.DecorateError(
-                                err, "deletion of network", false,
-                            ).Error(),
-                        ),
-                    ),
-                )
-            }
-        }
-        return clitools.SuccessResponse(nil)
-    },
+		if destroy {
+			err := client.New().Network.Destroy(networkList, temporal.GetExecutionTimeout())
+			if err != nil {
+				return clitools.FailureResponse(
+					clitools.ExitOnRPC(
+						utils.Capitalize(
+							client.DecorateError(
+								err, "deletion of network", false,
+							).Error(),
+						),
+					),
+				)
+			}
+		} else {
+			err := client.New().Network.Delete(networkList, temporal.GetExecutionTimeout())
+			if err != nil {
+				return clitools.FailureResponse(
+					clitools.ExitOnRPC(
+						utils.Capitalize(
+							client.DecorateError(
+								err, "deletion of network", false,
+							).Error(),
+						),
+					),
+				)
+			}
+		}
+		return clitools.SuccessResponse(nil)
+	},
 }
 
 var networkInspect = cli.Command{
-    Name:      "inspect",
-    Aliases:   []string{"show"},
-    Usage:     "inspect NETWORK",
-    ArgsUsage: "<network_name>",
-    Action: func(c *cli.Context) error {
-        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
-        if c.NArg() != 1 {
-            _ = cli.ShowSubcommandHelp(c)
-            return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
-        }
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "inspect NETWORK",
+	ArgsUsage: "<network_name>",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
+		}
 
-        network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
-        if err != nil {
-            return clitools.FailureResponse(
-                clitools.ExitOnRPC(
-                    utils.Capitalize(
-                        client.DecorateError(
-                            err, "inspection of network", false,
-                        ).Error(),
-                    ),
-                ),
-            )
-        }
+		network, err := client.New().Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		if err != nil {
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					utils.Capitalize(
+						client.DecorateError(
+							err, "inspection of network", false,
+						).Error(),
+					),
+				),
+			)
+		}
 
-        // Convert struct to map using struct to json then json to map
-        // errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
-        mapped := map[string]interface{}{}
-        jsoned, _ := json.Marshal(network)
-        _ = json.Unmarshal(jsoned, &mapped)
+		// Convert struct to map using struct to json then json to map
+		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
+		mapped := map[string]interface{}{}
+		jsoned, _ := json.Marshal(network)
+		_ = json.Unmarshal(jsoned, &mapped)
 
-        // Get gateway(s) information (needs the name(s) in the output map)
-        var pgw, sgw *pb.Host
-        pgwID := network.GetGatewayId()
-        sgwID := network.GetSecondaryGatewayId()
-        pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
-        if err == nil {
-            mapped["gateway_name"] = pgw.Name
-        } else {
-            mapped["gateway_name"] = "<unknown>"
-        }
+		// Get gateway(s) information (needs the name(s) in the output map)
+		var pgw, sgw *pb.Host
+		pgwID := network.GetGatewayId()
+		sgwID := network.GetSecondaryGatewayId()
+		pgw, err = client.New().Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+		if err == nil {
+			mapped["gateway_name"] = pgw.Name
+		} else {
+			mapped["gateway_name"] = "<unknown>"
+		}
 
-        if pgw != nil {
-            mapped["gateway_name"] = pgw.Name
-            if network.GetSecondaryGatewayId() != "" {
-                sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
-                if err == nil {
-                    mapped["secondary_gateway_name"] = sgw.Name
-                } else {
-                    mapped["secondary_gateway_name"] = "<unknown>"
-                }
-            }
-        }
+		if pgw != nil {
+			mapped["gateway_name"] = pgw.Name
+			if network.GetSecondaryGatewayId() != "" {
+				sgw, err = client.New().Host.Inspect(sgwID, temporal.GetExecutionTimeout())
+				if err == nil {
+					mapped["secondary_gateway_name"] = sgw.Name
+				} else {
+					mapped["secondary_gateway_name"] = "<unknown>"
+				}
+			}
+		}
 
-        // Removed entry virtual_ip if empty
-        if len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
-            delete(mapped, "virtual_ip")
-        }
+		// Removed entry virtual_ip if empty
+		if len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+			delete(mapped, "virtual_ip")
+		}
 
-        return clitools.SuccessResponse(mapped)
-    },
+		return clitools.SuccessResponse(mapped)
+	},
 }
 
 var networkCreate = cli.Command{
-    Name:      "create",
-    Aliases:   []string{"new"},
-    Usage:     "create a network",
-    ArgsUsage: "<network_name>",
-    Flags: []cli.Flag{
-        cli.StringFlag{
-            Name:  "cidr",
-            Value: "192.168.0.0/24",
-            Usage: "cidr of the network",
-        },
-        cli.StringFlag{
-            Name:  "os",
-            Value: "Ubuntu 18.04",
-            Usage: "Image name for the gateway",
-        },
-        cli.StringFlag{
-            Name:  "domain",
-            Value: "",
-            Usage: "Defines the domain used to define host FQDN (default: empty)",
-        },
-        cli.StringFlag{
-            Name:  "gwname",
-            Value: "",
-            Usage: "Name for the gateway. Default to 'gw-<network_name>'",
-        },
-        cli.BoolFlag{
-            Name:  "failover",
-            Usage: "creates 2 gateways for the network with a VIP used as internal default route",
-        },
-        cli.BoolFlag{
-            Name:  "keep-on-failure, k",
-            Usage: "If set, the resources are not deleted on failure (default: not set)",
-        },
-        cli.StringFlag{
-            Name: "S, sizing",
-            Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "create a network",
+	ArgsUsage: "<network_name>",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "cidr",
+			Value: "192.168.0.0/24",
+			Usage: "cidr of the network",
+		},
+		cli.StringFlag{
+			Name:  "os",
+			Value: "Ubuntu 18.04",
+			Usage: "Image name for the gateway",
+		},
+		cli.StringFlag{
+			Name:  "domain",
+			Value: "",
+			Usage: "Defines the domain used to define host FQDN (default: empty)",
+		},
+		cli.StringFlag{
+			Name:  "gwname",
+			Value: "",
+			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
+		},
+		cli.BoolFlag{
+			Name:  "failover",
+			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
+		},
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If set, the resources are not deleted on failure (default: not set)",
+		},
+		cli.StringFlag{
+			Name: "S, sizing",
+			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
 			<component> can be cpu, cpufreq, gpu, ram, disk
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
 				- = means exactly <value>
@@ -246,55 +246,55 @@ var networkCreate = cli.Command{
 				--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
 				--sizing "cpu <= 8, ram ~ 16"
 `,
-        },
-        cli.UintFlag{
-            Name:  "cpu",
-            Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
-        },
-        cli.Float64Flag{
-            Name:  "ram",
-            Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
-        },
-        cli.UintFlag{
-            Name:  "disk",
-            Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
-        },
-    },
-    Action: func(c *cli.Context) error {
-        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
-        if c.NArg() != 1 {
-            _ = cli.ShowSubcommandHelp(c)
-            return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
-        }
+		},
+		cli.UintFlag{
+			Name:  "cpu",
+			Usage: "DEPRECATED! uses --sizing! Defines the number of cpu of masters and nodes in the cluster",
+		},
+		cli.Float64Flag{
+			Name:  "ram",
+			Usage: "DEPRECATED! uses --sizing! Defines the size of RAM of masters and nodes in the cluster (in GB)",
+		},
+		cli.UintFlag{
+			Name:  "disk",
+			Usage: "DEPRECATED! uses --sizing! Defines the size of system disk of masters and nodes (in GB)",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", networkCmdName, c.Command.Name, c.Args())
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <network_name>."))
+		}
 
-        def, err := constructPBHostDefinitionFromCLI(c, "sizing")
-        if err != nil {
-            return err
-        }
-        netdef := pb.NetworkDefinition{
-            Cidr:     c.String("cidr"),
-            Name:     c.Args().Get(0),
-            FailOver: c.Bool("failover"),
-            Domain:   c.String("domain"),
-            Gateway: &pb.GatewayDefinition{
-                ImageId: c.String("os"),
-                Name:    c.String("gwname"),
-                Sizing:  def.Sizing,
-            },
-            KeepOnFailure: c.Bool("keep-on-failure"),
-        }
-        network, err := client.New().Network.Create(&netdef, temporal.GetExecutionTimeout())
-        if err != nil {
-            return clitools.FailureResponse(
-                clitools.ExitOnRPC(
-                    utils.Capitalize(
-                        client.DecorateError(
-                            err, "creation of network", true,
-                        ).Error(),
-                    ),
-                ),
-            )
-        }
-        return clitools.SuccessResponse(network)
-    },
+		def, err := constructPBHostDefinitionFromCLI(c, "sizing")
+		if err != nil {
+			return err
+		}
+		netdef := pb.NetworkDefinition{
+			Cidr:     c.String("cidr"),
+			Name:     c.Args().Get(0),
+			FailOver: c.Bool("failover"),
+			Domain:   c.String("domain"),
+			Gateway: &pb.GatewayDefinition{
+				ImageId: c.String("os"),
+				Name:    c.String("gwname"),
+				Sizing:  def.Sizing,
+			},
+			KeepOnFailure: c.Bool("keep-on-failure"),
+		}
+		network, err := client.New().Network.Create(&netdef, temporal.GetExecutionTimeout())
+		if err != nil {
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					utils.Capitalize(
+						client.DecorateError(
+							err, "creation of network", true,
+						).Error(),
+					),
+				),
+			)
+		}
+		return clitools.SuccessResponse(network)
+	},
 }

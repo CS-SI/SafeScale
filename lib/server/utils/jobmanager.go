@@ -17,82 +17,82 @@
 package utils
 
 import (
-    "context"
-    "fmt"
-    "sync"
-    "time"
+	"context"
+	"fmt"
+	"sync"
+	"time"
 
-    "github.com/sirupsen/logrus"
-    "google.golang.org/grpc/metadata"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/metadata"
 )
 
 type jobInfo struct {
-    commandName string
-    launchTime  time.Time
-    context     context.Context
-    cancelFunc  func()
+	commandName string
+	launchTime  time.Time
+	context     context.Context
+	cancelFunc  func()
 }
 
 func (ji *jobInfo) toString() string {
-    return fmt.Sprintf("Task : %s\nCreation time : %s", ji.commandName, ji.launchTime.String())
+	return fmt.Sprintf("Task : %s\nCreation time : %s", ji.commandName, ji.launchTime.String())
 }
 
 var (
-    jobMap          = map[string]jobInfo{}
-    mutexJobManager sync.Mutex
+	jobMap          = map[string]jobInfo{}
+	mutexJobManager sync.Mutex
 )
 
 // JobRegister ...
 func JobRegister(ctx context.Context, cancelFunc func(), command string) error {
-    md, ok := metadata.FromIncomingContext(ctx)
-    if !ok {
-        return fmt.Errorf("no uuid in grpc metadata")
-    }
-    mutexJobManager.Lock()
-    defer mutexJobManager.Unlock()
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return fmt.Errorf("no uuid in grpc metadata")
+	}
+	mutexJobManager.Lock()
+	defer mutexJobManager.Unlock()
 
-    jobMap[md.Get("uuid")[0]] = jobInfo{
-        commandName: command,
-        launchTime:  time.Now(),
-        context:     ctx,
-        cancelFunc:  cancelFunc,
-    }
+	jobMap[md.Get("uuid")[0]] = jobInfo{
+		commandName: command,
+		launchTime:  time.Now(),
+		context:     ctx,
+		cancelFunc:  cancelFunc,
+	}
 
-    return nil
+	return nil
 }
 
 // JobCancelUUID ...
 func JobCancelUUID(uuid string) {
-    mutexJobManager.Lock()
-    defer mutexJobManager.Unlock()
-    if info, found := jobMap[uuid]; found {
-        info.cancelFunc()
-    }
+	mutexJobManager.Lock()
+	defer mutexJobManager.Unlock()
+	if info, found := jobMap[uuid]; found {
+		info.cancelFunc()
+	}
 }
 
 // JobDeregisterUUID ...
 func JobDeregisterUUID(uuid string) {
-    mutexJobManager.Lock()
-    defer mutexJobManager.Unlock()
+	mutexJobManager.Lock()
+	defer mutexJobManager.Unlock()
 
-    delete(jobMap, uuid)
+	delete(jobMap, uuid)
 }
 
 // JobDeregister ...
 func JobDeregister(ctx context.Context) {
-    md, ok := metadata.FromIncomingContext(ctx)
-    if !ok {
-        logrus.Errorf("Trying to deregister a job without uuid!")
-    } else {
-        JobDeregisterUUID(md.Get("uuid")[0])
-    }
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		logrus.Errorf("Trying to deregister a job without uuid!")
+	} else {
+		JobDeregisterUUID(md.Get("uuid")[0])
+	}
 }
 
 // JobList ...
 func JobList() map[string]string {
-    listMap := map[string]string{}
-    for uuid, info := range jobMap {
-        listMap[uuid] = info.toString()
-    }
-    return listMap
+	listMap := map[string]string{}
+	for uuid, info := range jobMap {
+		listMap[uuid] = info.toString()
+	}
+	return listMap
 }

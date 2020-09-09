@@ -17,37 +17,37 @@
 package serialize
 
 import (
-    "sync"
+	"sync"
 
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-    Data data.Clonable
-    sync.RWMutex
-    module, key string
+	Data data.Clonable
+	sync.RWMutex
+	module, key string
 }
 
 // MarshalJSON (json.Marshaller interface)
 func (jp *jsonProperty) MarshalJSON() ([]byte, error) {
-    jp.Lock()
-    defer jp.Unlock()
+	jp.Lock()
+	defer jp.Unlock()
 
-    jsoned, err := ToJSON(jp.Data)
-    if err != nil {
-        return nil, err
-    }
-    return ToJSON(string(jsoned))
+	jsoned, err := ToJSON(jp.Data)
+	if err != nil {
+		return nil, err
+	}
+	return ToJSON(string(jsoned))
 }
 
 // SyncedJSONProperty is used to manipulate jsonProperty with type of lock asked (as returns by JSONProperties.LockBy<x>)
 type SyncedJSONProperty struct {
-    *jsonProperty
-    readLock bool
+	*jsonProperty
+	readLock bool
 }
 
 // ThenUse allows to run a function with 'key' decoded content passed as parameter after a
@@ -57,45 +57,45 @@ type SyncedJSONProperty struct {
 // If the extension is locked for read, no change will be encoded into the extension.
 // The lock applied on the extension is automatically released on exit.
 func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err error) {
-    if sp == nil {
-        return scerr.InvalidInstanceError()
-    }
-    if sp.jsonProperty == nil {
-        return scerr.InvalidParameterError("sp.jsonProperty", "cannot be nil")
-    }
-    if apply == nil {
-        return scerr.InvalidParameterError("apply", "cannot be nil")
-    }
+	if sp == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if sp.jsonProperty == nil {
+		return scerr.InvalidParameterError("sp.jsonProperty", "cannot be nil")
+	}
+	if apply == nil {
+		return scerr.InvalidParameterError("apply", "cannot be nil")
+	}
 
-    tracer := debug.NewTracer(nil, "", false).WithStopwatch().GoingIn()
-    defer tracer.OnExitTrace()()
-    defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
-    defer sp.unlock()
+	tracer := debug.NewTracer(nil, "", false).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
+	defer sp.unlock()
 
-    if jsonData := sp.jsonProperty.Data; jsonData != nil {
-        clone := jsonData.Clone()
-        err := apply(clone)
-        if err != nil {
-            return err
-        }
-        if !sp.readLock {
-            sp.jsonProperty.Data.Replace(clone)
-        }
-    }
+	if jsonData := sp.jsonProperty.Data; jsonData != nil {
+		clone := jsonData.Clone()
+		err := apply(clone)
+		if err != nil {
+			return err
+		}
+		if !sp.readLock {
+			sp.jsonProperty.Data.Replace(clone)
+		}
+	}
 
-    return nil
+	return nil
 }
 
 // unlock ...
 func (sp *SyncedJSONProperty) unlock() {
-    if sp == nil {
-        panic("Calling sp.unlock() with sp==nil!")
-    }
-    if !sp.readLock {
-        sp.jsonProperty.Unlock()
-    } else {
-        sp.jsonProperty.RUnlock()
-    }
+	if sp == nil {
+		panic("Calling sp.unlock() with sp==nil!")
+	}
+	if !sp.readLock {
+		sp.jsonProperty.Unlock()
+	} else {
+		sp.jsonProperty.RUnlock()
+	}
 }
 
 // jsonProperties ...
@@ -103,30 +103,30 @@ type jsonProperties map[string]*jsonProperty
 
 // JSONProperties ...
 type JSONProperties struct {
-    Properties jsonProperties
-    // This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
-    sync.Mutex
-    module string
+	Properties jsonProperties
+	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
+	sync.Mutex
+	module string
 }
 
 // NewJSONProperties creates a new JSonProperties instance
 func NewJSONProperties(module string) *JSONProperties {
-    if module == "" {
-        panic("module is empty!")
-    }
-    return &JSONProperties{
-        Properties: jsonProperties{},
-        module:     module,
-    }
+	if module == "" {
+		panic("module is empty!")
+	}
+	return &JSONProperties{
+		Properties: jsonProperties{},
+		module:     module,
+	}
 }
 
 // Lookup tells if a key is present in JSonProperties
 func (x *JSONProperties) Lookup(key string) bool {
-    x.Lock()
-    defer x.Unlock()
+	x.Lock()
+	defer x.Unlock()
 
-    _, ok := x.Properties[key]
-    return ok
+	_, ok := x.Properties[key]
+	return ok
 }
 
 // LockForRead is used to lock an extension for read
@@ -134,37 +134,37 @@ func (x *JSONProperties) Lookup(key string) bool {
 // If no extension exists corresponding to the key, an empty extension is created (in other words, this call
 // cannot fail because a key doesn't exist).
 func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
-    if x == nil {
-        panic("Calling utils.serialize.JSONProperties::LockForRead() from nil pointer!")
-    }
-    if x.Properties == nil {
-        panic("x.Properties is nil!")
-    }
-    if x.module == "" {
-        panic("x.module is empty!")
-    }
-    if key == "" {
-        panic("key is empty!")
-    }
+	if x == nil {
+		panic("Calling utils.serialize.JSONProperties::LockForRead() from nil pointer!")
+	}
+	if x.Properties == nil {
+		panic("x.Properties is nil!")
+	}
+	if x.module == "" {
+		panic("x.module is empty!")
+	}
+	if key == "" {
+		panic("key is empty!")
+	}
 
-    x.Lock()
-    defer x.Unlock()
+	x.Lock()
+	defer x.Unlock()
 
-    var (
-        item  *jsonProperty
-        found bool
-    )
-    if item, found = x.Properties[key]; !found {
-        zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-        item = &jsonProperty{
-            Data:   zeroValue,
-            module: x.module,
-            key:    key,
-        }
-        x.Properties[key] = item
-    }
-    item.RLock()
-    return &SyncedJSONProperty{jsonProperty: item, readLock: true}
+	var (
+		item  *jsonProperty
+		found bool
+	)
+	if item, found = x.Properties[key]; !found {
+		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+		item = &jsonProperty{
+			Data:   zeroValue,
+			module: x.module,
+			key:    key,
+		}
+		x.Properties[key] = item
+	}
+	item.RLock()
+	return &SyncedJSONProperty{jsonProperty: item, readLock: true}
 }
 
 // LockForWrite is used to lock an extension for write
@@ -172,87 +172,87 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 // If no extension exists corresponding to the key, an empty one is created (in other words, this call
 // cannot fail because a key doesn't exist).
 func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
-    if x == nil {
-        panic("Calling x.LockForWrite() with x==nil!")
-    }
-    if x.Properties == nil {
-        panic("x.jsonProperties is nil!")
-    }
-    if x.module == "" {
-        panic("x.module is empty!")
-    }
-    if key == "" {
-        panic("key is empty!")
-    }
+	if x == nil {
+		panic("Calling x.LockForWrite() with x==nil!")
+	}
+	if x.Properties == nil {
+		panic("x.jsonProperties is nil!")
+	}
+	if x.module == "" {
+		panic("x.module is empty!")
+	}
+	if key == "" {
+		panic("key is empty!")
+	}
 
-    x.Lock()
-    defer x.Unlock()
+	x.Lock()
+	defer x.Unlock()
 
-    var (
-        item  *jsonProperty
-        found bool
-    )
-    if item, found = x.Properties[key]; !found {
-        zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-        item = &jsonProperty{
-            Data:   zeroValue,
-            module: x.module,
-            key:    key,
-        }
-        x.Properties[key] = item
-    }
-    item.Lock()
-    return &SyncedJSONProperty{jsonProperty: item, readLock: false}
+	var (
+		item  *jsonProperty
+		found bool
+	)
+	if item, found = x.Properties[key]; !found {
+		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+		item = &jsonProperty{
+			Data:   zeroValue,
+			module: x.module,
+			key:    key,
+		}
+		x.Properties[key] = item
+	}
+	item.Lock()
+	return &SyncedJSONProperty{jsonProperty: item, readLock: false}
 }
 
 // SetModule allows to change the module of the JSONProperties (used to "contextualize" Property Types)
 func (x *JSONProperties) SetModule(module string) {
-    if module != "" && x.module == module {
-        return
-    }
-    if x.module != "" {
-        panic("x.SetModule() cannot be changed if x.module is already set!")
-    }
-    if module == "" {
-        panic("module is empty!")
-    }
-    x.Lock()
-    defer x.Unlock()
+	if module != "" && x.module == module {
+		return
+	}
+	if x.module != "" {
+		panic("x.SetModule() cannot be changed if x.module is already set!")
+	}
+	if module == "" {
+		panic("module is empty!")
+	}
+	x.Lock()
+	defer x.Unlock()
 
-    if x.module == "" {
-        x.module = module
-    }
+	if x.module == "" {
+		x.module = module
+	}
 }
 
 // MarshalJSON implements json.Marshaller
 // Note: DO NOT LOCK property here, deadlock risk
 func (x *JSONProperties) MarshalJSON() ([]byte, error) {
-    return ToJSON(&(x.Properties))
+	return ToJSON(&(x.Properties))
 }
 
 // UnmarshalJSON implement json.Unmarshaller
 // Note: DO NOT LOCK property here, deadlock risk
 func (x *JSONProperties) UnmarshalJSON(b []byte) error {
-    // Decode JSON data
-    unjsoned := map[string]string{}
-    err := FromJSON(b, &unjsoned)
-    if err != nil {
-        return err
-    }
+	// Decode JSON data
+	unjsoned := map[string]string{}
+	err := FromJSON(b, &unjsoned)
+	if err != nil {
+		return err
+	}
 
-    // Now do the real work
-    for key, value := range unjsoned {
-        zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-        err := FromJSON([]byte(value), zeroValue)
-        if err != nil {
-            return err
-        }
-        item := &jsonProperty{
-            Data:   zeroValue,
-            module: x.module,
-            key:    key,
-        }
-        x.Properties[key] = item
-    }
-    return nil
+	// Now do the real work
+	for key, value := range unjsoned {
+		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
+		err := FromJSON([]byte(value), zeroValue)
+		if err != nil {
+			return err
+		}
+		item := &jsonProperty{
+			Data:   zeroValue,
+			module: x.module,
+			key:    key,
+		}
+		x.Properties[key] = item
+	}
+	return nil
 }

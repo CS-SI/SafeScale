@@ -17,35 +17,35 @@
 package control
 
 import (
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
-    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
 )
 
 // Request defines what kind of Cluster is wanted
 type Request struct {
-    // Name is the name of the cluster wanted
-    Name string
-    // CIDR defines the network to create
-    CIDR string
-    // Domain defines the domain to use to build host names
-    Domain string
-    // Complexity is the implementation wanted, can be Small, Normal or Large
-    Complexity complexity.Enum
-    // Flavor tells what kind of cluster to create
-    Flavor flavor.Enum
-    // NetworkID is the ID of the network to use
-    NetworkID string
-    // Tenant contains the name of the tenant
-    Tenant string
-    // KeepOnFailure is set to True to keep resources on cluster creation failure
-    KeepOnFailure bool
-    // GatewaysDef count
-    GatewaysDef *pb.HostDefinition
-    // NodesDef count
-    MastersDef *pb.HostDefinition
-    // NodesDef count
-    NodesDef *pb.HostDefinition
-    // DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
-    DisabledDefaultFeatures map[string]struct{}
+	// Name is the name of the cluster wanted
+	Name string
+	// CIDR defines the network to create
+	CIDR string
+	// Domain defines the domain to use to build host names
+	Domain string
+	// Complexity is the implementation wanted, can be Small, Normal or Large
+	Complexity complexity.Enum
+	// Flavor tells what kind of cluster to create
+	Flavor flavor.Enum
+	// NetworkID is the ID of the network to use
+	NetworkID string
+	// Tenant contains the name of the tenant
+	Tenant string
+	// KeepOnFailure is set to True to keep resources on cluster creation failure
+	KeepOnFailure bool
+	// GatewaysDef count
+	GatewaysDef *pb.HostDefinition
+	// NodesDef count
+	MastersDef *pb.HostDefinition
+	// NodesDef count
+	NodesDef *pb.HostDefinition
+	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
+	DisabledDefaultFeatures map[string]struct{}
 }

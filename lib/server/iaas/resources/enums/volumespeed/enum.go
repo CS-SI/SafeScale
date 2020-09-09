@@ -23,10 +23,10 @@ package volumespeed
 type Enum int
 
 const (
-    // COLD speed volume
-    COLD Enum = iota
-    // HDD speed volume.
-    HDD
-    // SSD speed volume
-    SSD
+	// COLD speed volume
+	COLD Enum = iota
+	// HDD speed volume.
+	HDD
+	// SSD speed volume
+	SSD
 )

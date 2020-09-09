@@ -17,21 +17,21 @@
 package listeners
 
 import (
-    "context"
-    "fmt"
+	"context"
+	"fmt"
 
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-    log "github.com/sirupsen/logrus"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/handlers"
-    srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-    "github.com/CS-SI/SafeScale/lib/system"
-    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // SSHHandler exists to ease integration tests
@@ -47,87 +47,87 @@ type SSHListener struct{}
 
 // Run executes an ssh command on a remote host
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshResponse, err error) {
-    if s == nil {
-        return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
-    }
-    if in == nil {
-        return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
-    }
-    host := in.GetHost().GetName()
-    command := in.GetCommand()
+	if s == nil {
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+	}
+	if in == nil {
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
+	}
+	host := in.GetHost().GetName()
+	command := in.GetCommand()
 
-    tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
-    tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
-    defer tracer.OnExitTrace()()
-    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
+	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-    log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
+	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
 
-    ctx, cancelFunc := context.WithCancel(ctx)
-    if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err == nil {
-        defer srvutils.JobDeregister(ctx)
-    }
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err == nil {
+		defer srvutils.JobDeregister(ctx)
+	}
 
-    tenant := GetCurrentTenant()
-    if tenant == nil {
-        // log.Info("Can't execute ssh command: no tenant set")
-        return nil, status.Errorf(codes.FailedPrecondition, "cannot execute ssh command: no tenant set")
-    }
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		// log.Info("Can't execute ssh command: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot execute ssh command: no tenant set")
+	}
 
-    handler := SSHHandler(tenant.Service)
-    retcode, stdout, stderr, err := handler.Run(ctx, host, command, outputs.DISPLAY)
-    if err != nil {
-        err = status.Errorf(codes.Internal, getUserMessage(err))
-    }
-    return &pb.SshResponse{
-        Status:    int32(retcode),
-        OutputStd: stdout,
-        OutputErr: stderr,
-    }, err
+	handler := SSHHandler(tenant.Service)
+	retcode, stdout, stderr, err := handler.Run(ctx, host, command, outputs.DISPLAY)
+	if err != nil {
+		err = status.Errorf(codes.Internal, getUserMessage(err))
+	}
+	return &pb.SshResponse{
+		Status:    int32(retcode),
+		OutputStd: stdout,
+		OutputErr: stderr,
+	}, err
 }
 
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.SshResponse, err error) {
-    if s == nil {
-        return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
-    }
-    if in == nil {
-        return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
-    }
-    source := in.Source
-    dest := in.Destination
+	if s == nil {
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+	}
+	if in == nil {
+		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
+	}
+	source := in.Source
+	dest := in.Destination
 
-    tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
-    defer tracer.OnExitTrace()()
-    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-    log.Infof("Listeners: ssh copy %s %s", source, dest)
+	log.Infof("Listeners: ssh copy %s %s", source, dest)
 
-    ctx, cancelFunc := context.WithCancel(ctx)
-    if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Copy "+source+" to "+dest); err == nil {
-        defer srvutils.JobDeregister(ctx)
-    }
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Copy "+source+" to "+dest); err == nil {
+		defer srvutils.JobDeregister(ctx)
+	}
 
-    tenant := GetCurrentTenant()
-    if tenant == nil {
-        // log.Info("Can't copy by ssh command: no tenant set")
-        return nil, status.Errorf(codes.FailedPrecondition, "cannot copy by ssh: no tenant set")
-    }
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		// log.Info("Can't copy by ssh command: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot copy by ssh: no tenant set")
+	}
 
-    handler := SSHHandler(tenant.Service)
-    retcode, stdout, stderr, err := handler.Copy(ctx, source, dest)
-    if err != nil {
-        return nil, status.Errorf(codes.Internal, getUserMessage(err))
-    }
-    if retcode != 0 {
-        return nil, fmt.Errorf(
-            "cannot copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr,
-        )
-    }
+	handler := SSHHandler(tenant.Service)
+	retcode, stdout, stderr, err := handler.Copy(ctx, source, dest)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
+	}
+	if retcode != 0 {
+		return nil, fmt.Errorf(
+			"cannot copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr,
+		)
+	}
 
-    return &pb.SshResponse{
-        Status:    int32(retcode),
-        OutputStd: stdout,
-        OutputErr: stderr,
-    }, nil
+	return &pb.SshResponse{
+		Status:    int32(retcode),
+		OutputStd: stdout,
+		OutputErr: stderr,
+	}, nil
 }

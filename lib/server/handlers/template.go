@@ -17,14 +17,14 @@
 package handlers
 
 import (
-    "context"
-    "fmt"
+	"context"
+	"fmt"
 
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 //go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateAPI
@@ -33,27 +33,27 @@ import (
 
 // TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-    List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
+	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
 }
 
 // TemplateHandler template service
 type TemplateHandler struct {
-    service iaas.Service
+	service iaas.Service
 }
 
 // NewTemplateHandler creates a template service
 func NewTemplateHandler(svc iaas.Service) TemplateAPI {
-    return &TemplateHandler{
-        service: svc,
-    }
+	return &TemplateHandler{
+		service: svc,
+	}
 }
 
 // List returns the template list
 func (handler *TemplateHandler) List(ctx context.Context, all bool) (tlist []resources.HostTemplate, err error) {
-    tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
-    defer tracer.OnExitTrace()()
-    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-    tlist, err = handler.service.ListTemplates(all)
-    return tlist, err
+	tlist, err = handler.service.ListTemplates(all)
+	return tlist, err
 }

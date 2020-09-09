@@ -17,56 +17,56 @@
 package commands
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/urfave/cli"
+	"github.com/urfave/cli"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/client"
-    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
-    "github.com/CS-SI/SafeScale/lib/utils/temporal"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/client"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var (
-    // Verbose tells if user asks more verbosity
-    Verbose bool
-    // Debug tells if user asks debug information
-    Debug bool
+	// Verbose tells if user asks more verbosity
+	Verbose bool
+	// Debug tells if user asks debug information
+	Debug bool
 
-    hostName     string
-    hostInstance *pb.Host
-    featureName  string
+	hostName     string
+	hostInstance *pb.Host
+	featureName  string
 )
 
 func extractFeatureArgument(c *cli.Context) error {
-    if c.NArg() < 2 {
-        _ = cli.ShowSubcommandHelp(c)
-        return clitools.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
-    }
-    featureName = c.Args().Get(1)
-    if featureName == "" {
-        return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME")
-    }
-    return nil
+	if c.NArg() < 2 {
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument("Missing mandatory argument FEATURENAME")
+	}
+	featureName = c.Args().Get(1)
+	if featureName == "" {
+		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME")
+	}
+	return nil
 }
 
 // Use the hostnamPos-th argument of the command as a hostName and use it to get the host instance
 func extractHostArgument(c *cli.Context, hostnamePos int) error {
-    hostName = c.Args().Get(hostnamePos)
-    if hostName == "" {
-        return clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
-    }
+	hostName = c.Args().Get(hostnamePos)
+	if hostName == "" {
+		return clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
+	}
 
-    var err error
-    hostInstance, err = client.New().Host.Inspect(hostName, temporal.GetExecutionTimeout())
-    if err != nil {
-        // fmt.Printf("%s\n", err.Error())
-        return clitools.ExitOnRPC(err.Error())
-    }
-    if hostInstance == nil {
-        return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found.\n", hostName))
-    }
+	var err error
+	hostInstance, err = client.New().Host.Inspect(hostName, temporal.GetExecutionTimeout())
+	if err != nil {
+		// fmt.Printf("%s\n", err.Error())
+		return clitools.ExitOnRPC(err.Error())
+	}
+	if hostInstance == nil {
+		return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found.\n", hostName))
+	}
 
-    return nil
+	return nil
 }

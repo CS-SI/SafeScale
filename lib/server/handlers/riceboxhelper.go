@@ -17,69 +17,69 @@
 package handlers
 
 import (
-    "bytes"
-    "context"
-    "text/template"
+	"bytes"
+	"context"
+	"text/template"
 
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
-    rice "github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 )
 
 //go:generate rice embed-go
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-    defer scerr.OnExitLogError(debug.NewTracer(nil, "", true).TraceMessage(""), &err)()
+	defer scerr.OnExitLogError(debug.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
-    box, err := rice.FindBox("../handlers/scripts")
-    if err != nil {
-        return "", err
-    }
-    scriptContent, err := box.String(script)
-    if err != nil {
-        return "", err
-    }
-    tpl, err := template.New("TemplateName").Parse(scriptContent)
-    if err != nil {
-        return "", err
-    }
+	box, err := rice.FindBox("../handlers/scripts")
+	if err != nil {
+		return "", err
+	}
+	scriptContent, err := box.String(script)
+	if err != nil {
+		return "", err
+	}
+	tpl, err := template.New("TemplateName").Parse(scriptContent)
+	if err != nil {
+		return "", err
+	}
 
-    var buffer bytes.Buffer
-    if err = tpl.Execute(&buffer, data); err != nil {
-        return "", err
-    }
+	var buffer bytes.Buffer
+	if err = tpl.Execute(&buffer, data); err != nil {
+		return "", err
+	}
 
-    tplcmd = buffer.String()
-    // fmt.Println(tplcmd)
-    return tplcmd, nil
+	tplcmd = buffer.String()
+	// fmt.Println(tplcmd)
+	return tplcmd, nil
 }
 
 // Execute the given script (embeded in a rice-box) with the given data on the host identified by hostid
 func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
-    scriptCmd, err := getBoxContent(script, data)
-    if err != nil {
-        return err
-    }
-    // retrieve ssh config to perform some commands
-    sshHandler := NewSSHHandler(svc)
-    ssh, err := sshHandler.GetConfig(ctx, hostid)
-    if err != nil {
-        return err
-    }
+	scriptCmd, err := getBoxContent(script, data)
+	if err != nil {
+		return err
+	}
+	// retrieve ssh config to perform some commands
+	sshHandler := NewSSHHandler(svc)
+	ssh, err := sshHandler.GetConfig(ctx, hostid)
+	if err != nil {
+		return err
+	}
 
-    cmd, err := ssh.SudoCommand(scriptCmd, false)
-    if err != nil {
-        return err
-    }
-    _, err = cmd.Output()
+	cmd, err := ssh.SudoCommand(scriptCmd, false)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
 
-    if err != nil {
-        return err
-    }
-    return nil
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -17,27 +17,27 @@
 package property
 
 const (
-    // DescriptionV1 contains optional additional info describing cluster (purpose, ...)
-    DescriptionV1 = "1"
-    // DefaultsV1 contains additional info about default settings (node sizing, default image, ...)
-    // Deprecated by DefaultsV2 (but kept for compatibility)
-    DefaultsV1 = "2"
-    // CompositeV1 contains optional additional info about the composite build of the cluster (multi-tenant)
-    CompositeV1 = "3"
-    // FeaturesV1 contains optional additional info describing installed features on cluster
-    FeaturesV1 = "4"
-    // NasV1 contains optional additional info describing Nases and shared folders on cluster
-    NasV1 = "5"
-    // NodesV1 contains optional additional info describing Nodes inside the cluster
-    NodesV1 = "6"
-    // StateV1 contains optional additional info describing cluster state
-    StateV1 = "7"
-    // NetworkV1 contains optional additional info about network of the cluster
-    NetworkV1 = "8"
-    // DefaultsV2 contains optional additional info about network of the cluster
-    DefaultsV2 = "9"
-    // NetworkV2 contains optional additional info about network of the cluster (vip)
-    NetworkV2 = "10"
-    // ControlPlaneV1 contains optional additional info about Control Plane of the cluster
-    ControlPlaneV1 = "11"
+	// DescriptionV1 contains optional additional info describing cluster (purpose, ...)
+	DescriptionV1 = "1"
+	// DefaultsV1 contains additional info about default settings (node sizing, default image, ...)
+	// Deprecated by DefaultsV2 (but kept for compatibility)
+	DefaultsV1 = "2"
+	// CompositeV1 contains optional additional info about the composite build of the cluster (multi-tenant)
+	CompositeV1 = "3"
+	// FeaturesV1 contains optional additional info describing installed features on cluster
+	FeaturesV1 = "4"
+	// NasV1 contains optional additional info describing Nases and shared folders on cluster
+	NasV1 = "5"
+	// NodesV1 contains optional additional info describing Nodes inside the cluster
+	NodesV1 = "6"
+	// StateV1 contains optional additional info describing cluster state
+	StateV1 = "7"
+	// NetworkV1 contains optional additional info about network of the cluster
+	NetworkV1 = "8"
+	// DefaultsV2 contains optional additional info about network of the cluster
+	DefaultsV2 = "9"
+	// NetworkV2 contains optional additional info about network of the cluster (vip)
+	NetworkV2 = "10"
+	// ControlPlaneV1 contains optional additional info about Control Plane of the cluster
+	ControlPlaneV1 = "11"
 )

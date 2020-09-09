@@ -17,128 +17,128 @@
 package ebrc
 
 import (
-    "strings"
+	"strings"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-    apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/ebrc"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/ebrc"
 )
 
 // provider is the provider implementation of the Ebrc provider
 type provider struct {
-    *ebrc.StackEbrc
+	*ebrc.StackEbrc
 
-    tenantParameters map[string]interface{}
+	tenantParameters map[string]interface{}
 }
 
 // Build build a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
-    identity, _ := params["identity"].(map[string]interface{})
-    compute, _ := params["compute"].(map[string]interface{})
+	identity, _ := params["identity"].(map[string]interface{})
+	compute, _ := params["compute"].(map[string]interface{})
 
-    username, _ := identity["User"].(string)
-    password, _ := identity["Password"].(string)
-    insecure, _ := identity["Insecure"].(string)
-    region, _ := compute["Region"].(string)
-    vdc, _ := compute["Vdc"].(string)
-    org, _ := identity["Org"].(string)
-    identityEndpoint, _ := identity["EntryPoint"].(string)
+	username, _ := identity["User"].(string)
+	password, _ := identity["Password"].(string)
+	insecure, _ := identity["Insecure"].(string)
+	region, _ := compute["Region"].(string)
+	vdc, _ := compute["Vdc"].(string)
+	org, _ := identity["Org"].(string)
+	identityEndpoint, _ := identity["EntryPoint"].(string)
 
-    authOptions := stacks.AuthenticationOptions{
-        IdentityEndpoint: identityEndpoint,
-        Username:         username,
-        Password:         password,
-        Region:           region,
-        ProjectName:      org,
-        ProjectID:        vdc,
-        FloatingIPPool:   "public",
-    }
+	authOptions := stacks.AuthenticationOptions{
+		IdentityEndpoint: identityEndpoint,
+		Username:         username,
+		Password:         password,
+		Region:           region,
+		ProjectName:      org,
+		ProjectID:        vdc,
+		FloatingIPPool:   "public",
+	}
 
-    metadataBucketName, err := objectstorage.BuildMetadataBucketName("ebrc", region, "", vdc)
-    if err != nil {
-        return nil, err
-    }
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName("ebrc", region, "", vdc)
+	if err != nil {
+		return nil, err
+	}
 
-    cfgOptions := stacks.ConfigurationOptions{
-        DNSList:                   []string{"176.65.72.102", "176.65.72.106"},
-        UseFloatingIP:             true,
-        UseLayer3Networking:       true,
-        AutoHostNetworkInterfaces: false,
-        VolumeSpeeds: map[string]volumespeed.Enum{
-            "standard":   volumespeed.COLD,
-            "performant": volumespeed.HDD,
-        },
-        MetadataBucket: metadataBucketName,
-    }
+	cfgOptions := stacks.ConfigurationOptions{
+		DNSList:                   []string{"176.65.72.102", "176.65.72.106"},
+		UseFloatingIP:             true,
+		UseLayer3Networking:       true,
+		AutoHostNetworkInterfaces: false,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"standard":   volumespeed.COLD,
+			"performant": volumespeed.HDD,
+		},
+		MetadataBucket: metadataBucketName,
+	}
 
-    notsafe := false
-    if strings.EqualFold(insecure, "True") {
-        notsafe = true
-    }
+	notsafe := false
+	if strings.EqualFold(insecure, "True") {
+		notsafe = true
+	}
 
-    ebrcOptions := stacks.VCloudConfigurationOptions{Insecure: notsafe}
+	ebrcOptions := stacks.VCloudConfigurationOptions{Insecure: notsafe}
 
-    stack, err := ebrc.New(authOptions, ebrcOptions, cfgOptions)
-    if err != nil {
-        return nil, err
-    }
+	stack, err := ebrc.New(authOptions, ebrcOptions, cfgOptions)
+	if err != nil {
+		return nil, err
+	}
 
-    return &provider{
-        StackEbrc:        stack,
-        tenantParameters: params,
-    }, nil
+	return &provider{
+		StackEbrc:        stack,
+		tenantParameters: params,
+	}, nil
 }
 
 // GetAuthOpts returns the auth options
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
-    cfg := providers.ConfigMap{}
-    opts := p.StackEbrc.GetAuthenticationOptions()
+	cfg := providers.ConfigMap{}
+	opts := p.StackEbrc.GetAuthenticationOptions()
 
-    cfg.Set("TenantName", opts.TenantName)
-    cfg.Set("Login", opts.Username)
-    cfg.Set("Password", opts.Password)
-    cfg.Set("AuthUrl", opts.IdentityEndpoint)
-    cfg.Set("Region", opts.Region)
-    cfg.Set("Org", opts.ProjectName)
-    cfg.Set("Vdc", opts.ProjectID)
+	cfg.Set("TenantName", opts.TenantName)
+	cfg.Set("Login", opts.Username)
+	cfg.Set("Password", opts.Password)
+	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("Region", opts.Region)
+	cfg.Set("Org", opts.ProjectName)
+	cfg.Set("Vdc", opts.ProjectID)
 
-    return cfg, nil
+	return cfg, nil
 }
 
 // GetCfgOpts return configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
-    cfg := providers.ConfigMap{}
-    opts := p.StackEbrc.GetConfigurationOptions()
+	cfg := providers.ConfigMap{}
+	opts := p.StackEbrc.GetConfigurationOptions()
 
-    cfg.Set("DNSList", opts.DNSList)
-    cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
-    cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
-    cfg.Set("DefaultImage", opts.DefaultImage)
-    cfg.Set("ProviderNetwork", opts.ProviderNetwork)
-    cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("DNSList", opts.DNSList)
+	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
+	cfg.Set("DefaultImage", opts.DefaultImage)
+	cfg.Set("ProviderNetwork", opts.ProviderNetwork)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 
-    return cfg, nil
+	return cfg, nil
 }
 
 // GetName returns the providerName
 func (p *provider) GetName() string {
-    return "ebrc"
+	return "ebrc"
 }
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p *provider) GetTenantParameters() map[string]interface{} {
-    return p.tenantParameters
+	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
-    return providers.Capabilities{}
+	return providers.Capabilities{}
 }
 
 func init() {
-    iaas.Register("ebrc", &provider{})
+	iaas.Register("ebrc", &provider{})
 }

@@ -17,74 +17,74 @@
 package install
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-    "github.com/CS-SI/SafeScale/lib/server/install/enums/method"
+	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 )
 
 func init() {
 
-    allEmbedded = []*Feature{
-        dockerFeature(),
-        ntpServerFeature(),
-        ntpClientFeature(),
-        ansibleFeature(),
-        postgresql4platformFeature(),
-        nVidiaDockerFeature(),
-        mpichBuildFeature(),
-        ohpcSlurmMasterFeature(),
-        ohpcSlurmNodeFeature(),
-        remoteDesktopFeature(),
-        postgres4gatewayFeature(),
-        edgeproxy4networkFeature(),
-        keycloak4platformFeature(),
-        kubernetesFeature(),
-        proxycacheServerFeature(),
-        proxycacheClientFeature(),
-        apacheIgniteFeature(),
-        elasticsearchFeature(),
-        logstashFeature(),
-        metricbeatFeature(),
-        heartbeatFeature(),
-        elastalertFeature(),
-        filebeatFeature(),
-        packetbeatFeature(),
-        kibanaFeature(),
-        k8shelm2Feature(),
-        sparkmaster4platformFeature(),
-        elassandraFeature(),
-        consul4platformFeature(),
-        monitoring4platformFeature(),
-        geoserverFeature(),
-        certificateAuthorityFeature(),
-    }
+	allEmbedded = []*Feature{
+		dockerFeature(),
+		ntpServerFeature(),
+		ntpClientFeature(),
+		ansibleFeature(),
+		postgresql4platformFeature(),
+		nVidiaDockerFeature(),
+		mpichBuildFeature(),
+		ohpcSlurmMasterFeature(),
+		ohpcSlurmNodeFeature(),
+		remoteDesktopFeature(),
+		postgres4gatewayFeature(),
+		edgeproxy4networkFeature(),
+		keycloak4platformFeature(),
+		kubernetesFeature(),
+		proxycacheServerFeature(),
+		proxycacheClientFeature(),
+		apacheIgniteFeature(),
+		elasticsearchFeature(),
+		logstashFeature(),
+		metricbeatFeature(),
+		heartbeatFeature(),
+		elastalertFeature(),
+		filebeatFeature(),
+		packetbeatFeature(),
+		kibanaFeature(),
+		k8shelm2Feature(),
+		sparkmaster4platformFeature(),
+		elassandraFeature(),
+		consul4platformFeature(),
+		monitoring4platformFeature(),
+		geoserverFeature(),
+		certificateAuthorityFeature(),
+	}
 
-    for _, item := range allEmbedded {
-        // allEmbeddedMap[item.BaseFilename()] = item
-        allEmbeddedMap[item.DisplayName()] = item
-        installers := item.specs.GetStringMap("feature.install")
-        for k := range installers {
-            meth, err := method.Parse(k)
-            if err != nil {
-                logrus.Errorf(
-                    fmt.Sprintf(
-                        "syntax error in feature '%s' specification file (%s)! install meth '%s' unknown!",
-                        item.DisplayName(), item.DisplayFilename(), k,
-                    ),
-                )
-                continue
-            }
-            if _, found := availableEmbeddedMap[meth]; !found {
-                availableEmbeddedMap[meth] = map[string]*Feature{
-                    item.DisplayName(): item,
-                    // item.BaseFilename(): item,
-                }
-            } else {
-                availableEmbeddedMap[meth][item.DisplayName()] = item
-                // availableEmbeddedMap[meth][item.BaseFilename()] = item
-            }
-        }
-    }
+	for _, item := range allEmbedded {
+		// allEmbeddedMap[item.BaseFilename()] = item
+		allEmbeddedMap[item.DisplayName()] = item
+		installers := item.specs.GetStringMap("feature.install")
+		for k := range installers {
+			meth, err := method.Parse(k)
+			if err != nil {
+				logrus.Errorf(
+					fmt.Sprintf(
+						"syntax error in feature '%s' specification file (%s)! install meth '%s' unknown!",
+						item.DisplayName(), item.DisplayFilename(), k,
+					),
+				)
+				continue
+			}
+			if _, found := availableEmbeddedMap[meth]; !found {
+				availableEmbeddedMap[meth] = map[string]*Feature{
+					item.DisplayName(): item,
+					// item.BaseFilename(): item,
+				}
+			} else {
+				availableEmbeddedMap[meth][item.DisplayName()] = item
+				// availableEmbeddedMap[meth][item.BaseFilename()] = item
+			}
+		}
+	}
 }

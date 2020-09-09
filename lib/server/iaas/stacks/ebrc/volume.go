@@ -17,18 +17,18 @@
 package ebrc
 
 import (
-    "fmt"
-    "hash/fnv"
-    "strconv"
-    "strings"
+	"fmt"
+	"hash/fnv"
+	"strconv"
+	"strings"
 
-    "github.com/pkg/errors"
-    "github.com/sirupsen/logrus"
-    "github.com/vmware/go-vcloud-director/types/v56"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/vmware/go-vcloud-director/types/v56"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-    "github.com/CS-SI/SafeScale/lib/utils"
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // -------------Volumes Management---------------------------------------------------------------------------------------
@@ -38,169 +38,169 @@ import (
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
-    if s == nil {
-        return nil, scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 
-    diskCreateParams := &types.DiskCreateParams{
-        Disk: &types.Disk{
-            Name:       request.Name,
-            Size:       int(request.Size * 1024 * 1024 * 1024),
-            BusType:    "6",
-            BusSubType: "lsilogicsas",
-        },
-    }
+	diskCreateParams := &types.DiskCreateParams{
+		Disk: &types.Disk{
+			Name:       request.Name,
+			Size:       int(request.Size * 1024 * 1024 * 1024),
+			BusType:    "6",
+			BusSubType: "lsilogicsas",
+		},
+	}
 
-    _, vdc, err := s.getOrgVdc()
-    if err != nil {
-        return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume"))
-    }
+	_, vdc, err := s.getOrgVdc()
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume"))
+	}
 
-    storageProfileValue := ""
-    for _, sps := range vdc.Vdc.VdcStorageProfiles {
-        for _, sp := range sps.VdcStorageProfile {
-            storageProfileValue = sp.Name
-        }
-    }
+	storageProfileValue := ""
+	for _, sps := range vdc.Vdc.VdcStorageProfiles {
+		for _, sp := range sps.VdcStorageProfile {
+			storageProfileValue = sp.Name
+		}
+	}
 
-    var storageReference types.Reference
-    if storageProfileValue != "" {
-        storageReference, err = vdc.FindStorageProfileReference(storageProfileValue)
-        if err != nil {
-            return nil, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", storageProfileValue), err)
-        }
-        diskCreateParams.Disk.StorageProfile = &types.Reference{HREF: storageReference.HREF}
-    }
+	var storageReference types.Reference
+	if storageProfileValue != "" {
+		storageReference, err = vdc.FindStorageProfileReference(storageProfileValue)
+		if err != nil {
+			return nil, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", storageProfileValue), err)
+		}
+		diskCreateParams.Disk.StorageProfile = &types.Reference{HREF: storageReference.HREF}
+	}
 
-    task, err := vdc.CreateDisk(diskCreateParams)
-    if err != nil {
-        return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
-    }
+	task, err := vdc.CreateDisk(diskCreateParams)
+	if err != nil {
+		return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
+	}
 
-    err = task.WaitTaskCompletion()
-    if err != nil {
-        return nil, scerr.Errorf(fmt.Sprintf("error waiting to finish creation of independent disk: %s", err), err)
-    }
+	err = task.WaitTaskCompletion()
+	if err != nil {
+		return nil, scerr.Errorf(fmt.Sprintf("error waiting to finish creation of independent disk: %s", err), err)
+	}
 
-    drec, err := vdc.QueryDisk(request.Name)
-    if err != nil {
-        return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
-    }
-    disk, err := vdc.FindDiskByHREF(drec.Disk.HREF)
-    if err != nil {
-        return nil, scerr.Errorf(fmt.Sprintf("unable to find disk by reference: %s", err), err)
-    }
+	drec, err := vdc.QueryDisk(request.Name)
+	if err != nil {
+		return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
+	}
+	disk, err := vdc.FindDiskByHREF(drec.Disk.HREF)
+	if err != nil {
+		return nil, scerr.Errorf(fmt.Sprintf("unable to find disk by reference: %s", err), err)
+	}
 
-    revol := &resources.Volume{
-        ID:   disk.Disk.Id,
-        Name: disk.Disk.Name,
-        Size: disk.Disk.Size,
-    }
+	revol := &resources.Volume{
+		ID:   disk.Disk.Id,
+		Name: disk.Disk.Name,
+		Size: disk.Disk.Size,
+	}
 
-    return revol, nil
+	return revol, nil
 }
 
 // GetVolume returns the volume identified by id
 func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
-    logrus.Debug("ebrc.Client.GetVolume() called")
-    defer logrus.Debug("ebrc.Client.GetVolume() done")
+	logrus.Debug("ebrc.Client.GetVolume() called")
+	defer logrus.Debug("ebrc.Client.GetVolume() done")
 
-    if s == nil {
-        return nil, scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 
-    var volume resources.Volume
+	var volume resources.Volume
 
-    _, vdc, err := s.getOrgVdc()
-    if err != nil {
-        return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes"))
-    }
+	_, vdc, err := s.getOrgVdc()
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes"))
+	}
 
-    // FIXME Add data
-    dr, err := vdc.QueryDisk(ref)
-    if err == nil {
-        thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
-        if err == nil {
-            volume = resources.Volume{
-                Name: thed.Disk.Name,
-                Size: thed.Disk.Size,
-                ID:   thed.Disk.Id,
-            }
-        }
-    }
+	// FIXME Add data
+	dr, err := vdc.QueryDisk(ref)
+	if err == nil {
+		thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
+		if err == nil {
+			volume = resources.Volume{
+				Name: thed.Disk.Name,
+				Size: thed.Disk.Size,
+				ID:   thed.Disk.Id,
+			}
+		}
+	}
 
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    return &volume, nil
+	return &volume, nil
 }
 
 // ListVolumes return the list of all volume known on the current tenant
 func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
-    logrus.Debug("ebrc.Client.ListVolumes() called")
-    defer logrus.Debug("ebrc.Client.ListVolumes() done")
+	logrus.Debug("ebrc.Client.ListVolumes() called")
+	defer logrus.Debug("ebrc.Client.ListVolumes() done")
 
-    if s == nil {
-        return nil, scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 
-    var volumes []resources.Volume
+	var volumes []resources.Volume
 
-    org, vdc, err := s.getOrgVdc()
-    if err != nil {
-        return volumes, errors.Wrap(err, fmt.Sprintf("Error listing volumes"))
-    }
+	org, vdc, err := s.getOrgVdc()
+	if err != nil {
+		return volumes, errors.Wrap(err, fmt.Sprintf("Error listing volumes"))
+	}
 
-    // Check if network is already there
-    refs, err := getLinks(org, "vnd.vmware.vcloud.disk+xml")
-    if err != nil {
-        return nil, errors.Wrap(err, fmt.Sprintf("Error recovering network information"))
-    }
-    for _, ref := range refs {
-        // FIXME Add data
-        dr, err := vdc.QueryDisk(ref.Name)
-        if err == nil {
-            thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
-            if err == nil {
-                volumes = append(volumes, resources.Volume{Name: ref.Name, ID: ref.ID, Size: thed.Disk.Size})
-            }
-        }
-    }
+	// Check if network is already there
+	refs, err := getLinks(org, "vnd.vmware.vcloud.disk+xml")
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Error recovering network information"))
+	}
+	for _, ref := range refs {
+		// FIXME Add data
+		dr, err := vdc.QueryDisk(ref.Name)
+		if err == nil {
+			thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
+			if err == nil {
+				volumes = append(volumes, resources.Volume{Name: ref.Name, ID: ref.ID, Size: thed.Disk.Size})
+			}
+		}
+	}
 
-    return volumes, nil
+	return volumes, nil
 }
 
 // DeleteVolume deletes the volume identified by id
 func (s *StackEbrc) DeleteVolume(ref string) error {
-    logrus.Debugf("ebrc.Client.DeleteVolume(%s) called", ref)
-    defer logrus.Debugf("ebrc.Client.DeleteVolume(%s) done", ref)
+	logrus.Debugf("ebrc.Client.DeleteVolume(%s) called", ref)
+	defer logrus.Debugf("ebrc.Client.DeleteVolume(%s) done", ref)
 
-    if s == nil {
-        return scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 
-    thed, err := s.findDiskByID(ref)
-    if err != nil {
-        return err
-    }
+	thed, err := s.findDiskByID(ref)
+	if err != nil {
+		return err
+	}
 
-    deltask, err := thed.Delete()
-    if err != nil {
-        return err
-    }
-    err = deltask.WaitTaskCompletion()
-    return err
+	deltask, err := thed.Delete()
+	if err != nil {
+		return err
+	}
+	err = deltask.WaitTaskCompletion()
+	return err
 }
 
 func hash(s string) string {
-    h := fnv.New32a()
-    _, _ = h.Write([]byte(s))
-    return strconv.Itoa(int(h.Sum32()))
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return strconv.Itoa(int(h.Sum32()))
 }
 
 func getAttachmentID(volume string, domain string) string {
-    return volume + ":" + domain
+	return volume + ":" + domain
 }
 
 // CreateVolumeAttachment attaches a volume to an host
@@ -208,138 +208,138 @@ func getAttachmentID(volume string, domain string) string {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
-    logrus.Debugf(">>> stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
-    defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
+	logrus.Debugf(">>> stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
+	defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 
-    if s == nil {
-        return "", scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return "", scerr.InvalidInstanceError()
+	}
 
-    vm, err := s.findVMByID(request.HostID)
-    if err != nil || utils.IsEmpty(vm) {
-        return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
-    }
+	vm, err := s.findVMByID(request.HostID)
+	if err != nil || utils.IsEmpty(vm) {
+		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
+	}
 
-    disk, err := s.findDiskByID(request.VolumeID)
-    if err != nil || utils.IsEmpty(disk) {
-        return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, disk empty"))
-    }
+	disk, err := s.findDiskByID(request.VolumeID)
+	if err != nil || utils.IsEmpty(disk) {
+		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, disk empty"))
+	}
 
-    attask, err := vm.AttachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
-    if err != nil {
-        return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
-    }
+	attask, err := vm.AttachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
+	if err != nil {
+		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
+	}
 
-    err = attask.WaitTaskCompletion()
-    if err != nil {
-        return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
-    }
+	err = attask.WaitTaskCompletion()
+	if err != nil {
+		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
+	}
 
-    return getAttachmentID(request.HostID, request.VolumeID), nil
+	return getAttachmentID(request.HostID, request.VolumeID), nil
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
-    logrus.Debugf(">>> stacks.ebrc::GetVolumeAttachment(%s)", id)
-    defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
+	logrus.Debugf(">>> stacks.ebrc::GetVolumeAttachment(%s)", id)
+	defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
 
-    if s == nil {
-        return nil, scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 
-    vats, err := s.ListVolumeAttachments(serverID)
-    if err != nil {
-        return nil, errors.Wrap(err, fmt.Sprintf("Error getting attachment"))
-    }
+	vats, err := s.ListVolumeAttachments(serverID)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("Error getting attachment"))
+	}
 
-    for _, vat := range vats {
-        if vat.ID == id && vat.ServerID == serverID {
-            return &vat, nil
-        }
-    }
+	for _, vat := range vats {
+		if vat.ID == id && vat.ServerID == serverID {
+			return &vat, nil
+		}
+	}
 
-    return nil, scerr.Errorf(fmt.Sprintf("Attachment [%s] to [%s] not found", id, serverID), nil)
+	return nil, scerr.Errorf(fmt.Sprintf("Attachment [%s] to [%s] not found", id, serverID), nil)
 }
 
 // DeleteVolumeAttachment ...
 func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
-    logrus.Debugf(">>> stacks.ebrc::DeleteVolumeAttachment(%s)", id)
-    defer logrus.Debugf("<<< stacks.ebrc::DeleteVolumeAttachment(%s)", id)
+	logrus.Debugf(">>> stacks.ebrc::DeleteVolumeAttachment(%s)", id)
+	defer logrus.Debugf("<<< stacks.ebrc::DeleteVolumeAttachment(%s)", id)
 
-    if s == nil {
-        return scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return scerr.InvalidInstanceError()
+	}
 
-    vm, err := s.findVMByID(serverID)
-    if err != nil {
-        return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
-    }
+	vm, err := s.findVMByID(serverID)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+	}
 
-    splitted := strings.Split(id, ":")
+	splitted := strings.Split(id, ":")
 
-    diskId := strings.Join(splitted[len(splitted)/2:], ":")
-    disk, err := s.findDiskByID(diskId)
-    if err != nil {
-        return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
-    }
+	diskId := strings.Join(splitted[len(splitted)/2:], ":")
+	disk, err := s.findDiskByID(diskId)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+	}
 
-    attask, err := vm.DetachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
-    if err != nil {
-        return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
-    }
+	attask, err := vm.DetachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+	}
 
-    err = attask.WaitTaskCompletion()
-    if err != nil {
-        return errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
-    }
+	err = attask.WaitTaskCompletion()
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
+	}
 
-    return nil
+	return nil
 }
 
 // ListVolumeAttachments lists available volume attachments
 func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-    if s == nil {
-        return nil, scerr.InvalidInstanceError()
-    }
+	if s == nil {
+		return nil, scerr.InvalidInstanceError()
+	}
 
-    vms, err := s.findVmNames()
-    if err != nil {
-        return []resources.VolumeAttachment{}, err
-    }
+	vms, err := s.findVmNames()
+	if err != nil {
+		return []resources.VolumeAttachment{}, err
+	}
 
-    _, vdc, err := s.getOrgVdc()
-    if err != nil {
-        return []resources.VolumeAttachment{}, errors.Wrap(err, fmt.Sprintf("Error deleting volume"))
-    }
+	_, vdc, err := s.getOrgVdc()
+	if err != nil {
+		return []resources.VolumeAttachment{}, errors.Wrap(err, fmt.Sprintf("Error deleting volume"))
+	}
 
-    var attachments []resources.VolumeAttachment
+	var attachments []resources.VolumeAttachment
 
-    for _, vmname := range vms {
-        vm, err := s.findVMByName(vmname)
-        if err != nil {
-            continue
-        }
+	for _, vmname := range vms {
+		vm, err := s.findVMByName(vmname)
+		if err != nil {
+			continue
+		}
 
-        for _, ittem := range vm.VM.VirtualHardwareSection.Item {
-            if ittem != nil {
-                if ittem.ResourceType == 17 {
-                    dadr := ittem.HostResource[0].Disk
-                    thedi, err := vdc.FindDiskByHREF(dadr)
-                    if err != nil {
-                        continue
-                    }
+		for _, ittem := range vm.VM.VirtualHardwareSection.Item {
+			if ittem != nil {
+				if ittem.ResourceType == 17 {
+					dadr := ittem.HostResource[0].Disk
+					thedi, err := vdc.FindDiskByHREF(dadr)
+					if err != nil {
+						continue
+					}
 
-                    reid := resources.VolumeAttachment{
-                        ID:       serverID + ":" + thedi.Disk.Id,
-                        VolumeID: thedi.Disk.Id,
-                        ServerID: serverID,
-                    }
+					reid := resources.VolumeAttachment{
+						ID:       serverID + ":" + thedi.Disk.Id,
+						VolumeID: thedi.Disk.Id,
+						ServerID: serverID,
+					}
 
-                    attachments = append(attachments, reid)
-                }
-            }
-        }
-    }
+					attachments = append(attachments, reid)
+				}
+			}
+		}
+	}
 
-    return attachments, nil
+	return attachments, nil
 }

@@ -17,12 +17,12 @@
 package templates
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 )
 
 // Filter ...
 type Filter struct {
-    filter Predicate
+	filter Predicate
 }
 
 // Predicate ...
@@ -30,75 +30,75 @@ type Predicate func(resources.HostTemplate) bool
 
 // NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
-    return &Filter{filter: predicate}
+	return &Filter{filter: predicate}
 }
 
 // Not ...
 func (f *Filter) Not() *Filter {
-    oldFilter := f.filter
-    f.filter = func(in resources.HostTemplate) bool {
-        return !oldFilter(in)
-    }
-    return f
+	oldFilter := f.filter
+	f.filter = func(in resources.HostTemplate) bool {
+		return !oldFilter(in)
+	}
+	return f
 }
 
 // And ...
 func (f *Filter) And(other *Filter) *Filter {
-    oldFilter := f.filter
-    f.filter = func(in resources.HostTemplate) bool {
-        return oldFilter(in) && other.filter(in)
-    }
-    return f
+	oldFilter := f.filter
+	f.filter = func(in resources.HostTemplate) bool {
+		return oldFilter(in) && other.filter(in)
+	}
+	return f
 }
 
 // Or ...
 func (f *Filter) Or(other *Filter) *Filter {
-    oldFilter := f.filter
-    f.filter = func(in resources.HostTemplate) bool {
-        return oldFilter(in) || other.filter(in)
-    }
-    return f
+	oldFilter := f.filter
+	f.filter = func(in resources.HostTemplate) bool {
+		return oldFilter(in) || other.filter(in)
+	}
+	return f
 }
 
 // Not ...
 func Not(f Predicate) Predicate {
-    return func(in resources.HostTemplate) bool {
-        return !f(in)
-    }
+	return func(in resources.HostTemplate) bool {
+		return !f(in)
+	}
 }
 
 // OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-    return func(in resources.HostTemplate) bool {
-        for _, f := range filters {
-            if f(in) {
-                return true
-            }
-        }
-        return false
-    }
+	return func(in resources.HostTemplate) bool {
+		for _, f := range filters {
+			if f(in) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 // AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-    return func(in resources.HostTemplate) bool {
-        for _, f := range filters {
-            if !f(in) {
-                return false
-            }
-        }
-        return true
-    }
+	return func(in resources.HostTemplate) bool {
+		for _, f := range filters {
+			if !f(in) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 // FilterTemplates ...
 func FilterTemplates(templates []resources.HostTemplate, f *Filter) []resources.HostTemplate {
-    res := make([]resources.HostTemplate, 0)
-    for _, template := range templates {
+	res := make([]resources.HostTemplate, 0)
+	for _, template := range templates {
 
-        if f.filter(template) {
-            res = append(res, template)
-        }
-    }
-    return res
+		if f.filter(template) {
+			res = append(res, template)
+		}
+	}
+	return res
 }

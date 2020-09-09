@@ -17,10 +17,10 @@
 package propertiesv1
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // ControlPlane contains information used by cluster control plane (when there is one)
@@ -28,36 +28,36 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type ControlPlane struct {
-    VirtualIP *resources.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
+	VirtualIP *resources.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
 }
 
 func newControlPlane() *ControlPlane {
-    return &ControlPlane{}
+	return &ControlPlane{}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (cp *ControlPlane) Content() data.Clonable {
-    return cp
+	return cp
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (cp *ControlPlane) Clone() data.Clonable {
-    return newControlPlane().Replace(cp)
+	return newControlPlane().Replace(cp)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (cp *ControlPlane) Replace(p data.Clonable) data.Clonable {
-    src := p.(*ControlPlane)
-    *cp = *src
-    if src.VirtualIP != nil {
-        cp.VirtualIP = src.VirtualIP.Clone().(*resources.VirtualIP)
-    }
-    return cp
+	src := p.(*ControlPlane)
+	*cp = *src
+	if src.VirtualIP != nil {
+		cp.VirtualIP = src.VirtualIP.Clone().(*resources.VirtualIP)
+	}
+	return cp
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("clusters", property.ControlPlaneV1, &ControlPlane{})
+	serialize.PropertyTypeRegistry.Register("clusters", property.ControlPlaneV1, &ControlPlane{})
 }

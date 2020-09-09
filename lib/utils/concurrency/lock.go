@@ -17,165 +17,165 @@
 package concurrency
 
 import (
-    "fmt"
-    "sync"
+	"fmt"
+	"sync"
 )
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
 
 // TaskedLock ...
 type TaskedLock interface {
-    RLock(Task)
-    RUnlock(Task)
-    Lock(Task)
-    Unlock(Task)
-    IsRLocked(Task) bool
-    IsLocked(Task) bool
+	RLock(Task)
+	RUnlock(Task)
+	Lock(Task)
+	Unlock(Task)
+	IsRLocked(Task) bool
+	IsLocked(Task) bool
 }
 
 // taskedLock ...
 type taskedLock struct {
-    lock       *sync.Mutex
-    rwmutex    *sync.RWMutex
-    readLocks  map[string]uint64
-    writeLocks map[string]uint64
+	lock       *sync.Mutex
+	rwmutex    *sync.RWMutex
+	readLocks  map[string]uint64
+	writeLocks map[string]uint64
 }
 
 // NewTaskedLock ...
 func NewTaskedLock() TaskedLock {
-    return &taskedLock{
-        lock:       &sync.Mutex{},
-        rwmutex:    &sync.RWMutex{},
-        readLocks:  map[string]uint64{},
-        writeLocks: map[string]uint64{},
-    }
+	return &taskedLock{
+		lock:       &sync.Mutex{},
+		rwmutex:    &sync.RWMutex{},
+		readLocks:  map[string]uint64{},
+		writeLocks: map[string]uint64{},
+	}
 }
 
 // RLock locks for read in the context if:
 // 1. registers the lock for read only if a lock for write is already registered in the context
 // 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) {
-    if task == nil {
-        return
-    }
+	if task == nil {
+		return
+	}
 
-    // FIXME: tracer cannot be used in concurrency because of import cycle
-    //        equivalent feature has to be recoded specifically for concurrency
-    tracer := newTracer(task, Trace.Locks)
-    defer tracer.goingIn().onExitTrace()()
+	// FIXME: tracer cannot be used in concurrency because of import cycle
+	//        equivalent feature has to be recoded specifically for concurrency
+	tracer := newTracer(task, Trace.Locks)
+	defer tracer.goingIn().onExitTrace()()
 
-    tid, _ := task.GetID() // FIXME: Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
-    tm.lock.Lock()
+	tm.lock.Lock()
 
-    if _, ok := tm.readLocks[tid]; ok {
-        tm.readLocks[tid]++
-        tm.lock.Unlock()
-        return
-    }
-    tm.readLocks[tid] = 1
-    if _, ok := tm.writeLocks[tid]; !ok {
-        tracer.trace("really RLocking...")
-        tm.lock.Unlock()
-        tm.rwmutex.RLock()
-        return
-    }
-    tracer.trace("using running write lock...")
-    tm.lock.Unlock()
+	if _, ok := tm.readLocks[tid]; ok {
+		tm.readLocks[tid]++
+		tm.lock.Unlock()
+		return
+	}
+	tm.readLocks[tid] = 1
+	if _, ok := tm.writeLocks[tid]; !ok {
+		tracer.trace("really RLocking...")
+		tm.lock.Unlock()
+		tm.rwmutex.RLock()
+		return
+	}
+	tracer.trace("using running write lock...")
+	tm.lock.Unlock()
 }
 
 // RUnlock unregisters the lock for read for the context and unlock for read
 // only if no lock for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) {
-    tracer := newTracer(task, Trace.Locks).goingIn()
-    defer tracer.onExitTrace()()
+	tracer := newTracer(task, Trace.Locks).goingIn()
+	defer tracer.onExitTrace()()
 
-    tid, _ := task.GetID() // FIXME: Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
-    tm.lock.Lock()
-    defer tm.lock.Unlock()
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 
-    if _, ok := tm.readLocks[tid]; !ok {
-        tracer.trace("Cannot RUnlock, not RLocked")
-        panic(fmt.Sprintf("Cannot RUnlock task %s: not RLocked", tid))
-    }
-    tm.readLocks[tid]--
-    if tm.readLocks[tid] == 0 {
-        delete(tm.readLocks, tid)
-        // If not locked for write, actively unlock for read the RWMutex
-        if _, ok := tm.writeLocks[tid]; ok {
-            tracer.trace("in running write lock, doing nothing")
-        } else {
-            tracer.trace("really RUnlocking...")
-            tm.rwmutex.RUnlock()
-        }
-    }
+	if _, ok := tm.readLocks[tid]; !ok {
+		tracer.trace("Cannot RUnlock, not RLocked")
+		panic(fmt.Sprintf("Cannot RUnlock task %s: not RLocked", tid))
+	}
+	tm.readLocks[tid]--
+	if tm.readLocks[tid] == 0 {
+		delete(tm.readLocks, tid)
+		// If not locked for write, actively unlock for read the RWMutex
+		if _, ok := tm.writeLocks[tid]; ok {
+			tracer.trace("in running write lock, doing nothing")
+		} else {
+			tracer.trace("really RUnlocking...")
+			tm.rwmutex.RUnlock()
+		}
+	}
 }
 
 // Lock acquires a write lock.
 func (tm *taskedLock) Lock(task Task) {
-    tracer := newTracer(task, Trace.Locks).goingIn()
-    defer tracer.onExitTrace()()
+	tracer := newTracer(task, Trace.Locks).goingIn()
+	defer tracer.onExitTrace()()
 
-    tid, _ := task.GetID() // FIXME: Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
-    tm.lock.Lock()
+	tm.lock.Lock()
 
-    // If already locked for write, increments counter for the task
-    if _, ok := tm.writeLocks[tid]; ok {
-        tm.writeLocks[tid]++
-        tm.lock.Unlock()
-        return
-    }
-    // If already lock for read, panic
-    if _, ok := tm.readLocks[tid]; ok {
-        tracer.trace("Can't Lock, already RLocked")
-        taskID, _ := task.GetID()
-        panic(fmt.Sprintf("cannot Lock task '%s': already RLocked", taskID))
-    }
-    // registers lock for read for the task and actively lock the RWMutex
-    tm.writeLocks[tid] = 1
-    tm.lock.Unlock()
-    tm.rwmutex.Lock()
+	// If already locked for write, increments counter for the task
+	if _, ok := tm.writeLocks[tid]; ok {
+		tm.writeLocks[tid]++
+		tm.lock.Unlock()
+		return
+	}
+	// If already lock for read, panic
+	if _, ok := tm.readLocks[tid]; ok {
+		tracer.trace("Can't Lock, already RLocked")
+		taskID, _ := task.GetID()
+		panic(fmt.Sprintf("cannot Lock task '%s': already RLocked", taskID))
+	}
+	// registers lock for read for the task and actively lock the RWMutex
+	tm.writeLocks[tid] = 1
+	tm.lock.Unlock()
+	tm.rwmutex.Lock()
 }
 
 // Unlock releases a write lock
 func (tm *taskedLock) Unlock(task Task) {
-    tracer := newTracer(task, Trace.Locks).goingIn()
-    defer tracer.onExitTrace()()
+	tracer := newTracer(task, Trace.Locks).goingIn()
+	defer tracer.onExitTrace()()
 
-    tid, _ := task.GetID() // FIXME: Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
-    tm.lock.Lock()
-    defer tm.lock.Unlock()
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 
-    // a TaskedLock can be Locked then RLocked without problem,
-    // but RUnlocks must have been done before Unlock.
-    if _, ok := tm.readLocks[tid]; ok {
-        tracer.trace(fmt.Sprintf("Can't Unlock, %d remaining RLock inside", tm.readLocks[tid]))
-        panic(fmt.Sprintf("Can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid]))
-    }
-    if _, ok := tm.writeLocks[tid]; !ok {
-        tracer.trace("Can't Unlock, not Locked")
-        panic(fmt.Sprintf("Can't Unlock task '%s': not Locked", tid))
-    }
-    tm.writeLocks[tid]--
-    if tm.writeLocks[tid] == 0 {
-        delete(tm.writeLocks, tid)
-        tm.rwmutex.Unlock()
-    }
+	// a TaskedLock can be Locked then RLocked without problem,
+	// but RUnlocks must have been done before Unlock.
+	if _, ok := tm.readLocks[tid]; ok {
+		tracer.trace(fmt.Sprintf("Can't Unlock, %d remaining RLock inside", tm.readLocks[tid]))
+		panic(fmt.Sprintf("Can't Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid]))
+	}
+	if _, ok := tm.writeLocks[tid]; !ok {
+		tracer.trace("Can't Unlock, not Locked")
+		panic(fmt.Sprintf("Can't Unlock task '%s': not Locked", tid))
+	}
+	tm.writeLocks[tid]--
+	if tm.writeLocks[tid] == 0 {
+		delete(tm.writeLocks, tid)
+		tm.rwmutex.Unlock()
+	}
 }
 
 // IsRLocked tells if the task is owning a read lock
 func (tm *taskedLock) IsRLocked(task Task) bool {
-    taskid, _ := task.GetID() // FIXME Fix locks later
-    _, ok := tm.readLocks[taskid]
-    return ok
+	taskid, _ := task.GetID() // FIXME Fix locks later
+	_, ok := tm.readLocks[taskid]
+	return ok
 }
 
 // IsLocked tells if the task is owning a write lock
 func (tm *taskedLock) IsLocked(task Task) bool {
-    taskid, _ := task.GetID() // FIXME Fix locks later
-    _, ok := tm.writeLocks[taskid]
-    return ok
+	taskid, _ := task.GetID() // FIXME Fix locks later
+	_, ok := tm.writeLocks[taskid]
+	return ok
 }

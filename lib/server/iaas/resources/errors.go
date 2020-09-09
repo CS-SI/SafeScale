@@ -17,55 +17,55 @@
 package resources
 
 import (
-    "fmt"
-    "time"
+	"fmt"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // ResourceNotFoundError creates a ErrNotFound error
 func ResourceNotFoundError(resource, name string) scerr.ErrNotFound {
-    msgFinal := fmt.Sprintf("failed to find %s", resource)
-    if name != "" {
-        msgFinal += fmt.Sprintf(" '%s'", name)
-    }
+	msgFinal := fmt.Sprintf("failed to find %s", resource)
+	if name != "" {
+		msgFinal += fmt.Sprintf(" '%s'", name)
+	}
 
-    return scerr.NotFoundError(msgFinal)
+	return scerr.NotFoundError(msgFinal)
 }
 
 // ResourceTimeoutError creates a ErrTimeout error
 func ResourceTimeoutError(resource, name string, dur time.Duration) scerr.ErrTimeout {
-    msgFinal := fmt.Sprintf("timeout of '%s' waiting for '%s' '%s'", dur, resource, name)
-    return scerr.TimeoutError(msgFinal, dur, nil)
+	msgFinal := fmt.Sprintf("timeout of '%s' waiting for '%s' '%s'", dur, resource, name)
+	return scerr.TimeoutError(msgFinal, dur, nil)
 }
 
 // TimeoutError creates a ErrTimeout error
 func TimeoutError(message string, dur time.Duration) scerr.ErrTimeout {
-    return scerr.TimeoutError(message, dur, nil)
+	return scerr.TimeoutError(message, dur, nil)
 }
 
 // ResourceNotAvailableError creates a ResourceNotAvailable error
 func ResourceNotAvailableError(resource, name string) scerr.ErrNotAvailable {
-    msgFinal := fmt.Sprintf("%s '%s' is unavailable", resource, name)
-    return scerr.NotAvailableError(msgFinal)
+	msgFinal := fmt.Sprintf("%s '%s' is unavailable", resource, name)
+	return scerr.NotAvailableError(msgFinal)
 }
 
 // ResourceDuplicateError creates a ResourceAlreadyExists error
 func ResourceDuplicateError(resource, name string) scerr.ErrDuplicate {
-    msgFinal := fmt.Sprintf("%s '%s' already exists", resource, name)
-    return scerr.DuplicateError(msgFinal)
+	msgFinal := fmt.Sprintf("%s '%s' already exists", resource, name)
+	return scerr.DuplicateError(msgFinal)
 }
 
 // ResourceInvalidRequestError creates a ErrResourceInvalidRequest error
 func ResourceInvalidRequestError(resource, reason string) scerr.ErrInvalidRequest {
-    msgFinal := fmt.Sprintf("%s request is invalid: %s", resource, reason)
+	msgFinal := fmt.Sprintf("%s request is invalid: %s", resource, reason)
 
-    return scerr.InvalidRequestError(msgFinal)
+	return scerr.InvalidRequestError(msgFinal)
 }
 
 // ResourceForbiddenError creates a ErrResourceForbidden error
 func ResourceForbiddenError(resource, name string) scerr.ErrForbidden {
-    msgFinal := fmt.Sprintf("access to %s resource '%s' is denied", resource, name)
+	msgFinal := fmt.Sprintf("access to %s resource '%s' is denied", resource, name)
 
-    return scerr.ForbiddenError(msgFinal)
+	return scerr.ForbiddenError(msgFinal)
 }

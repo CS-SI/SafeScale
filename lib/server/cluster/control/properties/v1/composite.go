@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // Composite ...
@@ -27,37 +27,37 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type Composite struct {
-    // Array of tenants hosting a multi-tenant cluster (multi starting from 1)
-    Tenants []string `json:"tenants"`
+	// Array of tenants hosting a multi-tenant cluster (multi starting from 1)
+	Tenants []string `json:"tenants"`
 }
 
 func newComposite() *Composite {
-    return &Composite{
-        Tenants: []string{},
-    }
+	return &Composite{
+		Tenants: []string{},
+	}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (c *Composite) Content() data.Clonable {
-    return c
+	return c
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (c *Composite) Clone() data.Clonable {
-    return newComposite().Replace(c)
+	return newComposite().Replace(c)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (c *Composite) Replace(p data.Clonable) data.Clonable {
-    src := p.(*Composite)
-    c.Tenants = make([]string, len(src.Tenants))
-    copy(c.Tenants, src.Tenants)
-    return c
+	src := p.(*Composite)
+	c.Tenants = make([]string, len(src.Tenants))
+	copy(c.Tenants, src.Tenants)
+	return c
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("clusters", property.CompositeV1, newComposite())
+	serialize.PropertyTypeRegistry.Register("clusters", property.CompositeV1, newComposite())
 }

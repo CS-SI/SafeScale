@@ -17,39 +17,39 @@
 package crypt
 
 import (
-    "crypto/rand"
-    "crypto/rsa"
-    "crypto/x509"
-    "encoding/pem"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 
-    "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh"
 
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // GenerateRSAKeyPair creates a key pair
 func GenerateRSAKeyPair(name string) (privKey string, pubKey string, err error) {
-    if name == "" {
-        return "", "", scerr.InvalidParameterError("name", "cannot be empty string")
-    }
+	if name == "" {
+		return "", "", scerr.InvalidParameterError("name", "cannot be empty string")
+	}
 
-    privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-    if err != nil {
-        return "", "", err
-    }
-    publicKey := privateKey.PublicKey
-    pub, err := ssh.NewPublicKey(&publicKey)
-    if err != nil {
-        return "", "", err
-    }
-    pubBytes := ssh.MarshalAuthorizedKey(pub)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return "", "", err
+	}
+	publicKey := privateKey.PublicKey
+	pub, err := ssh.NewPublicKey(&publicKey)
+	if err != nil {
+		return "", "", err
+	}
+	pubBytes := ssh.MarshalAuthorizedKey(pub)
 
-    priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-    priKeyPem := pem.EncodeToMemory(
-        &pem.Block{
-            Type:  "RSA PRIVATE KEY",
-            Bytes: priBytes,
-        },
-    )
-    return string(priKeyPem), string(pubBytes), nil
+	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	priKeyPem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: priBytes,
+		},
+	)
+	return string(priKeyPem), string(pubBytes), nil
 }

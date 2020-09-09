@@ -17,57 +17,57 @@
 package client
 
 import (
-    "time"
+	"time"
 
-    googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/utils"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // tenant is the part of safescale client handling tenants
 type tenant struct {
-    // session is not used currently
-    session *Session
+	// session is not used currently
+	session *Session
 }
 
 // List ...
 func (t *tenant) List(timeout time.Duration) (*pb.TenantList, error) {
-    t.session.Connect()
-    defer t.session.Disconnect()
-    service := pb.NewTenantServiceClient(t.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    return service.List(ctx, &googleprotobuf.Empty{})
+	return service.List(ctx, &googleprotobuf.Empty{})
 
 }
 
 // Get ...
 func (t *tenant) Get(timeout time.Duration) (*pb.TenantName, error) {
-    t.session.Connect()
-    defer t.session.Disconnect()
-    service := pb.NewTenantServiceClient(t.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    return service.Get(ctx, &googleprotobuf.Empty{})
+	return service.Get(ctx, &googleprotobuf.Empty{})
 }
 
 // Set ...
 func (t *tenant) Set(name string, timeout time.Duration) error {
-    t.session.Connect()
-    defer t.session.Disconnect()
-    service := pb.NewTenantServiceClient(t.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTenantServiceClient(t.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Set(ctx, &pb.TenantName{Name: name})
-    return err
+	_, err = service.Set(ctx, &pb.TenantName{Name: name})
+	return err
 }

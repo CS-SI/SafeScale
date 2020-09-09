@@ -1,16 +1,16 @@
 package tenant
 
 import (
-    "testing"
+	"testing"
 
-    "github.com/CS-SI/SafeScale/integrationtests"
-    "github.com/CS-SI/SafeScale/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/integrationtests"
+	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 )
 
 func Test_Env_Setup(t *testing.T) {
-    integrationtests.EnvSetup(t, providers.FLEXIBLEENGINE)
+	integrationtests.EnvSetup(t, providers.FLEXIBLEENGINE)
 }
 
 func Test_Setup(t *testing.T) {
-    integrationtests.Setup(t, providers.FLEXIBLEENGINE)
+	integrationtests.Setup(t, providers.FLEXIBLEENGINE)
 }

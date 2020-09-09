@@ -1,46 +1,46 @@
 package propertiesv1
 
 import (
-    "reflect"
-    "testing"
+	"reflect"
+	"testing"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNetworkDescription_Clone(t *testing.T) {
-    ct := NewNetworkDescription()
-    ct.Purpose = "Someone"
+	ct := NewNetworkDescription()
+	ct.Purpose = "Someone"
 
-    clonedCt, ok := ct.Clone().(*NetworkDescription)
-    if !ok {
-        t.Fail()
-    }
+	clonedCt, ok := ct.Clone().(*NetworkDescription)
+	if !ok {
+		t.Fail()
+	}
 
-    assert.Equal(t, ct, clonedCt)
-    clonedCt.Purpose = "Other"
+	assert.Equal(t, ct, clonedCt)
+	clonedCt.Purpose = "Other"
 
-    areEqual := reflect.DeepEqual(ct, clonedCt)
-    if areEqual {
-        t.Error("It's a shallow clone !")
-        t.Fail()
-    }
+	areEqual := reflect.DeepEqual(ct, clonedCt)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
 }
 
 func TestNetworkHosts_Clone(t *testing.T) {
-    ct := NewNetworkHosts()
-    ct.ByName["Never"] = "Change"
+	ct := NewNetworkHosts()
+	ct.ByName["Never"] = "Change"
 
-    clonedCt, ok := ct.Clone().(*NetworkHosts)
-    if !ok {
-        t.Fail()
-    }
+	clonedCt, ok := ct.Clone().(*NetworkHosts)
+	if !ok {
+		t.Fail()
+	}
 
-    assert.Equal(t, ct, clonedCt)
-    clonedCt.ByName["Never"] = "Other"
+	assert.Equal(t, ct, clonedCt)
+	clonedCt.ByName["Never"] = "Other"
 
-    areEqual := reflect.DeepEqual(ct, clonedCt)
-    if areEqual {
-        t.Error("It's a shallow clone !")
-        t.Fail()
-    }
+	areEqual := reflect.DeepEqual(ct, clonedCt)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
 }

@@ -17,18 +17,18 @@
 package template
 
 import (
-    txttmpl "text/template"
+	txttmpl "text/template"
 
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Parse returns a text template with default funcs declared
 func Parse(title, content string, funcMap map[string]interface{}) (*txttmpl.Template, error) {
-    if title == "" {
-        return nil, scerr.InvalidParameterError("title", "cannot be empty string")
-    }
-    if content == "" {
-        return nil, scerr.InvalidParameterError("content", "cannot be empty string")
-    }
-    return txttmpl.New(title).Funcs(MergeFuncs(funcMap, false)).Parse(content)
+	if title == "" {
+		return nil, scerr.InvalidParameterError("title", "cannot be empty string")
+	}
+	if content == "" {
+		return nil, scerr.InvalidParameterError("content", "cannot be empty string")
+	}
+	return txttmpl.New(title).Funcs(MergeFuncs(funcMap, false)).Parse(content)
 }

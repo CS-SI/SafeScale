@@ -17,8 +17,8 @@
 package utils
 
 var (
-    // Debug if set to true, work in debug mode
-    Debug = false
-    // Verbose if set to true, increase verbosity
-    Verbose = false
+	// Debug if set to true, work in debug mode
+	Debug = false
+	// Verbose if set to true, increase verbosity
+	Verbose = false
 )
