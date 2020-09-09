@@ -20,6 +20,7 @@ package retry
 // delays and stop conditions
 
 import (
+	"os"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -77,10 +78,32 @@ func Action(run func() error, arbiter Arbiter, officer *Officer,
 
 }
 
+func BackoffSelector() Backoff {
+	if delayAlgo := os.Getenv("SAFESCALE_ALGO_DELAY"); delayAlgo != "" {
+		switch delayAlgo {
+		case "Constant":
+			return Constant
+		case "Incremental":
+			return Incremental
+		case "Linear":
+			return Linear
+		case "Exponential":
+			return Exponential
+		case "Fibonacci":
+			return Fibonacci
+		default:
+			return Constant
+		}
+	}
+
+	return Constant
+}
+
 // WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Duration) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 4
 	}
 
 	if delay <= 0 {
@@ -94,7 +117,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -106,6 +129,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout time.Duration) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 4
 	}
 
 	if delay <= 0 {
@@ -119,7 +143,7 @@ func WhileUnsuccessfulTimeout(run func() error, delay time.Duration, timeout tim
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -149,7 +173,7 @@ func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Durati
 func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
-		delay = timeout / 2
+		delay = timeout / 4
 	}
 
 	if notify == nil {
@@ -167,7 +191,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -180,6 +204,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
+		delay = timeout / 4
 	}
 
 	if notify == nil {
@@ -197,7 +222,7 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -231,7 +256,7 @@ func WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(run func() error, t
 func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duration) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
-		delay = timeout / 2
+		delay = timeout / 4
 	}
 
 	if delay <= 0 {
@@ -245,7 +270,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -271,7 +296,7 @@ func WhileSuccessfulDelay5Seconds(run func() error, timeout time.Duration) error
 func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) error {
 	if delay > timeout {
 		logrus.Warnf("unexpected: delay greater than timeout ?? : (%s) > (%s)", delay, timeout)
-		delay = timeout / 2
+		delay = timeout / 4
 	}
 
 	if notify == nil {
@@ -289,7 +314,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
