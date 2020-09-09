@@ -131,7 +131,9 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
 		return nil, scerr.Errorf(
-			fmt.Sprintf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error()), err,
+			fmt.Sprintf(
+				"failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error(),
+			), err,
 		)
 	}
 
@@ -179,7 +181,9 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
 		return nil, scerr.Errorf(
-			fmt.Sprintf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error()), err,
+			fmt.Sprintf(
+				"failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error(),
+			), err,
 		)
 	}
 
@@ -406,7 +410,9 @@ func getImagePathFromID(s *Stack, id string) (path string, err error) {
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
 		return "", scerr.Errorf(
-			fmt.Sprintf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error()), err,
+			fmt.Sprintf(
+				"failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error(),
+			), err,
 		)
 	}
 
@@ -465,7 +471,9 @@ func getDiskFromID(s *Stack, id string) (disk string, err error) {
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(byteValue), &result); err != nil {
 		return "", scerr.Errorf(
-			fmt.Sprintf("failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error()), err,
+			fmt.Sprintf(
+				"failed to unmarshal jsonFile %s : %s", s.LibvirtConfig.ImagesJSONPath, err.Error(),
+			), err,
 		)
 	}
 
@@ -522,7 +530,11 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
 			err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
 			if err != nil {
 				return nil, scerr.Errorf(
-					fmt.Sprintf(fmt.Sprintf("failed unmarshall the volume description : %s", err.Error())), err,
+					fmt.Sprintf(
+						fmt.Sprintf(
+							"failed unmarshall the volume description : %s", err.Error(),
+						),
+					), err,
 				)
 			}
 
@@ -1070,8 +1082,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			logrus.Errorf(
 				"Commands failed: [%s] with error [%s], stdOutput [%s] and stdError [%s]", command, err.Error(),
-				cmdOutput.String(),
-				cmdError.String(),
+				cmdOutput.String(), cmdError.String(),
 			)
 			return nil, userData, scerr.Errorf(fmt.Sprintf("Commands failed : \n%s\n%s", command, err.Error()), err)
 		}

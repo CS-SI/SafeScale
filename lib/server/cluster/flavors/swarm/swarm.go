@@ -180,9 +180,7 @@ func getGlobalSystemRequirements(task concurrency.Task, foreman control.Foreman)
 	return anon.(string), nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (
-	string, map[string]interface{},
-) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 

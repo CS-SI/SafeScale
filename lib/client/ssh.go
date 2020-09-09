@@ -43,9 +43,7 @@ type ssh struct {
 }
 
 // Run executes the command
-func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (
-	int, string, string, error,
-) {
+func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
 	var (
 		retcode        int
 		stdout, stderr string

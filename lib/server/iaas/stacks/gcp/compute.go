@@ -187,26 +187,6 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	// privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	// publicKey := privateKey.PublicKey
-	// pub, _ := ssh.NewPublicKey(&publicKey)
-	// pubBytes := ssh.MarshalAuthorizedKey(pub)
-	// pubKey := string(pubBytes)
-
-	// priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	// priKeyPem := pem.EncodeToMemory(
-	// 	&pem.Block{
-	// 		Type:  "RSA PRIVATE KEY",
-	// 		Bytes: priBytes,
-	// 	},
-	// )
-	// priKey := string(priKeyPem)
-	// return &resources.KeyPair{
-	// 	ID:         name,
-	// 	Name:       name,
-	// 	PublicKey:  pubKey,
-	// 	PrivateKey: priKey,
-	// }, nil
 	return resources.NewKeyPair(name)
 }
 
@@ -554,10 +534,7 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(
-	service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string,
-	subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate,
-) (*resources.Host, error) {
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageID

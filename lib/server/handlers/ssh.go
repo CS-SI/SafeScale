@@ -171,9 +171,7 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs outputs.Enum) (
-	retCode int, stdOut string, stdErr string, err error,
-) {
+func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs outputs.Enum) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
@@ -216,9 +214,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 }
 
 // Run tries to execute command 'cmd' on the host
-func (handler *SSHHandler) RunWithTimeout(
-	ctx context.Context, hostName, cmd string, outs outputs.Enum, timeout time.Duration,
-) (retCode int, stdOut string, stdErr string, err error) {
+func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd string, outs outputs.Enum, timeout time.Duration) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
@@ -261,9 +257,7 @@ func (handler *SSHHandler) RunWithTimeout(
 }
 
 // run executes command on the host
-func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, outs outputs.Enum, duration time.Duration) (
-	int, string, string, error,
-) {
+func (handler *SSHHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, outs outputs.Enum, duration time.Duration) (int, string, string, error) {
 	// Create the command
 	sshCmd, err := ssh.Command(cmd)
 	if err != nil {

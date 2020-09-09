@@ -221,9 +221,7 @@ func (svc *service) WaitVolumeState(volumeID string, state volumestate.Enum, tim
 	}
 }
 
-func pollVolume(
-	svc *service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *resources.Volume,
-) {
+func pollVolume(svc *service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *resources.Volume) {
 	for {
 		v, err := svc.GetVolume(volumeID)
 		if err != nil {
@@ -296,9 +294,7 @@ func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
 
 // SelectTemplatesBySize select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (
-	selectedTpls []*resources.HostTemplate, err error,
-) {
+func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, force bool) (selectedTpls []*resources.HostTemplate, err error) {
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -455,8 +451,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	for _, t := range allTpls {
 		msg := fmt.Sprintf(
 			"Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores,
-			t.RAMSize,
-			t.DiskSize,
+			t.RAMSize, t.DiskSize,
 		)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {

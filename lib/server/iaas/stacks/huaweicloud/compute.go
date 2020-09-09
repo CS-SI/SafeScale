@@ -1198,9 +1198,7 @@ func toHostState(status string) hoststate.Enum {
 
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (
-	server *servers.Server, err error,
-) {
+func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}

@@ -248,12 +248,16 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 	ok, err := utils.DoCIDRsIntersect(s.vpc.CIDR, req.CIDR)
 	if err != nil {
 		return nil, scerr.Errorf(
-			fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil,
+			fmt.Sprintf(
+				"cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR,
+			), nil,
 		)
 	}
 	if !ok {
 		return nil, scerr.Errorf(
-			fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil,
+			fmt.Sprintf(
+				"cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR,
+			), nil,
 		)
 	}
 
@@ -261,7 +265,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 	subnet, err = s.createSubnet(req.Name, req.CIDR)
 	if err != nil {
 		return nil, scerr.Errorf(
-			fmt.Sprintf("error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err)), err,
+			fmt.Sprintf(
+				"error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err),
+			), err,
 		)
 	}
 
@@ -351,7 +357,9 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	if err != nil {
 		if !strings.Contains(err.Error(), id) {
 			return nil, scerr.Errorf(
-				fmt.Sprintf("failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err)), err,
+				fmt.Sprintf(
+					"failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err),
+				), err,
 			)
 		}
 	}
@@ -722,9 +730,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
-	*resources.Host, *userdata.Content, error,
-) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}
@@ -759,7 +765,9 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 			return nil, userData, err
 		default:
 			return nil, userData, scerr.Errorf(
-				fmt.Sprintf("error creating gateway : %s", openstack.ProviderErrorToString(err)), err,
+				fmt.Sprintf(
+					"error creating gateway : %s", openstack.ProviderErrorToString(err),
+				), err,
 			)
 		}
 	}

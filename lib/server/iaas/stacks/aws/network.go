@@ -654,9 +654,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	return hoststate.ERROR, scerr.Errorf(fmt.Sprintf("unexpected host state"), nil)
 }
 
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
-	_ *resources.Host, _ *userdata.Content, err error,
-) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (_ *resources.Host, _ *userdata.Content, err error) {
 	if s == nil {
 		return nil, nil, scerr.InvalidInstanceError()
 	}

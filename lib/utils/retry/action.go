@@ -53,10 +53,8 @@ type action struct {
 // Action tries to executes 'run' following verdicts from arbiter, with delay decided by 'officer'.
 // If defined, 'first' is executed before trying (and may fail), and last is executed after the
 // tries (whatever the state of the tries is, and cannot fail)
-func Action(
-	run func() error, arbiter Arbiter, officer *Officer,
-	first func() error, last func() error, notify Notify,
-) error {
+func Action(run func() error, arbiter Arbiter, officer *Officer,
+	first func() error, last func() error, notify Notify) error {
 
 	if run == nil {
 		return scerr.InvalidParameterError("run", "cannot be nil!")

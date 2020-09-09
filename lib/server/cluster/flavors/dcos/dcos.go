@@ -211,9 +211,7 @@ func configureNode(task concurrency.Task, foreman control.Foreman, index int, ho
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (
-	string, map[string]interface{},
-) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, hostType nodetype.Enum) (string, map[string]interface{}) {
 	data := map[string]interface{}{}
 
 	var script string

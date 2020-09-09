@@ -164,9 +164,7 @@ func defaultImage(task concurrency.Task, foreman control.Foreman) string {
 // 	return nil
 // }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (
-	string, map[string]interface{},
-) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	data := map[string]interface{}{}
 	switch nodeType {

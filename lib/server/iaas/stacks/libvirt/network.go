@@ -86,7 +86,11 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 	err = xml.Unmarshal([]byte(libvirtNetworkXML), networkDescription)
 	if err != nil {
 		return nil, scerr.Errorf(
-			fmt.Sprintf(fmt.Sprintf("failed get Unmarshal networks's xml description  : %s", err.Error())), err,
+			fmt.Sprintf(
+				fmt.Sprintf(
+					"failed get Unmarshal networks's xml description  : %s", err.Error(),
+				),
+			), err,
 		)
 	}
 
@@ -302,9 +306,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
-	*resources.Host, *userdata.Content, error,
-) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	network := req.Network

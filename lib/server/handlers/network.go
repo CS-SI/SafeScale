@@ -55,9 +55,7 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(
-		context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool, string, bool,
-	) (*resources.Network, error)
+	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool, string, bool) (*resources.Network, error)
 	List(context.Context, bool) ([]*resources.Network, error)
 	Inspect(context.Context, string) (*resources.Network, error)
 	Delete(context.Context, string) error
@@ -84,7 +82,6 @@ func (handler *NetworkHandler) Create(
 	sizing resources.SizingRequirements, theos string, gwname string,
 	failover bool, domain string, keeponfailure bool,
 ) (network *resources.Network, err error) {
-
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -461,6 +458,7 @@ func (handler *NetworkHandler) Create(
 		if err != nil {
 			return nil, err
 		}
+
 		secondaryTask, err = secondaryTask.Start(handler.waitForInstallPhase1OnGateway, secondaryGateway)
 		if err != nil {
 			return nil, err
@@ -704,7 +702,6 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	task concurrency.Task, params concurrency.TaskParameters,
 ) (result concurrency.TaskResult, err error) {
-
 	gw := params.(*resources.Host)
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
@@ -736,14 +733,13 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 		}
 		return nil, err
 	}
+
 	logrus.Infof("SSH service of gateway '%s' started.", gw.Name)
 
 	return nil, nil
 }
 
-func (handler *NetworkHandler) installPhase2OnGateway(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, err error) {
+func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		gw       *resources.Host
 		userData *userdata.Content
@@ -797,7 +793,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(
 		)
 	}
 
-	// FIXME: AWS Retrieve data anyway
+	// retrieve data anyway
 	retrieveForensicsData(task.GetContext(), sshHandler, gw)
 
 	logrus.Infof("Gateway '%s' successfully configured.", gw.Name)

@@ -236,7 +236,9 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
 		return nil, scerr.Errorf(
-			fmt.Sprintf("failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err)), err,
+			fmt.Sprintf(
+				"failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err),
+			), err,
 		)
 	}
 	fip, err := r.Extract()
