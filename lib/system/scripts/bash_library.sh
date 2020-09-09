@@ -273,24 +273,24 @@ export -f sfFirewallReload
 # sfInstall installs a package and exits if it fails...
 sfInstall() {
     case $LINUX_KIND in
-        debian | ubuntu)
-            export DEBIAN_FRONTEND=noninteractive
-            sfRetry 5m 5 "sfApt update"
-            sfApt install $1 -y || exit 194
-            which $1 || exit 194
-            ;;
-        centos | fedora | rhel | redhat)
-            if [[ -n $(which dnf) ]]; then
-                dnf install -y $1 || exit 194
-            else
-                yum install -y $1 || exit 194
-            fi
-            which $1 || exit 194
-            ;;
-        *)
-            echo "Unsupported operating system '$LINUX_KIND'"
-            exit 195
-            ;;
+    debian | ubuntu)
+        export DEBIAN_FRONTEND=noninteractive
+        sfRetry 5m 5 "sfApt update"
+        sfRetry 3m 5 "sfApt install $1 -y" || exit 194
+        which $1 || exit 194
+        ;;
+    centos | fedora | rhel | redhat)
+        if [[ -n $(which dnf) ]]; then
+            dnf install -y $1 || exit 194
+        else
+            yum install -y $1 || exit 194
+        fi
+        which $1 || exit 194
+        ;;
+    *)
+        echo "Unsupported operating system '$LINUX_KIND'"
+        exit 195
+        ;;
     esac
     return 0
 }
@@ -409,18 +409,18 @@ sfHelm() {
     local stop=0
     for p in "$@"; do
         case "$p" in
-            "--*") ;;
+        "--*") ;;
 
-            "search" | "repo")
-                stop=1
-                use_tls=
-                ;;
-            "init")
-                echo "sfHelm init is forbidden" && return 1
-                ;;
-            *)
-                stop=1
-                ;;
+        "search" | "repo")
+            stop=1
+            use_tls=
+            ;;
+        "init")
+            echo "sfHelm init is forbidden" && return 1
+            ;;
+        *)
+            stop=1
+            ;;
         esac
         [ $stop -eq 1 ] && break
     done
@@ -663,102 +663,102 @@ sfService() {
 
     if [ "$use_systemd" = "1" ]; then
         case $1 in
-            is-active)
-                systemctl is-active $2
-                return $?
-                ;;
-            is-enabled)
-                systemctl is-enabled $2
-                return $?
-                ;;
-            enable)
-                systemctl enable $2
-                return $?
-                ;;
-            disable)
-                systemctl disable $2
-                return $?
-                ;;
-            start)
-                systemctl start $2
-                return $?
-                ;;
-            stop)
-                systemctl stop $2
-                return $?
-                ;;
-            restart)
-                systemctl restart $2
-                return $?
-                ;;
-            reload)
-                systemctl reload $2
-                return $?
-                ;;
-            status)
-                systemctl status $2
-                return $?
-                ;;
-            *)
-                echo "sfService(): unhandled command '$1'"
-                ;;
+        is-active)
+            systemctl is-active $2
+            return $?
+            ;;
+        is-enabled)
+            systemctl is-enabled $2
+            return $?
+            ;;
+        enable)
+            systemctl enable $2
+            return $?
+            ;;
+        disable)
+            systemctl disable $2
+            return $?
+            ;;
+        start)
+            systemctl start $2
+            return $?
+            ;;
+        stop)
+            systemctl stop $2
+            return $?
+            ;;
+        restart)
+            systemctl restart $2
+            return $?
+            ;;
+        reload)
+            systemctl reload $2
+            return $?
+            ;;
+        status)
+            systemctl status $2
+            return $?
+            ;;
+        *)
+            echo "sfService(): unhandled command '$1'"
+            ;;
         esac
     elif [ "$redhat_like" = "1" ]; then
         case $1 in
-            enable)
-                chkconfig $2 on
-                return $?
-                ;;
-            disable)
-                chkconfig $2 off
-                return $?
-                ;;
-            start)
-                service $2 start
-                return $?
-                ;;
-            stop)
-                service $2 stop
-                return $?
-                ;;
-            restart)
-                service $2 restart
-                return $?
-                ;;
-            reload)
-                service $2 reload
-                return $?
-                ;;
-            status)
-                service $2 status
-                return $?
-                ;;
+        enable)
+            chkconfig $2 on
+            return $?
+            ;;
+        disable)
+            chkconfig $2 off
+            return $?
+            ;;
+        start)
+            service $2 start
+            return $?
+            ;;
+        stop)
+            service $2 stop
+            return $?
+            ;;
+        restart)
+            service $2 restart
+            return $?
+            ;;
+        reload)
+            service $2 reload
+            return $?
+            ;;
+        status)
+            service $2 status
+            return $?
+            ;;
         esac
     else
         case $1 in
-            start)
-                service $2 start
-                return $?
-                ;;
-            stop)
-                service $2 stop
-                return $?
-                ;;
-            restart)
-                service $2 restart
-                return $?
-                ;;
-            reload)
-                service $2 reload
-                return $?
-                ;;
-            status)
-                service $2 status
-                return $?
-                ;;
-            *)
-                echo "sfService(): unhandled command '$1'"
-                ;;
+        start)
+            service $2 start
+            return $?
+            ;;
+        stop)
+            service $2 stop
+            return $?
+            ;;
+        restart)
+            service $2 restart
+            return $?
+            ;;
+        reload)
+            service $2 reload
+            return $?
+            ;;
+        status)
+            service $2 status
+            return $?
+            ;;
+        *)
+            echo "sfService(): unhandled command '$1'"
+            ;;
         esac
     fi
 
@@ -956,11 +956,11 @@ sfDetectFacts() {
                 VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
                 FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
                 case $VERSION_ID in
-                    '' | *[!0-9]*)
-                        VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
-                        FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
-                        ;;
-                    *) ;;
+                '' | *[!0-9]*)
+                    VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+                    FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
+                    ;;
+                *) ;;
 
                 esac
             }
@@ -972,14 +972,14 @@ sfDetectFacts() {
 
     # Some facts about system
     case ${FACTS["linux_kind"]} in
-        redhat | rhel | centos | fedora)
-            FACTS["redhat_like"]=1
-            FACTS["debian_like"]=0
-            ;;
-        debian | ubuntu)
-            FACTS["redhat_like"]=0
-            FACTS["debian_like"]=1
-            ;;
+    redhat | rhel | centos | fedora)
+        FACTS["redhat_like"]=1
+        FACTS["debian_like"]=0
+        ;;
+    debian | ubuntu)
+        FACTS["redhat_like"]=0
+        FACTS["debian_like"]=1
+        ;;
     esac
     if systemctl | grep '\-.mount' &>/dev/null; then
         FACTS["use_systemd"]=1
