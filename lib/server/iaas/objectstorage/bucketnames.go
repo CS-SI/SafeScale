@@ -17,52 +17,52 @@
 package objectstorage
 
 import (
-    "encoding/hex"
-    "fmt"
-    "hash/fnv"
-    "os"
-    "strings"
+	"encoding/hex"
+	"fmt"
+	"hash/fnv"
+	"os"
+	"strings"
 )
 
 const (
-    maxBucketNameLength = 63
-    // bucketNamePrefix is the beginning of the name of the bucket for Metadata
-    bucketNamePrefix = "0.safescale"
-    suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
+	maxBucketNameLength = 63
+	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
+	bucketNamePrefix = "0.safescale"
+	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
 // BuildMetadataBucketName builds the name of the bucket/container that will store metadata
 func BuildMetadataBucketName(driver, region, domain, project string) (name string, err error) {
-    hash := fnv.New128a()
-    sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-    _, err = hash.Write([]byte(sig))
-    if err != nil {
-        return "", err
-    }
-    hashed := hex.EncodeToString(hash.Sum(nil))
-    name = bucketNamePrefix + "-" + hashed
+	hash := fnv.New128a()
+	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
+	_, err = hash.Write([]byte(sig))
+	if err != nil {
+		return "", err
+	}
+	hashed := hex.EncodeToString(hash.Sum(nil))
+	name = bucketNamePrefix + "-" + hashed
 
-    nameLen := len(name)
-    if suffix, ok := os.LookupEnv(suffixEnvName); ok {
-        name += "." + suffix
-        if len(name) > maxBucketNameLength {
-            return "", fmt.Errorf("suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
-        }
-    }
+	nameLen := len(name)
+	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
+		name += "." + suffix
+		if len(name) > maxBucketNameLength {
+			return "", fmt.Errorf("suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+		}
+	}
 
-    // FIXME GCP, Remove specific driver code
-    if driver == "gcp" {
-        name = strings.Replace(name, ".", "-", -1)
-    }
+	// FIXME GCP, Remove specific driver code
+	if driver == "gcp" {
+		name = strings.Replace(name, ".", "-", -1)
+	}
 
-    // FIXME AWS, Remove specific driver code
-    if driver == "aws" {
-        name = strings.Replace(name, ".", "-", -1)
-    }
+	// FIXME AWS, Remove specific driver code
+	if driver == "aws" {
+		name = strings.Replace(name, ".", "-", -1)
+	}
 
-    name = strings.ToLower(name)
+	name = strings.ToLower(name)
 
-    // logrus.Infof("Using bucket named '%s'", name)
+	// logrus.Infof("Using bucket named '%s'", name)
 
-    return name, nil
+	return name, nil
 }

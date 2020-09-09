@@ -17,11 +17,11 @@
 package propertiesv1
 
 import (
-    "time"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -29,34 +29,34 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type NetworkDescription struct {
-    Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
-    Created time.Time `json:"created,omitempty"` // Contains the date of creation if the network
-    Domain  string    `json:"domain,omitempty"`  // Defines the domain to use for host FQDN in this network
+	Purpose string    `json:"purpose,omitempty"` // contains the purpose of this network
+	Created time.Time `json:"created,omitempty"` // Contains the date of creation if the network
+	Domain  string    `json:"domain,omitempty"`  // Defines the domain to use for host FQDN in this network
 
 }
 
 // NewNetworkDescription ...
 func NewNetworkDescription() *NetworkDescription {
-    return &NetworkDescription{}
+	return &NetworkDescription{}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (nd *NetworkDescription) Content() data.Clonable {
-    return nd
+	return nd
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (nd *NetworkDescription) Clone() data.Clonable {
-    return NewNetworkDescription().Replace(nd)
+	return NewNetworkDescription().Replace(nd)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
-    *nd = *p.(*NetworkDescription)
-    return nd
+	*nd = *p.(*NetworkDescription)
+	return nd
 }
 
 // NetworkHosts contains information about hosts connected to the network
@@ -64,54 +64,54 @@ func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type NetworkHosts struct {
-    ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
-    ByName map[string]string `json:"by_name"` // list of host IDs, indexed by host name
+	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
+	ByName map[string]string `json:"by_name"` // list of host IDs, indexed by host name
 }
 
 // NewNetworkHosts ...
 func NewNetworkHosts() *NetworkHosts {
-    return &NetworkHosts{
-        ByID:   map[string]string{},
-        ByName: map[string]string{},
-    }
+	return &NetworkHosts{
+		ByID:   map[string]string{},
+		ByName: map[string]string{},
+	}
 }
 
 // Reset resets the content of the property
 func (nh *NetworkHosts) Reset() {
-    *nh = NetworkHosts{
-        ByID:   map[string]string{},
-        ByName: map[string]string{},
-    }
+	*nh = NetworkHosts{
+		ByID:   map[string]string{},
+		ByName: map[string]string{},
+	}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (nh *NetworkHosts) Content() data.Clonable {
-    return nh
+	return nh
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (nh *NetworkHosts) Clone() data.Clonable {
-    return NewNetworkHosts().Replace(nh)
+	return NewNetworkHosts().Replace(nh)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
-    src := p.(*NetworkHosts)
-    nh.ByID = make(map[string]string, len(src.ByID))
-    for k, v := range src.ByID {
-        nh.ByID[k] = v
-    }
-    nh.ByName = make(map[string]string, len(src.ByName))
-    for k, v := range src.ByName {
-        nh.ByName[k] = v
-    }
-    return nh
+	src := p.(*NetworkHosts)
+	nh.ByID = make(map[string]string, len(src.ByID))
+	for k, v := range src.ByID {
+		nh.ByID[k] = v
+	}
+	nh.ByName = make(map[string]string, len(src.ByName))
+	for k, v := range src.ByName {
+		nh.ByName[k] = v
+	}
+	return nh
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.HostsV1, NewNetworkHosts())
-    serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.DescriptionV1, NewNetworkDescription())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.HostsV1, NewNetworkHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.DescriptionV1, NewNetworkDescription())
 }

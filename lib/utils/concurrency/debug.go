@@ -18,9 +18,9 @@ package concurrency
 
 // Trace contains what component in the package to trace
 var Trace = struct {
-    Locks bool
-    Tasks bool
+	Locks bool
+	Tasks bool
 }{
-    false,
-    false,
+	false,
+	false,
 }

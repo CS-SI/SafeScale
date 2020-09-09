@@ -17,30 +17,30 @@
 package huaweicloud
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
 // GetAuthOpts returns the auth options
 func (s *Stack) GetAuthOpts() (providers.Config, error) {
-    cfg := providers.ConfigMap{}
+	cfg := providers.ConfigMap{}
 
-    cfg.Set("DomainName", s.authOpts.DomainName)
-    cfg.Set("Login", s.authOpts.Username)
-    cfg.Set("Password", s.authOpts.Password)
-    cfg.Set("AuthUrl", s.authOpts.IdentityEndpoint)
-    cfg.Set("Region", s.authOpts.Region)
-    cfg.Set("VPCName", s.authOpts.VPCName)
+	cfg.Set("DomainName", s.authOpts.DomainName)
+	cfg.Set("Login", s.authOpts.Username)
+	cfg.Set("Password", s.authOpts.Password)
+	cfg.Set("AuthUrl", s.authOpts.IdentityEndpoint)
+	cfg.Set("Region", s.authOpts.Region)
+	cfg.Set("VPCName", s.authOpts.VPCName)
 
-    return cfg, nil
+	return cfg, nil
 }
 
 // GetConfigurationOptions ...
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-    return s.cfgOpts
+	return s.cfgOpts
 }
 
 // GetAuthenticationOptions ...
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-    return s.authOpts
+	return s.authOpts
 }

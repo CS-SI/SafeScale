@@ -17,27 +17,27 @@
 package client
 
 import (
-    "time"
+	"time"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/utils"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // host is the safescale client part handling hosts
 type template struct {
-    // session is not used currently
-    session *Session
+	// session is not used currently
+	session *Session
 }
 
 // List return the list of availble templates on the current tenant
 func (t *template) List(all bool, timeout time.Duration) (*pb.TemplateList, error) {
-    t.session.Connect()
-    defer t.session.Disconnect()
-    service := pb.NewTemplateServiceClient(t.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
-    return service.List(ctx, &pb.TemplateListRequest{All: all})
+	t.session.Connect()
+	defer t.session.Disconnect()
+	service := pb.NewTemplateServiceClient(t.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
+	return service.List(ctx, &pb.TemplateListRequest{All: all})
 
 }

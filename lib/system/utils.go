@@ -17,12 +17,12 @@
 package system
 
 import (
-    "fmt"
-    "os/exec"
-    "sync/atomic"
-    "syscall"
+	"fmt"
+	"os/exec"
+	"sync/atomic"
+	"syscall"
 
-    rice "github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 )
 
 //go:generate rice embed-go
@@ -32,38 +32,38 @@ var bashLibraryContent atomic.Value
 
 // GetBashLibrary generates the content of {{.reserved_BashLibrary}}
 func GetBashLibrary() (string, error) {
-    anon := bashLibraryContent.Load()
-    if anon == nil {
-        box, err := rice.FindBox("../system/scripts")
-        if err != nil {
-            return "", err
-        }
+	anon := bashLibraryContent.Load()
+	if anon == nil {
+		box, err := rice.FindBox("../system/scripts")
+		if err != nil {
+			return "", err
+		}
 
-        // get file contents as string
-        tmplContent, err := box.String("bash_library.sh")
-        if err != nil {
-            return "", err
-        }
-        bashLibraryContent.Store(tmplContent)
-        anon = bashLibraryContent.Load()
-    }
-    return anon.(string), nil
+		// get file contents as string
+		tmplContent, err := box.String("bash_library.sh")
+		if err != nil {
+			return "", err
+		}
+		bashLibraryContent.Store(tmplContent)
+		anon = bashLibraryContent.Load()
+	}
+	return anon.(string), nil
 }
 
 // ExtractRetCode extracts info from the error
 func ExtractRetCode(err error) (string, int, error) {
-    retCode := -1
-    msg := "__ NO MESSAGE __"
-    if ee, ok := err.(*exec.ExitError); ok {
-        // Try to get retCode
-        if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-            retCode = status.ExitStatus()
-        } else {
-            return msg, retCode, fmt.Errorf("ExitError.Sys is not a 'syscall.WaitStatus'")
-        }
-        // Retrive error message
-        msg = ee.Error()
-        return msg, retCode, nil
-    }
-    return msg, retCode, fmt.Errorf("error is not an 'ExitError'")
+	retCode := -1
+	msg := "__ NO MESSAGE __"
+	if ee, ok := err.(*exec.ExitError); ok {
+		// Try to get retCode
+		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
+			retCode = status.ExitStatus()
+		} else {
+			return msg, retCode, fmt.Errorf("ExitError.Sys is not a 'syscall.WaitStatus'")
+		}
+		// Retrive error message
+		msg = ee.Error()
+		return msg, retCode, nil
+	}
+	return msg, retCode, fmt.Errorf("error is not an 'ExitError'")
 }

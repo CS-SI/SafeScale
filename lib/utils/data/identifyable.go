@@ -20,6 +20,6 @@ package data
 
 // Identifyable ...
 type Identifyable interface {
-    GetName() string
-    GetID() string
+	GetName() string
+	GetID() string
 }

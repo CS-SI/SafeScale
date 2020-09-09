@@ -17,133 +17,133 @@
 package client
 
 import (
-    "strings"
-    "sync"
-    "time"
+	"strings"
+	"sync"
+	"time"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/utils"
-    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // volume is the part of safescale client handing volumes
 type volume struct {
-    // session is not used currently
-    session *Session
+	// session is not used currently
+	session *Session
 }
 
 // List ...
 func (v *volume) List(all bool, timeout time.Duration) (*pb.VolumeList, error) {
-    v.session.Connect()
-    defer v.session.Disconnect()
-    service := pb.NewVolumeServiceClient(v.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    return service.List(ctx, &pb.VolumeListRequest{All: all})
+	return service.List(ctx, &pb.VolumeListRequest{All: all})
 
 }
 
 // Inspect ...
 func (v *volume) Inspect(name string, timeout time.Duration) (*pb.VolumeInfo, error) {
-    v.session.Connect()
-    defer v.session.Disconnect()
-    service := pb.NewVolumeServiceClient(v.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    return service.Inspect(ctx, &pb.Reference{Name: name})
+	return service.Inspect(ctx, &pb.Reference{Name: name})
 
 }
 
 // Delete ...
 func (v *volume) Delete(names []string, timeout time.Duration) error {
-    v.session.Connect()
-    defer v.session.Disconnect()
-    service := pb.NewVolumeServiceClient(v.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    var (
-        mutex sync.Mutex
-        wg    sync.WaitGroup
-        errs  []string
-    )
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
+	)
 
-    volumeDeleter := func(aname string) {
-        defer wg.Done()
-        _, err := service.Delete(ctx, &pb.Reference{Name: aname})
+	volumeDeleter := func(aname string) {
+		defer wg.Done()
+		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 
-        if err != nil {
-            mutex.Lock()
-            errs = append(errs, err.Error())
-            mutex.Unlock()
-        }
-    }
+		if err != nil {
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
+		}
+	}
 
-    wg.Add(len(names))
-    for _, target := range names {
-        go volumeDeleter(target)
-    }
-    wg.Wait()
+	wg.Add(len(names))
+	for _, target := range names {
+		go volumeDeleter(target)
+	}
+	wg.Wait()
 
-    if len(errs) > 0 {
-        return clitools.ExitOnRPC(strings.Join(errs, ", "))
-    }
-    return nil
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+	}
+	return nil
 
 }
 
 // Create ...
 func (v *volume) Create(def *pb.VolumeDefinition, timeout time.Duration) (*pb.Volume, error) {
-    v.session.Connect()
-    defer v.session.Disconnect()
-    service := pb.NewVolumeServiceClient(v.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return nil, err
-    }
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
 
-    return service.Create(ctx, def)
+	return service.Create(ctx, def)
 
 }
 
 // Attach ...
 func (v *volume) Attach(def *pb.VolumeAttachment, timeout time.Duration) error {
-    v.session.Connect()
-    defer v.session.Disconnect()
-    service := pb.NewVolumeServiceClient(v.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Attach(ctx, def)
-    return err
+	_, err = service.Attach(ctx, def)
+	return err
 
 }
 
 // Detach ...
 func (v *volume) Detach(volumeName string, hostName string, timeout time.Duration) error {
-    v.session.Connect()
-    defer v.session.Disconnect()
-    service := pb.NewVolumeServiceClient(v.session.connection)
-    ctx, err := utils.GetContext(true)
-    if err != nil {
-        return err
-    }
+	v.session.Connect()
+	defer v.session.Disconnect()
+	service := pb.NewVolumeServiceClient(v.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
 
-    _, err = service.Detach(
-        ctx, &pb.VolumeDetachment{
-            Volume: &pb.Reference{Name: volumeName},
-            Host:   &pb.Reference{Name: hostName},
-        },
-    )
-    return err
+	_, err = service.Detach(
+		ctx, &pb.VolumeDetachment{
+			Volume: &pb.Reference{Name: volumeName},
+			Host:   &pb.Reference{Name: hostName},
+		},
+	)
+	return err
 }

@@ -17,59 +17,59 @@
 package identity
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
-    "github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
+	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // Identity contains the bare minimum information about a cluster
 type Identity struct {
-    Name       string             `json:"name"`       // Name is the name of the cluster
-    Flavor     flavor.Enum        `json:"flavor"`     // Flavor tells what kind of cluster it is
-    Complexity complexity.Enum    `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
-    Keypair    *resources.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
+	Name       string             `json:"name"`       // Name is the name of the cluster
+	Flavor     flavor.Enum        `json:"flavor"`     // Flavor tells what kind of cluster it is
+	Complexity complexity.Enum    `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
+	Keypair    *resources.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
 
-    // AdminPassword contains the password of cladm account. This password
-    // is used to connect via Guacamole, but cannot be used with SSH
-    AdminPassword string `json:"admin_password"`
+	// AdminPassword contains the password of cladm account. This password
+	// is used to connect via Guacamole, but cannot be used with SSH
+	AdminPassword string `json:"admin_password"`
 }
 
 // NewIdentity ...
 func NewIdentity() *Identity {
-    return &Identity{}
+	return &Identity{}
 }
 
 // Content ...
 // satisfies interface data.Clonable
 func (i *Identity) Content() data.Clonable {
-    return i
+	return i
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (i *Identity) Clone() data.Clonable {
-    return NewIdentity().Replace(i)
+	return NewIdentity().Replace(i)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (i *Identity) Replace(p data.Clonable) data.Clonable {
-    src := p.(*Identity)
-    *i = *src
-    i.Keypair = &resources.KeyPair{}
-    *i.Keypair = *src.Keypair
-    return i
+	src := p.(*Identity)
+	*i = *src
+	i.Keypair = &resources.KeyPair{}
+	*i.Keypair = *src.Keypair
+	return i
 }
 
 // OK ...
 func (i *Identity) OK() bool {
-    if i == nil {
-        return false
-    }
+	if i == nil {
+		return false
+	}
 
-    result := true
-    result = result && i.Name != ""
-    result = result && i.Flavor != 0
-    return result
+	result := true
+	result = result && i.Name != ""
+	result = result && i.Flavor != 0
+	return result
 }

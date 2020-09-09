@@ -17,61 +17,61 @@
 package system_test
 
 import (
-    "fmt"
-    "io/ioutil"
-    "os/user"
-    "strings"
-    "testing"
+	"fmt"
+	"io/ioutil"
+	"os/user"
+	"strings"
+	"testing"
 
-    "github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 
-    "github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/system"
 )
 
 func Test_Command(t *testing.T) {
-    usr, err := user.Current()
-    assert.Nil(t, err)
-    content, err := ioutil.ReadFile(fmt.Sprintf("%s/.ssh/id_rsa", usr.HomeDir))
-    if err != nil {
-        t.Skip()
-    }
+	usr, err := user.Current()
+	assert.Nil(t, err)
+	content, err := ioutil.ReadFile(fmt.Sprintf("%s/.ssh/id_rsa", usr.HomeDir))
+	if err != nil {
+		t.Skip()
+	}
 
-    assert.Nil(t, err)
+	assert.Nil(t, err)
 
-    sshConf := system.SSHConfig{
-        User:       usr.Name,
-        Host:       "127.0.0.1",
-        Port:       22,
-        PrivateKey: string(content),
-    }
-    cmd, err := sshConf.Command("whoami")
-    assert.Nil(t, err)
-    out, err := cmd.Output() // FIXME Correct this test
-    if err != nil {
-        t.Skip()
-    }
-    assert.Nil(t, err)
-    assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
-    gateway := sshConf
+	sshConf := system.SSHConfig{
+		User:       usr.Name,
+		Host:       "127.0.0.1",
+		Port:       22,
+		PrivateKey: string(content),
+	}
+	cmd, err := sshConf.Command("whoami")
+	assert.Nil(t, err)
+	out, err := cmd.Output() // FIXME Correct this test
+	if err != nil {
+		t.Skip()
+	}
+	assert.Nil(t, err)
+	assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
+	gateway := sshConf
 
-    if !utils.IsEmpty(gateway) {
-        sshConf.GatewayConfig = &gateway
-        cmd, err := sshConf.Command("bash -c whoami")
-        assert.Nil(t, err)
-        out, err := cmd.Output()
-        assert.Nil(t, err)
-        assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
-    }
+	if !utils.IsEmpty(gateway) {
+		sshConf.GatewayConfig = &gateway
+		cmd, err := sshConf.Command("bash -c whoami")
+		assert.Nil(t, err)
+		out, err := cmd.Output()
+		assert.Nil(t, err)
+		assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
+	}
 
-    if !utils.IsEmpty(gateway) {
-        gw := gateway
-        sshConf.GatewayConfig.GatewayConfig = &gw
-        cmd, err := sshConf.Command("bash -c whoami")
-        assert.Nil(t, err)
-        out, err := cmd.Output()
-        assert.Nil(t, err)
-        assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
-    }
+	if !utils.IsEmpty(gateway) {
+		gw := gateway
+		sshConf.GatewayConfig.GatewayConfig = &gw
+		cmd, err := sshConf.Command("bash -c whoami")
+		assert.Nil(t, err)
+		out, err := cmd.Output()
+		assert.Nil(t, err)
+		assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
+	}
 }

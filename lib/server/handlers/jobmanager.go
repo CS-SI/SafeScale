@@ -17,38 +17,38 @@
 package handlers
 
 import (
-    "context"
+	"context"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
-    srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 //go:generate mockgen -destination=../mocks/mock_JobManager.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers JobManagerAPI
 
 // JobManagerAPI defines API to manipulate process
 type JobManagerAPI interface {
-    List(ctx context.Context) (map[string]string, error)
-    Stop(ctx context.Context, uuid string)
+	List(ctx context.Context) (map[string]string, error)
+	Stop(ctx context.Context, uuid string)
 }
 
 // JobManagerHandler service
 type JobManagerHandler struct {
-    service iaas.Service
+	service iaas.Service
 }
 
 // NewJobHandler creates a Volume service
 func NewJobHandler(svc iaas.Service) JobManagerAPI {
-    return &JobManagerHandler{
-        service: svc,
-    }
+	return &JobManagerHandler{
+		service: svc,
+	}
 }
 
 // List returns the Running Process list
 func (pmh *JobManagerHandler) List(ctx context.Context) (map[string]string, error) {
-    return srvutils.JobList(), nil
+	return srvutils.JobList(), nil
 }
 
 // Stop stop the designed Process
 func (pmh *JobManagerHandler) Stop(ctx context.Context, uuid string) {
-    srvutils.JobCancelUUID(uuid)
+	srvutils.JobCancelUUID(uuid)
 }

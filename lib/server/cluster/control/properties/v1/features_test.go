@@ -1,28 +1,28 @@
 package propertiesv1
 
 import (
-    "reflect"
-    "testing"
+	"reflect"
+	"testing"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFeatures_Clone(t *testing.T) {
-    ct := newFeatures()
-    ct.Installed["fair"] = "something"
-    ct.Disabled["kind"] = struct{}{}
+	ct := newFeatures()
+	ct.Installed["fair"] = "something"
+	ct.Disabled["kind"] = struct{}{}
 
-    clonedCt, ok := ct.Clone().(*Features)
-    if !ok {
-        t.Fail()
-    }
+	clonedCt, ok := ct.Clone().(*Features)
+	if !ok {
+		t.Fail()
+	}
 
-    assert.Equal(t, ct, clonedCt)
-    clonedCt.Installed["fair"] = "commitment"
+	assert.Equal(t, ct, clonedCt)
+	clonedCt.Installed["fair"] = "commitment"
 
-    areEqual := reflect.DeepEqual(ct, clonedCt)
-    if areEqual {
-        t.Error("It's a shallow clone !")
-        t.Fail()
-    }
+	areEqual := reflect.DeepEqual(ct, clonedCt)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
 }

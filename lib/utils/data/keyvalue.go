@@ -21,45 +21,45 @@ type Map map[string]interface{}
 
 // NewMap ...
 func NewMap() Map {
-    return Map{}
+	return Map{}
 }
 
 // Clone clones the content of a Variables
 // satisfies interface Clonable
 func (m Map) Clone() Map {
-    return Map{}.Replace(m)
+	return Map{}.Replace(m)
 }
 
 // Replace replaces the content of the Map with content of another one
 // satisfies interface Clonable
 func (m Map) Replace(src Map) Map {
-    nm := Map{}
-    for k, v := range src {
-        nm[k] = v
-    }
-    return nm
+	nm := Map{}
+	for k, v := range src {
+		nm[k] = v
+	}
+	return nm
 }
 
 // Merge add missing keys from source
 func (m Map) Merge(src Map) Map {
-    for k, v := range src {
-        if _, ok := m[k]; !ok {
-            m[k] = v
-        }
-    }
-    return m
+	for k, v := range src {
+		if _, ok := m[k]; !ok {
+			m[k] = v
+		}
+	}
+	return m
 }
 
 // ForceMerge add missing keys from source in p and replace the ones in source already in p
 func (m Map) ForceMerge(src Map) Map {
-    for k, v := range src {
-        m[k] = v
-    }
-    return m
+	for k, v := range src {
+		m[k] = v
+	}
+	return m
 }
 
 // Contains tells if a key is present in Map
 func (m Map) Contains(key string) bool {
-    _, ok := m[key]
-    return ok
+	_, ok := m[key]
+	return ok
 }

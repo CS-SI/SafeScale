@@ -17,66 +17,66 @@
 package debug
 
 import (
-    "encoding/json"
-    "os"
-    "strings"
+	"encoding/json"
+	"os"
+	"strings"
 
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 var settings map[string]map[string]struct{} = nil
 
 // RegisterTraceSettings keeps track of what has to be traced
 func RegisterTraceSettings(jsonSettings string) error {
-    if settings != nil {
-        return scerr.DuplicateError("trace settings are already defined")
-    }
+	if settings != nil {
+		return scerr.DuplicateError("trace settings are already defined")
+	}
 
-    newSettings := map[string]map[string]struct{}{}
-    err := json.Unmarshal([]byte(jsonSettings), &newSettings)
-    if err != nil {
-        return scerr.Wrap(scerr.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings")
-    }
+	newSettings := map[string]map[string]struct{}{}
+	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
+	if err != nil {
+		return scerr.Wrap(scerr.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings")
+	}
 
-    // Check with env variable SAFESCALE_TRACE if key or key.subkey is inside
-    if env := os.Getenv("SAFESCALE_TRACE"); env != "" {
-        parts := strings.Split(env, ",")
-        for _, part := range parts {
-            if part == "" {
-                continue
-            }
-            keys := strings.Split(strings.TrimSpace(part), ".")
-            key := strings.TrimSpace(keys[0])
-            if _, ok := newSettings[keys[0]]; !ok {
-                newSettings[key] = map[string]struct{}{}
-            }
-            if len(keys) > 1 {
-                subkey := strings.TrimSpace(keys[1])
-                newSettings[key][subkey] = struct{}{}
-            }
-        }
-    }
+	// Check with env variable SAFESCALE_TRACE if key or key.subkey is inside
+	if env := os.Getenv("SAFESCALE_TRACE"); env != "" {
+		parts := strings.Split(env, ",")
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			keys := strings.Split(strings.TrimSpace(part), ".")
+			key := strings.TrimSpace(keys[0])
+			if _, ok := newSettings[keys[0]]; !ok {
+				newSettings[key] = map[string]struct{}{}
+			}
+			if len(keys) > 1 {
+				subkey := strings.TrimSpace(keys[1])
+				newSettings[key][subkey] = struct{}{}
+			}
+		}
+	}
 
-    settings = newSettings
-    return nil
+	settings = newSettings
+	return nil
 }
 
 // IfTrace tells if a specific trace is asked for
 func IfTrace(key string) bool {
-    if key == "" {
-        return false
-    }
-    parts := strings.Split(key, ".")
-    // If key.subkey is defined, return true
-    if len(parts) >= 2 {
-        _, ok := settings[parts[0]][parts[1]]
-        if ok {
-            return true
-        }
-    }
-    // If key is defined and there is no subkey, return true (key enabled as a whole)
-    if _, ok := settings[parts[0]]; ok && len(settings[parts[0]]) == 0 {
-        return true
-    }
-    return false
+	if key == "" {
+		return false
+	}
+	parts := strings.Split(key, ".")
+	// If key.subkey is defined, return true
+	if len(parts) >= 2 {
+		_, ok := settings[parts[0]][parts[1]]
+		if ok {
+			return true
+		}
+	}
+	// If key is defined and there is no subkey, return true (key enabled as a whole)
+	if _, ok := settings[parts[0]]; ok && len(settings[parts[0]]) == 0 {
+		return true
+	}
+	return false
 }

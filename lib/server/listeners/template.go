@@ -17,18 +17,18 @@
 package listeners
 
 import (
-    "context"
+	"context"
 
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-    log "github.com/sirupsen/logrus"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
-    pb "github.com/CS-SI/SafeScale/lib"
-    "github.com/CS-SI/SafeScale/lib/server/handlers"
-    srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-    "github.com/CS-SI/SafeScale/lib/utils/scerr"
+	pb "github.com/CS-SI/SafeScale/lib"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // TemplateHandler exists to ease integration tests
@@ -41,37 +41,37 @@ type TemplateListener struct{}
 
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
-    if s == nil {
-        return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
-    }
-    all := in.GetAll()
+	if s == nil {
+		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+	}
+	all := in.GetAll()
 
-    tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-    defer tracer.OnExitTrace()()
-    defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-    ctx, cancelFunc := context.WithCancel(ctx)
-    if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {
-        defer srvutils.JobDeregister(ctx)
-    }
+	ctx, cancelFunc := context.WithCancel(ctx)
+	if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {
+		defer srvutils.JobDeregister(ctx)
+	}
 
-    tenant := GetCurrentTenant()
-    if tenant == nil {
-        log.Info("Can't list templates: no tenant set")
-        return nil, status.Errorf(codes.FailedPrecondition, "cannot list templates: no tenant set")
-    }
+	tenant := GetCurrentTenant()
+	if tenant == nil {
+		log.Info("Can't list templates: no tenant set")
+		return nil, status.Errorf(codes.FailedPrecondition, "cannot list templates: no tenant set")
+	}
 
-    handler := TemplateHandler(tenant.Service)
-    templates, err := handler.List(ctx, all)
-    if err != nil {
-        return nil, status.Errorf(codes.Internal, getUserMessage(err))
-    }
+	handler := TemplateHandler(tenant.Service)
+	templates, err := handler.List(ctx, all)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
+	}
 
-    // Map resources.Host to pb.Host
-    var pbTemplates []*pb.HostTemplate
-    for _, template := range templates {
-        pbTemplates = append(pbTemplates, srvutils.ToPBHostTemplate(&template))
-    }
-    rv := &pb.TemplateList{Templates: pbTemplates}
-    return rv, nil
+	// Map resources.Host to pb.Host
+	var pbTemplates []*pb.HostTemplate
+	for _, template := range templates {
+		pbTemplates = append(pbTemplates, srvutils.ToPBHostTemplate(&template))
+	}
+	rv := &pb.TemplateList{Templates: pbTemplates}
+	return rv, nil
 }

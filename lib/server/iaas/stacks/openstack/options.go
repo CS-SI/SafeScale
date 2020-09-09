@@ -20,10 +20,10 @@ import "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 // GetConfigurationOptions ...
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-    return s.cfgOpts
+	return s.cfgOpts
 }
 
 // GetAuthenticationOptions ...
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-    return s.authOpts
+	return s.authOpts
 }

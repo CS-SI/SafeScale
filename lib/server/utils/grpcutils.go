@@ -17,37 +17,37 @@
 package utils
 
 import (
-    "fmt"
-    "log"
-    "strings"
+	"fmt"
+	"log"
+	"strings"
 
-    "google.golang.org/grpc"
+	"google.golang.org/grpc"
 
-    pb "github.com/CS-SI/SafeScale/lib"
+	pb "github.com/CS-SI/SafeScale/lib"
 )
 
 // GetConnection returns a connection to GRPC server
 func GetConnection(host string, port int) *grpc.ClientConn {
-    address := fmt.Sprintf("%s:%d", host, port)
+	address := fmt.Sprintf("%s:%d", host, port)
 
-    // Set up a connection to the server.
-    conn, err := grpc.Dial(address, grpc.WithInsecure())
-    if err != nil {
-        log.Fatalf("failed to connect to safescaled (%s:%d): %v", host, port, err)
-    }
-    return conn
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("failed to connect to safescaled (%s:%d): %v", host, port, err)
+	}
+	return conn
 }
 
 // GetReference return a reference from the name or id given in the pb.Reference
 func GetReference(in *pb.Reference) string {
-    var ref string
-    name := in.GetName()
-    if strings.TrimSpace(name) != "" {
-        ref = name
-    }
-    id := in.GetId()
-    if strings.TrimSpace(id) != "" {
-        ref = id
-    }
-    return ref
+	var ref string
+	name := in.GetName()
+	if strings.TrimSpace(name) != "" {
+		ref = name
+	}
+	id := in.GetId()
+	if strings.TrimSpace(id) != "" {
+		ref = id
+	}
+	return ref
 }

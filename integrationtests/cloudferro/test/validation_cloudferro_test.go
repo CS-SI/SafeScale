@@ -1,39 +1,39 @@
 package test
 
 import (
-    "testing"
+	"testing"
 
-    "github.com/CS-SI/SafeScale/integrationtests"
-    "github.com/CS-SI/SafeScale/integrationtests/enums/providers"
+	"github.com/CS-SI/SafeScale/integrationtests"
+	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 )
 
 func Test_Basic(t *testing.T) {
-    integrationtests.Basic(t, providers.CLOUDFERRO)
+	integrationtests.Basic(t, providers.CLOUDFERRO)
 }
 func Test_ReadyToSSH(t *testing.T) {
-    integrationtests.ReadyToSSH(t, providers.CLOUDFERRO)
+	integrationtests.ReadyToSSH(t, providers.CLOUDFERRO)
 }
 
 func Test_ShareError(t *testing.T) {
-    integrationtests.ShareError(t, providers.CLOUDFERRO)
+	integrationtests.ShareError(t, providers.CLOUDFERRO)
 }
 
 func Test_VolumeError(t *testing.T) {
-    integrationtests.VolumeError(t, providers.CLOUDFERRO)
+	integrationtests.VolumeError(t, providers.CLOUDFERRO)
 }
 
 func Test_StopStart(t *testing.T) {
-    integrationtests.StopStart(t, providers.CLOUDFERRO)
+	integrationtests.StopStart(t, providers.CLOUDFERRO)
 }
 
 func Test_DeleteVolumeMounted(t *testing.T) {
-    integrationtests.DeleteVolumeMounted(t, providers.CLOUDFERRO)
+	integrationtests.DeleteVolumeMounted(t, providers.CLOUDFERRO)
 }
 
 func Test_UntilShare(t *testing.T) {
-    integrationtests.UntilShare(t, providers.CLOUDFERRO)
+	integrationtests.UntilShare(t, providers.CLOUDFERRO)
 }
 
 func Test_UntilVolume(t *testing.T) {
-    integrationtests.UntilVolume(t, providers.CLOUDFERRO)
+	integrationtests.UntilVolume(t, providers.CLOUDFERRO)
 }

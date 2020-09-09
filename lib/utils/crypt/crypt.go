@@ -19,11 +19,11 @@
 package crypt
 
 import (
-    "crypto/aes"
-    "crypto/cipher"
-    "crypto/rand"
-    "fmt"
-    "io"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"fmt"
+	"io"
 )
 
 // Key ...
@@ -37,73 +37,73 @@ type Key [32]byte
 // If text is not nil and not empty, and the length of text us greater than 32, the 32 first bytes
 // are used as key.
 func NewEncryptionKey(text []byte) (*Key, error) {
-    key := Key{}
-    nBytes := len(text)
-    if len(text) == 0 {
-        _, err := io.ReadFull(rand.Reader, key[:])
-        if err != nil {
-            return nil, fmt.Errorf("cannot read enough random bytes (you should consider to stop using this computer): %v", err)
-        }
-    } else {
-        n := nBytes
-        if nBytes > 32 {
-            n = 32
-        }
-        for i := 0; i < n; i++ {
-            key[i] = text[i]
-        }
-        for i := n; i < 32; i++ {
-            key[i] = ' '
-        }
-    }
-    return &key, nil
+	key := Key{}
+	nBytes := len(text)
+	if len(text) == 0 {
+		_, err := io.ReadFull(rand.Reader, key[:])
+		if err != nil {
+			return nil, fmt.Errorf("cannot read enough random bytes (you should consider to stop using this computer): %v", err)
+		}
+	} else {
+		n := nBytes
+		if nBytes > 32 {
+			n = 32
+		}
+		for i := 0; i < n; i++ {
+			key[i] = text[i]
+		}
+		for i := n; i < 32; i++ {
+			key[i] = ' '
+		}
+	}
+	return &key, nil
 }
 
 // Encrypt encrypts data using 256-bit AES-GCM.  This both hides the content of
 // the data and provides a check that it hasn't been altered. Output takes the
 // form nonce|ciphertext|tag where '|' indicates concatenation.
 func Encrypt(plaintext []byte, key *Key) ([]byte, error) {
-    block, err := aes.NewCipher(key[:])
-    if err != nil {
-        return nil, err
-    }
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, err
+	}
 
-    gcm, err := cipher.NewGCM(block)
-    if err != nil {
-        return nil, err
-    }
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
 
-    nonce := make([]byte, gcm.NonceSize())
-    _, err = io.ReadFull(rand.Reader, nonce)
-    if err != nil {
-        return nil, err
-    }
+	nonce := make([]byte, gcm.NonceSize())
+	_, err = io.ReadFull(rand.Reader, nonce)
+	if err != nil {
+		return nil, err
+	}
 
-    return gcm.Seal(nonce, nonce, plaintext, nil), nil
+	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
 // Decrypt decrypts data using 256-bit AES-GCM.  This both hides the content of
 // the data and provides a check that it hasn't been altered. Expects input
 // form nonce|ciphertext|tag where '|' indicates concatenation.
 func Decrypt(ciphertext []byte, key *Key) ([]byte, error) {
-    block, err := aes.NewCipher(key[:])
-    if err != nil {
-        return nil, err
-    }
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, err
+	}
 
-    gcm, err := cipher.NewGCM(block)
-    if err != nil {
-        return nil, err
-    }
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
 
-    if len(ciphertext) < gcm.NonceSize() {
-        return nil, fmt.Errorf("malformed ciphertext")
-    }
+	if len(ciphertext) < gcm.NonceSize() {
+		return nil, fmt.Errorf("malformed ciphertext")
+	}
 
-    return gcm.Open(
-        nil,
-        ciphertext[:gcm.NonceSize()],
-        ciphertext[gcm.NonceSize():],
-        nil,
-    )
+	return gcm.Open(
+		nil,
+		ciphertext[:gcm.NonceSize()],
+		ciphertext[gcm.NonceSize():],
+		nil,
+	)
 }

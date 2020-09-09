@@ -21,10 +21,10 @@ package context
 type Enum uint8
 
 const (
-    _ Enum = iota
+	_ Enum = iota
 
-    // Host indicates the context of feature addition is on host
-    Host
-    // Cluster indicates the context of feature addition is on cluster
-    Cluster
+	// Host indicates the context of feature addition is on host
+	Host
+	// Cluster indicates the context of feature addition is on cluster
+	Cluster
 )
