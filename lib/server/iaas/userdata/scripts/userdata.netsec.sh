@@ -90,16 +90,21 @@ reset_fw() {
         firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
     }
     {{- end }}
+
+    # Sets the default target of packets coming from public interface to DROP
+    firewall-offline-cmd --zone=public --set-target=DROP || return 1
+
     # Attach LAN interfaces to zone trusted
     [ ! -z $PR_IFs ] && {
         for i in $PR_IFs; do
             firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
         done
     }
-    # Attach lo interface to zone trusted
     firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
+
     # Allow service ssh on public zone
     firewall-offline-cmd --zone=public --add-service=ssh || return 1
+
     # Save current fw settings as permanent
     sfService enable firewalld
 }

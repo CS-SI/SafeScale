@@ -70,9 +70,9 @@ type Content struct {
     DNSServers []string
     // CIDR contains the cidr of the network
     CIDR string
-    // defaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
+    // DefaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
     DefaultRouteIP string
-    // getEndpointIP is the IP of the gateway or the VIP if gateway HA is enabled
+    // EndpointIP is the IP of the gateway or the VIP if gateway HA is enabled
     EndpointIP string
     // PrimaryGatewayPrivateIP is the private IP of the primary gateway
     PrimaryGatewayPrivateIP string
@@ -94,6 +94,8 @@ type Content struct {
     // PublicVIP string // VPL: change to getEndpointIP
     // // PrivateVIP contains the private IP of the VIP instance if it exists
     // PrivateVIP string // VPL: change to defaultRouteIP
+    // GatewayHAKeepalivedPassword contains the password to use in keepalived configurations
+    GatewayHAKeepalivedPassword string
 
     ProviderName     string
     BuildSubnetworks bool
