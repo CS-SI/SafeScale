@@ -159,29 +159,45 @@ func (e ErrCore) Consequences() []error {
 
 // Wrap creates a new error with a message 'message' and a cause error 'cause'
 func Wrap(cause error, message string) ErrCore {
-	return NewErrCore(message, cause, []error{})
+	fileName := GetCallerFileName()
+	ind := strings.Index(fileName, "/SafeScale") + len("/SafeScale")
+	fileName = fileName[ind:]
+
+	fileLine := GetCallerFileLine()
+	return NewErrCore(message, cause, nil, fileName, fileLine)
 }
 
-func ErrorfWithCause(message string, cause error) ErrCore {
-	return NewErrCore(message, cause, nil)
+func ErrorfWithoutCause(message string) ErrCore {
+	fileName := GetCallerFileName()
+	ind := strings.Index(fileName, "/SafeScale") + len("/SafeScale")
+	fileName = fileName[ind:]
+
+	fileLine := GetCallerFileLine()
+	return NewErrCore(message, nil, nil, fileName, fileLine)
 }
 
 func Errorf(message string, cause error) ErrCore {
-	return NewErrCore(message, cause, nil)
+	fileName := GetCallerFileName()
+	ind := strings.Index(fileName, "/SafeScale") + len("/SafeScale")
+	fileName = fileName[ind:]
+
+	fileLine := GetCallerFileLine()
+	return NewErrCore(message, cause, nil, fileName, fileLine)
 }
 
 // NewErrCore creates a new error with a message 'message', a cause error 'cause' and a list of teardown problems 'consequences'
-func NewErrCore(message string, cause error, consequences []error) ErrCore {
+func NewErrCore(message string, cause error, consequences []error, fileError string, lineError int) ErrCore {
+	richMessage := fmt.Sprintf("[%s:%d] %s", fileError, lineError, message)
 	if consequences == nil {
 		return ErrCore{
-			message:      message,
+			message:      richMessage,
 			cause:        cause,
 			consequences: []error{},
 		}
 	}
 
 	return ErrCore{
-		message:      message,
+		message:      richMessage,
 		cause:        cause,
 		consequences: consequences,
 	}

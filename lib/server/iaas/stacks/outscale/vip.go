@@ -108,7 +108,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	}
 	// No nics linked to the VM
 	if len(res.Nics) == 0 {
-		return -1, scerr.NewErrCore("no nics linked to the VM", nil, nil)
+		return -1, scerr.Errorf("no nics linked to the VM", nil)
 	}
 	var numbers sort.IntSlice
 	for _, nic := range res.Nics {
@@ -116,7 +116,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	}
 
 	if numbers == nil {
-		return 0, scerr.NewErrCore("no nics linked to the VM", nil, nil)
+		return 0, scerr.Errorf("no nics linked to the VM", nil)
 	}
 
 	sort.Sort(numbers)
