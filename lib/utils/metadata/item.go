@@ -59,6 +59,10 @@ func (i *Item) GetService() iaas.Service {
 	return i.folder.GetService()
 }
 
+func (i *Item) OK() (bool, error) {
+	return i.payload != nil, nil
+}
+
 // GetBucket returns the bucket used by Item
 func (i *Item) GetBucket() objectstorage.Bucket {
 	return i.folder.GetBucket()
