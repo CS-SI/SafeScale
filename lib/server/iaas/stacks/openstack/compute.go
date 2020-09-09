@@ -18,9 +18,10 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"

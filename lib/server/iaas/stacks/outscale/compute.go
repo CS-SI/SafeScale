@@ -28,6 +28,8 @@ import (
 	"github.com/antihax/optional"
 	"github.com/sirupsen/logrus"
 
+	"github.com/outscale-dev/osc-sdk-go/osc"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
@@ -38,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/outscale-dev/osc-sdk-go/osc"
 )
 
 func normalizeImageName(name string) string {
