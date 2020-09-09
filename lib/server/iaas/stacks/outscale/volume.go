@@ -2,7 +2,10 @@ package outscale
 
 import (
 	"fmt"
+
 	"github.com/antihax/optional"
+
+	"github.com/outscale-dev/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
@@ -10,7 +13,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/outscale-dev/osc-sdk-go/osc"
 )
 
 // CreateVolume creates a block volume
