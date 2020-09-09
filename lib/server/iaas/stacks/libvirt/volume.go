@@ -77,7 +77,11 @@ func (s *Stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, error) 
 		storagePoolXML, err := storagePool.GetXMLDesc(0)
 		if err != nil {
 			return nil, scerr.Errorf(
-				fmt.Sprintf(fmt.Sprintf("failed get xml description of the storage pool : %s", err.Error())), err,
+				fmt.Sprintf(
+					fmt.Sprintf(
+						"failed get xml description of the storage pool : %s", err.Error(),
+					),
+				), err,
 			)
 		}
 		storagePoolDescription := &libvirtxml.StoragePool{}
@@ -280,8 +284,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if err != nil {
 		return nil, scerr.Errorf(
 			fmt.Sprintf(
-				"failed to create the volume %s on pool %s : %s", request.Name, storagePoolDescription.Name,
-				err.Error(),
+				"failed to create the volume %s on pool %s : %s", request.Name, storagePoolDescription.Name, err.Error(),
 			), err,
 		)
 	}
@@ -291,8 +294,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, scerr.Errorf(
 			fmt.Sprintf(
 				"failed to get resources.Volume form libvirt.Volume %s on pool %s : %s", request.Name,
-				storagePoolDescription.Name,
-				err.Error(),
+				storagePoolDescription.Name, err.Error(),
 			), err,
 		)
 	}

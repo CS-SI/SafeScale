@@ -112,9 +112,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway stub
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
-	*resources.Host, *userdata.Content, error,
-) {
+func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
 	return nil, nil, scerr.Errorf(fmt.Sprintf(errorStr), nil)
 }
 

@@ -450,7 +450,9 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
 			return host, scerr.Errorf(
-				fmt.Sprintf("timeout waiting to get host '%s' information after %v", host.ID, timeout), retryErr,
+				fmt.Sprintf(
+					"timeout waiting to get host '%s' information after %v", host.ID, timeout,
+				), retryErr,
 			)
 		}
 		return host, retryErr
@@ -657,8 +659,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 				server, err = buildAwsSpotMachine(
 					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID,
-					string(userDataPhase1),
-					isGateway, template, sgID,
+					string(userDataPhase1), isGateway, template, sgID,
 				)
 			} else {
 				netID := defaultNetwork.ID
@@ -672,8 +673,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 				server, err = buildAwsMachine(
 					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID,
-					string(userDataPhase1),
-					isGateway, template, sgID,
+					string(userDataPhase1), isGateway, template, sgID,
 				)
 			}
 			if err != nil {
@@ -912,10 +912,7 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 	return nil
 }
 
-func buildAwsSpotMachine(
-	EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool,
-	template *resources.HostTemplate, sgID string,
-) (*resources.Host, error) {
+func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *resources.HostTemplate, sgID string) (*resources.Host, error) {
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),

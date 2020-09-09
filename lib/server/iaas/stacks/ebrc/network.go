@@ -748,9 +748,7 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (
-	host *resources.Host, content *userdata.Content, err error,
-) {
+func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, content *userdata.Content, err error) {
 	logrus.Debug("ebrc.Client.CreateGateway() called")
 	defer logrus.Debug("ebrc.Client.CreateGateway() done")
 
@@ -785,7 +783,9 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resource
 			return nil, userData, err
 		default:
 			return nil, userData, scerr.Errorf(
-				fmt.Sprintf("Error creating gateway : %s", openstack.ProviderErrorToString(err)), err,
+				fmt.Sprintf(
+					"Error creating gateway : %s", openstack.ProviderErrorToString(err),
+				), err,
 			)
 		}
 	}

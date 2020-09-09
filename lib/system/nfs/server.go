@@ -53,9 +53,7 @@ func (s *Server) Install() error {
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(
-	path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
-) error {
+func (s *Server) AddShare(path string, secutityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool) error {
 	share, err := NewShare(s, path)
 	if err != nil {
 		return fmt.Errorf("failed to create the share : %s", err.Error())
@@ -160,9 +158,7 @@ func (s *Server) ExpandVGDevice(device, name, format string, doNotFormat bool, d
 }
 
 // MountVGDevice shrinks a LVM Virtual Group in the remote system
-func (s *Server) ShrinkVGDevice(device, name, format string, doNotFormat bool, drives []string, vuSize int, targetSize int) (
-	string, error,
-) {
+func (s *Server) ShrinkVGDevice(device, name, format string, doNotFormat bool, drives []string, vuSize int, targetSize int) (string, error) {
 	data := map[string]interface{}{
 		"Device":      device,
 		"Name":        name,

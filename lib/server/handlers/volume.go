@@ -261,9 +261,7 @@ func (handler *VolumeHandler) Inspect(
 }
 
 // Create a volume
-func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (
-	volume *resources.Volume, err error,
-) {
+func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (volume *resources.Volume, err error) {
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -386,9 +384,7 @@ func (handler *VolumeHandler) isAlreadyMounted(ctx context.Context, hostName str
 }
 
 // Attach a volume to an host
-func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (
-	_ string, err error,
-) {
+func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (_ string, err error) {
 	if handler == nil {
 		return "", scerr.InvalidInstanceError()
 	}
@@ -778,9 +774,7 @@ func getHostVolume(ctx context.Context, svc *VolumeHandler, hostName string) (*p
 	return hostVolumesV1, nil
 }
 
-func (handler *VolumeHandler) attachLVM(
-	ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool,
-) (err error) {
+func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostName, path, format string, doNotFormat bool) (err error) {
 	// Get volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
@@ -1218,9 +1212,7 @@ func getServerByID(ctx context.Context, handler *VolumeHandler, hostID string) (
 	return server, nil
 }
 
-func getHostLocalMount(ctx context.Context, handler *VolumeHandler, volumeName, hostName string) (
-	mount *propsv1.HostLocalMount, err error,
-) {
+func getHostLocalMount(ctx context.Context, handler *VolumeHandler, volumeName, hostName string) (mount *propsv1.HostLocalMount, err error) {
 	// Get Host data
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -1282,9 +1274,7 @@ func getHostLocalMount(ctx context.Context, handler *VolumeHandler, volumeName, 
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Expand(
-	ctx context.Context, volumeName, hostName string, increment uint32, incrementType string,
-) (err error) {
+func (handler *VolumeHandler) Expand(ctx context.Context, volumeName, hostName string, increment uint32, incrementType string) (err error) {
 	// Load volume data
 	volume, _, err := handler.Inspect(ctx, volumeName)
 	if err != nil {
@@ -1432,9 +1422,7 @@ func (handler *VolumeHandler) Expand(
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
-func (handler *VolumeHandler) Shrink(
-	ctx context.Context, volumeName, hostName string, increment uint32, incrementType string,
-) (err error) {
+func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName string, increment uint32, incrementType string) (err error) {
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}

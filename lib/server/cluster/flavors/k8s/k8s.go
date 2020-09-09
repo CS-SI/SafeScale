@@ -278,9 +278,7 @@ func unconfigureCluster(task concurrency.Task, foreman control.Foreman) error {
 	return nil
 }
 
-func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (
-	string, map[string]interface{},
-) {
+func getNodeInstallationScript(task concurrency.Task, foreman control.Foreman, nodeType nodetype.Enum) (string, map[string]interface{}) {
 	script := ""
 	theData := map[string]interface{}{}
 

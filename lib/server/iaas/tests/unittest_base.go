@@ -197,9 +197,7 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 }
 
 // CreateNetwork creates a test network
-func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (
-	*resources.Network, *resources.Host,
-) {
+func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*resources.Network, *resources.Host) {
 
 	network, err := tester.Service.CreateNetwork(
 		resources.NetworkRequest{
@@ -245,9 +243,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (
-	*resources.Host, *userdata.Content, error,
-) {
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (*resources.Host, *userdata.Content, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(
 		resources.SizingRequirements{
 			MinCores:    1,

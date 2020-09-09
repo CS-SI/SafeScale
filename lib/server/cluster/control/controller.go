@@ -751,9 +751,7 @@ func (c *Controller) AddNode(task concurrency.Task, req *pb.HostDefinition) (str
 	return hosts[0], nil
 }
 
-func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task concurrency.Task) (
-	_ string, _ *pb.HostDefinition, err error,
-) {
+func (c *Controller) getImageAndNodeDescriptionUsedInClusterFromMetadata(task concurrency.Task) (_ string, _ *pb.HostDefinition, err error) {
 	if c == nil {
 		return "", nil, scerr.InvalidInstanceError()
 	}

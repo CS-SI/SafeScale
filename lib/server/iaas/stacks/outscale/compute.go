@@ -371,27 +371,6 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return s.parseTemplateID(id)
 }
 
-// VPL: obsolete
-// func (s *Stack) getOrCreateKeypair(request resources.HostRequest) (*resources.KeyPair, error) {
-//	id, err := uuid.NewV4()
-//	if err != nil {
-//		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-//		logrus.Debugf(utils.Capitalize(msg))
-//		return nil, fmt.Errorf(msg)
-//	}
-//	if request.KeyPair == nil {
-//		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-//		kp, err := s.CreateKeyPair(name)
-//		if err != nil {
-//			msg := fmt.Sprintf("Failed to create host key pair: %+v", err)
-//			logrus.Errorf(msg)
-//			return nil, fmt.Errorf(msg)
-//		}
-//		return kp, nil
-//	}
-//	return request.KeyPair, nil
-// }
-
 func (s *Stack) getOrCreatePassword(request resources.HostRequest) (string, error) {
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)

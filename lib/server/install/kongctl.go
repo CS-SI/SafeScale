@@ -318,9 +318,7 @@ func (k *KongController) createUpstream(name string, options data.Map, v *Variab
 	return nil
 }
 
-func (k *KongController) addSourceControl(
-	ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *Variables,
-) error {
+func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *Variables) error {
 	if sourceControl == nil {
 		return nil
 	}

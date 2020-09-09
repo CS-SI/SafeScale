@@ -82,9 +82,7 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers func(task concurrency.Task, b Foreman) (
-		int, int, int,
-	) // returns masterCount, pruvateNodeCount, publicNodeCount
+	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)    // returns masterCount, pruvateNodeCount, publicNodeCount
 	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) *pb.HostDefinition // sizing of Gateway(s)
 	DefaultMasterSizing         func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of master(s)
 	DefaultNodeSizing           func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of node(s)
@@ -1562,9 +1560,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 }
 
 // installNodeRequirements ...
-func (b *foreman) installNodeRequirements(
-	task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string,
-) (err error) {
+func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string) (err error) {
 	if b.makers.GetTemplateBox == nil {
 		return scerr.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
 	}
@@ -1747,9 +1743,7 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType node
 
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	if t == nil {
 		t, err = concurrency.VoidTask()
 		if err != nil {
@@ -1804,9 +1798,7 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	gw, ok := params.(*pb.Host)
 	if !ok {
@@ -1837,9 +1829,7 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	count := p["count"].(int)
@@ -1901,9 +1891,7 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
@@ -2046,9 +2034,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -2105,9 +2091,7 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	if b == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -2150,9 +2134,7 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	if b == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -2409,9 +2391,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (
-	task concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (task concurrency.TaskResult, err error) {
 	clusterName := b.cluster.GetIdentity(t).Name
 
 	tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
@@ -2476,9 +2456,7 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
@@ -2776,7 +2754,7 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 	return nil
 }
 
-// BuildHostname builds a unique hostname in the Cluster
+// buildHostname builds a unique hostname in the Cluster
 func (b *foreman) buildHostname(task concurrency.Task, core string, nodeType nodetype.Enum) (string, error) {
 	var (
 		index int

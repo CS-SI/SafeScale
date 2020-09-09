@@ -146,8 +146,7 @@ var clusterListCommand = cli.Command{
 			if err != nil {
 				return clitools.FailureResponse(
 					clitools.ExitOnErrorWithMessage(
-						exitcode.Run,
-						fmt.Sprintf(
+						exitcode.Run, fmt.Sprintf(
 							"failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name,
 						),
 					),
@@ -1238,8 +1237,7 @@ func executeCommand(command string, files *RemoteFilesHandler, outs outputs.Enum
 	if err != nil {
 		msg := fmt.Sprintf(
 			"No masters found available for the cluster '%s': %v",
-			clusterInstance.GetIdentity(concurrency.RootTask()).Name,
-			err.Error(),
+			clusterInstance.GetIdentity(concurrency.RootTask()).Name, err.Error(),
 		)
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}

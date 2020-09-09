@@ -310,8 +310,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		return "", scerr.Wrap(
 			err, fmt.Sprintf(
 				"error creating volume attachment between server %s and volume %s: %s", request.HostID,
-				request.VolumeID,
-				ProviderErrorToString(err),
+				request.VolumeID, ProviderErrorToString(err),
 			),
 		)
 	}

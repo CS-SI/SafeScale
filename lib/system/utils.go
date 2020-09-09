@@ -27,7 +27,7 @@ import (
 
 //go:generate rice embed-go
 
-// bashLibrayContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
+// bashLibraryContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
 var bashLibraryContent atomic.Value
 
 // GetBashLibrary generates the content of {{.reserved_BashLibrary}}
