@@ -93,7 +93,7 @@ func (tg *taskGroup) GetID() (string, error) {
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{taskgroup <id>}".
 func (tg *taskGroup) Signature() string {
-	tid, _ := tg.GetID() // FIXME: Later
+	tid, _ := tg.GetID() // FIXME Later
 	if !Trace.Tasks {
 		return ""
 	}

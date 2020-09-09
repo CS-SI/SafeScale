@@ -18,6 +18,7 @@ package concurrency
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -25,69 +26,94 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// tracer ...
-type tracer struct {
+// concurrentTracer ...
+type concurrentTracer struct {
 	taskSig      string
 	fileName     string
+	lineNumber   int
 	funcName     string
 	callerParams string
 	enabled      bool
 	inDone       bool
 	outDone      bool
+	sw           temporal.Stopwatch
 }
 
-const (
-	unknownFunction = "<unknown function>"
-	unknownFile     = "<unknown file>"
-)
+var NullTracer = &concurrentTracer{}
 
-// newTracer creates a new tracer instance
-func newTracer(t Task, enabled bool) *tracer {
-	tracer := tracer{}
+// IsLogActive ... FIXME:
+func IsLogActive(key string) bool {
+	if logs := os.Getenv("SAFESCALE_OPTIONAL_LOGS"); logs != "" {
+		return strings.Contains(logs, key)
+	}
+	return false
+}
+
+// NewTracer creates a new concurrentTracer instance
+func NewTracer(t Task, message string, enabled bool) *concurrentTracer {
+	tracer := concurrentTracer{}
 	if t != nil {
 		tracer.taskSig = t.GetSignature()
 	}
 	tracer.enabled = enabled
 
-	tracer.callerParams = "()"
+	tracer.callerParams = message
+	if message == "" {
+		tracer.callerParams = "()"
+	}
 
-	if pc, file, _, ok := runtime.Caller(1); ok {
+	if pc, file, line, ok := runtime.Caller(1); ok {
 		tracer.fileName = strings.Replace(file, getPartToRemove(), "", 1)
 		if f := runtime.FuncForPC(pc); f != nil {
+			tracer.lineNumber = line
 			tracer.funcName = filepath.Base(f.Name())
 		}
 	}
 	if tracer.funcName == "" {
-		tracer.funcName = unknownFunction
+		tracer.funcName = "<unknown function>"
 	}
 	if tracer.fileName == "" {
-		tracer.funcName = unknownFile
+		tracer.funcName = "<unknown file>"
 	}
 
 	return &tracer
 }
 
-// isNull returns true if the instance is a null value of tracer
-func (t *tracer) isNull() bool {
-	return t == nil || (t.callerParams == "" && (t.funcName == unknownFunction || t.fileName == unknownFile))
+// IsNull returns true if the instance is NullTracer
+func (t *concurrentTracer) IsNull() bool {
+	return t == nil || t == NullTracer
+}
+
+// WithStopwatch will add a measure of duration between GoingIn and GoingOut.
+// GoingOut will add the elapsed time in the log message (if it has to be logged...).
+func (t *concurrentTracer) WithStopwatch() *concurrentTracer {
+	if !t.IsNull() && t.sw == nil {
+		t.sw = temporal.NewStopwatch()
+	}
+	return t
 }
 
 // GoingInMessage returns the content of the message when entering the function
-func (t *tracer) goingInMessage() string {
-	if t.isNull() {
+func (t *concurrentTracer) GoingInMessage() string {
+	if t.IsNull() {
 		return ""
 	}
 	return ">>> " + t.buildMessage()
 }
 
 // GoingIn logs the input message (signifying we are going in) using TRACE level
-func (t *tracer) goingIn() *tracer {
-	if !t.isNull() && !t.inDone {
+func (t *concurrentTracer) GoingIn() *concurrentTracer {
+	if !t.IsNull() && !t.inDone {
+		if t.sw != nil {
+			t.sw.Start()
+		}
 		if t.enabled {
 			t.inDone = true
-			msg := t.goingInMessage()
+			msg := t.GoingInMessage()
 			if msg != "" {
 				logrus.Tracef(msg)
 			}
@@ -96,20 +122,26 @@ func (t *tracer) goingIn() *tracer {
 	return t
 }
 
-// goingOutMessage returns the content of the message when exiting the function
-func (t *tracer) goingOutMessage() string {
-	if t.isNull() {
+// GoingOutMessage returns the content of the message when exiting the function
+func (t *concurrentTracer) GoingOutMessage() string {
+	if t.IsNull() {
 		return ""
 	}
 	return "<<< " + t.buildMessage()
 }
 
 // GoingOut logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
-func (t *tracer) goingOut() *tracer {
-	if !t.isNull() && !t.outDone {
+func (t *concurrentTracer) GoingOut() *concurrentTracer {
+	if !t.IsNull() && !t.outDone {
+		if t.sw != nil {
+			t.sw.Stop()
+		}
 		if t.enabled {
 			t.outDone = true
-			msg := t.goingOutMessage()
+			msg := t.GoingOutMessage()
+			if t.sw != nil {
+				msg += " (duration: " + t.sw.String() + ")"
+			}
 			if msg != "" {
 				logrus.Tracef(msg)
 			}
@@ -119,40 +151,56 @@ func (t *tracer) goingOut() *tracer {
 }
 
 // OnExitTrace returns a function that will log the output message using TRACE level.
-func (t *tracer) onExitTrace() func() {
-	if t.isNull() || t.outDone {
+func (t *concurrentTracer) OnExitTrace() func() {
+	if t.IsNull() || t.outDone {
 		return func() {}
 	}
-	return func() { t.goingOut() }
+	return func() { t.GoingOut() }
 }
 
 // buildMessage builds the message with available information from stack trace
-func (t *tracer) buildMessage() string {
-	if t.isNull() {
+func (t *concurrentTracer) buildMessage() string {
+	if t.IsNull() {
 		return ""
 	}
 
 	message := t.taskSig
-	if _, _, line, ok := runtime.Caller(1); ok {
-		message += " " + t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(line) + "]"
+	if _, _, _, ok := runtime.Caller(1); ok {
+		message += " " + t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(t.lineNumber) + "]"
 	}
 	return message
 }
 
 // TraceMessage returns a string containing a trace message
-func (t *tracer) traceMessage(format string, a ...interface{}) string {
+func (t *concurrentTracer) TraceMessage(format string, a ...interface{}) string {
 	return "--- " + t.buildMessage() + ": " + fmt.Sprintf(format, a...)
 }
 
 // Trace traces a message
-func (t *tracer) trace(format string, a ...interface{}) *tracer {
-	if !t.isNull() && t.enabled {
-		msg := t.traceMessage(format, a...)
+func (t *concurrentTracer) Trace(format string, a ...interface{}) *concurrentTracer {
+	if !t.IsNull() && t.enabled {
+		msg := t.TraceMessage(format, a...)
 		if msg != "" {
 			logrus.Tracef(msg)
 		}
 	}
 	return t
+}
+
+// TraceAsError traces a message with error level
+func (t *concurrentTracer) TraceAsError(format string, a ...interface{}) *concurrentTracer {
+	if !t.IsNull() && t.enabled {
+		msg := t.TraceMessage(format, a...)
+		if msg != "" {
+			logrus.Errorf(msg)
+		}
+	}
+	return t
+}
+
+// Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
+func (t *concurrentTracer) Stopwatch() temporal.Stopwatch {
+	return t.sw
 }
 
 // removePart contains the basedir to remove from file pathes
