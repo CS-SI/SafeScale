@@ -35,7 +35,9 @@ func RegisterTraceSettings(jsonSettings string) error {
 	newSettings := map[string]map[string]struct{}{}
 	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
 	if err != nil {
-		return scerr.Wrap(scerr.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings")
+		return scerr.Wrap(
+			scerr.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings",
+		)
 	}
 
 	// Check with env variable SAFESCALE_TRACE if key or key.subkey is inside

@@ -458,7 +458,9 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 	// Checks if CIDR is valid...
 	_, networkDesc, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), nil)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), nil,
+		)
 	}
 
 	stringMask, err := ipv4MaskString(networkDesc.Mask)

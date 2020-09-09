@@ -137,7 +137,9 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*resources.V
 
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error())), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error())), err,
+		)
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -161,14 +163,18 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error())), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error())), err,
+		)
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
 
 	volumeXML, err := volume.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error())), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error())), err,
+		)
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -241,14 +247,21 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if info.Available < uint64(request.Size)*1024*1024*1024 {
 		return nil, scerr.Errorf(
 			fmt.Sprintf(
-				"free disk space is not sufficient to create a new volume, only %f GB left", float32(info.Available)/1024/1024/1024,
+				"free disk space is not sufficient to create a new volume, only %f GB left",
+				float32(info.Available)/1024/1024/1024,
 			), err,
 		)
 	}
 
 	storagePoolXML, err := storagePool.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the storage pool : %s", err.Error())), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(
+				fmt.Sprintf(
+					"failed get xml description of the storage pool : %s", err.Error(),
+				),
+			), err,
+		)
 	}
 	storagePoolDescription := &libvirtxml.StoragePool{}
 	err = xml.Unmarshal([]byte(storagePoolXML), storagePoolDescription)
@@ -267,7 +280,8 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if err != nil {
 		return nil, scerr.Errorf(
 			fmt.Sprintf(
-				"failed to create the volume %s on pool %s : %s", request.Name, storagePoolDescription.Name, err.Error(),
+				"failed to create the volume %s on pool %s : %s", request.Name, storagePoolDescription.Name,
+				err.Error(),
 			), err,
 		)
 	}
@@ -276,7 +290,8 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if err != nil {
 		return nil, scerr.Errorf(
 			fmt.Sprintf(
-				"failed to get resources.Volume form libvirt.Volume %s on pool %s : %s", request.Name, storagePoolDescription.Name,
+				"failed to get resources.Volume form libvirt.Volume %s on pool %s : %s", request.Name,
+				storagePoolDescription.Name,
 				err.Error(),
 			), err,
 		)
@@ -296,7 +311,9 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 
 	volume, err := getVolumeFromLibvirtVolume(libvirtVolume)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to get resources.volume from libvirt.Volume : %s", err.Error()), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("failed to get resources.volume from libvirt.Volume : %s", err.Error()), err,
+		)
 	}
 
 	return volume, nil
@@ -319,7 +336,11 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	for _, libvirtVolume := range libvirtVolumes {
 		volume, err := getVolumeFromLibvirtVolume(&libvirtVolume)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("failed to get resources.Valume from libvirt.Volume : %s", err.Error()), err)
+			return nil, scerr.Errorf(
+				fmt.Sprintf(
+					"failed to get resources.Valume from libvirt.Volume : %s", err.Error(),
+				), err,
+			)
 		}
 		volumes = append(volumes, *volume)
 	}
@@ -359,7 +380,9 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	}
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return "", scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error())), err)
+		return "", scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error())), err,
+		)
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
@@ -370,7 +393,9 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	}
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
-		return "", scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error())), err)
+		return "", scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get xml description of the volume : %s", err.Error())), err,
+		)
 	}
 	volumeDescription := &libvirtxml.StorageVolume{}
 	err = xml.Unmarshal([]byte(volumeXML), volumeDescription)
@@ -489,7 +514,9 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error())), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get xml description of the domain : %s", err.Error())), err,
+		)
 	}
 	domainDescription := &libvirtxml.Domain{}
 	err = xml.Unmarshal([]byte(domainXML), domainDescription)
@@ -510,7 +537,9 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	for _, volume := range volumes {
 		volumeAttachment, err := getAttachmentFromVolumeAndDomain(volume, domain)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("failed to get Attachment from volume and domain : %s", err.Error()), err)
+			return nil, scerr.Errorf(
+				fmt.Sprintf("failed to get Attachment from volume and domain : %s", err.Error()), err,
+			)
 		}
 		volumeAttachments = append(volumeAttachments, *volumeAttachment)
 	}

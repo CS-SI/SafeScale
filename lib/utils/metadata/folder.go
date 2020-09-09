@@ -211,7 +211,11 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		err = callback(data)
 		if err != nil {
 			if _, ok := err.(*json.SyntaxError); ok && strings.Contains(err.Error(), "invalid character") {
-				err = scerr.SyntaxError(fmt.Sprintf("seems metadata '%s' is encrypted but not encryption key provided", i))
+				err = scerr.SyntaxError(
+					fmt.Sprintf(
+						"seems metadata '%s' is encrypted but not encryption key provided", i,
+					),
+				)
 			}
 			logrus.Errorf("Error browsing metadata: running callback: %+v", err)
 			return err

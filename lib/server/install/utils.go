@@ -172,7 +172,9 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
 
-	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s, %s:%s)", localpath, host.Name, remotepath), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(
+		nil, fmt.Sprintf("(%s, %s:%s)", localpath, host.Name, remotepath), true,
+	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -196,13 +198,18 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
 					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
-					logrus.Tracef(fmt.Sprintf("this error occured, considered as an unrecoverable network error: %v", err))
+					logrus.Tracef(
+						fmt.Sprintf(
+							"this error occured, considered as an unrecoverable network error: %v", err,
+						),
+					)
 					networkError = true
 					return nil
 				}
 				if system.IsSCPRetryable(retcode) {
 					err = fmt.Errorf(
-						"failed to copy file '%s' to '%s' (retcode: %d=%s)", localpath, to, retcode, system.SCPErrorString(retcode),
+						"failed to copy file '%s' to '%s' (retcode: %d=%s)", localpath, to, retcode,
+						system.SCPErrorString(retcode),
 					)
 					return err
 				}
@@ -262,9 +269,13 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error())
+			return fmt.Errorf(
+				"timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error(),
+			)
 		default:
-			return fmt.Errorf("failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error())
+			return fmt.Errorf(
+				"failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error(),
+			)
 		}
 	}
 	return nil
@@ -285,7 +296,11 @@ func UploadStringToRemoteFile(content string, host *pb.Host, filename string, ow
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		partials := strings.Split(filename, "/")
-		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1]))
+		dumpName := utils.AbsPathify(
+			fmt.Sprintf(
+				"$HOME/.safescale/forensics/%s/%s", host.Name, partials[len(partials)-1],
+			),
+		)
 
 		err := ioutil.WriteFile(dumpName, []byte(content), 0644)
 		if err != nil {
@@ -340,7 +355,9 @@ func normalizeScript(params map[string]interface{}) (string, error) {
 	params["TemplateOperationTimeout"] = strings.Replace(
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
 	)
-	params["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	params["TemplateLongOperationTimeout"] = strings.Replace(
+		temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
 	params["TemplatePullImagesTimeout"] = strings.Replace(
 		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
 	)

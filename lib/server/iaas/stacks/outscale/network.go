@@ -118,7 +118,8 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	if vpc.IpRange == req.CIDR {
 		return nil, scerr.Errorf(
 			fmt.Sprintf(
-				"cannot create subnet with CIDR '%s': identical to VPC CIDR, choose a subnet of '%s'", req.CIDR, vpc.IpRange,
+				"cannot create subnet with CIDR '%s': identical to VPC CIDR, choose a subnet of '%s'", req.CIDR,
+				vpc.IpRange,
 			), nil,
 		)
 	}

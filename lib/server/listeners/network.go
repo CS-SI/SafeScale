@@ -168,7 +168,9 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -208,7 +210,9 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -246,7 +250,9 @@ func (s *NetworkListener) Destroy(ctx context.Context, in *pb.Reference) (buf *g
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.FailedPrecondition, "cannot inspect network: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()

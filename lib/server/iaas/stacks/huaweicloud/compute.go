@@ -282,7 +282,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if ok, err := validatehostName(request); !ok {
 		return nil, userData, scerr.Errorf(
 			fmt.Sprintf(
-				"name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, openstack.ProviderErrorToString(err),
+				"name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName,
+				openstack.ProviderErrorToString(err),
 			), err,
 		)
 	}
@@ -339,7 +340,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", openstack.ProviderErrorToString(err)), err)
+		return nil, userData, scerr.Errorf(
+			fmt.Sprintf("failed to get image: %s", openstack.ProviderErrorToString(err)), err,
+		)
 	}
 
 	// Determines appropriate disk size
@@ -393,7 +396,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if err != nil {
 		return nil, userData, scerr.Errorf(
 			fmt.Sprintf(
-				"failed to build query to create host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err),
+				"failed to build query to create host '%s': %s", request.ResourceName,
+				openstack.ProviderErrorToString(err),
 			), err,
 		)
 	}
@@ -520,10 +524,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				switch derr.(type) {
 				case scerr.ErrNotFound:
 					logrus.Errorf(
-						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr,
+						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name,
+						derr,
 					)
 				case scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+					logrus.Errorf(
+						"Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr,
+					)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
@@ -538,7 +545,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		if err != nil {
 			return nil, userData, scerr.Errorf(
 				fmt.Sprintf(
-					"error attaching public IP for host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err),
+					"error attaching public IP for host '%s': %s", request.ResourceName,
+					openstack.ProviderErrorToString(err),
 				), err,
 			)
 		}
@@ -579,7 +587,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			if err != nil {
 				return nil, userData, scerr.Errorf(
 					fmt.Sprintf(
-						"error enabling gateway mode of host '%s': %s", request.ResourceName, openstack.ProviderErrorToString(err),
+						"error enabling gateway mode of host '%s': %s", request.ResourceName,
+						openstack.ProviderErrorToString(err),
 					), err,
 				)
 			}
@@ -642,7 +651,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 
 	switch serverState {
 	case hoststate.STARTED, hoststate.STOPPED:
-		server, err := s.waitHostState(host.ID, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay())
+		server, err := s.waitHostState(
+			host.ID, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay(),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -882,11 +893,19 @@ func (s *Stack) DeleteHost(id string) error {
 				s.Stack.ComputeClient, id, floatingips.DisassociateOpts{FloatingIP: fip.IP},
 			).ExtractErr()
 			if err != nil {
-				return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
+				return scerr.Errorf(
+					fmt.Sprintf(
+						"error deleting host %s : %s", id, openstack.ProviderErrorToString(err),
+					), err,
+				)
 			}
 			err = floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
 			if err != nil {
-				return scerr.Errorf(fmt.Sprintf("error deleting host %s : %s", id, openstack.ProviderErrorToString(err)), err)
+				return scerr.Errorf(
+					fmt.Sprintf(
+						"error deleting host %s : %s", id, openstack.ProviderErrorToString(err),
+					), err,
+				)
 			}
 		}
 	}
@@ -994,7 +1013,11 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 		return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s'", hostID))
 	}
 	if len(fips) > 1 {
-		return nil, scerr.Errorf(fmt.Sprintf("configuration error, more than one Floating IP associated to host '%s'", hostID), nil)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(
+				"configuration error, more than one Floating IP associated to host '%s'", hostID,
+			), nil,
+		)
 	}
 	return &fips[0], nil
 }
@@ -1216,7 +1239,9 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 					return err
 				case gc.ErrDefault409:
 					// specific handling for error 409
-					return scerr.AbortedError("", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err))
+					return scerr.AbortedError(
+						"", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err),
+					)
 				case gc.ErrDefault429:
 					// rate limiting defined by provider, retry
 					return err
@@ -1242,7 +1267,11 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 					default:
 						return scerr.AbortedError(
 							"",
-							scerr.Errorf(fmt.Sprintf("error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err), err),
+							scerr.Errorf(
+								fmt.Sprintf(
+									"error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err,
+								), err,
+							),
 						)
 					}
 				}
@@ -1252,7 +1281,9 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 				}
 
 				// Any other error stops the retry
-				return scerr.AbortedError("", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err))
+				return scerr.AbortedError(
+					"", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err),
+				)
 			}
 
 			if server == nil {
@@ -1276,7 +1307,8 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 			if !((lastState == hoststate.STARTING) || (lastState == hoststate.STOPPING)) {
 				return scerr.Errorf(
 					fmt.Sprintf(
-						"host status of '%s' is in state '%s', and that's not a transition state", host.ID, server.Status,
+						"host status of '%s' is in state '%s', and that's not a transition state", host.ID,
+						server.Status,
 					), nil,
 				)
 			}

@@ -531,7 +531,9 @@ var hostAddFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
-			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf(
+				"failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false),
+			)
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -626,7 +628,9 @@ var hostCheckFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
-			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf(
+				"failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false),
+			)
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -636,7 +640,9 @@ var hostCheckFeatureCommand = cli.Command{
 		}
 		results, err := feature.Check(target, values, install.Settings{})
 		if err != nil {
-			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error())
+			msg := fmt.Sprintf(
+				"error checking if feature '%s' is installed on '%s': %s\n", featureName, hostName, err.Error(),
+			)
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -697,7 +703,9 @@ var hostDeleteFeatureCommand = cli.Command{
 		// Wait for SSH service on remote host first
 		err = client.New().SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 		if err != nil {
-			msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false))
+			msg := fmt.Sprintf(
+				"failed to reach '%s': %s", hostName, client.DecorateError(err, "waiting ssh on host", false),
+			)
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 

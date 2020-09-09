@@ -55,7 +55,8 @@ func normalizeError(err error) error {
 				reqId := model.ResponseContext.RequestId
 				return scerr.UnknownError(
 					fmt.Sprintf(
-						"from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type,
+						"from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code,
+						merr.Type,
 						merr.Details, reqId,
 					),
 				)

@@ -127,7 +127,8 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 				if err != nil {
 					return false, scerr.NotAvailableError(
 						fmt.Sprintf(
-							"failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s", err.Error(),
+							"failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s",
+							err.Error(),
 							addressedGateway.Name,
 						),
 					)
@@ -405,7 +406,8 @@ func (k *KongController) post(name, url, data string, v *Variables, propagate bo
 	}
 	if retcode != 0 {
 		logrus.Debugf(
-			"submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr,
+			"submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode,
+			stdout, stderr,
 		)
 		return nil, "", fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
@@ -432,7 +434,9 @@ func (k *KongController) put(name, url, data string, v *Variables, propagate boo
 		return nil, "", err
 	}
 	if retcode != 0 {
-		logrus.Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.Debugf(
+			"submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr,
+		)
 		return nil, "", fmt.Errorf("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
@@ -458,7 +462,9 @@ func (k *KongController) patch(name, url, data string, v *Variables, propagate b
 		return nil, "", err
 	}
 	if retcode != 0 {
-		logrus.Debugf("update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
+		logrus.Debugf(
+			"update of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr,
+		)
 		return nil, "", fmt.Errorf("update of rule '%s' failed: retcode=%d", name, retcode)
 	}
 

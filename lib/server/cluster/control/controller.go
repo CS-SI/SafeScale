@@ -926,7 +926,8 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 	if len(errors) > 0 {
 		err = fmt.Errorf(
-			"errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)), strings.Join(errors, "\n"),
+			"errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)),
+			strings.Join(errors, "\n"),
 		)
 		return nil, err
 	}
@@ -1265,7 +1266,11 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			},
 		)
 		if err != nil {
-			return scerr.InvalidRequestError(fmt.Sprintf("cannot delete node '%s' because of attached volumes: %v", host.Name, err))
+			return scerr.InvalidRequestError(
+				fmt.Sprintf(
+					"cannot delete node '%s' because of attached volumes: %v", host.Name, err,
+				),
+			)
 		}
 	}
 

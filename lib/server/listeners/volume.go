@@ -104,7 +104,9 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	size := in.GetSize()
 	// FIXME: validate parameters
 
-	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(
+		nil, fmt.Sprintf("('%s', %s, %d)", name, speed.String(), size), true,
+	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -197,7 +199,9 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot attach volume: neither name nor id given as reference for host")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot attach volume: neither name nor id given as reference for host",
+		)
 	}
 	mountPath := in.GetMountPath()
 	// FIXME: change Format to Filesystem in protobuf
@@ -258,7 +262,9 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for host")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for host",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
@@ -298,7 +304,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot delete volume: neither name nor id given as reference")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot delete volume: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -320,7 +328,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 	handler := VolumeHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		return empty, status.Errorf(codes.Internal, fmt.Sprintf("cannot delete volume '%s': %s", ref, getUserMessage(err)))
+		return empty, status.Errorf(
+			codes.Internal, fmt.Sprintf("cannot delete volume '%s': %s", ref, getUserMessage(err)),
+		)
 	}
 	log.Infof("Volume '%s' successfully deleted.", ref)
 	return empty, nil
@@ -336,7 +346,9 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "cannot inspect volume: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.InvalidArgument, "cannot inspect volume: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()

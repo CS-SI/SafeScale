@@ -456,7 +456,8 @@ func (l *location) WriteMultiPartObject(
 	}
 
 	defer debug.NewTracer(
-		nil, fmt.Sprintf("('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize), false, /*Trace.Location*/
+		nil, fmt.Sprintf("('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize),
+		false, /*Trace.Location*/
 	).GoingIn().OnExitTrace()()
 
 	bucket, err := newBucket(l.stowLocation, bucketName)

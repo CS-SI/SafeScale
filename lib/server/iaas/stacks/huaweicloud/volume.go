@@ -162,7 +162,9 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	)
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)))
+			return nil, scerr.Wrap(
+				err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)),
+			)
 		}
 		log.Warnf("Complete volume list empty")
 	}

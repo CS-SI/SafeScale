@@ -153,8 +153,12 @@ func (b *foreman) ExecuteScript(
 	data["reserved_BashLibrary"] = bashLibrary
 
 	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
-	data["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
-	data["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	data["TemplateOperationTimeout"] = strings.Replace(
+		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["TemplateLongOperationTimeout"] = strings.Replace(
+		temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
 	data["TemplatePullImagesTimeout"] = strings.Replace(
 		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
 	)
@@ -167,7 +171,9 @@ func (b *foreman) ExecuteScript(
 	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
 	cmd := fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
 
-	return client.New().SSH.Run(hostID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+	return client.New().SSH.Run(
+		hostID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout(),
+	)
 }
 
 // construct ...
@@ -500,7 +506,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil {
 			return err
 		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskInstallGateway, srvutils.ToPBHost(secondaryGateway))
+		secondaryGatewayTask, err = secondaryGatewayTask.Start(
+			b.taskInstallGateway, srvutils.ToPBHost(secondaryGateway),
+		)
 		if err != nil {
 			return err
 		}
@@ -590,7 +598,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil {
 			return err
 		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway))
+		secondaryGatewayTask, err = secondaryGatewayTask.Start(
+			b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway),
+		)
 		if err != nil {
 			return err
 		}
@@ -1173,7 +1183,8 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 		}
 		labelCmd := "docker node update " + host.Name + " --label-add safescale.host.role=node"
 		retcode, _, stderr, err = clientSSH.Run(
-			selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+			selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout,
+			client.DefaultExecutionTimeout,
 		)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to label swarm worker '%s' as node: %s", host.Name, stderr)
@@ -1197,14 +1208,16 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 
 	if secondaryGateway != nil {
 		retcode, _, stderr, err := clientSSH.Run(
-			secondaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+			secondaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout,
+			client.DefaultExecutionTimeout,
 		)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
 		}
 		labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=gateway"
 		retcode, _, stderr, err = clientSSH.Run(
-			selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+			selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout,
+			client.DefaultExecutionTimeout,
 		)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
@@ -1260,8 +1273,12 @@ func uploadTemplateToFile(
 
 	// FIXME Time and again
 	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
-	data["TemplateOperationTimeout"] = strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1)
-	data["TemplateLongOperationTimeout"] = strings.Replace(temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1)
+	data["TemplateOperationTimeout"] = strings.Replace(
+		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["TemplateLongOperationTimeout"] = strings.Replace(
+		temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
 	data["TemplatePullImagesTimeout"] = strings.Replace(
 		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
 	)
@@ -1379,7 +1396,8 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 		}
 		nodeLabel := "docker node update " + pbHost.Name + " --label-add safescale.host.role=node"
 		retcode, _, stderr, err = clientSSH.Run(
-			selectedMaster.Id, nodeLabel, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
+			selectedMaster.Id, nodeLabel, outputs.COLLECT, client.DefaultConnectionTimeout,
+			client.DefaultExecutionTimeout,
 		)
 		if err != nil || retcode != 0 {
 			return fmt.Errorf("failed to add label to docker Swarm worker '%s': %s", pbHost.Name, stderr)
@@ -1476,7 +1494,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	clientSSH := client.New().SSH
 
 	// Check worker is member of the Swarm
-	cmd := fmt.Sprintf("docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name)
+	cmd := fmt.Sprintf(
+		"docker node ls --format \"{{.Hostname}}\" --filter \"name=%s\" | grep -i %s", pbHost.Name, pbHost.Name,
+	)
 	retcode, _, _, err := clientSSH.Run(
 		selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
@@ -1534,7 +1554,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr)
+		return fmt.Errorf(
+			"failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr,
+		)
 	}
 	return nil
 }
@@ -1672,7 +1694,9 @@ func (b *foreman) installNodeRequirements(
 				} else if stderr != "" {
 					output = stderr
 				}
-				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output)
+				msg := fmt.Sprintf(
+					"failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output,
+				)
 				logrus.Errorf(utils.Capitalize(msg))
 				return fmt.Errorf(msg)
 			}
@@ -1822,7 +1846,9 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	def := p["masterDef"].(*pb.HostDefinition)
 	nokeep := p["nokeep"].(bool)
 
-	tracer := debug.NewTracer(t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(
+		t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true,
+	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -1998,7 +2024,9 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		},
 	)
 	if err != nil {
-		return nil, client.DecorateError(err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false)
+		return nil, client.DecorateError(
+			err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false,
+		)
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
 
@@ -2069,7 +2097,8 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	}
 
 	logrus.Debugf(
-		"[cluster %s] Masters configuration successful in [%s].", b.cluster.Name, temporal.FormatDuration(time.Since(started)),
+		"[cluster %s] Masters configuration successful in [%s].", b.cluster.Name,
+		temporal.FormatDuration(time.Since(started)),
 	)
 	return nil, nil
 }

@@ -160,7 +160,9 @@ func (handler *ShareHandler) Create(
 	if err != nil {
 		return nil, err
 	}
-	err = nfsServer.AddShare(sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck)
+	err = nfsServer.AddShare(
+		sharePath, securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +329,8 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 	case <-ctx.Done():
 		log.Warnf("Share deletion cancelled by user")
 		_, err = handler.Create(
-			context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false, false, false,
+			context.Background(), share.Name, server.Name, share.Path, []string{}, false, false, false, false, false,
+			false, false,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to stop share deletion")
@@ -399,7 +402,9 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	}
 
 	if len(shares) == 0 && len(warnings) != 0 {
-		return shares, scerr.Errorf("there have been problems iterating the list of shares", scerr.ErrListError(warnings))
+		return shares, scerr.Errorf(
+			"there have been problems iterating the list of shares", scerr.ErrListError(warnings),
+		)
 	}
 
 	return shares, nil

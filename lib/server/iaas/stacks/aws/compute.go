@@ -430,7 +430,8 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 
 			if host.LastState == hoststate.ERROR {
 				err = retry.AbortedError(
-					"error waiting for host in ready state", scerr.Errorf(fmt.Sprintf("last state: %s", host.LastState), nil),
+					"error waiting for host in ready state",
+					scerr.Errorf(fmt.Sprintf("last state: %s", host.LastState), nil),
 				)
 				logrus.Warn(err)
 				return err
@@ -523,7 +524,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	if defaultGateway == nil && !hostMustHavePublicIP {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("the host %s must have a gateway or be public", resourceName), nil)
+		return nil, userData, scerr.Errorf(
+			fmt.Sprintf("the host %s must have a gateway or be public", resourceName), nil,
+		)
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -653,7 +656,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				}
 
 				server, err = buildAwsSpotMachine(
-					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1),
+					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID,
+					string(userDataPhase1),
 					isGateway, template, sgID,
 				)
 			} else {
@@ -667,7 +671,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				}
 
 				server, err = buildAwsMachine(
-					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1),
+					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID,
+					string(userDataPhase1),
 					isGateway, template, sgID,
 				)
 			}
@@ -1540,7 +1545,9 @@ func (s *Stack) StartHost(id string) error {
 			}
 
 			if hostTmp.LastState != hoststate.STARTED {
-				return scerr.Errorf(fmt.Sprintf("not in started state (current state: %s)", hostTmp.LastState.String()), nil)
+				return scerr.Errorf(
+					fmt.Sprintf("not in started state (current state: %s)", hostTmp.LastState.String()), nil,
+				)
 			}
 			return nil
 		},
@@ -1579,7 +1586,9 @@ func (s *Stack) RebootHost(id string) error {
 			}
 
 			if hostTmp.LastState != hoststate.STARTED {
-				return scerr.Errorf(fmt.Sprintf("not in started state (current state: %s)", hostTmp.LastState.String()), nil)
+				return scerr.Errorf(
+					fmt.Sprintf("not in started state (current state: %s)", hostTmp.LastState.String()), nil,
+				)
 			}
 			return nil
 		},

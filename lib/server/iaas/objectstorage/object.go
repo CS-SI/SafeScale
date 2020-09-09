@@ -207,7 +207,9 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 		return scerr.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("(%d, %d)", sourceSize, chunkSize), false, /*Trace.Controller*/
+	).GoingIn().OnExitTrace()()
 
 	metadataCopy := o.GetMetadata().Clone()
 
@@ -243,7 +245,8 @@ func writeChunk(
 	nBytesRead, err := source.Read(buf)
 	if err == io.EOF {
 		msg := fmt.Sprintf(
-			"failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName, container.Name(),
+			"failed to read data from source to write in chunk of object '%s' in bucket '%s'", objectName,
+			container.Name(),
 		)
 		log.Errorf(msg)
 		return fmt.Errorf(msg)
@@ -255,7 +258,9 @@ func writeChunk(
 	if err != nil {
 		return err
 	}
-	log.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
+	log.Debugf(
+		"written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName,
+	)
 	return err
 }
 

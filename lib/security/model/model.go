@@ -82,7 +82,9 @@ func (da *DataAccess) GetUserAccessPermissionsByService(email, serviceName strin
 		return permissions, err
 	}
 	var roles []Role
-	if db.Model(&user).Where(&Role{ServiceID: service.ID}).Preload("AccessPermissions").Related(&roles, "Roles").Error != nil {
+	if db.Model(&user).Where(&Role{ServiceID: service.ID}).Preload("AccessPermissions").Related(
+		&roles, "Roles",
+	).Error != nil {
 		return permissions, err
 	}
 

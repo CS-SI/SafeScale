@@ -283,7 +283,9 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		)
 	}
 	if defaultGateway == nil && !hostMustHavePublicIP {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("The host %s must have a gateway or be public", resourceName), nil)
+		return nil, userData, scerr.Errorf(
+			fmt.Sprintf("The host %s must have a gateway or be public", resourceName), nil,
+		)
 	}
 
 	org, vdc, err := s.getOrgVdc()

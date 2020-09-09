@@ -54,7 +54,8 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 	images = []resources.Image{}
 
 	families := []string{
-		"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud", "suse-sap-cloud",
+		"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud",
+		"suse-sap-cloud",
 	}
 
 	for _, family := range families {
@@ -68,7 +69,8 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 
 			for _, image := range resp.Items {
 				images = append(
-					images, resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10)},
+					images,
+					resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10)},
 				)
 			}
 			token := resp.NextPageToken
@@ -277,7 +279,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	if defaultGateway == nil && !hostMustHavePublicIP {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("the host %s must have a gateway or be public", resourceName), nil)
+		return nil, userData, scerr.Errorf(
+			fmt.Sprintf("the host %s must have a gateway or be public", resourceName), nil,
+		)
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -378,7 +382,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := buildGcpMachine(
-				s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region, s.GcpConfig.Zone,
+				s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region,
+				s.GcpConfig.Zone,
 				s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template,
 			)
 			if err != nil {
@@ -457,10 +462,13 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 				switch derr.(type) {
 				case scerr.ErrNotFound:
 					logrus.Errorf(
-						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr,
+						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name,
+						derr,
 					)
 				case scerr.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
+					logrus.Errorf(
+						"Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr,
+					)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", newHost.Name, derr)
 				}
@@ -714,7 +722,9 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 		if err != nil {
 			continue
 		}
-		psg, err := s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectID, region, getResourceNameFromSelfLink(sn.Subnet)).Do()
+		psg, err := s.ComputeService.Subnetworks.Get(
+			s.GcpConfig.ProjectID, region, getResourceNameFromSelfLink(sn.Subnet),
+		).Do()
 		if err != nil {
 			continue
 		}
@@ -880,7 +890,9 @@ func (s *Stack) DeleteHost(id string) (err error) {
 					return nil
 				}
 			}
-			return scerr.Errorf(fmt.Sprintf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr), recErr)
+			return scerr.Errorf(
+				fmt.Sprintf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr), recErr,
+			)
 		}, temporal.GetContextTimeout(),
 	)
 

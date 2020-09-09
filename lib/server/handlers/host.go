@@ -817,7 +817,8 @@ func (handler *HostHandler) Create(
 
 		// Setting err will trigger defers
 		err = fmt.Errorf(
-			"failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode, stdout, stderr,
+			"failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode, stdout,
+			stderr,
 		)
 		if client.IsProvisioningError(err) {
 			retrieveForensicsData(ctx, sshHandler, host)
@@ -909,7 +910,9 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 		if err == nil { // If there's no ssh connection, no need to wait
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
-			_, _, _, _ = sshHandler.Run(ctx, host.Name, "systemd-resolve --status > /tmp/systemd-resolve.txt", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(
+				ctx, host.Name, "systemd-resolve --status > /tmp/systemd-resolve.txt", outputs.COLLECT,
+			)
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "netplan ip leases eth0 > /tmp/netplan.txt", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf textdumps.tar.gz /tmp/*.txt", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
@@ -930,7 +933,11 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 			)
 			_, _, _, _ = sshHandler.Copy(
 				ctx, host.Name+":"+utils.LogFolder+"/packages_installed_after.phase2.list",
-				utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/packages_installed_after.%s.list", host.Name, "phase2")),
+				utils.AbsPathify(
+					fmt.Sprintf(
+						"$HOME/.safescale/forensics/%s/packages_installed_after.%s.list", host.Name, "phase2",
+					),
+				),
 			)
 		}
 	}

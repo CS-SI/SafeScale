@@ -219,7 +219,8 @@ func (s *Shard) ToString() string {
 		return "nil"
 	}
 	return fmt.Sprintf(
-		"Shard : \n name     : %s\n bucket   : %s\n nonce    : %x\n checkSum : %x", s.Name, s.BucketName, s.Nonce, s.CheckSum,
+		"Shard : \n name     : %s\n bucket   : %s\n nonce    : %x\n checkSum : %x", s.Name, s.BucketName, s.Nonce,
+		s.CheckSum,
 	)
 }
 
@@ -332,7 +333,9 @@ func (cg *ChunkGroup) InitShards(
 
 	cg.NbDataShards = int(math.Ceil(float64(cg.FileSize) / float64(chunkSize)))
 	if cg.NbDataShards > 256 {
-		return 0, 0, fmt.Errorf("too many datashards, you have to increase the chunk size to at least %d bytes", cg.FileSize/256+1)
+		return 0, 0, fmt.Errorf(
+			"too many datashards, you have to increase the chunk size to at least %d bytes", cg.FileSize/256+1,
+		)
 	}
 	parityRatio := float64(ratioNumerator) / float64(ratioDenominator)
 	if parityRatio < 1 {

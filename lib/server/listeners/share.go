@@ -81,8 +81,10 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 
 	handler := ShareHandler(tenant.Service)
 	share, err := handler.Create(
-		ctx, shareName, hostRef, sharePath, in.GetSecurityModes(), in.GetOptions().GetReadOnly(), in.GetOptions().GetRootSquash(),
-		in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(),
+		ctx, shareName, hostRef, sharePath, in.GetSecurityModes(), in.GetOptions().GetReadOnly(),
+		in.GetOptions().GetRootSquash(),
+		in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(),
+		in.GetOptions().GetCrossMount(),
 		in.GetOptions().GetSubtreeCheck(),
 	)
 	if err != nil {
@@ -136,7 +138,8 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 	err = handler.Delete(ctx, shareName)
 	if err != nil {
 		return empty, status.Errorf(
-			codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)+adaptedUserMessage(err)).Message(),
+			codes.Internal,
+			scerr.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)+adaptedUserMessage(err)).Message(),
 		)
 	}
 	return empty, nil
@@ -259,7 +262,8 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	err = handler.Unmount(ctx, shareRef, hostRef)
 	if err != nil {
 		return empty, status.Errorf(
-			codes.Internal, scerr.Wrap(err, fmt.Sprintf("cannot unmount share '%s'", shareRef)+adaptedUserMessage(err)).Message(),
+			codes.Internal,
+			scerr.Wrap(err, fmt.Sprintf("cannot unmount share '%s'", shareRef)+adaptedUserMessage(err)).Message(),
 		)
 	}
 	return empty, nil

@@ -82,7 +82,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 	// Checks if CIDR is valid...
 	_, _, err = net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err,
+		)
 	}
 
 	// We specify a name and that it should forward packets
@@ -95,7 +97,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 	// Execute the operation and get back a networks.NetworkClient struct
 	network, err := networks.Create(s.NetworkClient, opts).Extract()
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("error creating network '%s': %s", req.Name, ProviderErrorToString(err)), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("error creating network '%s': %s", req.Name, ProviderErrorToString(err)), err,
+		)
 	}
 
 	// Starting from here, delete network if exit with error
@@ -111,7 +115,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 
 	subnet, err := s.createSubnet(req.Name, network.ID, req.CIDR, req.IPVersion, req.DNSServers)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("error creating network '%s': %s", req.Name, ProviderErrorToString(err)), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("error creating network '%s': %s", req.Name, ProviderErrorToString(err)), err,
+		)
 	}
 
 	// Starting from here, delete subnet if exit with error
@@ -231,7 +237,9 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 			for _, n := range networkList {
 				sns, err := s.listSubnets(n.ID)
 				if err != nil {
-					return false, scerr.Errorf(fmt.Sprintf("error getting network: %s", ProviderErrorToString(err)), err)
+					return false, scerr.Errorf(
+						fmt.Sprintf("error getting network: %s", ProviderErrorToString(err)), err,
+					)
 				}
 				if len(sns) != 1 {
 					continue
@@ -365,7 +373,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 			if derr != nil {
 				switch derr.(type) {
 				case scerr.ErrNotFound:
-					log.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name, derr)
+					log.Errorf(
+						"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", newHost.Name,
+						derr,
+					)
 				case scerr.ErrTimeout:
 					log.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", newHost.Name, derr)
 				default:
@@ -682,7 +693,9 @@ func (s *Stack) deleteSubnet(id string) error {
 				)
 			}
 		}
-		return scerr.Errorf(fmt.Sprintf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), retryErr), retryErr)
+		return scerr.Errorf(
+			fmt.Sprintf("failed to delete subnet after %v: %v", temporal.GetContextTimeout(), retryErr), retryErr,
+		)
 	}
 	return nil
 }
@@ -701,7 +714,9 @@ func (s *Stack) createRouter(req RouterRequest) (*Router, error) {
 	}
 	router, err := routers.Create(s.NetworkClient, opts).Extract()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("failed to create router '%s': %s", req.Name, ProviderErrorToString(err)))
+		return nil, scerr.Wrap(
+			err, fmt.Sprintf("failed to create router '%s': %s", req.Name, ProviderErrorToString(err)),
+		)
 	}
 	log.Debugf("Router '%s' (%s) successfully created", router.Name, router.ID)
 	return &Router{
@@ -785,7 +800,9 @@ func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) error {
 	)
 	_, err := r.Extract()
 	if err != nil {
-		msg := fmt.Sprintf("failed to remove subnet '%s' from router '%s': %s", subnetID, routerID, ProviderErrorToString(err))
+		msg := fmt.Sprintf(
+			"failed to remove subnet '%s' from router '%s': %s", subnetID, routerID, ProviderErrorToString(err),
+		)
 		return scerr.Wrap(err, msg)
 	}
 	return nil
@@ -866,7 +883,9 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	}
 	for _, p := range hostPorts {
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
-		_, err = ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
+		_, err = ports.Update(
+			s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs},
+		).Extract()
 		if err != nil {
 			return err
 		}
@@ -906,7 +925,9 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 				newAllowedAddressPairs = append(newAllowedAddressPairs, a)
 			}
 		}
-		_, err = ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
+		_, err = ports.Update(
+			s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs},
+		).Extract()
 		if err != nil {
 			return err
 		}

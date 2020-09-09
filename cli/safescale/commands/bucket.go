@@ -195,7 +195,9 @@ var bucketMount = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
 		}
 
-		err := client.New().Bucket.Mount(c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout())
+		err := client.New().Bucket.Mount(
+			c.Args().Get(0), c.Args().Get(1), c.String("path"), temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			return clitools.FailureResponse(
 				clitools.ExitOnRPC(

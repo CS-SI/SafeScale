@@ -320,12 +320,16 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 		if err != nil {
 			if force {
-				log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+				log.Warnf(
+					"Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v",
+					err,
+				)
 			} else {
 				var noHostError string
 				if sizing.MinFreq <= 0 {
 					noHostError = fmt.Sprintf(
-						"Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err,
+						"Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU,
+						err,
 					)
 				} else {
 					noHostError = fmt.Sprintf(
@@ -350,12 +354,16 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
 				if force {
-					log.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+					log.Warnf(
+						"Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v",
+						err,
+					)
 				} else {
 					var noHostError string
 					if sizing.MinFreq <= 0 {
 						noHostError = fmt.Sprintf(
-							"Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err,
+							"Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v",
+							sizing.MinGPU, err,
 						)
 					} else {
 						noHostError = fmt.Sprintf(
@@ -446,7 +454,8 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 
 	for _, t := range allTpls {
 		msg := fmt.Sprintf(
-			"Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize,
+			"Discard machine template '%s' with : %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores,
+			t.RAMSize,
 			t.DiskSize,
 		)
 		msg += " %s"

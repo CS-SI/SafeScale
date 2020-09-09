@@ -57,7 +57,8 @@ func ProviderErrorToString(err error) string {
 		return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
 	default:
 		logrus.Debugf(
-			"Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(), err,
+			"Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(),
+			err,
 		)
 		return err.Error()
 	}
@@ -87,9 +88,13 @@ func TranslateError(err error) error {
 	case *gophercloud.ErrDefault500:
 		return scerr.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return scerr.Errorf(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), err)
+		return scerr.Errorf(
+			fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), err,
+		)
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return scerr.Errorf(fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), err)
+		return scerr.Errorf(
+			fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), err,
+		)
 	default:
 		logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
 		return scerr.Errorf(fmt.Sprintf("unhandled error received from provider: %s", err.Error()), err)
@@ -212,7 +217,11 @@ func New(
 			},
 		)
 	default:
-		return nil, scerr.Errorf(fmt.Sprintf("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"]), nil)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(
+				"unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"],
+			), nil,
+		)
 	}
 	if err != nil {
 		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
@@ -227,7 +236,11 @@ func New(
 			},
 		)
 	default:
-		return nil, scerr.Errorf(fmt.Sprintf("unmanaged Openstack service 'network' version '%s'", s.versions["network"]), nil)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(
+				"unmanaged Openstack service 'network' version '%s'", s.versions["network"],
+			), nil,
+		)
 	}
 	if err != nil {
 		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
@@ -248,7 +261,9 @@ func New(
 			},
 		)
 	default:
-		return nil, scerr.Errorf(fmt.Sprintf("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"]), nil)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"]), nil,
+		)
 	}
 	if err != nil {
 		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)

@@ -59,7 +59,9 @@ func TestModel(t *testing.T) {
 	assert.Equal(t, 1, db.Model(&role1).Association("AccessPermissions").Count())
 	var roles []model.Role
 	assert.Nil(
-		t, db.Model(&usr1).Where(&model.Role{ServiceID: srv1.ID}).Preload("AccessPermissions").Related(&roles, "Roles").Error,
+		t, db.Model(&usr1).Where(&model.Role{ServiceID: srv1.ID}).Preload("AccessPermissions").Related(
+			&roles, "Roles",
+		).Error,
 	)
 	assert.Equal(t, 1, len(roles))
 	perms, err := da.GetUserAccessPermissionsByService("user@c-s.fr", "srv1")

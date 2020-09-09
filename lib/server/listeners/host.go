@@ -226,7 +226,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Message())
+		return nil, status.Errorf(
+			codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Message(),
+		)
 	}
 	name := in.GetName()
 
@@ -286,7 +288,9 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Message())
+		return nil, status.Errorf(
+			codes.FailedPrecondition, scerr.InvalidParameterError("in", "cannot be nil").Message(),
+		)
 	}
 	name := in.GetName()
 
@@ -332,7 +336,9 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -368,7 +374,9 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -405,7 +413,9 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
+		return empty, status.Errorf(
+			codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -442,7 +452,9 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()

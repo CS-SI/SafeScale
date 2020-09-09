@@ -805,7 +805,11 @@ func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *
 	err = mn.ReadByID(networkID)
 	if err != nil {
 		if _, ok := err.(scerr.ErrNotFound); ok {
-			return nil, scerr.NotFoundError(fmt.Sprintf("metadata about the network '%s' doesn't exist anymore", networkID))
+			return nil, scerr.NotFoundError(
+				fmt.Sprintf(
+					"metadata about the network '%s' doesn't exist anymore", networkID,
+				),
+			)
 		}
 		return nil, err
 	}

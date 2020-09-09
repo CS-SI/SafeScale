@@ -75,7 +75,9 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 		return nil, scerr.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("(%s, %s)", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("(%s, %s)", path, prefix), false, /*Trace.Controller*/
+	).GoingIn().OnExitTrace()()
 
 	var list []string
 
@@ -106,7 +108,9 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 		return scerr.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("('%s', '%s')", path, prefix), false, /*Trace.Controller*/
+	).GoingIn().OnExitTrace()()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -136,7 +140,9 @@ func (b *bucket) Clear(path, prefix string) error {
 		return scerr.InvalidInstanceContentError("b.container", "cannot be nil")
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("('%s', '%s')", path, prefix), false, /* Trace.ObjectStorage */
+	).GoingIn().OnExitTrace()()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -168,7 +174,9 @@ func (b *bucket) DeleteObject(objectName string) error {
 		return scerr.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", objectName), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("('%s')", objectName), false, /* Trace.ObjectStorage */
+	).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
 	if err != nil {
@@ -233,7 +241,8 @@ func (b *bucket) WriteMultiPartObject(
 	}
 
 	defer debug.NewTracer(
-		nil, fmt.Sprintf("('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize), false, /* Trace.ObjectStorage */
+		nil, fmt.Sprintf("('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize),
+		false, /* Trace.ObjectStorage */
 	).GoingIn().OnExitTrace()()
 
 	o, err := newObject(b, objectName)
@@ -260,7 +269,9 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 		return 0, scerr.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("('%s', '%s')", path, prefix), false, /* Trace.ObjectStorage */
+	).GoingIn().OnExitTrace()()
 
 	var count int64
 	fullPath := buildFullPath(path, prefix)
@@ -289,7 +300,9 @@ func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 		return 0, "", scerr.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", path, prefix), false /* Trace.ObjectStorage */).GoingIn().OnExitTrace()()
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("('%s', '%s')", path, prefix), false, /* Trace.ObjectStorage */
+	).GoingIn().OnExitTrace()()
 
 	var err error
 	var totalSize int64

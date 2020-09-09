@@ -49,7 +49,9 @@ func infoFromCidr(cidr string) (string, string, string, string, error) {
 
 	mask := fmt.Sprintf("%d.%d.%d.%d", IPNet.Mask[0], IPNet.Mask[1], IPNet.Mask[2], IPNet.Mask[3])
 	dhcpStart := fmt.Sprintf("%d.%d.%d.%d", IP[12], IP[13], IPNet.IP[2], IPNet.IP[3]+2)
-	dhcpEnd := fmt.Sprintf("%d.%d.%d.%d", IP[12], IP[13], IPNet.IP[2]+(255-IPNet.Mask[2]), IPNet.IP[3]+(255-IPNet.Mask[3]-1))
+	dhcpEnd := fmt.Sprintf(
+		"%d.%d.%d.%d", IP[12], IP[13], IPNet.IP[2]+(255-IPNet.Mask[2]), IPNet.IP[3]+(255-IPNet.Mask[3]-1),
+	)
 
 	return IPNet.IP.String(), mask, dhcpStart, dhcpEnd, nil
 }
@@ -64,7 +66,9 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 			if errCode == 43 {
 				return nil, resources.ResourceNotFoundError("network", ref)
 			}
-			return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed to fetch network from ref : %s", err.Error())), err)
+			return nil, scerr.Errorf(
+				fmt.Sprintf(fmt.Sprintf("failed to fetch network from ref : %s", err.Error())), err,
+			)
 		}
 	}
 
@@ -74,7 +78,9 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.Network, error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed get network's xml description  : %s", err.Error())), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(fmt.Sprintf("failed get network's xml description  : %s", err.Error())), err,
+		)
 	}
 	networkDescription := &libvirtxml.Network{}
 	err = xml.Unmarshal([]byte(libvirtNetworkXML), networkDescription)
@@ -196,7 +202,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to convert a libvirt network into a network : %s", err.Error()), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("failed to convert a libvirt network into a network : %s", err.Error()), err,
+		)
 	}
 
 	return network, nil
@@ -223,7 +231,9 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 
 	network, err := getNetworkFromLibvirtNetwork(libvirtNetwork)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to convert a libvirt network into a network : %s", err.Error()), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf("failed to convert a libvirt network into a network : %s", err.Error()), err,
+		)
 	}
 
 	return network, nil
@@ -248,7 +258,13 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for _, libvirtNetwork := range libvirtNetworks {
 		network, err := getNetworkFromLibvirtNetwork(&libvirtNetwork)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf(fmt.Sprintf("failed to get network from libvirtNetwork : %s", err.Error())), err)
+			return nil, scerr.Errorf(
+				fmt.Sprintf(
+					fmt.Sprintf(
+						"failed to get network from libvirtNetwork : %s", err.Error(),
+					),
+				), err,
+			)
 		}
 
 		networks = append(networks, network)
