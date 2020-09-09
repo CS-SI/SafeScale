@@ -64,7 +64,9 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName()); err == nil {
+	if err := srvutils.JobRegister(
+		ctx, cancelFunc, "SSH Run "+in.GetCommand()+" on host "+in.GetHost().GetName(),
+	); err == nil {
 		defer srvutils.JobDeregister(ctx)
 	}
 

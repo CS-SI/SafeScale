@@ -104,7 +104,9 @@ func (s *Server) RemoveShare(path string) error {
 		"Path": path,
 	}
 	retcode, stdout, stderr, err := executeScript(*s.SSHConfig, "nfs_server_path_unexport.sh", data)
-	return handleExecuteScriptReturn(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
+	return handleExecuteScriptReturn(
+		retcode, stdout, stderr, err, "Error executing script to unexport a shared directory",
+	)
 }
 
 // MountBlockDevice mounts a block device in the remote system

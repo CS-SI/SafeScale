@@ -183,7 +183,11 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 		},
 	)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err)), err)
+		return nil, scerr.Errorf(
+			fmt.Sprintf(
+				"failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err),
+			), err,
+		)
 	}
 	if found {
 		return &fip, nil
@@ -266,7 +270,8 @@ func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 	if err != nil {
 		return scerr.Errorf(
 			fmt.Sprintf(
-				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err),
+				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
+				openstack.ProviderErrorToString(err),
 			), err,
 		)
 	}
@@ -283,7 +288,8 @@ func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 	if err != nil {
 		return scerr.Errorf(
 			fmt.Sprintf(
-				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err),
+				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
+				openstack.ProviderErrorToString(err),
 			), err,
 		)
 	}
@@ -296,7 +302,8 @@ func (s *Stack) DissociateFloatingIP(host *resources.Host, id string) error {
 	if err != nil {
 		return scerr.Errorf(
 			fmt.Sprintf(
-				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err),
+				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
+				openstack.ProviderErrorToString(err),
 			), err,
 		)
 	}
@@ -313,7 +320,8 @@ func (s *Stack) DissociateFloatingIP(host *resources.Host, id string) error {
 	if err != nil {
 		return scerr.Errorf(
 			fmt.Sprintf(
-				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name, openstack.ProviderErrorToString(err),
+				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
+				openstack.ProviderErrorToString(err),
 			), err,
 		)
 	}

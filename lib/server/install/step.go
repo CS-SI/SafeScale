@@ -281,7 +281,8 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 		for _, h := range hosts {
 			tracer.Trace(
-				"%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
+				"%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name,
+				h.Name,
 			)
 			is.Worker.startTime = time.Now()
 
@@ -332,7 +333,8 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 		subtasks := map[string]concurrency.Task{}
 		for _, h := range hosts {
 			tracer.Trace(
-				"%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name,
+				"%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name,
+				h.Name,
 			)
 			is.Worker.startTime = time.Now()
 
@@ -440,7 +442,11 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		return stepResult{err: fmt.Errorf("failed to finalize installer script for step '%s': %s", is.Name, err.Error())}, nil
+		return stepResult{
+			err: fmt.Errorf(
+				"failed to finalize installer script for step '%s': %s", is.Name, err.Error(),
+			),
+		}, nil
 	}
 
 	// If options file is defined, upload it to the remote host
@@ -455,7 +461,8 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 
 	// Uploads then executes command
 	filename := fmt.Sprintf(
-		"%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.DisplayName(), strings.ToLower(is.Action.String()), is.Name,
+		"%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.DisplayName(),
+		strings.ToLower(is.Action.String()), is.Name,
 	)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
@@ -466,7 +473,9 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
 
 	// Executes the script on the remote host
-	retcode, _, _, err := client.New().SSH.Run(host.Name, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, _, _, err := client.New().SSH.Run(
+		host.Name, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime,
+	)
 	if err != nil {
 		return stepResult{err: err}, nil
 	}

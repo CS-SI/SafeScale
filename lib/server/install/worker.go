@@ -549,7 +549,9 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fmt.Errorf(msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, fmt.Errorf(
+				msg, w.feature.DisplayName(), w.feature.DisplayFilename(), stepKey, yamlTargetsKeyword,
+			)
 		}
 
 		hostsList, err = w.identifyHosts(stepT)
@@ -625,7 +627,9 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		} else {
 			wallTimeConv, inner := strconv.Atoi(anon.(string))
 			if inner != nil {
-				logrus.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+				logrus.Warningf(
+					"Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword,
+				)
 			} else {
 				wallTime = time.Duration(wallTimeConv) * time.Minute
 			}
@@ -713,7 +717,8 @@ func (w *worker) validateContextForCluster() error {
 		}
 	}
 	msg := fmt.Sprintf(
-		"feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.DisplayName(), clusterFlavor.String(),
+		"feature '%s' not suitable for flavor '%s' of the targeted cluster", w.feature.DisplayName(),
+		clusterFlavor.String(),
 	)
 	return fmt.Errorf(msg)
 }

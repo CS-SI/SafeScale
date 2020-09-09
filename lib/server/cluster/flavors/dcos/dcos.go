@@ -271,7 +271,9 @@ func configureGateway(task concurrency.Task, foreman control.Foreman) error {
 		if retcode < int(errorcode.NextErrorCode) {
 			errcode := errorcode.Enum(retcode)
 			logrus.Errorf("[gateway] configuration failed:\nretcode=%d (%s)", errcode, errcode.String())
-			return fmt.Errorf("scripted gateway configuration failed with error code %d (%s)", errcode, errcode.String())
+			return fmt.Errorf(
+				"scripted gateway configuration failed with error code %d (%s)", errcode, errcode.String(),
+			)
 		}
 
 		logrus.Errorf("[gateway] configuration failed:\nretcode=%d", retcode)

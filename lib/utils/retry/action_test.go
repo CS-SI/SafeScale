@@ -164,7 +164,9 @@ func TestVerifyErrorType(t *testing.T) {
 
 		if cause := scerr.Cause(recovered); cause != nil {
 			if _, ok := cause.(scerr.ErrNotFound); !ok {
-				t.Errorf("It should be a '*scerr.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
+				t.Errorf(
+					"It should be a '*scerr.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String(),
+				)
 			}
 		}
 	}
@@ -331,7 +333,8 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 				if delta.Seconds() >= tt.args.timeout.Seconds()+2 && !tt.wantTOErr {
 					t.Errorf(
 						"WhileUnsuccessfulDelay50ms() error = %v", fmt.Errorf(
-							"it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds(),
+							"it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(),
+							tt.args.timeout.Seconds(),
 						),
 					)
 				}
@@ -369,7 +372,9 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				testStart := time.Now()
 				var err error
-				if err = WhileUnsuccessfulDelay50msSecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+				if err = WhileUnsuccessfulDelay50msSecondsTimeout(
+					tt.args.run, tt.args.timeout,
+				); (err != nil) != tt.wantErr {
 					t.Errorf("WhileUnsuccessfulDelay50msSecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
 				}
 				if err != nil {
@@ -383,7 +388,8 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 				if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
 					t.Errorf(
 						"WhileUnsuccessfulDelay50msSecondsTimeout() error = %v", fmt.Errorf(
-							"it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds(),
+							"it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(),
+							tt.args.timeout.Seconds(),
 						),
 					)
 				}

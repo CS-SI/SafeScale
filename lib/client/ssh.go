@@ -355,7 +355,8 @@ func (s *ssh) CloseTunnels(name string, localPort string, remotePort string, tim
 	}
 
 	cmdString := fmt.Sprintf(
-		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.Host, remotePort, sshCfg.GatewayConfig.User, sshCfg.GatewayConfig.Host,
+		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.Host, remotePort, sshCfg.GatewayConfig.User,
+		sshCfg.GatewayConfig.Host,
 	)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()

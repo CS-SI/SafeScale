@@ -88,7 +88,9 @@ var ClusterCommand = cli.Command{
 }
 
 func extractClusterArgument(c *cli.Context) error {
-	if !c.Command.HasName("list") || strings.HasSuffix(c.App.Name, " node") || strings.HasSuffix(c.App.Name, " master") {
+	if !c.Command.HasName("list") || strings.HasSuffix(c.App.Name, " node") || strings.HasSuffix(
+		c.App.Name, " master",
+	) {
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.ExitOnInvalidArgument("Missing mandatory argument CLUSTERNAME.")
@@ -104,7 +106,9 @@ func extractClusterArgument(c *cli.Context) error {
 		if err != nil {
 			if _, ok := err.(scerr.ErrNotFound); ok {
 				if !c.Command.HasName("create") {
-					return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName))
+					return clitools.ExitOnErrorWithMessage(
+						exitcode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName),
+					)
 				}
 			} else {
 				msg := fmt.Sprintf("failed to query for cluster '%s': %s\n", clusterName, err.Error())
@@ -143,7 +147,9 @@ var clusterListCommand = cli.Command{
 				return clitools.FailureResponse(
 					clitools.ExitOnErrorWithMessage(
 						exitcode.Run,
-						fmt.Sprintf("failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name),
+						fmt.Sprintf(
+							"failed to extract data about cluster '%s'", c.GetIdentity(concurrency.RootTask()).Name,
+						),
 					),
 				)
 			}
@@ -340,7 +346,8 @@ func convertToMap(c api.Cluster) (map[string]interface{}, error) {
 		result["remote_desktop"] = remoteDesktops
 	} else {
 		result["remote_desktop"] = fmt.Sprintf(
-			"Remote Desktop not installed. To install it, execute 'safescale platform add-feature %s remotedesktop'.", clusterName,
+			"Remote Desktop not installed. To install it, execute 'safescale platform add-feature %s remotedesktop'.",
+			clusterName,
 		)
 	}
 
@@ -935,7 +942,9 @@ var clusterDcosCommand = cli.Command{
 
 		identity := clusterInstance.GetIdentity(concurrency.RootTask())
 		if identity.Flavor != flavor.DCOS {
-			msg := fmt.Sprintf("Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", identity.Flavor.String())
+			msg := fmt.Sprintf(
+				"Can't call dcos on this cluster, its flavor isn't DCOS (%s).\n", identity.Flavor.String(),
+			)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotApplicable, msg))
 		}
 
@@ -1167,7 +1176,8 @@ var clusterHelmCommand = cli.Command{
 							rfc := RemoteFileItem{
 								Local: localFile,
 								Remote: fmt.Sprintf(
-									"%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID, time.Now().UnixNano(),
+									"%s/helm_values_%d.%s.%d.tmp", utils.TempFolder, idx+1, clientID,
+									time.Now().UnixNano(),
 								),
 								RemoteOwner:  "cladm",
 								RemoteRights: "u+rwx,go-rwx",
@@ -1177,7 +1187,9 @@ var clusterHelmCommand = cli.Command{
 							filteredArgs = append(filteredArgs, rfc.Remote)
 						} else {
 							// data comes from the standard input
-							return clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "'-f -' is not yet supported")
+							return clitools.ExitOnErrorWithMessage(
+								exitcode.NotImplemented, "'-f -' is not yet supported",
+							)
 						}
 						ignoreNext = true
 					}
@@ -1225,7 +1237,8 @@ func executeCommand(command string, files *RemoteFilesHandler, outs outputs.Enum
 	master, err := clusterInstance.FindAvailableMaster(concurrency.RootTask())
 	if err != nil {
 		msg := fmt.Sprintf(
-			"No masters found available for the cluster '%s': %v", clusterInstance.GetIdentity(concurrency.RootTask()).Name,
+			"No masters found available for the cluster '%s': %v",
+			clusterInstance.GetIdentity(concurrency.RootTask()).Name,
 			err.Error(),
 		)
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1342,7 +1355,9 @@ var clusterAddFeatureCommand = cli.Command{
 		}
 		results, err := feature.Add(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf(
+				"error installing feature '%s' on cluster '%s': %s\n", featureName, clusterName, err.Error(),
+			)
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 		if !results.Successful() {
@@ -1405,7 +1420,9 @@ var clusterCheckFeatureCommand = cli.Command{
 		}
 		results, err := feature.Check(target, values, settings)
 		if err != nil {
-			msg := fmt.Sprintf("error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf(
+				"error checking if feature '%s' is installed on '%s': %s\n", featureName, clusterName, err.Error(),
+			)
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 

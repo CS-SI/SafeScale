@@ -102,7 +102,9 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 		stackName := get(identity, "provider")
 		userID := get(identity, "UserID")
 		if userID == "" {
-			return nil, scerr.NewErrCore("'UserID' parameter in section 'identity' of the tenant is mandatory", nil, nil)
+			return nil, scerr.NewErrCore(
+				"'UserID' parameter in section 'identity' of the tenant is mandatory", nil, nil,
+			)
 		}
 		var err error
 		metadata["Bucket"], err = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)

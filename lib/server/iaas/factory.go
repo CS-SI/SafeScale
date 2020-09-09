@@ -603,7 +603,9 @@ func loadConfig() error {
 				allTenants[name] = provider
 
 			} else {
-				return fmt.Errorf("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
+				return fmt.Errorf(
+					"invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name,
+				)
 			}
 		} else {
 			return fmt.Errorf("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())

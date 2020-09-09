@@ -119,7 +119,13 @@ var shareCreate = cli.Command{
 		}
 		err := client.New().Share.Create(&def, temporal.GetExecutionTimeout())
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "creation of share", true).Error()))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					client.DecorateError(
+						err, "creation of share", true,
+					).Error(),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -180,7 +186,13 @@ var shareList = cli.Command{
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
 		list, err := client.New().Share.List(0)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "list of shares", false).Error()))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					client.DecorateError(
+						err, "list of shares", false,
+					).Error(),
+				),
+			)
 		}
 		return clitools.SuccessResponse(list.ShareList)
 	},
@@ -246,7 +258,13 @@ var shareUnmount = cli.Command{
 		}
 		err := client.New().Share.Unmount(&def, temporal.GetExecutionTimeout())
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "unmount of share", true).Error()))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					client.DecorateError(
+						err, "unmount of share", true,
+					).Error(),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -266,7 +284,13 @@ var shareInspect = cli.Command{
 
 		list, err := client.New().Share.Inspect(c.Args().Get(0), temporal.GetExecutionTimeout())
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(client.DecorateError(err, "inspection of share", false).Error()))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					client.DecorateError(
+						err, "inspection of share", false,
+					).Error(),
+				),
+			)
 		}
 		return clitools.SuccessResponse(list)
 	},

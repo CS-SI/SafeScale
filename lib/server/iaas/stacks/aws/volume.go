@@ -226,7 +226,9 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 			}, nil
 		}
 	}
-	return nil, scerr.Errorf(fmt.Sprintf("volume attachment of volume %s on server %s does not exist", serverID, id), nil)
+	return nil, scerr.Errorf(
+		fmt.Sprintf("volume attachment of volume %s on server %s does not exist", serverID, id), nil,
+	)
 }
 
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {

@@ -323,7 +323,11 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)
 		} else {
-			log.Debug(fmt.Sprintf("Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID))
+			log.Debug(
+				fmt.Sprintf(
+					"Flavor %s@%s is not available at the moment at is so ignored", template.Name, template.ID,
+				),
+			)
 		}
 	}
 	allTemplates = listAvailableTemplates

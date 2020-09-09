@@ -320,7 +320,9 @@ func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, f
 		),
 	)
 	for i := 0; i < nbFiles; i++ {
-		files = append(files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]})
+		files = append(
+			files, &pb.File{Name: fileNames[i], Date: uploadDates[i], Size: fileSizes[i], Buckets: fileBuckets[i]},
+		)
 	}
 	return &pb.FileList{Files: files}
 }

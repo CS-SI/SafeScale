@@ -130,7 +130,11 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 
 	taskStatus := tg.task.GetStatus()
 	if taskStatus != READY && taskStatus != RUNNING {
-		return nil, scerr.InvalidRequestError(fmt.Sprintf("cannot start new task in group '%s': neither ready nor running", tid))
+		return nil, scerr.InvalidRequestError(
+			fmt.Sprintf(
+				"cannot start new task in group '%s': neither ready nor running", tid,
+			),
+		)
 	}
 
 	tg.last++
@@ -240,7 +244,9 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil)
+			return false, nil, scerr.TimeoutError(
+				fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil,
+			)
 		default:
 			ok, result, err := tg.TryWaitGroup()
 			if ok {

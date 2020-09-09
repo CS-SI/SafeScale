@@ -82,7 +82,9 @@ func (s *Stack) deleteInternetService(onet *osc.Net) error {
 		)
 		if err != nil {
 			err = normalizeError(err)
-			logrus.Errorf("cannot unlink internet service '%s' from network '%s': %v", ois.InternetServiceId, onet.NetId, err)
+			logrus.Errorf(
+				"cannot unlink internet service '%s' from network '%s': %v", ois.InternetServiceId, onet.NetId, err,
+			)
 			return err
 		}
 		deleteInternetServiceRequest := osc.DeleteInternetServiceRequest{
@@ -95,7 +97,9 @@ func (s *Stack) deleteInternetService(onet *osc.Net) error {
 		)
 		if err != nil {
 			err = normalizeError(err)
-			logrus.Errorf("internet service %s linked to network %s cannot be deleted: %v", ois.InternetServiceId, onet.NetId, err)
+			logrus.Errorf(
+				"internet service %s linked to network %s cannot be deleted: %v", ois.InternetServiceId, onet.NetId, err,
+			)
 			return err
 		}
 		break

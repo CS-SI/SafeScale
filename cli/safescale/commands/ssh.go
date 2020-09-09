@@ -133,7 +133,8 @@ var sshCopy = cli.Command{
 			timeout = temporal.GetHostTimeout()
 		}
 		retcode, _, _, err := client.New().SSH.Copy(
-			normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(), timeout,
+			normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.GetConnectionTimeout(),
+			timeout,
 		)
 		if err != nil {
 			return clitools.FailureResponse(

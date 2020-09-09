@@ -143,7 +143,11 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 			return nil, err
 		}
 	default:
-		return nil, scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", req.Flavor.String()))
+		return nil, scerr.NotImplementedError(
+			fmt.Sprintf(
+				"cluster Flavor '%s' not yet implemented", req.Flavor.String(),
+			),
+		)
 	}
 
 	log.Infof("Cluster '%s' created and initialized successfully", req.Name)

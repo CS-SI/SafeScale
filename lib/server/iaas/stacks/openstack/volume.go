@@ -129,7 +129,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			break
 		}
 		if vol == nil {
-			err = scerr.Errorf(fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil)
+			err = scerr.Errorf(
+				fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil,
+			)
 			break
 		}
 		v = resources.Volume{
@@ -153,7 +155,9 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			break
 		}
 		if vol == nil {
-			err = scerr.Errorf(fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil)
+			err = scerr.Errorf(
+				fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil,
+			)
 			break
 		}
 		v = resources.Volume{
@@ -305,7 +309,8 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	if err != nil {
 		return "", scerr.Wrap(
 			err, fmt.Sprintf(
-				"error creating volume attachment between server %s and volume %s: %s", request.HostID, request.VolumeID,
+				"error creating volume attachment between server %s and volume %s: %s", request.HostID,
+				request.VolumeID,
 				ProviderErrorToString(err),
 			),
 		)
@@ -330,7 +335,9 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)))
+		return nil, scerr.Wrap(
+			err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)),
+		)
 	}
 	return &resources.VolumeAttachment{
 		ID:       va.ID,
@@ -393,7 +400,9 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)))
+		return scerr.Wrap(
+			err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)),
+		)
 	}
 	return nil
 }

@@ -425,7 +425,9 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			sshSvc := handlers.NewSSHHandler(serviceProvider)
 			ssh, err := sshSvc.GetConfig(context.Background(), host.ID)
 			if err != nil {
-				logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error())
+				logrus.Warnf(
+					"template [%s] host '%s': error reading SSHConfig: %v\n", template.Name, hostName, err.Error(),
+				)
 				return err
 			}
 			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
@@ -463,13 +465,16 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				return err
 			}
 
-			nerr = ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json"), daOut, 0666)
+			nerr = ioutil.WriteFile(
+				utils.AbsPathify("$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json"), daOut, 0666,
+			)
 			if nerr != nil {
 				logrus.Warnf("template [%s] : Error writing file: %v", template.Name, nerr)
 				return nerr
 			}
 			logrus.Infof(
-				"template [%s] : Stored in file: %s", template.Name, "$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json",
+				"template [%s] : Stored in file: %s", template.Name,
+				"$HOME/.safescale/scanner/"+theTenant+"#"+template.Name+".json",
 			)
 		} else {
 			return fmt.Errorf("no gateway network")
@@ -572,7 +577,9 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 }
 
 func main() {
-	logrus.Printf("%s version %s\n", os.Args[0], Version+", build "+Revision+" ("+BuildDate+"), compiled with "+runtime.Version())
+	logrus.Printf(
+		"%s version %s\n", os.Args[0], Version+", build "+Revision+" ("+BuildDate+"), compiled with "+runtime.Version(),
+	)
 
 	safescaledPort := 50051
 

@@ -126,7 +126,8 @@ func (t *Token) Validate() (string, string, error) {
 			if err != nil {
 				return "", "", scerr.InvalidRequestError(
 					fmt.Sprintf(
-						"first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error(),
+						"first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword,
+						err.Error(),
 					),
 				)
 			}
@@ -135,7 +136,8 @@ func (t *Token) Validate() (string, string, error) {
 			if err != nil {
 				return "", "", scerr.InvalidRequestError(
 					fmt.Sprintf(
-						"second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error(),
+						"second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword,
+						err.Error(),
 					),
 				)
 			}
@@ -221,7 +223,11 @@ func (t *Token) Validate() (string, string, error) {
 		return value, "", nil
 	}
 
-	return "", "", scerr.InvalidRequestError(fmt.Sprintf("operator '%s' of token '%s' is not supported", operator, keyword))
+	return "", "", scerr.InvalidRequestError(
+		fmt.Sprintf(
+			"operator '%s' of token '%s' is not supported", operator, keyword,
+		),
+	)
 }
 
 // ParseParameter transforms a string to a list of tokens

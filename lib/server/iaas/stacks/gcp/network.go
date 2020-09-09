@@ -105,7 +105,9 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		Region:      theRegion,
 	}
 
-	opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
+	opp, err := compuService.Subnetworks.Insert(
+		s.GcpConfig.ProjectID, theRegion, &subnetReq,
+	).Context(context.Background()).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -210,9 +212,11 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 				"https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", s.GcpConfig.ProjectID,
 				s.GcpConfig.NetworkName,
 			),
-			NextHopInstance: fmt.Sprintf("projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectID, s.GcpConfig.Zone, req.Name),
-			Priority:        800,
-			Tags:            []string{fmt.Sprintf("no-ip-%s", gcpSubNet.Name)},
+			NextHopInstance: fmt.Sprintf(
+				"projects/%s/zones/%s/instances/gw-%s", s.GcpConfig.ProjectID, s.GcpConfig.Zone, req.Name,
+			),
+			Priority: 800,
+			Tags:     []string{fmt.Sprintf("no-ip-%s", gcpSubNet.Name)},
 		}
 		opp, err := compuService.Routes.Insert(s.GcpConfig.ProjectID, route).Do()
 		if err != nil {
@@ -343,7 +347,9 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if theNetwork == nil {
-		return scerr.Errorf(fmt.Sprintf("delete network failed: unexpected nil network when looking for [%s]", ref), err)
+		return scerr.Errorf(
+			fmt.Sprintf("delete network failed: unexpected nil network when looking for [%s]", ref), err,
+		)
 	}
 
 	if !theNetwork.OK() {
@@ -392,7 +398,9 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+			operr = waitUntilOperationIsSuccessfulOrTimeout(
+				oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
+			)
 			if operr != nil {
 				logrus.Warn(operr)
 			}
@@ -414,7 +422,9 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				DesiredState: "DONE",
 			}
 
-			operr = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+			operr = waitUntilOperationIsSuccessfulOrTimeout(
+				oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
+			)
 			if operr != nil {
 				logrus.Warn(operr)
 			}

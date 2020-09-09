@@ -105,7 +105,9 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 		if err == nil {
 			for _, f := range files {
 				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
-					feature, err := NewFeature(concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					feature, err := NewFeature(
+						concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1),
+					)
 					if err != nil {
 						logrus.Error(err) // FIXME Don't hide errors
 						continue
@@ -514,7 +516,8 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 			results, err := needed.Check(t, v, s)
 			if err != nil {
 				return fmt.Errorf(
-					"failed to check required feature '%s' for feature '%s': %s", requirement, f.DisplayName(), err.Error(),
+					"failed to check required feature '%s' for feature '%s': %s", requirement, f.DisplayName(),
+					err.Error(),
 				)
 			}
 			if !results.Successful() {
@@ -523,7 +526,9 @@ func (f *Feature) installRequirements(t Target, v Variables, s Settings) error {
 					return fmt.Errorf("failed to install required feature '%s': %s", requirement, err.Error())
 				}
 				if !results.Successful() {
-					return fmt.Errorf("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
+					return fmt.Errorf(
+						"failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages(),
+					)
 				}
 			}
 		}

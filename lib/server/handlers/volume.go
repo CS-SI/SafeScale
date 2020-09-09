@@ -140,7 +140,9 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 				for _, v := range volumeAttachmentsV1.Hosts {
 					list = append(list, v)
 				}
-				return fmt.Errorf("still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", "))
+				return fmt.Errorf(
+					"still attached to %d host%s: %s", nbAttach, utils.Plural(nbAttach), strings.Join(list, ", "),
+				)
 			}
 			return nil
 		},
@@ -267,7 +269,9 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	}
 	// FIXME: validate parameters
 
-	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(
+		nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true,
+	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -461,12 +465,15 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 								mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
 								if !ok {
 									return fmt.Errorf(
-										"metadata inconsistency for volume '%s' attached to host '%s'", volume.Name, host.Name,
+										"metadata inconsistency for volume '%s' attached to host '%s'", volume.Name,
+										host.Name,
 									)
 								}
 								path := mount.Path
 								if path != mountPoint {
-									return fmt.Errorf("volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path)
+									return fmt.Errorf(
+										"volume '%s' is already attached in '%s:%s'", volume.Name, host.Name, path,
+									)
 								}
 								return nil
 							}
@@ -560,7 +567,9 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 								temporal.GetExecutionTimeout(),
 							)
 							if retryErr != nil {
-								return fmt.Errorf("failed to confirm the disk attachment after %s", temporal.GetExecutionTimeout())
+								return fmt.Errorf(
+									"failed to confirm the disk attachment after %s", temporal.GetExecutionTimeout(),
+								)
 							}
 
 							// Recovers real device name from the system
@@ -597,7 +606,8 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 									derr := server.UnmountBlockDevice(volumeUUID)
 									if derr != nil {
 										logrus.Errorf(
-											"failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name, derr,
+											"failed to unmount volume '%s' from host '%s': %v", volume.Name, host.Name,
+											derr,
 										)
 										err = scerr.AddConsequence(err, derr)
 									}
@@ -635,15 +645,18 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 				switch derr.(type) {
 				case scerr.ErrNotFound:
 					logrus.Errorf(
-						"Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr,
+						"Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name,
+						host.Name, derr,
 					)
 				case scerr.ErrTimeout:
 					logrus.Errorf(
-						"Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr,
+						"Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name,
+						host.Name, derr,
 					)
 				default:
 					logrus.Errorf(
-						"Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name, host.Name, derr,
+						"Cleaning up on failure, failed to detach volume '%s' from host '%s': %v", volume.Name,
+						host.Name, derr,
 					)
 				}
 				err = scerr.AddConsequence(err, derr)
@@ -913,7 +926,10 @@ func (handler *VolumeHandler) attachLVM(
 					delete(hostMountsV1.LocalMountsByDevice, previous)
 
 					hostMountsV1.LocalMountsByDevice[newIds[ind]] = mountPoint + "_lvm_" + strconv.Itoa(ind)
-					logrus.Warnf("Storing in LVM LocalMountsByDevice [%s], [%s]", newIds[ind], mountPoint+"_lvm_"+strconv.Itoa(ind))
+					logrus.Warnf(
+						"Storing in LVM LocalMountsByDevice [%s], [%s]", newIds[ind],
+						mountPoint+"_lvm_"+strconv.Itoa(ind),
+					)
 					return nil
 				},
 			)
@@ -1129,7 +1145,9 @@ func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *res
 		func() error {
 			retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 				func() error {
-					retcode, stdout, stderr, err = sshCmd.RunWithTimeout(nil, outputs.COLLECT, temporal.GetHostTimeout())
+					retcode, stdout, stderr, err = sshCmd.RunWithTimeout(
+						nil, outputs.COLLECT, temporal.GetHostTimeout(),
+					)
 					return err
 				},
 				temporal.GetHostTimeout(),
@@ -1227,7 +1245,11 @@ func getHostLocalMount(ctx context.Context, handler *VolumeHandler, volumeName, 
 			hostVolumesV1 := data.(*propsv1.HostVolumes)
 			att, found := hostVolumesV1.VolumesByID[volume.ID]
 			if !found {
-				return scerr.Errorf(fmt.Sprintf("Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name), nil)
+				return scerr.Errorf(
+					fmt.Sprintf(
+						"Can't detach volume '%s': not attached to host '%s'", volumeName, host.Name,
+					), nil,
+				)
 			}
 			attachment = att
 			return nil
@@ -1245,7 +1267,9 @@ func getHostLocalMount(ctx context.Context, handler *VolumeHandler, volumeName, 
 			path := hostMountsV1.LocalMountsByDevice[device]
 			mount = hostMountsV1.LocalMountsByPath[path]
 			if mount == nil {
-				return scerr.Errorf(fmt.Sprintf("metadata inconsistency: no mount corresponding to volume attachment"), nil)
+				return scerr.Errorf(
+					fmt.Sprintf("metadata inconsistency: no mount corresponding to volume attachment"), nil,
+				)
 			}
 			return nil
 		},
@@ -1298,7 +1322,9 @@ func (handler *VolumeHandler) Expand(
 
 	if incrementType == "gb" {
 		nun = uint32(math.Ceil(float64(float64(increment) / float64(vuSize))))
-		logrus.Debugf("We have to create volumes of %d Gb, working with units of %d Gb size, %d volumes", increment, vuSize, nun)
+		logrus.Debugf(
+			"We have to create volumes of %d Gb, working with units of %d Gb size, %d volumes", increment, vuSize, nun,
+		)
 	}
 
 	if incrementType == "uv" {
@@ -1331,7 +1357,9 @@ func (handler *VolumeHandler) Expand(
 				} else {
 					errorDeletingVolume := metadata.RemoveVolume(handler.service, vol.ID)
 					if errorDeletingVolume != nil {
-						logrus.Debugf("Expand cleanup : error removing volume metadata: %s", errorDeletingVolume.Error())
+						logrus.Debugf(
+							"Expand cleanup : error removing volume metadata: %s", errorDeletingVolume.Error(),
+						)
 					} else {
 						logrus.Debugf("Expand cleanup : cleaned volume %s", vol.Name)
 					}
@@ -1366,7 +1394,8 @@ func (handler *VolumeHandler) Expand(
 		}
 
 		devName, err := handler.Attach(
-			ctx, newVolume.Name, hostName, mountInfo.Path+"_lvm_"+strconv.Itoa(len(volume.PVM)+tba), mountInfo.FileSystem, false,
+			ctx, newVolume.Name, hostName, mountInfo.Path+"_lvm_"+strconv.Itoa(len(volume.PVM)+tba),
+			mountInfo.FileSystem, false,
 		)
 		if err != nil {
 			logrus.Debugf("Error attaching volume: %v", err.Error())
@@ -1484,7 +1513,9 @@ func (handler *VolumeHandler) Shrink(
 		return err
 	}
 
-	shrinkOutput, err := server.ShrinkVGDevice("", volumeName, mountInfo.FileSystem, false, deviceNames, vuSize, wantedSizeInGb)
+	shrinkOutput, err := server.ShrinkVGDevice(
+		"", volumeName, mountInfo.FileSystem, false, deviceNames, vuSize, wantedSizeInGb,
+	)
 	if err != nil {
 		if strings.Contains(shrinkOutput, "SS:FAILURE:") {
 			lines := strings.Split(shrinkOutput, "\n")

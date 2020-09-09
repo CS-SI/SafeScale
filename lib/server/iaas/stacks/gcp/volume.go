@@ -225,7 +225,9 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		Source:     gcpDisk.SelfLink,
 	}
 
-	op, err := s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, cad).Do()
+	op, err := s.ComputeService.Instances.AttachDisk(
+		s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, cad,
+	).Do()
 	if err != nil {
 		return "", err
 	}
@@ -296,7 +298,9 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 		return err
 	}
 
-	op, err := s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, gcpDisk.Name).Do()
+	op, err := s.ComputeService.Instances.DetachDisk(
+		s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, gcpDisk.Name,
+	).Do()
 	if err != nil {
 		return err
 	}
@@ -351,7 +355,9 @@ type gcpDiskAttachment struct {
 }
 
 func newGcpDiskAttachment(hostName string, diskName string) *gcpDiskAttachment {
-	return &gcpDiskAttachment{hostName: hostName, diskName: diskName, attachmentID: fmt.Sprintf("%s---%s", hostName, diskName)}
+	return &gcpDiskAttachment{
+		hostName: hostName, diskName: diskName, attachmentID: fmt.Sprintf("%s---%s", hostName, diskName),
+	}
 }
 
 func newGcpDiskAttachmentFromID(theID string) *gcpDiskAttachment {
