@@ -96,15 +96,13 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 
 	region := get(compute, "Region")
 	if region == "" {
-		return nil, scerr.NewErrCore("'Region' parameter in section 'compute' of the tenant is mandatory", nil, nil)
+		return nil, scerr.Errorf("'Region' parameter in section 'compute' of the tenant is mandatory", nil)
 	}
 	if _, ok := metadata["Bucket"]; !ok {
 		stackName := get(identity, "provider")
 		userID := get(identity, "UserID")
 		if userID == "" {
-			return nil, scerr.NewErrCore(
-				"'UserID' parameter in section 'identity' of the tenant is mandatory", nil, nil,
-			)
+			return nil, scerr.Errorf("'UserID' parameter in section 'identity' of the tenant is mandatory", nil)
 		}
 		var err error
 		metadata["Bucket"], err = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
