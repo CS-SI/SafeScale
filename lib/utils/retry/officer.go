@@ -10,6 +10,8 @@ type Officer struct {
 	Block func(Try)
 }
 
+type Backoff func(duration time.Duration) *Officer
+
 // Constant sleeps for duration duration
 func Constant(duration time.Duration) *Officer {
 	o := Officer{
@@ -52,7 +54,6 @@ func Exponential(base time.Duration) *Officer {
 }
 
 // Fibonacci sleeps for duration * fib(tries)
-// TODO:See if we can use a context to prevent the full calculation for each try...
 func Fibonacci(duration time.Duration) *Officer {
 	o := Officer{
 		Block: func(t Try) {
