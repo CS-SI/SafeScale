@@ -174,7 +174,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 		return err
 	}
 	if mh == nil {
-		return fmt.Errorf("host '%s' not found", ref)
+		return scerr.Errorf(fmt.Sprintf("host '%s' not found", ref), nil)
 	}
 	mhm, err := mh.Get()
 	if err != nil {
@@ -212,9 +212,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 }
 
 // Resize ...
-func (handler *HostHandler) Resize(
-	ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32,
-) (newHost *resources.Host, err error) {
+func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
 	tracer := debug.NewTracer(
 		nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true,
 	).WithStopwatch().GoingIn()
@@ -289,7 +287,7 @@ func (handler *HostHandler) Resize(
 		}
 	}
 	if newHost == nil {
-		return nil, fmt.Errorf("unknown error resizing host '%s'", ref)
+		return nil, scerr.Errorf(fmt.Sprintf("unknown error resizing host '%s'", ref), nil)
 	}
 
 	return newHost, err
@@ -302,8 +300,7 @@ func (handler *HostHandler) Resize(
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool,
-) (newHost *resources.Host, err error) {
+	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (newHost *resources.Host, err error) {
 
 	if handler == nil {
 		return nil, scerr.InvalidInstanceError()
@@ -365,10 +362,14 @@ func (handler *HostHandler) Create(
 			return nil, err
 		}
 	} else {
-		// host in state 'TERMINATED' doesn't really exist, other states mean the host exists
-		if host.LastState != hoststate.TERMINATED {
-			return nil, resources.ResourceDuplicateError("host", name)
+		hostThere, hsErr := handler.service.GetHostState(name)
+		if hsErr == nil {
+			logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
+			if hostThere != hoststate.TERMINATED {
+				return nil, resources.ResourceDuplicateError("host", name)
+			}
 		}
+		return nil, resources.ResourceDuplicateError("host", name)
 	}
 
 	var (
@@ -511,6 +512,7 @@ func (handler *HostHandler) Create(
 		0,
 	)
 	if err != nil {
+		logrus.Error(scerr.Errorf("failure creating host", err))
 		switch err.(type) {
 		case scerr.ErrInvalidRequest:
 			return nil, err
@@ -708,7 +710,6 @@ func (handler *HostHandler) Create(
 	_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		derr := err
-		err = nil
 		if client.IsTimeoutError(derr) {
 			return nil, scerr.Wrap(derr, fmt.Sprintf("timeout waiting host '%s' to become ready", host.Name))
 		}
@@ -731,7 +732,7 @@ func (handler *HostHandler) Create(
 
 	// Updates host link with networks
 	for _, i := range networks {
-		err = i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(
+		merr := i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(
 			func(clonable data.Clonable) error {
 				networkHostsV1 := clonable.(*propsv1.NetworkHosts)
 				networkHostsV1.ByName[host.Name] = host.ID
@@ -739,13 +740,13 @@ func (handler *HostHandler) Create(
 				return nil
 			},
 		)
-		if err != nil {
-			logrus.Errorf(err.Error())
+		if merr != nil {
+			logrus.Errorf(merr.Error())
 			continue
 		}
-		_, err = metadata.SaveNetwork(handler.service, i)
-		if err != nil {
-			logrus.Errorf(err.Error())
+		_, merr = metadata.SaveNetwork(handler.service, i)
+		if merr != nil {
+			logrus.Errorf(merr.Error())
 		}
 	}
 
@@ -794,10 +795,20 @@ func (handler *HostHandler) Create(
 			if stdout != "" || stderr != "" {
 				logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
 			}
-			if retcode == 255 {
-				return fmt.Errorf("connection failed, retrying")
+
+			if inErr != nil {
+				return inErr
 			}
-			return inErr
+
+			if retcode != 0 {
+				logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
+				if retcode != 255 {
+					return scerr.AbortedError(fmt.Sprintf("Remote SSH service response: errorcode %d", retcode), nil)
+				}
+				return scerr.Errorf(fmt.Sprintf("Remote SSH service response: errorcode %d", retcode), nil)
+			} else {
+				return nil
+			}
 		},
 		temporal.GetHostTimeout(),
 		func(t retry.Try, v verdict.Enum) {
@@ -807,9 +818,11 @@ func (handler *HostHandler) Create(
 		},
 	)
 	if retryErr != nil {
+		logrus.Error(scerr.Errorf("failure running phase 2", retryErr))
 		retrieveForensicsData(ctx, sshHandler, host)
 		return nil, err
 	}
+
 	// VPL:
 	if host == nil {
 		return nil, scerr.InconsistentError("host is nil after Run(phase2)")
@@ -818,17 +831,12 @@ func (handler *HostHandler) Create(
 	if retcode != 0 {
 		retrieveForensicsData(ctx, sshHandler, host)
 
-		// Setting err will trigger defers
-		err = fmt.Errorf(
-			"failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode, stdout,
-			stderr,
+		return nil, scerr.Errorf(
+			fmt.Sprintf(
+				"failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode,
+				stdout, stderr,
+			), nil,
 		)
-		if client.IsProvisioningError(err) {
-			retrieveForensicsData(ctx, sshHandler, host)
-			logrus.Error(err)
-		}
-
-		return nil, err
 	}
 
 	// FIXME: AWS Retrieve data anyway
@@ -910,6 +918,8 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase1"))
 		etcDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/etcdata.tar.gz", host.Name))
 		textDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/textdata.tar.gz", host.Name))
+		fwDumpName1 := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/firewall-trusted.cfg", host.Name))
+		fwDumpName2 := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/firewall-public.cfg", host.Name))
 
 		_, _, _, err := sshHandler.RunWithTimeout(ctx, host.Name, "whoami", outputs.COLLECT, 10*time.Second)
 		if err == nil { // If there's no ssh connection, no need to wait
@@ -922,6 +932,8 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf textdumps.tar.gz /tmp/*.txt", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/textdumps.tar.gz", textDumpName)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/tmp/firewall-trusted.cfg", fwDumpName1)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/tmp/firewall-public.cfg", fwDumpName2)
 
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase1.sh", dumpName+"sh")
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase1.log", dumpName+"log")
@@ -937,8 +949,7 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 				),
 			)
 			_, _, _, _ = sshHandler.Copy(
-				ctx, host.Name+":"+utils.LogFolder+"/packages_installed_after.phase2.list",
-				utils.AbsPathify(
+				ctx, host.Name+":"+utils.LogFolder+"/packages_installed_after.phase2.list", utils.AbsPathify(
 					fmt.Sprintf(
 						"$HOME/.safescale/forensics/%s/packages_installed_after.%s.list", host.Name, "phase2",
 					),
@@ -1124,13 +1135,13 @@ func normalizeError(in error) (err error) {
 			default:
 				return scerr.InvalidRequestError(
 					fmt.Sprintf(
-						"failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), realErr.Error(),
+						"failed to communicate (error type: %s): %v", reflect.TypeOf(realErr).String(), realErr.Error(),
 					),
 				)
 			}
 		default:
 			// In any other case, the error should explain the potential retry has to stop
-			return scerr.AbortedError("", in)
+			return scerr.Wrap(in, "")
 		}
 	}
 	return nil
@@ -1292,7 +1303,10 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	)
 	err = retryOnCommunicationFailure(
 		func() error {
-			return handler.service.DeleteHost(host.ID)
+			if host != nil {
+				return handler.service.DeleteHost(host.ID)
+			}
+			return nil
 		},
 		0,
 	)
