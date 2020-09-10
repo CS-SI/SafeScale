@@ -17,6 +17,8 @@
 package control
 
 import (
+	"github.com/graymeta/stow"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -169,6 +171,11 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.AbortedError("not found", innerErr)
 				}
+
+				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+					return retry.AbortedError("not found", innerErr)
+				}
+
 				return innerErr
 			}
 			return nil
