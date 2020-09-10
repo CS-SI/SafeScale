@@ -51,13 +51,13 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
-        sfApt update
-        sfApt install -qqy nfs-common nfs-kernel-server
+        sfRetry 3m 5 "sfApt update"
+        sfRetry 3m 5 "sfApt install -qqy nfs-common nfs-kernel-server"
         ;;
 
     rhel|centos)
         sfRetry 3m 5 "yum makecache"
-        yum install -y nfs-utils
+        sfRetry 3m 5 "sfYum install -y nfs-utils"
         systemctl enable rpcbind
         systemctl enable nfs-server
         systemctl enable nfs-lock
