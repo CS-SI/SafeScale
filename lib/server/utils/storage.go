@@ -176,9 +176,15 @@ func NewShard(bucket objectstorage.Bucket) (*Shard, error) {
 			break
 		}
 	}
+
+	bucketName, err := bucket.GetName()
+	if err != nil {
+		return nil, err
+	}
+
 	shard := Shard{
 		Name:       name,
-		BucketName: bucket.GetName(),
+		BucketName: bucketName,
 	}
 	return &shard, nil
 }

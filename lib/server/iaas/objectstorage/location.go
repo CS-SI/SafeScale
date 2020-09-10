@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
 
@@ -31,8 +32,6 @@ import (
 	_ "github.com/graymeta/stow/google"
 	_ "github.com/graymeta/stow/s3"
 	_ "github.com/graymeta/stow/swift"
-
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // location ...

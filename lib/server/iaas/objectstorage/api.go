@@ -106,7 +106,7 @@ type Bucket interface {
 	// CopyObject(string, string) error
 
 	// GetName returns the name of the bucket
-	GetName() string
+	GetName() (string, error)
 	// GetCount returns the number of objects in the Bucket
 	GetCount(string, string) (int64, error)
 	// GetSize returns the total size of all objects in the bucket
@@ -129,23 +129,23 @@ func (om ObjectMetadata) Clone() ObjectMetadata {
 
 // Object interface
 type Object interface {
-	Stored() bool
+	Stored() (bool, error)
 
 	Read(io.Writer, int64, int64) error
 	Write(io.Reader, int64) error
 	WriteMultiPart(io.Reader, int64, int) error
 	Reload() error
 	Delete() error
-	AddMetadata(ObjectMetadata)
-	ForceAddMetadata(ObjectMetadata)
-	ReplaceMetadata(ObjectMetadata)
+	AddMetadata(ObjectMetadata) error
+	ForceAddMetadata(ObjectMetadata) error
+	ReplaceMetadata(ObjectMetadata) error
 
-	GetID() string
-	GetName() string
+	GetID() (string, error)
+	GetName() (string, error)
 	GetLastUpdate() (time.Time, error)
-	GetSize() int64
-	GetETag() string
-	GetMetadata() ObjectMetadata
+	GetSize() (int64, error)
+	GetETag() (string, error)
+	GetMetadata() (ObjectMetadata, error)
 }
 
 // FIXME GCP Remove specific driver code

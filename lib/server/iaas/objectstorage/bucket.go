@@ -23,9 +23,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	"github.com/graymeta/stow"
-
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+
+	"github.com/graymeta/stow"
 )
 
 // bucket describes a Bucket
@@ -63,9 +63,7 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if o.item == nil {
-		return nil, fmt.Errorf("not found")
-	}
+
 	return o, nil
 }
 
@@ -220,7 +218,10 @@ func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int
 	if err != nil {
 		return nil, err
 	}
-	o.AddMetadata(metadata)
+	err = o.AddMetadata(metadata)
+	if err != nil {
+		return nil, err
+	}
 	err = o.Write(source, sourceSize)
 	if err != nil {
 		return nil, err
@@ -249,7 +250,10 @@ func (b *bucket) WriteMultiPartObject(
 	if err != nil {
 		return nil, err
 	}
-	o.AddMetadata(metadata)
+	err = o.AddMetadata(metadata)
+	if err != nil {
+		return nil, err
+	}
 	err = o.WriteMultiPart(source, sourceSize, chunkSize)
 	if err != nil {
 		return nil, err
@@ -258,8 +262,12 @@ func (b *bucket) WriteMultiPartObject(
 }
 
 // GetName returns the name of the Bucket
-func (b *bucket) GetName() string {
-	return b.Name
+func (b *bucket) GetName() (string, error) {
+	if b == nil {
+		return "", scerr.InvalidInstanceError()
+	}
+
+	return b.Name, nil
 }
 
 // GetCount returns the count of objects in the Bucket
