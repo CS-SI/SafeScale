@@ -452,7 +452,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 
 	serverState, err := s.GetHostState(host.ID)
 	if err != nil {
-		return host, err
+		return nil, err
 	}
 
 	switch serverState {
@@ -461,12 +461,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 			host.ID, []hoststate.Enum{hoststate.STARTED, hoststate.STOPPED}, 2*temporal.GetBigDelay(),
 		)
 		if err != nil {
-			return host, err
+			return nil, err
 		}
 
 		err = s.complementHost(host, server)
 		if err != nil {
-			return host, err
+			return nil, err
 		}
 
 		if !host.OK() {
