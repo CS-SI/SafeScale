@@ -19,6 +19,9 @@ package huaweicloud
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	log "github.com/sirupsen/logrus"
@@ -117,14 +120,39 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 
 // GetVolume returns the volume identified by id
 // If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
-func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
-	r := volumes.Get(s.Stack.VolumeClient, id)
-	volume, err := r.Extract()
-	if err != nil {
-		if _, ok := err.(gc.ErrDefault404); ok {
-			return nil, resources.ResourceNotFoundError("volume", id)
+func (s *Stack) GetVolume(id string) (_ *resources.Volume, err error) {
+	var volume *volumes.Volume
+
+	unwrap := false
+	getErr := retry.WhileSuccessfulDelay1Second(
+		func() error {
+			r := volumes.Get(s.Stack.VolumeClient, id)
+			volume, err = r.Extract()
+			if err != nil {
+				return openstack.ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
+						if _, ok := ferr.(gc.ErrDefault404); ok {
+							unwrap = true
+							return scerr.AbortedError("", resources.ResourceNotFoundError("volume", id))
+						}
+
+						return scerr.Wrap(
+							ferr, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(ferr)),
+						)
+					},
+				)
+			}
+
+			return nil
+		},
+		temporal.GetContextTimeout(),
+	)
+
+	if getErr != nil {
+		if unwrap {
+			return nil, scerr.Cause(getErr)
 		}
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(err)))
+		return nil, getErr
 	}
 
 	av := resources.Volume{
