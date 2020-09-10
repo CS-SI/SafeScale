@@ -180,6 +180,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	// Wants to inform about the duration of the operation
+	defer temporal.NewStopwatch().OnExitLogInfo(
+		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
+		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
+	)()
+
 	state := clusterstate.Unknown
 
 	defer func() {
@@ -245,7 +251,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 	gatewaysDefault.ImageId = imageID
-	gatewaysDef := complementHostDefinition(req.GatewaysDef, gatewaysDefault)
+
+	gatewaysDef := complementHostDefinition(
+		req.GatewaysDef, gatewaysDefault,
+	)
 
 	// Determine master sizing
 	var mastersDefault *pb.HostDefinition
@@ -265,7 +274,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 	// Note: no way yet to define master sizing from cli...
 	mastersDefault.ImageId = imageID
-	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault)
+	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault) // FIXME OPP Issue warning if not enough size
 
 	// Determine node sizing
 	var nodesDefault *pb.HostDefinition
@@ -284,10 +293,10 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 	nodesDefault.ImageId = imageID
-	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault)
+	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault) // FIXME OPP Issue warning if not enough size
 
 	// Initialize service to use
-	clientInstance := client.New()
+	clientInstance := client.New() // FIXME: Mock calls to client.New
 	tenant, err := clientInstance.Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {
 		return err
@@ -558,10 +567,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		return err
 	}
 
-	// Step 2: waits for gateway installation end and masters creation end
+	// FIXME: What about cleanup ?, unit test Task class
+
+	// Step 2: waits for gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		_ = mastersTask.Abort() // FIXME: Handle aborts
+		_ = mastersTask.Abort() // FIXME Handle aborts
 		_ = privateNodesTask.Abort()
 		return primaryGatewayStatus
 	}
@@ -658,13 +669,6 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 	logrus.Debugf("Masters configured")
 
-	// Step 5: awaits nodes creation
-	_, privateNodesStatus = privateNodesTask.Wait()
-	if privateNodesStatus != nil {
-		return privateNodesStatus
-	}
-	logrus.Debugf("Nodes created")
-
 	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
@@ -675,6 +679,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			}
 		}
 	}()
+
+	// Step 5: awaits nodes creation
+	_, privateNodesStatus = privateNodesTask.Wait()
+	if privateNodesStatus != nil {
+		return privateNodesStatus
+	}
 
 	// Step 6: Starts nodes configuration, if all masters and nodes
 	// have been created and gateway has been configured with success
@@ -704,8 +714,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	return nil
 }
 
-// destruct destroys a cluster meticulously
-func (b *foreman) destruct(task concurrency.Task) (err error) {
+func (b *foreman) wipe(task concurrency.Task) (err error) {
 	cluster := b.cluster
 
 	tracer := debug.NewTracer(task, "", true).GoingIn()
@@ -724,20 +733,23 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		},
 	)
 	if err != nil {
-		return err
+		return scerr.Wrap(err, "")
 	}
 
 	// Unconfigure cluster
 	if b.makers.UnconfigureCluster != nil {
 		err = b.makers.UnconfigureCluster(task, b)
 		if err != nil {
-			return err
+			return scerr.Wrap(err, "")
 		}
 	}
 
 	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		funcErr := cluster.deleteMaster(t, params.(string))
-		return nil, funcErr
+		funcErr := cluster.wipeMaster(t, params.(string))
+		if funcErr != nil {
+			return nil, scerr.Wrap(funcErr, "")
+		}
+		return nil, nil
 	}
 
 	var cleaningErrors []error
@@ -750,12 +762,36 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 			return err
 		}
 	}
+
+	logrus.Infof("[cluster %s] detected %d nodes ...", b.cluster.Name, nodeLength)
+
 	masterList := cluster.ListMasterIDs(task)
 	masterLength := len(masterList)
 	if masterLength > 0 {
 		if err := checkForAttachedVolumes(task, cluster, masterList, "master"); err != nil {
 			return err
 		}
+	}
+
+	logrus.Infof("[cluster %s] detected %d masters ...", b.cluster.Name, masterLength)
+
+	logrus.Infof("[cluster %s] deleting nodes ...", b.cluster.Name)
+
+	// If no nodes, generate the names, look for its id, add it to nodeList
+	if nodeLength == 0 {
+		num := 0
+		switch b.cluster.Complexity {
+		case complexity.Small:
+			num = 1
+		case complexity.Normal:
+			num = 3
+		case complexity.Large:
+			num = 5
+		}
+		for i := 1; i <= num; i++ {
+			nodeList = append(nodeList, fmt.Sprintf("%s-node-%d", b.cluster.Name, i))
+		}
+		nodeLength = len(nodeList)
 	}
 
 	// No volumes attached, delete nodes
@@ -766,7 +802,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 			if err != nil {
 				return err
 			}
-			subtask, err = subtask.Start(b.taskDeleteNode, nodeList[i])
+			subtask, err = subtask.Start(b.taskWipeNode, nodeList[i])
 			if err != nil {
 				return err
 			}
@@ -775,9 +811,28 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		for _, s := range subtasks {
 			_, subErr := s.Wait()
 			if subErr != nil {
+				logrus.Warn(subErr)
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
+	}
+
+	logrus.Infof("[cluster %s] deleting masters ...", b.cluster.Name)
+
+	if masterLength == 0 {
+		num := 0
+		switch b.cluster.Complexity {
+		case complexity.Small:
+			num = 1
+		case complexity.Normal:
+			num = 3
+		case complexity.Large:
+			num = 5
+		}
+		for i := 1; i <= num; i++ {
+			masterList = append(masterList, fmt.Sprintf("%s-master-%d", b.cluster.Name, i))
+		}
+		masterLength = len(masterList)
 	}
 
 	// delete the Masters
@@ -798,6 +853,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		for _, s := range subtasks {
 			_, subErr := s.Wait()
 			if subErr != nil {
+				logrus.Warn(subErr)
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
@@ -827,6 +883,8 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		return scerr.ErrListError(cleaningErrors)
 	}
 
+	logrus.Infof("[cluster %s] deleting network ...", b.cluster.Name)
+
 	// Deletes the network
 	clientNetwork := client.New().Network
 	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
@@ -839,6 +897,174 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		cleaningErrors = append(cleaningErrors, retryErr)
 		return scerr.ErrListError(cleaningErrors)
 	}
+
+	logrus.Infof("[cluster %s] deleting metadata ...", b.cluster.Name)
+
+	// Deletes the metadata
+	err = cluster.DeleteMetadata(task)
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	cluster.service = nil
+
+	return scerr.ErrListError(cleaningErrors)
+}
+
+// destruct destroys a cluster meticulously
+func (b *foreman) destruct(task concurrency.Task) (err error) {
+	cluster := b.cluster
+
+	tracer := debug.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	// Updates metadata
+	err = cluster.UpdateMetadata(
+		task, func() error {
+			return cluster.Properties.LockForWrite(property.StateV1).ThenUse(
+				func(clonable data.Clonable) error {
+					clonable.(*clusterpropsv1.State).State = clusterstate.Removed
+					return nil
+				},
+			)
+		},
+	)
+	if err != nil {
+		return scerr.Wrap(err, "")
+	}
+
+	// Unconfigure cluster
+	if b.makers.UnconfigureCluster != nil {
+		err = b.makers.UnconfigureCluster(task, b)
+		if err != nil {
+			return scerr.Wrap(err, "")
+		}
+	}
+
+	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := cluster.deleteMaster(t, params.(string))
+		if funcErr != nil {
+			return nil, scerr.Wrap(funcErr, "")
+		}
+		return nil, nil
+	}
+
+	var cleaningErrors []error
+
+	// check if nodes and/or masters have volumes attached (which would forbid the deletion)
+	nodeList := cluster.ListNodeIDs(task)
+	nodeLength := len(nodeList)
+	if nodeLength > 0 {
+		if err := checkForAttachedVolumes(task, cluster, nodeList, "node"); err != nil {
+			return err
+		}
+	}
+
+	logrus.Infof("[cluster %s] detected %d nodes ...", b.cluster.Name, nodeLength)
+
+	masterList := cluster.ListMasterIDs(task)
+	masterLength := len(masterList)
+	if masterLength > 0 {
+		if err := checkForAttachedVolumes(task, cluster, masterList, "master"); err != nil {
+			return err
+		}
+	}
+
+	logrus.Infof("[cluster %s] detected %d masters ...", b.cluster.Name, masterLength)
+
+	logrus.Infof("[cluster %s] deleting nodes ...", b.cluster.Name)
+
+	// No volumes attached, delete nodes
+	if nodeLength > 0 {
+		var subtasks []concurrency.Task
+		for i := 0; i < nodeLength; i++ {
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+			subtask, err = subtask.Start(b.taskDeleteNode, nodeList[i])
+			if err != nil {
+				return err
+			}
+			subtasks = append(subtasks, subtask)
+		}
+		for _, s := range subtasks {
+			_, subErr := s.Wait()
+			if subErr != nil {
+				logrus.Warn(subErr)
+				cleaningErrors = append(cleaningErrors, subErr)
+			}
+		}
+	}
+
+	logrus.Infof("[cluster %s] deleting masters ...", b.cluster.Name)
+
+	// delete the Masters
+	if masterLength > 0 {
+		var subtasks []concurrency.Task
+		for i := 0; i < masterLength; i++ {
+			subtask, err := task.New()
+			if err != nil {
+				return err
+			}
+
+			subtask, err = subtask.Start(deleteMasterFunc, masterList[i])
+			if err != nil {
+				return err
+			}
+			subtasks = append(subtasks, subtask)
+		}
+		for _, s := range subtasks {
+			_, subErr := s.Wait()
+			if subErr != nil {
+				logrus.Warn(subErr)
+				cleaningErrors = append(cleaningErrors, subErr)
+			}
+		}
+	}
+
+	// get access to metadata
+	cluster.RLock(task)
+	networkID := ""
+	if cluster.Properties.Lookup(property.NetworkV2) {
+		err = cluster.Properties.LockForRead(property.NetworkV2).ThenUse(
+			func(clonable data.Clonable) error {
+				networkID = clonable.(*clusterpropsv2.Network).NetworkID
+				return nil
+			},
+		)
+	} else {
+		err = cluster.Properties.LockForRead(property.NetworkV1).ThenUse(
+			func(clonable data.Clonable) error {
+				networkID = clonable.(*clusterpropsv1.Network).NetworkID
+				return nil
+			},
+		)
+	}
+	cluster.RUnlock(task)
+	if err != nil {
+		cleaningErrors = append(cleaningErrors, err)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	logrus.Infof("[cluster %s] deleting network ...", b.cluster.Name)
+
+	// Deletes the network
+	clientNetwork := client.New().Network
+	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		func() error {
+			return clientNetwork.Delete([]string{networkID}, temporal.GetExecutionTimeout())
+		},
+		temporal.GetHostTimeout(),
+	)
+	if retryErr != nil {
+		cleaningErrors = append(cleaningErrors, retryErr)
+		return scerr.ErrListError(cleaningErrors)
+	}
+
+	logrus.Infof("[cluster %s] deleting metadata ...", b.cluster.Name)
 
 	// Deletes the metadata
 	err = cluster.DeleteMetadata(task)
@@ -897,6 +1123,11 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
 
 func (b *foreman) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	funcErr := b.cluster.DeleteSpecificNode(task, params.(string), "")
+	return nil, funcErr
+}
+
+func (b *foreman) taskWipeNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+	funcErr := b.cluster.WipeSpecificNode(task, params.(string), "")
 	return nil, funcErr
 }
 
@@ -1928,9 +2159,10 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	hostLabel := fmt.Sprintf("master #%d", index)
-
 	def.KeepOnFailure = !nokeep
+
+	hostLabel := fmt.Sprintf("master #%d", index)
+	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
 
 	netCfg, err := b.cluster.GetNetworkConfig(t)
 	if err != nil {
@@ -1950,96 +2182,46 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		return nil, scerr.DuplicateError(fmt.Sprintf("there is already a host named '%s'", hostDef.Name))
 	}
 
-	// Updates cluster metadata to keep track of the host we will create
-	err = b.cluster.UpdateMetadata(
-		t, func() error {
-			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
-				func(clonable data.Clonable) error {
-					nodesV1 := clonable.(*clusterpropsv1.Nodes)
-					// Update swarmCluster definition in Object Storage
-					node := &clusterpropsv1.Node{
-						Name: hostDef.Name,
-					}
-					nodesV1.Masters = append(nodesV1.Masters, node)
-					return nil
-				},
-			)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Starting from here, if an error occurs and nokeep is true, deletes master from cluster metadata
-	defer func() {
-		if err != nil && nokeep {
-			derr := b.cluster.UpdateMetadata(
-				t, func() error {
-					return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
-						func(clonable data.Clonable) error {
-							nodesV1 := clonable.(*clusterpropsv1.Nodes)
-							// Update swarmCluster definition in Object Storage
-							_, innerErr := deleteNodeFromListByName(nodesV1.Masters, hostDef.Name)
-							return innerErr
-						},
-					)
-				},
-			)
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
 	hostDef.Network = netCfg.NetworkID
 	hostDef.Public = false
 	clientHost := client.New().Host
 	pbHost, err := clientHost.Create(hostDef, timeout)
-	if err != nil {
-		return nil, err
-	}
-	if pbHost == nil {
-		return nil, scerr.InconsistentError("safescaled returned an invalid host object: pbHost cannot be nil")
-	}
-
-	// Starting from here, if err is not nil and nokeep is true, delete the host created
-	defer func() {
-		if err != nil {
+	if pbHost != nil {
+		// Updates cluster metadata to keep track of created host, before testing if an error occurred during the creation
+		mErr := b.cluster.UpdateMetadata(
+			t, func() error {
+				// Locks for write the NodesV1 extension...
+				return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+					func(clonable data.Clonable) error {
+						nodesV1 := clonable.(*clusterpropsv1.Nodes)
+						// Update swarmCluster definition in Object Storage
+						node := &clusterpropsv1.Node{
+							ID:        pbHost.Id,
+							Name:      pbHost.Name,
+							PrivateIP: pbHost.PrivateIp,
+							PublicIP:  pbHost.PublicIp,
+						}
+						nodesV1.Masters = append(nodesV1.Masters, node)
+						return nil
+					},
+				)
+			},
+		)
+		if mErr != nil && nokeep {
 			derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				mErr = scerr.AddConsequence(mErr, derr)
 			}
+			return nil, mErr
 		}
-	}()
-
-	// Updates cluster metadata to update node information corresponding to created host, before testing if an error occurred during the creation
-	err = b.cluster.UpdateMetadata(
-		t, func() error {
-			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
-				func(clonable data.Clonable) error {
-					nodesV1 := clonable.(*clusterpropsv1.Nodes)
-					// Update cluster definition in Object Storage
-					found, idx := findNodeByName(nodesV1.Masters, pbHost.Name)
-					if !found {
-						return scerr.NotFoundError(fmt.Sprintf("failed to update node named '%s'", pbHost.Name))
-					}
-					node := nodesV1.Masters[idx]
-					node.ID = pbHost.Id
-					node.PrivateIP = pbHost.PrivateIp
-					node.PublicIP = pbHost.PublicIp
-					return nil
-				},
-			)
-		},
-	)
+	}
 	if err != nil {
 		return nil, client.DecorateError(
 			err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false,
 		)
 	}
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
+	logrus.Debugf("[%s] host resource creation successful", hostLabel)
 
 	err = b.installProxyCacheClient(t, pbHost, hostLabel)
 	if err != nil {
@@ -2052,6 +2234,7 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 		return nil, err
 	}
 
+	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
 	return nil, nil
 }
 
@@ -2284,8 +2467,10 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	hostLabel := fmt.Sprintf("node #%d", index)
 	def.KeepOnFailure = !nokeep
+
+	hostLabel := fmt.Sprintf("node #%d", index)
+	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
 
 	netCfg, err := b.cluster.GetNetworkConfig(t)
 	if err != nil {
@@ -2310,92 +2495,53 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, scerr.DuplicateError(fmt.Sprintf("there is already a host named '%s'", hostDef.Name))
 	}
 
-	// Updates cluster metadata to keep track of the host we will create
-	err = b.cluster.UpdateMetadata(
-		t, func() error {
-			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
-				func(clonable data.Clonable) error {
-					nodesV1 := clonable.(*clusterpropsv1.Nodes)
-					// Update swarmCluster definition in Object Storage
-					node := &clusterpropsv1.Node{
-						Name: hostDef.Name,
-					}
-					nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
-					return nil
-				},
-			)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Starting from here, if an error occurs and nokeep is set, deletes node from cluster metadata
-	defer func() {
-		if err != nil && nokeep {
-			derr := b.cluster.UpdateMetadata(
-				t, func() error {
-					return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
-						func(clonable data.Clonable) error {
-							nodesV1 := clonable.(*clusterpropsv1.Nodes)
-							// Update swarmCluster definition in Object Storage
-							_, innerErr := deleteNodeFromListByName(nodesV1.PrivateNodes, hostDef.Name)
-							return innerErr
-						},
-					)
-				},
-			)
-			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
-			}
-		}
-	}()
-
 	clientHost := client.New().Host
-	// var node *clusterpropsv1.Node
+	var node *clusterpropsv1.Node
 	pbHost, err := clientHost.Create(hostDef, timeout)
-	if err != nil {
-		return nil, err
-	}
-
-	// Starting from here, if err is not nil and nokeep is true, delete the host created
-	defer func() {
-		if err != nil {
+	if pbHost != nil {
+		defer func() {
+			if err != nil {
+				derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
+				if derr != nil {
+					err = scerr.AddConsequence(err, derr)
+				}
+			}
+		}()
+		mErr := b.cluster.UpdateMetadata(
+			t, func() error {
+				// Locks for write the NodesV1 extension...
+				return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+					func(clonable data.Clonable) error {
+						nodesV1 := clonable.(*clusterpropsv1.Nodes)
+						// Registers the new Agent in the swarmCluster struct
+						node = &clusterpropsv1.Node{
+							ID:        pbHost.Id,
+							Name:      pbHost.Name,
+							PrivateIP: pbHost.PrivateIp,
+							PublicIP:  pbHost.PublicIp,
+						}
+						nodesV1.PrivateNodes = append(nodesV1.PrivateNodes, node)
+						return nil
+					},
+				)
+			},
+		)
+		if mErr != nil && nokeep {
 			derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				mErr = scerr.AddConsequence(mErr, derr)
 			}
+			return nil, mErr
 		}
-	}()
-
-	// host created, update cluster metadata
-	err = b.cluster.UpdateMetadata(
-		t, func() error {
-			// Locks for write the NodesV1 extension...
-			return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
-				func(clonable data.Clonable) error {
-					nodesV1 := clonable.(*clusterpropsv1.Nodes)
-					// Updates the new node information
-					found, idx := findNodeByName(nodesV1.PrivateNodes, pbHost.Name)
-					if !found {
-						return scerr.NotFoundError(fmt.Sprintf("failed to find node with name '%s'", pbHost.Name))
-					}
-					node := nodesV1.PrivateNodes[idx]
-					node.ID = pbHost.Id
-					node.PrivateIP = pbHost.PrivateIp
-					node.PublicIP = pbHost.PublicIp
-					return nil
-				},
-			)
-		},
-	)
+		if mErr != nil {
+			logrus.Warnf("error writing cluster metadata of '%s'", pbHost.Id)
+		}
+	}
 	if err != nil {
-		logrus.Warnf("error writing cluster metadata of '%s'", pbHost.Id)
 		return nil, client.DecorateError(err, fmt.Sprintf("[%s] creation failed: %s", hostLabel, err.Error()), true)
 	}
-
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
+	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
 
 	err = b.installProxyCacheClient(t, pbHost, hostLabel)
 	if err != nil {
@@ -2409,6 +2555,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, err
 	}
 
+	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
 	return pbHost.Id, nil
 }
 

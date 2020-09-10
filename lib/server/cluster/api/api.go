@@ -83,4 +83,7 @@ type Cluster interface {
 
 	// Delete allows to destroy infrastructure of cluster
 	Delete(concurrency.Task) error
+
+	// Wipe allows to destroy infrastructure of cluster, forcing destruction of resources and ignoring errors
+	Wipe(concurrency.Task) error
 }

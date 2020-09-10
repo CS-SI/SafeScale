@@ -1036,6 +1036,31 @@ func (c *Controller) ForceGetState(task concurrency.Task) (state clusterstate.En
 }
 
 // deleteMaster deletes the master specified by its ID
+func (c *Controller) wipeMaster(task concurrency.Task, hostID string) (err error) {
+	if c == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+	if hostID == "" {
+		return scerr.InvalidParameterError("hostID", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	// Finally delete host
+	err = client.New().Host.Delete([]string{hostID}, temporal.GetLongOperationTimeout())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// deleteMaster deletes the master specified by its ID
 func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err error) {
 	if c == nil {
 		return scerr.InvalidInstanceError()
@@ -1157,6 +1182,37 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 	}
 
 	return c.deleteNode(task, node, selectedMaster)
+}
+
+// DeleteSpecificNode deletes the node specified by its ID
+func (c *Controller) WipeSpecificNode(task concurrency.Task, hostID string, selectedMaster string) (err error) {
+	if c == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if hostID == "" {
+		return scerr.InvalidParameterError("hostID", "cannot be empty string")
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%s)", hostID), true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	// Delete node
+	// Finally delete host
+
+	err = client.New().Host.Delete([]string{hostID}, temporal.GetLongOperationTimeout())
+	if err != nil {
+		if _, ok := err.(scerr.ErrNotFound); ok {
+			// host seems already deleted, so it's a success :-)
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }
 
 // DeleteSpecificNode deletes the node specified by its ID
@@ -1364,6 +1420,22 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return c.foreman.destruct(task)
+}
+
+// Wipe allows to destroy infrastructure of cluster, forcing destruction of resources and ignoring errors
+func (c *Controller) Wipe(task concurrency.Task) (err error) {
+	if c == nil {
+		return scerr.InvalidInstanceError()
+	}
+	if task == nil {
+		return scerr.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tracer := debug.NewTracer(task, "", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	return c.foreman.wipe(task)
 }
 
 // Stop stops the Cluster is its current state is compatible
