@@ -64,12 +64,15 @@ export -f sfYum
 LINUX_KIND=
 VERSION_ID=
 FULL_VERSION_ID=
+FULL_HOSTNAME=
+
 
 sfDetectFacts() {
     [[ -f /etc/os-release ]] && {
         . /etc/os-release
         LINUX_KIND=$ID
         FULL_HOSTNAME=$VERSION_ID
+        FULL_VERSION_ID=$VERSION_ID
     } || {
         which lsb_release &>/dev/null && {
             LINUX_KIND=$(lsb_release -is)
@@ -164,6 +167,8 @@ put_hostname_in_hosts() {
     FULL_HOSTNAME="{{ .HostName }}"
     SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
+    echo "" >>/etc/hosts
+    echo "127.0.0.1 ${SHORT_HOSTNAME}" >>/etc/hosts
     echo "${SHORT_HOSTNAME}" >/etc/hostname
     hostname "${SHORT_HOSTNAME}"
 }
@@ -192,7 +197,7 @@ disable_services() {
 function check_dns_configuration() {
     if [[ -r /etc/resolv.conf ]]; then
         echo "Getting DNS using resolv.conf..."
-        THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2)
+        THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2) || true
 
         if [[ -n ${THE_DNS} ]]; then
             timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
@@ -201,7 +206,7 @@ function check_dns_configuration() {
 
     if which systemd-resolve; then
         echo "Getting DNS using systemd-resolve"
-        THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}')
+        THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}') || true
         if [[ -n ${THE_DNS} ]]; then
             timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
         fi
@@ -209,7 +214,7 @@ function check_dns_configuration() {
 
     if which resolvectl; then
         echo "Getting DNS using resolvectl"
-        THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}')
+        THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}') || true
         if [[ -n ${THE_DNS} ]]; then
             timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
         fi
@@ -288,10 +293,10 @@ ensure_network_connectivity() {
     if [[ ${op} -eq 0 ]]; then
         echo "ensure_network_connectivity finished WITH network AFTER putting custom DNS..."
         return 0
+    else
+        echo "ensure_network_connectivity finished WITHOUT network, not even custom DNS was enough..."
+        return 1
     fi
-
-    echo "ensure_network_connectivity finished WITHOUT network, not even custom DNS was enough..."
-    return 1
 }
 
 function fail_fast_unsupported_distros() {
@@ -316,9 +321,11 @@ function fail_fast_unsupported_distros() {
                 echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $(lsb_release -rs)'!"
                 fail 199
             fi
-        elif [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $VERSION_ID'!"
-            fail 199
+        else
+            if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution (firewalld) '$LINUX_KIND $VERSION_ID'!"
+                fail 199
+            fi
         fi
         ;;
     fedora)
@@ -327,9 +334,11 @@ function fail_fast_unsupported_distros() {
                 echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
                 fail 199
             fi
-        elif [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
-            fail 199
+        else
+            if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+                fail 199
+            fi
         fi
         ;;
     *)
@@ -339,15 +348,15 @@ function fail_fast_unsupported_distros() {
     esac
 }
 
-#function compatible_network() {
-#    # Try installing network-scripts if available
-#    case $LINUX_KIND in
-#        redhat | rhel | centos | fedora)
-#            sfYum install -q -y network-scripts || true
-#            ;;
-#    *) ;;
-#    esac
-#}
+function compatible_network() {
+    # Try installing network-scripts if available
+    case $LINUX_KIND in
+    redhat | rhel | centos | fedora)
+        sfYum install -q -y network-scripts || true
+        ;;
+    *) ;;
+    esac
+}
 
 # ---- Main
 
@@ -361,11 +370,11 @@ disable_cloudinit_network_autoconf
 disable_services
 create_user
 
-#compatible_network
+compatible_network
 
 ensure_network_connectivity || true
 
-#compatible_network
+compatible_network
 
 touch /etc/cloud/cloud-init.disabled
 

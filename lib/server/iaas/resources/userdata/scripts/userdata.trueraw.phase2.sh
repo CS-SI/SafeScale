@@ -1092,11 +1092,11 @@ install_drivers_nvidia() {
             echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
             rmmod nouveau
         fi
-        sfWaitForApt && apt update &>/dev/null
-        sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 202
+        sfApt update &>/dev/null
+        sfApt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 202
         dpkg --add-architecture i386 &>/dev/null
-        sfWaitForApt && apt update &>/dev/null
-        sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 203
+        sfApt update &>/dev/null
+        sfApt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 203
         wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 204
         bash NVIDIA-Linux-x86_64-410.78.run -s || fail 205
         ;;
@@ -1156,7 +1156,7 @@ EOF
 
         sfApt update
         # Force update of systemd, pciutils and netplan
-        if dpkg --compare-versions $(sfGetFact "distrib_version") ge 17.10; then
+        if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
             sfApt install -y systemd pciutils netplan.io || fail 211
         else
             sfApt install -y systemd pciutils || fail 212

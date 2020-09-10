@@ -42,6 +42,25 @@ exec 1<>/opt/safescale/var/log/user_data.phase1.log
 exec 2>&1
 set -x
 
+sfApt() {
+    rc=-1
+    DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+    return $rc
+}
+export -f sfApt
+
+# try using dnf instead of yum if available
+sfYum() {
+    rc=-1
+    if [[ -n $(which dnf) ]]; then
+        dnf "$@" && rc=$?
+    else
+        yum "$@" && rc=$?
+    fi
+    return $rc
+}
+export -f sfYum
+
 LINUX_KIND=
 VERSION_ID=
 FULL_VERSION_ID=
@@ -170,22 +189,61 @@ disable_services() {
     esac
 }
 
-is_network_reachable() {
-    NETROUNDS=24
+function check_dns_configuration() {
+    if [[ -r /etc/resolv.conf ]]; then
+        echo "Getting DNS using resolv.conf..."
+        THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2) || true
+
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
+    fi
+
+    if which systemd-resolve; then
+        echo "Getting DNS using systemd-resolve"
+        THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}') || true
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
+    fi
+
+    if which resolvectl; then
+        echo "Getting DNS using resolvectl"
+        THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}') || true
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
+    fi
+
+    timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
+    return 1
+}
+
+function is_network_reachable() {
+    NETROUNDS=4
     REACHED=0
+    TRIED=0
 
     for i in $(seq ${NETROUNDS}); do
         if which curl; then
-            curl -I www.google.com -m 5 | grep "200 OK" && REACHED=1 && break
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
         fi
 
         if which wget; then
-            wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-        else
-            ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
         fi
 
-        sleep 1
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
     done
 
     if [[ ${REACHED} -eq 0 ]]; then
@@ -285,15 +343,33 @@ function fail_fast_unsupported_distros() {
     esac
 }
 
+function compatible_network() {
+    # Try installing network-scripts if available
+    case $LINUX_KIND in
+    redhat | rhel | centos | fedora)
+        sfYum install -q -y network-scripts || true
+        ;;
+    *) ;;
+    esac
+}
+
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
 
 put_hostname_in_hosts
+
+check_dns_configuration || true
+
 disable_cloudinit_network_autoconf
 disable_services
 create_user
+
+compatible_network
+
 ensure_network_connectivity || true
+
+compatible_network
 
 touch /etc/cloud/cloud-init.disabled
 
