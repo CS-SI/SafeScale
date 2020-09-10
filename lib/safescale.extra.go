@@ -17,6 +17,8 @@
 
 package safescale
 
+import "github.com/CS-SI/SafeScale/lib/utils/scerr"
+
 // Clone makes a copy of HostSizing
 func (x *HostSizing) Clone() *HostSizing {
 	if x == nil {
@@ -31,6 +33,123 @@ func (x *HostSizing) Clone() *HostSizing {
 		GpuCount:    x.GpuCount,
 		MinCpuFreq:  x.MinCpuFreq,
 	}
+}
+
+func (x *HostSizing) GreaterThan(y *HostSizing) (bool, error) {
+	if x == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+
+	if y == nil {
+		return false, scerr.InvalidParameterError("y", "cannot be nil")
+	}
+
+	if x.MinCpuCount < y.MinCpuCount {
+		return false, nil
+	}
+
+	if x.MinRamSize < y.MinRamSize {
+		return false, nil
+	}
+
+	if x.MinDiskSize < y.MinDiskSize {
+		return false, nil
+	}
+
+	if x.GpuCount < y.GpuCount {
+		return false, nil
+	}
+
+	if x.MinCpuFreq < y.MinCpuFreq {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (x *HostDefinition) LowerThan(y *HostDefinition) (bool, error) {
+	if x == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+
+	if y == nil {
+		return false, scerr.InvalidParameterError("y", "cannot be nil")
+	}
+
+	less := true
+
+	if x.Sizing.MinCpuCount >= y.Sizing.MinCpuCount {
+		less = false
+	}
+	if x.Sizing.MaxCpuCount >= y.Sizing.MaxCpuCount {
+		less = false
+	}
+	if x.Sizing.MinRamSize >= y.Sizing.MinRamSize {
+		less = false
+	}
+	if x.Sizing.MaxRamSize >= y.Sizing.MaxRamSize {
+		less = false
+	}
+	if x.Sizing.MinDiskSize >= y.Sizing.MinDiskSize {
+		less = false
+	}
+	if x.Sizing.GpuCount >= y.Sizing.GpuCount {
+		less = false
+	}
+	if x.Sizing.MinCpuFreq >= y.Sizing.MinCpuFreq {
+		less = false
+	}
+
+	return less, nil
+}
+
+func (x *HostDefinition) LowerOrEqualThan(y *HostDefinition) (bool, error) {
+	if x == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+
+	if y == nil {
+		return false, scerr.InvalidParameterError("y", "cannot be nil")
+	}
+
+	less := true
+
+	if x.Sizing.MinCpuCount > y.Sizing.MinCpuCount {
+		less = false
+	}
+	if x.Sizing.MaxCpuCount > y.Sizing.MaxCpuCount {
+		less = false
+	}
+	if x.Sizing.MinRamSize > y.Sizing.MinRamSize {
+		less = false
+	}
+	if x.Sizing.MaxRamSize > y.Sizing.MaxRamSize {
+		less = false
+	}
+	if x.Sizing.MinDiskSize > y.Sizing.MinDiskSize {
+		less = false
+	}
+	if x.Sizing.GpuCount > y.Sizing.GpuCount {
+		less = false
+	}
+	if x.Sizing.MinCpuFreq > y.Sizing.MinCpuFreq {
+		less = false
+	}
+
+	return less, nil
+}
+
+func (x *HostSizing) LowerOrEqualThan(y *HostSizing) (bool, error) {
+	if x == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+
+	gr, err := x.GreaterThan(y)
+	if err != nil {
+		return false, err
+	}
+
+	return !gr, nil
 }
 
 // Clone makes a copy of a HostDefinition
