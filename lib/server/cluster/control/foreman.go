@@ -29,6 +29,8 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -254,7 +256,18 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	gatewaysDef := complementHostDefinition(
 		req.GatewaysDef, gatewaysDefault,
-	)
+	) // FIXME OPP Issue warning if not enough size
+
+	if lower, err := gatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
+		if !req.Force {
+			return scerr.Errorf(
+				fmt.Sprintf(
+					"requested gateway sizing %s less than recommended %s", spew.Sdump(gatewaysDef),
+					spew.Sdump(gatewaysDefault),
+				), nil,
+			)
+		}
+	}
 
 	// Determine master sizing
 	var mastersDefault *pb.HostDefinition
@@ -276,6 +289,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	mastersDefault.ImageId = imageID
 	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault) // FIXME OPP Issue warning if not enough size
 
+	if lower, err := mastersDef.LowerThan(mastersDefault); err == nil && lower {
+		if !req.Force {
+			return scerr.Errorf("requested master sizing less than recommended", nil)
+		}
+	}
+
 	// Determine node sizing
 	var nodesDefault *pb.HostDefinition
 	if b.makers.DefaultNodeSizing != nil {
@@ -294,6 +313,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 	nodesDefault.ImageId = imageID
 	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault) // FIXME OPP Issue warning if not enough size
+
+	if lower, err := nodesDef.LowerThan(nodesDefault); err == nil && lower {
+		if !req.Force {
+			return scerr.Errorf("requested node sizing less than recommended", nil)
+		}
+	}
 
 	// Initialize service to use
 	clientInstance := client.New() // FIXME: Mock calls to client.New

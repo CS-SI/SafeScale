@@ -375,6 +375,10 @@ var clusterCreateCommand = cli.Command{
 			Name:  "keep-on-failure, k",
 			Usage: "If used, the resources are not deleted on failure (default: not set)",
 		},
+		cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If used, it forces the cluster creation even if requested sizing is less than recommended",
+		},
 		cli.StringFlag{
 			Name:  "cidr, N",
 			Value: "192.168.0.0/16",
@@ -470,6 +474,8 @@ var clusterCreateCommand = cli.Command{
 
 		keep := c.Bool("keep-on-failure")
 
+		force := c.Bool("force")
+
 		cidr := c.String("cidr")
 		domain := c.String("domain")
 
@@ -549,6 +555,7 @@ var clusterCreateCommand = cli.Command{
 				Domain:                  domain,
 				Flavor:                  clusterFlavor,
 				KeepOnFailure:           keep,
+				Force:                   force,
 				GatewaysDef:             gatewaysDef,
 				MastersDef:              mastersDef,
 				NodesDef:                nodesDef,
