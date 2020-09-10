@@ -52,27 +52,27 @@ set -x
 
 reset_fw() {
     case $LINUX_KIND in
-        debian | ubuntu)
-            sfApt update &>/dev/null || return 1
-            sfApt install -q -y firewalld || return 1
+    debian | ubuntu)
+        sfApt update &>/dev/null || return 1
+        sfApt install -q -y firewalld || return 1
 
-            systemctl stop ufw
-            systemctl disable ufw
-            sfApt purge -q -y ufw &>/dev/null || return 1
-            ;;
+        systemctl stop ufw
+        systemctl disable ufw
+        sfApt purge -q -y ufw &>/dev/null || return 1
+        ;;
 
-        redhat | rhel | centos | fedora)
-            # firewalld may not be installed
-            if ! systemctl is-active firewalld &>/dev/null; then
-                if ! systemctl status firewalld &>/dev/null; then
-                    if which dnf; then
-                        dnf install -q -y firewalld || return 1
-                    else
-                        yum install -q -y firewalld || return 1
-                    fi
+    redhat | rhel | centos | fedora)
+        # firewalld may not be installed
+        if ! systemctl is-active firewalld &>/dev/null; then
+            if ! systemctl status firewalld &>/dev/null; then
+                if which dnf; then
+                    dnf install -q -y firewalld || return 1
+                else
+                    yum install -q -y firewalld || return 1
                 fi
             fi
-            ;;
+        fi
+        ;;
     esac
 
     FWCMD=firewall-offline-cmd # firewall-cmd --permanent "like" command
@@ -100,10 +100,14 @@ reset_fw() {
     {{- if or .PublicIP .IsGateway }}
     [[ -z ${PU_IF} ]] && {
         $FWCMD --zone=public --add-source=${PU_IP}/32 || return 1
-        $FWCMD --set-default-zone=public; rc=$?; [ $rc -gt 0 && $rc -ne 16 ] && return 1
+        $FWCMD --set-default-zone=public
+        rc=$?
+        [ $rc -gt 0 && $rc -ne 16 ] && return 1
     }
     {{- else }}
-    $FWCMDnop --set-default-zone=trusted; rc=$?; [ $rc -gt 0 && $rc -ne 16 ] && return 1
+    $FWCMDnop --set-default-zone=trusted
+    rc=$?
+    [ $rc -gt 0 && $rc -ne 16 ] && return 1
     {{- end }}
     # Attach LAN interfaces to zone trusted
     [[ ! -z ${PR_IFs} ]] && {
@@ -247,39 +251,39 @@ substring_diff() {
 
 collect_original_packages() {
     case $LINUX_KIND in
-        debian | ubuntu)
-            dpkg-query -l >${SF_VARDIR}/log/packages_installed_before.phase2.list
-            ;;
-        redhat | rhel | centos | fedora)
-            rpm -qa | sort >${SF_VARDIR}/log/packages_installed_before.phase2.list
-            ;;
-        *) ;;
+    debian | ubuntu)
+        dpkg-query -l >${SF_VARDIR}/log/packages_installed_before.phase2.list
+        ;;
+    redhat | rhel | centos | fedora)
+        rpm -qa | sort >${SF_VARDIR}/log/packages_installed_before.phase2.list
+        ;;
+    *) ;;
     esac
 }
 
 ensure_curl_is_installed() {
     case $LINUX_KIND in
-        ubuntu | debian)
-            if [[ -n $(which curl) ]]; then
-                return 0
-            fi
-            DEBIAN_FRONTEND=noninteractive apt-get update || return 1
-            DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
-            ;;
-        redhat | rhel | centos | fedora)
-            if [[ -n $(which curl) ]]; then
-                return 0
-            fi
-            if which dnf; then
-                dnf install -y -q curl &>/dev/null || return 1
-            else
-                yum install -y -q curl &>/dev/null || return 1
-            fi
-            ;;
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 216
-            ;;
+    ubuntu | debian)
+        if [[ -n $(which curl) ]]; then
+            return 0
+        fi
+        DEBIAN_FRONTEND=noninteractive apt-get update || return 1
+        DEBIAN_FRONTEND=noninteractive apt-get install -y curl || return 1
+        ;;
+    redhat | rhel | centos | fedora)
+        if [[ -n $(which curl) ]]; then
+            return 0
+        fi
+        if which dnf; then
+            dnf install -y -q curl &>/dev/null || return 1
+        else
+            yum install -y -q curl &>/dev/null || return 1
+        fi
+        ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 216
+        ;;
     esac
 
     return 0
@@ -287,13 +291,13 @@ ensure_curl_is_installed() {
 
 collect_installed_packages() {
     case $LINUX_KIND in
-        debian | ubuntu)
-            dpkg-query -l >${SF_VARDIR}/log/packages_installed_after.phase2.list
-            ;;
-        redhat | rhel | centos | fedora)
-            rpm -qa | sort >${SF_VARDIR}/log/packages_installed_after.phase2.list
-            ;;
-        *) ;;
+    debian | ubuntu)
+        dpkg-query -l >${SF_VARDIR}/log/packages_installed_after.phase2.list
+        ;;
+    redhat | rhel | centos | fedora)
+        rpm -qa | sort >${SF_VARDIR}/log/packages_installed_after.phase2.list
+        ;;
+    *) ;;
 
     esac
 }
@@ -371,34 +375,34 @@ update_fqdn() {
 
 configure_network() {
     case $LINUX_KIND in
-        debian | ubuntu)
-            if systemctl status systemd-networkd &>/dev/null; then
-                configure_network_systemd_networkd
-            elif systemctl status networking &>/dev/null; then
-                configure_network_debian
-            else
-                echo "PROVISIONING_ERROR: failed to determine how to configure network"
-                fail 192
-            fi
-            ;;
+    debian | ubuntu)
+        if systemctl status systemd-networkd &>/dev/null; then
+            configure_network_systemd_networkd
+        elif systemctl status networking &>/dev/null; then
+            configure_network_debian
+        else
+            echo "PROVISIONING_ERROR: failed to determine how to configure network"
+            fail 192
+        fi
+        ;;
 
-        redhat | rhel | centos)
-            # Network configuration
-            if systemctl status systemd-networkd &>/dev/null; then
-                configure_network_systemd_networkd
-            else
-                configure_network_redhat
-            fi
-            ;;
-
-        fedora)
+    redhat | rhel | centos)
+        # Network configuration
+        if systemctl status systemd-networkd &>/dev/null; then
+            configure_network_systemd_networkd
+        else
             configure_network_redhat
-            ;;
+        fi
+        ;;
 
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 193
-            ;;
+    fedora)
+        configure_network_redhat
+        ;;
+
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 193
+        ;;
     esac
 
     {{- if .IsGateway }}
@@ -800,33 +804,33 @@ configure_network_redhat_with_nmcli() {
 
 check_for_ip() {
     case $LINUX_KIND in
-        debian)
-            lsb_release -rs | grep "8." && return 0
-            ;;
-        *) ;;
+    debian)
+        lsb_release -rs | grep "8." && return 0
+        ;;
+    *) ;;
     esac
 
     allip=$(ip -f inet -o addr show)
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
 
     case $LINUX_KIND in
-        ubuntu)
-            if [[ $(lsb_release -rs | cut -d. -f1) -eq 16 ]]; then
-                if [[ $(echo $allip | grep $1) == "" ]]; then
-                    echo "Ubuntu 16.04 is expected to fail this test..."
-                    return 0
-                fi
+    ubuntu)
+        if [[ $(lsb_release -rs | cut -d. -f1) -eq 16 ]]; then
+            if [[ $(echo $allip | grep $1) == "" ]]; then
+                echo "Ubuntu 16.04 is expected to fail this test..."
+                return 0
             fi
-            ;;
-        debian)
-            if [[ $(lsb_release -rs | cut -d. -f1) -eq 8 ]]; then
-                if [[ $(echo $allip | grep $1) == "" ]]; then
-                    echo "Debian 8 is expected to fail this test..."
-                    return 0
-                fi
+        fi
+        ;;
+    debian)
+        if [[ $(lsb_release -rs | cut -d. -f1) -eq 8 ]]; then
+            if [[ $(echo $allip | grep $1) == "" ]]; then
+                echo "Debian 8 is expected to fail this test..."
+                return 0
             fi
-            ;;
-        *) ;;
+        fi
+        ;;
+    *) ;;
     esac
 
     [[ -z "$ip" ]] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
@@ -863,8 +867,8 @@ net.ipv4.ip_forward=1
 net.ipv4.ip_nonlocal_bind=1
 EOF
         case $LINUX_KIND in
-            ubuntu) systemctl restart systemd-sysctl ;;
-            *) sysctl -p ;;
+        ubuntu) systemctl restart systemd-sysctl ;;
+        *) sysctl -p ;;
         esac
     fi
 
@@ -894,33 +898,33 @@ EOF
 install_keepalived() {
     # Try installing network-scripts if available
     case $LINUX_KIND in
-        redhat | rhel | centos | fedora)
-            if which dnf; then
-                dnf install -q -y network-scripts || true
-            else
-                yum install -q -y network-scripts || true
-            fi
-            ;;
-        *) ;;
+    redhat | rhel | centos | fedora)
+        if which dnf; then
+            dnf install -q -y network-scripts || true
+        else
+            yum install -q -y network-scripts || true
+        fi
+        ;;
+    *) ;;
     esac
 
     case $LINUX_KIND in
-        ubuntu | debian)
-            sfApt update && sfApt -y install keepalived || return 1
-            ;;
+    ubuntu | debian)
+        sfApt update && sfApt -y install keepalived || return 1
+        ;;
 
-        redhat | rhel | centos | fedora)
-            if which dnf; then
-                dnf install -q -y keepalived || return 1
-            else
-                yum install -q -y keepalived || return 1
-            fi
-            mkdir -p /var/run/keepalived &>/dev/null
-            ;;
-        *)
-            echo "Unsupported Linux distribution '$LINUX_KIND'!"
-            return 1
-            ;;
+    redhat | rhel | centos | fedora)
+        if which dnf; then
+            dnf install -q -y keepalived || return 1
+        else
+            yum install -q -y keepalived || return 1
+        fi
+        mkdir -p /var/run/keepalived &>/dev/null
+        ;;
+    *)
+        echo "Unsupported Linux distribution '$LINUX_KIND'!"
+        return 1
+        ;;
     esac
 
     NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
@@ -1003,14 +1007,14 @@ EOF
     if [[ op -ne 0 ]]; then
         if [[ kop -eq 0 ]]; then
             case $LINUX_KIND in
-                redhat | rhel | centos | fedora)
-                    if which dnf; then
-                        dnf install -q -y network-scripts || return 1
-                    else
-                        yum install -q -y network-scripts || return 1
-                    fi
-                    ;;
-                *) ;;
+            redhat | rhel | centos | fedora)
+                if which dnf; then
+                    dnf install -q -y network-scripts || return 1
+                else
+                    yum install -q -y network-scripts || return 1
+                fi
+                ;;
+            *) ;;
             esac
         fi
     fi
@@ -1133,48 +1137,48 @@ EOF
 
 install_drivers_nvidia() {
     case $LINUX_KIND in
-        ubuntu)
-            sfFinishPreviousInstall
-            add-apt-repository -y ppa:graphics-drivers &>/dev/null
-            sfApt update || fail 201
-            sfApt -y install nvidia-410 &>/dev/null || {
-                sfApt -y install nvidia-driver-410 &>/dev/null || fail 211
-            }
-            ;;
+    ubuntu)
+        sfFinishPreviousInstall
+        add-apt-repository -y ppa:graphics-drivers &>/dev/null
+        sfApt update || fail 201
+        sfApt -y install nvidia-410 &>/dev/null || {
+            sfApt -y install nvidia-driver-410 &>/dev/null || fail 211
+        }
+        ;;
 
-        debian)
-            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-                echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
-                rmmod nouveau
-            fi
-            sfWaitForApt && apt update &>/dev/null
-            sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 212
-            dpkg --add-architecture i386 &>/dev/null
-            sfWaitForApt && apt update &>/dev/null
-            sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 213
-            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 214
-            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 215
-            ;;
+    debian)
+        if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+            echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
+            rmmod nouveau
+        fi
+        sfWaitForApt && apt update &>/dev/null
+        sfWaitForApt && apt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null || fail 212
+        dpkg --add-architecture i386 &>/dev/null
+        sfWaitForApt && apt update &>/dev/null
+        sfWaitForApt && apt install -y lib32z1 lib32ncurses5 &>/dev/null || fail 213
+        wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || fail 214
+        bash NVIDIA-Linux-x86_64-410.78.run -s || fail 215
+        ;;
 
-        redhat | rhel | centos | fedora)
-            if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-                echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
-                dracut --force
-                rmmod nouveau
-            fi
-            yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 216
-            wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 217
-            # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
-            if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
-                bash NVIDIA-Linux-x86_64-410.78.run -s || fail 218
-            fi
-            rm -f NVIDIA-Linux-x86_64-410.78.run
-            ;;
+    redhat | rhel | centos | fedora)
+        if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
+            echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
+            dracut --force
+            rmmod nouveau
+        fi
+        yum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null || fail 216
+        wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || fail 217
+        # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
+        if [ $(uname -r) == $(yum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
+            bash NVIDIA-Linux-x86_64-410.78.run -s || fail 218
+        fi
+        rm -f NVIDIA-Linux-x86_64-410.78.run
+        ;;
 
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 219
-            ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 219
+        ;;
     esac
 }
 
@@ -1190,72 +1194,57 @@ scopev4 ::ffff:0.0.0.0/96       14
 EOF
 
     case $LINUX_KIND in
-        debian)
-            # Disable interactive installations
-            export DEBIAN_FRONTEND=noninteractive
-            # # Force use of IPv4 addresses when installing packages
-            # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
+    debian)
+        # Disable interactive installations
+        export DEBIAN_FRONTEND=noninteractive
+        # # Force use of IPv4 addresses when installing packages
+        # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-            sfApt update
-            # Force update of systemd, pciutils
-            sfApt install -q -y systemd pciutils || fail 220
-            # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-            ensure_network_connectivity
-            is_network_reachable
-            ;;
+        sfApt update
+        # Force update of systemd, pciutils
+        sfApt install -q -y systemd pciutils || fail 220
+        # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+        ensure_network_connectivity
+        is_network_reachable
+        ;;
 
-        ubuntu)
-            # Disable interactive installations
-            export DEBIAN_FRONTEND=noninteractive
-            # # Force use of IPv4 addresses when installing packages
-            # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
+    ubuntu)
+        # Disable interactive installations
+        export DEBIAN_FRONTEND=noninteractive
+        # # Force use of IPv4 addresses when installing packages
+        # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-            sfApt update
-            # Force update of systemd, pciutils and netplan
-            if dpkg --compare-versions $(sfGetFact "distrib_version") ge 17.10; then
-                sfApt install -y systemd pciutils netplan.io || fail 221
+        sfApt update
+        # Force update of systemd, pciutils and netplan
+        if dpkg --compare-versions $(sfGetFact "distrib_version") ge 17.10; then
+            sfApt install -y systemd pciutils netplan.io || fail 221
+        else
+            sfApt install -y systemd pciutils || fail 221
+        fi
+        # systemd, if updated, is restarted, so we may need to ensure again network connectivity
+        ensure_network_connectivity
+        is_network_reachable
+
+        # # Security updates ...
+        # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
+        ;;
+
+    redhat | rhel | centos | fedora)
+        # # Force use of IPv4 addresses when installing packages
+        # echo "ip_resolve=4" >>/etc/yum.conf
+
+        # Force update of systemd and pciutils
+        if which dnf; then
+            dnf install -q -y pciutils yum-utils || fail 222
+        else
+            yum install -q -y pciutils yum-utils || fail 222
+        fi
+
+        if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
+            if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
+                echo "Skipping upgrade of systemd when only 1 core is available"
             else
-                sfApt install -y systemd pciutils || fail 221
-            fi
-            # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-            ensure_network_connectivity
-            is_network_reachable
-
-            # # Security updates ...
-            # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
-            ;;
-
-        redhat | rhel | centos | fedora)
-            # # Force use of IPv4 addresses when installing packages
-            # echo "ip_resolve=4" >>/etc/yum.conf
-
-            # Force update of systemd and pciutils
-            if which dnf; then
-                dnf install -q -y pciutils yum-utils || fail 222
-            else
-                yum install -q -y pciutils yum-utils || fail 222
-            fi
-
-            if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
-                if [ "$(lscpu --all --parse=CORE,SOCKET | grep -Ev "^#" | sort -u | wc -l)" = "1" ]; then
-                    echo "Skipping upgrade of systemd when only 1 core is available"
-                else
-                    # systemd, if updated, is restarted, so we may need to ensure again network connectivity
-                    if which dnf; then
-                        op=-1
-                        msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
-                        echo $msg | grep "Nothing to do" && return
-                        [ $op -ne 0 ] && sfFail 223
-                    else
-                        op=-1
-                        msg=$(yum install -q -y systemd 2>&1) && op=$? || true
-                        echo $msg | grep "Nothing to do" && return
-                        [ $op -ne 0 ] && sfFail 223
-                    fi
-                    ensure_network_connectivity
-                    is_network_reachable
-                fi
-            else
+                # systemd, if updated, is restarted, so we may need to ensure again network connectivity
                 if which dnf; then
                     op=-1
                     msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
@@ -1270,81 +1259,96 @@ EOF
                 ensure_network_connectivity
                 is_network_reachable
             fi
+        else
+            if which dnf; then
+                op=-1
+                msg=$(dnf install -q -y systemd 2>&1) && op=$? || true
+                echo $msg | grep "Nothing to do" && return
+                [ $op -ne 0 ] && sfFail 223
+            else
+                op=-1
+                msg=$(yum install -q -y systemd 2>&1) && op=$? || true
+                echo $msg | grep "Nothing to do" && return
+                [ $op -ne 0 ] && sfFail 223
+            fi
+            ensure_network_connectivity
+            is_network_reachable
+        fi
 
-            # # install security updates
-            # yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
-            ;;
+        # # install security updates
+        # yum install -y yum-plugin-security yum-plugin-changelog && yum update -y --security
+        ;;
     esac
     sfProbeGPU
 }
 
 install_packages() {
     case $LINUX_KIND in
-        ubuntu | debian)
-            sfApt install -y -qq jq zip time zip &>/dev/null || fail 224
-            ;;
-        redhat | rhel | centos)
-            if which dnf; then
-                dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 224
-            else
-                yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 224
-            fi
-            ;;
-        fedora)
-            dnf install -y -q wget jq time zip &>/dev/null || fail 224
-            ;;
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 224
-            ;;
+    ubuntu | debian)
+        sfApt install -y -qq jq zip time zip &>/dev/null || fail 224
+        ;;
+    redhat | rhel | centos)
+        if which dnf; then
+            dnf install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 224
+        else
+            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 224
+        fi
+        ;;
+    fedora)
+        dnf install -y -q wget jq time zip &>/dev/null || fail 224
+        ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 224
+        ;;
     esac
 }
 
 add_common_repos() {
     case $LINUX_KIND in
-        ubuntu)
-            sfFinishPreviousInstall
-            add-apt-repository universe -y || fail 225
-            codename=$(sfGetFact "linux_codename")
-            echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
-            ;;
-        redhat | rhel | centos)
-            if which dnf; then
-                # Install EPEL repo ...
-                sfRetry 3m 5 "dnf install -y epel-release" || fail 226
-                sfRetry 3m 5 "dnf makecache -y" || fail 227
-                # ... but don't enable it by default
-                dnf config-manager --set-disabled epel &>/dev/null || true
-            else
-                # Install EPEL repo ...
-                sfRetry 3m 5 "yum install -y epel-release" || fail 218
-                sfRetry 3m 5 "yum makecache" || fail 229
-                # ... but don't enable it by default
-                yum-config-manager --disablerepo=epel &>/dev/null || true
-            fi
-            ;;
-        fedora)
-            sfRetry 3m 5 "dnf makecache -y" || fail 230
-            ;;
+    ubuntu)
+        sfFinishPreviousInstall
+        add-apt-repository universe -y || fail 225
+        codename=$(sfGetFact "linux_codename")
+        echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
+        ;;
+    redhat | rhel | centos)
+        if which dnf; then
+            # Install EPEL repo ...
+            sfRetry 3m 5 "dnf install -y epel-release" || fail 226
+            sfRetry 3m 5 "dnf makecache -y" || fail 227
+            # ... but don't enable it by default
+            dnf config-manager --set-disabled epel &>/dev/null || true
+        else
+            # Install EPEL repo ...
+            sfRetry 3m 5 "yum install -y epel-release" || fail 218
+            sfRetry 3m 5 "yum makecache" || fail 229
+            # ... but don't enable it by default
+            yum-config-manager --disablerepo=epel &>/dev/null || true
+        fi
+        ;;
+    fedora)
+        sfRetry 3m 5 "dnf makecache -y" || fail 230
+        ;;
     esac
 }
 
 configure_locale() {
     case $LINUX_KIND in
-        ubuntu | debian)
-            locale-gen en_US.UTF-8
-            ;;
+    ubuntu | debian)
+        locale-gen en_US.UTF-8
+        ;;
     esac
     export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
 force_dbus_restart() {
     case $LINUX_KIND in
-        ubuntu)
-            sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
-            sudo systemctl daemon-reexec
-            sudo systemctl restart dbus.service
-            ;;
+    ubuntu)
+        sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
+        sudo systemctl daemon-reexec
+        sudo systemctl restart dbus.service
+        ;;
     esac
 }
 
@@ -1354,9 +1358,9 @@ force_dbus_restart() {
 # considered a security risk. Especially when set after SSH and Firewall configuration applied.
 configure_root_password_if_needed() {
     case ${LINUX_KIND} in
-        redhat | rhel | centos | fedora)
-            echo "root:{{.Password}}" | chpasswd
-            ;;
+    redhat | rhel | centos | fedora)
+        echo "root:{{.Password}}" | chpasswd
+        ;;
     esac
 }
 
@@ -1365,26 +1369,26 @@ update_kernel_settings() {
 vm.max_map_count=262144
 EOF
     case $LINUX_KIND in
-        ubuntu) systemctl restart systemd-sysctl ;;
-        *) sysctl -p ;;
+    ubuntu) systemctl restart systemd-sysctl ;;
+    *) sysctl -p ;;
     esac
 }
 
 use_cgroups_v1_if_needed() {
     case $LINUX_KIND in
-        fedora)
-            if [[ -n $(which lsb_release) ]]; then
-                if [[ $(lsb_release -rs | cut -d. -f1) -gt 30 ]]; then
-                    dnf install -y grubby || return 1
-                    grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
-                fi
-            else
-                if [[ $(echo ${VERSION_ID}) -gt 30 ]]; then
-                    dnf install -y grubby || return 1
-                    grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
-                fi
+    fedora)
+        if [[ -n $(which lsb_release) ]]; then
+            if [[ $(lsb_release -rs | cut -d. -f1) -gt 30 ]]; then
+                dnf install -y grubby || return 1
+                grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
             fi
-            ;;
+        else
+            if [[ $(echo ${VERSION_ID}) -gt 30 ]]; then
+                dnf install -y grubby || return 1
+                grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0" || return 1
+            fi
+        fi
+        ;;
     esac
 
     return 0
@@ -1392,50 +1396,50 @@ use_cgroups_v1_if_needed() {
 
 function fail_fast_unsupported_distros() {
     case $LINUX_KIND in
-        debian)
-            lsb_release -rs | grep "8." && {
+    debian)
+        lsb_release -rs | grep "8." && {
+            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+            fail 231
+        } || true
+        ;;
+    ubuntu)
+        if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
+            if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
                 echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
                 fail 231
-            } || true
-            ;;
-        ubuntu)
-            if [[ $(lsb_release -rs | cut -d. -f1) -le 17 ]]; then
-                if [[ $(lsb_release -rs | cut -d. -f1) -ne 16 ]]; then
-                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-                    fail 231
-                fi
             fi
-            ;;
-        redhat | rhel | centos)
-            if [[ -n $(which lsb_release) ]]; then
-                if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
-                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-                    fail 231
-                fi
-            else
-                if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
-                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
-                    fail 231
-                fi
+        fi
+        ;;
+    redhat | rhel | centos)
+        if [[ -n $(which lsb_release) ]]; then
+            if [[ $(lsb_release -rs | cut -d. -f1) -lt 7 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                fail 231
             fi
-            ;;
-        fedora)
-            if [[ -n $(which lsb_release) ]]; then
-                if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
-                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-                    fail 231
-                fi
-            else
-                if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
-                    echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
-                    fail 231
-                fi
+        else
+            if [[ $(echo ${VERSION_ID}) -lt 7 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+                fail 231
             fi
-            ;;
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
-            fail 232
-            ;;
+        fi
+        ;;
+    fedora)
+        if [[ -n $(which lsb_release) ]]; then
+            if [[ $(lsb_release -rs | cut -d. -f1) -lt 30 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+                fail 231
+            fi
+        else
+            if [[ $(echo ${VERSION_ID}) -lt 30 ]]; then
+                echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $VERSION_ID'!"
+                fail 231
+            fi
+        fi
+        ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND $(lsb_release -rs)'!"
+        fail 232
+        ;;
     esac
 }
 
