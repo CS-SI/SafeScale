@@ -32,18 +32,18 @@ import (
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantName string, jobDescription string) (server.Job, fail.Error) {
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (server.Job, fail.Error) {
     if ctx == nil {
         return nil, fail.InvalidParameterError("ctx", "cannot be nil")
     }
 
     var tenant *Tenant
-    if tenantName != "" {
-        service, xerr := iaas.UseService(tenantName)
+    if tenantID != "" {
+        service, xerr := iaas.UseService(tenantID)
         if xerr != nil {
             return nil, xerr
         }
-        tenant = &Tenant{name: tenantName, Service: service}
+        tenant = &Tenant{name: tenantID, Service: service}
     } else {
         tenant = GetCurrentTenant()
         if tenant == nil {
@@ -121,7 +121,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
     return empty, server.AbortJobByID(uuid)
 }
 
-// ErrorList running process
+// List running process
 func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
     defer fail.OnExitConvertToGRPCStatus(&err)
     defer fail.OnExitWrapError(&err, "cannot list jobs")

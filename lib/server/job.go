@@ -19,6 +19,7 @@ package server
 import (
     "context"
     "fmt"
+    "github.com/CS-SI/SafeScale/lib/utils/data"
     "sync"
     "time"
 
@@ -33,6 +34,8 @@ import (
 
 // Job is the interface of a daemon job
 type Job interface {
+    data.NullValue
+
     GetID() string
     GetName() string
     GetTask() concurrency.Task
@@ -115,6 +118,11 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
         return nil, xerr
     }
     return &nj, nil
+}
+
+// IsNull tells if the instance represents a null value
+func (j *job) IsNull() bool {
+    return j == nil || j.uuid == ""
 }
 
 // GetID returns the id of the job (ie the uuid of gRPC message)

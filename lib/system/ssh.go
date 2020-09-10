@@ -798,10 +798,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
     }
 
     defer debug.NewTracer(task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
-    defer fail.OnExitTraceError(
-        fmt.Sprintf("timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout)),
-        &xerr,
-    )
+    defer fail.OnExitTraceError(&xerr,"timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host, temporal.FormatDuration(timeout))
 
     originalPhase := phase
     if phase == "ready" {
@@ -932,7 +929,7 @@ func (ssh *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
     }
 
     sshCmdString, keyFile, xerr := createSSHCmd(sshConfig, "", username, shell, true, false)
-    if !xerr.IsNull() {
+    if xerr != nil {
         for _, t := range tunnels {
             nerr := t.Close()
             if nerr != nil {

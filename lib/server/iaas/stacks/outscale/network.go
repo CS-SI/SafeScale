@@ -168,8 +168,8 @@ func toNetwork(subnet *osc.Subnet) *abstract.Network {
     return net
 }
 
-// GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
+// InspectNetwork returns the network identified by id
+func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
     emptyNetwork := abstract.NewNetwork()
     if s == nil {
         return emptyNetwork, fail.InvalidInstanceError()
@@ -191,8 +191,8 @@ func (s *Stack) GetNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
     return toNetwork(onet), nil
 }
 
-// GetNetworkByName returns the network identified by name)
-func (s *Stack) GetNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
+// InspectNetworkByName returns the network identified by name)
+func (s *Stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
     emptyNetwork := abstract.NewNetwork()
     if s == nil {
         return emptyNetwork, fail.InvalidInstanceError()

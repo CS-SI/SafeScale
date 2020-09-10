@@ -116,9 +116,9 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
     if xerr != nil {
         switch xerr.(type) {
         case *fail.ErrAlteredNothing: // This error means nothing has been change, so no need to update cache
-            return rh, nil
+            return nullHost(), nil
         case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
-            xerr = fail.NotFoundError("metadata of host '%s' not found", ref)
+            return nullHost(), fail.NotFoundError("metadata of host '%s' not found", ref)
         default:
             return nullHost(), xerr
         }
@@ -415,14 +415,14 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
     // Check if host exists and is managed bySafeScale
     if _, xerr = LoadHost(task, svc, hostReq.ResourceName); xerr != nil {
         if _, ok := xerr.(*fail.ErrNotFound); !ok {
-            return nil, fail.Wrap(xerr, "failed to check if it already exists")
+            return nil, fail.Wrap(xerr, "failed to check if host '%s' already exists", hostReq.ResourceName)
         }
     } else {
         return nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)
     }
 
     // Check if host exists but is not managed by SafeScale
-    if _, xerr = svc.GetHostByName(hostReq.ResourceName); xerr != nil {
+    if _, xerr = svc.InspectHostByName(hostReq.ResourceName); xerr != nil {
         if _, ok := xerr.(*fail.ErrNotFound); !ok {
             return nil, fail.Wrap(xerr, "failed to check if host resource name '%s' is already used", hostReq.ResourceName)
         }
@@ -2127,7 +2127,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
                         return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String)
                     }
 
-                    volumes = make([]string, len(hostVolumesV1.VolumesByName))
+                    volumes = make([]string, 0, len(hostVolumesV1.VolumesByName))
                     for _, v := range hostVolumesV1.VolumesByName {
                         volumes = append(volumes, v)
                     }

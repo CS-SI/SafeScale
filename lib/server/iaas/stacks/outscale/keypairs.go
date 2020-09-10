@@ -73,8 +73,8 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
     return normalizeError(err)
 }
 
-// GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
+// InspectKeyPair returns the key pair identified by id
+func (s *Stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
     nullAkp := &abstract.KeyPair{}
     if s == nil {
         return nullAkp, fail.InvalidInstanceError()

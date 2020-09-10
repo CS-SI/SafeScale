@@ -37,7 +37,7 @@ func DecorateWith(prefix, what, why string, ignoreCount int) string {
     }
 
     if what != "" {
-        msg += " '" + what + "'"
+        msg += what
     }
 
     if ignoreCount < 2 {
@@ -88,7 +88,7 @@ func IgnoreTraceUntil(callTrace interface{}, search string, stop Occurrence) str
     case string:
         source = casted
     default:
-        return fmt.Sprintf("do not known how to handle calltrace type '%s'", reflect.TypeOf(callTrace).String())
+        return fmt.Sprintf("do not known how to handle calltrace type '%s': %v", reflect.TypeOf(callTrace).String(), callTrace)
     }
 
     if search == "" {

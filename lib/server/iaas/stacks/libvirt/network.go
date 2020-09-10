@@ -162,14 +162,14 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
     }
 
     requestXML := `
-	 <network>
-		 <name>` + name + `</name>
-		 <ip address="` + ip + `" netmask="` + netmask + `">
-			 <dhcp>
-				 <range start="` + dhcpStart + `" end="` + dhcpEnd + `" />
-			 </dhcp>
-		 </ip>
-	 </network>`
+<network>
+    <name>` + name + `</name>
+    <ip address="` + ip + `" netmask="` + netmask + `">
+        <dhcp>
+            <range start="` + dhcpStart + `" end="` + dhcpEnd + `" />
+        </dhcp>
+    </ip>
+</network>`
 
     libvirtNetwork, err = s.LibvirtService.NetworkDefineXML(requestXML)
     if err != nil {
@@ -203,9 +203,15 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
     return network, nil
 }
 
-// GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
-    // FIXME: validate parameters
+// InspectNetwork returns the network identified by ref (id or name)
+func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
+    if s == nil {
+        return nil, fail.InvalidInstanceError()
+    }
+    if ref == "" {
+        return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+    }
+
     defer debug.NewTracer(nil, "", true).Entering().Exiting()
 
     libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
@@ -231,10 +237,10 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
     return network, nil
 }
 
-// GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
+// InspectNetworkByName returns the network identified by ref (id or name)
+func (s *Stack) InspectNetworkByName(ref string) (*abstract.Network, fail.Error) {
     defer debug.NewTracer(nil, "", true).Entering().Exiting()
-    return s.GetNetwork(ref)
+    return s.InspectNetwork(ref)
 }
 
 // ListNetworks lists available networks

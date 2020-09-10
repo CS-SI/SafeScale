@@ -127,7 +127,7 @@ func GetExecutionTimeout() time.Duration {
 
 // GetCommunicationTimeout ...
 func GetCommunicationTimeout() time.Duration {
-    return GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", defaultCommunicationTimeout)
+    return GetTimeoutFromEnv("SAFESCALE_COMMUNICATION_TIMEOUT", defaultCommunicationTimeout)
 }
 
 // GetLongOperationTimeout ...

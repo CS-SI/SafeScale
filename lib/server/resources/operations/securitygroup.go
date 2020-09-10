@@ -17,18 +17,17 @@
 package operations
 
 import (
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     "reflect"
     "time"
 
     "github.com/sirupsen/logrus"
 
+    "github.com/CS-SI/SafeScale/lib/protocol"
     "github.com/CS-SI/SafeScale/lib/server/iaas"
     "github.com/CS-SI/SafeScale/lib/server/resources"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/data"
@@ -84,14 +83,14 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
     }
     defer fail.OnPanic(&xerr)
 
-    rh, xerr := NewSecurityGroup(svc)
+    rsg, xerr := NewSecurityGroup(svc)
     if xerr != nil {
         return nullSg, xerr
     }
 
     xerr = retry.WhileUnsuccessfulDelay1Second(
         func() error {
-            return rh.Read(task, ref)
+            return rsg.Read(task, ref)
         },
         10*time.Second,
     )
@@ -105,6 +104,7 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
             return nullSg, xerr
         }
     }
+    return rsg, nil
 }
 
 // IsNull tests if instance is nil or empty
@@ -258,14 +258,12 @@ func (sg *securityGroup) Delete(task concurrency.Task) fail.Error {
     securityGroupID := sg.GetID()
     xerr := sg.Alter(task, func(_ data.Clonable, properties *serialize.JSONProperties) fail.Error {
         // Don't remove a securityGroup used on hosts
-        var shares map[string]*propertiesv1.SecurityGroupShare
         innerXErr := properties.Inspect(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
             hostsV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
             if !ok {
                 return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
             }
-            hosts := hosts.ByID
-            hostCount := len(hosts)
+            hostCount := len(hostsV1.ByID)
             if hostCount > 0 {
                 return fail.NotAvailableError("security group is currently binded to %d host%s", hostCount, strprocess.Plural(uint(hostCount)))
             }
@@ -451,24 +449,28 @@ func (sg securityGroup) GetBindedNetworks(task concurrency.Task) ([]string, fail
     return list, xerr
 }
 
+// CheckConsistency checks the rules in the security group on provider side are identical to the ones registered in metadata
+func (sg securityGroup) CheckConsistency(task concurrency.Task) fail.Error {
+    return fail.NotImplementedError()
+}
+
+// ToProtocol converts a Security Group to protobuf message
 func (sg securityGroup) ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error) {
     if sg.IsNull() {
         return nil, fail.InvalidInstanceError()
     }
 
     out := &protocol.SecurityGroupResponse{}
-    xerr := sg.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+    return out, sg.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
         asg, ok := clonable.(*abstract.SecurityGroup)
         if !ok {
             return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
         }
+
         out.Id = asg.ID
         out.Name = asg.Name
         out.Description = asg.Description
         out.Rules = converters.SecurityGroupRulesFromAbstractToProtocol(asg.Rules)
+        return nil
     })
-    if xerr != nil {
-        return nil, xerr
-    }
-    return out, nil
 }

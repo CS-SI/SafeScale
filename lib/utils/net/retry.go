@@ -41,6 +41,8 @@ func WhileCommunicationUnsuccessful(callback func() error, delay time.Duration, 
     switch realErr := xerr.(type) {
     case *retry.ErrStopRetry:
         xerr = fail.ToError(realErr.Cause())
+    case *retry.ErrTimeout:
+        xerr = fail.ToError(realErr.Cause())
     }
     return xerr
 }
@@ -68,16 +70,27 @@ func normalizeError(in error) (err error) {
     if in != nil {
         switch realErr := in.(type) {
         case *url.Error:
-            switch commErr := realErr.Err.(type) {
-            case *net.DNSError:
-                return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
-            default:
-                return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(realErr).String(), realErr.Error())
+            return normalizeURLError(realErr)
+        case fail.Error:   // a fail.Error may contain a cause of type *url.Error; it's the way used to propagate an *url.Error received by drivers.
+                           // In this case, normalize this url.Error accordingly
+            switch cause := realErr.Cause().(type) {
+            case *url.Error:
+                return normalizeURLError(cause)
             }
+            return retry.StopRetryError(in)
         default:
             // In any other case, the error should explain the potential retry has to stop
             return retry.StopRetryError(in)
         }
     }
     return nil
+}
+
+func normalizeURLError(err *url.Error) fail.Error {
+    switch commErr := err.Err.(type) {
+    case *net.DNSError:
+        return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
+    default:
+        return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+    }
 }

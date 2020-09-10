@@ -41,7 +41,7 @@ import (
 // BucketListener is the bucket service grpc server
 type BucketListener struct{}
 
-// ErrorList available buckets
+// List available buckets
 func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *protocol.BucketList, err error) {
     defer fail.OnExitConvertToGRPCStatus(&err)
     defer fail.OnExitWrapError(&err, "cannot list buckets")

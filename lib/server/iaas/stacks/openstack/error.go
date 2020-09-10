@@ -73,6 +73,8 @@ func NormalizeError(err error) fail.Error {
     }
 
     switch e := err.(type) {
+    case fail.Error:
+        return e
     case gophercloud.ErrDefault400:                                  // bad request
         return fail.InvalidRequestError(string(e.Body))
     case *gophercloud.ErrDefault400:                                 // bad request
@@ -109,6 +111,14 @@ func NormalizeError(err error) fail.Error {
         return fail.NotAvailableError(string(e.Body))
     case *gophercloud.ErrDefault503:                                 // service unavailable
         return fail.NotAvailableError(string(e.Body))
+    case gophercloud.ErrResourceNotFound:
+        return fail.NotFoundError(e.Error())
+    case *gophercloud.ErrResourceNotFound:
+        return fail.NotFoundError(e.Error())
+    case gophercloud.ErrMultipleResourcesFound:
+        return fail.DuplicateError(e.Error())
+    case *gophercloud.ErrMultipleResourcesFound:
+        return fail.DuplicateError(e.Error())
     case gophercloud.ErrUnexpectedResponseCode:
         return qualifyGophercloudResponseCode(&e)
     case *gophercloud.ErrUnexpectedResponseCode:

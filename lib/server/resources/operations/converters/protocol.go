@@ -19,6 +19,8 @@ package converters
 // Contains functions that are used to convert from Protocol
 
 import (
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+    "github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
     "strings"
 
     "github.com/CS-SI/SafeScale/lib/protocol"
@@ -181,6 +183,39 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
         OS:                      in.Os,
         KeepOnFailure:           in.KeepOnFailure,
         DisabledDefaultFeatures: disabled,
+    }
+    return out, nil
+}
+
+// SecurityGroupRuleFromProtocolToAbstract does what the name says
+func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (abstract.SecurityGroupRule, fail.Error) {
+    var out abstract.SecurityGroupRule
+    if in == nil {
+        return out, fail.InvalidParameterError("in", "cannot be nil")
+    }
+    out.ID = in.Id
+    out.Description = in.Description
+    out.Direction = securitygroupruledirection.Enum(in.Direction)
+    out.Protocol = string(in.Protocol)
+    out.EtherType = ipversion.Enum(in.EtherType)
+    out.PortFrom = uint16(in.PortFrom)
+    out.PortTo = uint16(in.PortTo)
+    out.CIDR = in.Cidr
+    return out, nil
+}
+
+// SecurityGroupRulesFromProtocolToAbstract does what the name says
+func SecurityGroupRulesFromProtocolToAbstract(in []*protocol.SecurityGroupRule) ([]abstract.SecurityGroupRule, fail.Error) {
+    if in == nil {
+        return nil, fail.InvalidParameterError("in", "cannot be nil")
+    }
+    out := make([]abstract.SecurityGroupRule, 0, len(in))
+    for _, v := range in {
+        rule, xerr := SecurityGroupRuleFromProtocolToAbstract(v)
+        if xerr != nil {
+            return nil, fail.Prepend(xerr, "failed to convert '*protocol.SecurityGroupRule' to 'abstract.SecurityGroupRule'")
+        }
+        out = append(out, rule)
     }
     return out, nil
 }

@@ -243,7 +243,7 @@ func (svc service) WaitVolumeState(volumeID string, state volumestate.Enum, time
 
 func pollVolume(svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume) {
     for {
-        v, err := svc.GetVolume(volumeID)
+        v, err := svc.InspectVolume(volumeID)
         if err != nil {
             cout <- 0
             return
@@ -616,7 +616,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
         return nil, nil, nil, fail.InvalidInstanceError()
     }
 
-    _, rerr := svc.GetHostByName(request.ResourceName)
+    _, rerr := svc.InspectHostByName(request.ResourceName)
     if rerr == nil {
         return nil, nil, nil, abstract.ResourceDuplicateError("Host", request.ResourceName)
     }

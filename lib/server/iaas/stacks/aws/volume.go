@@ -73,7 +73,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 }
 
 // GetVolume ...
-func (s *Stack) GetVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
+func (s *Stack) InspectVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -244,7 +244,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment ...
-func (s *Stack) GetVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
+func (s *Stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }

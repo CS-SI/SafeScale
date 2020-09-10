@@ -19,7 +19,6 @@ package operations
 import (
     "bytes"
     "strings"
-    "time"
 
     "github.com/sirupsen/logrus"
 
@@ -29,6 +28,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/crypt"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
     netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+    "github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // folder describes a metadata folder
@@ -163,7 +163,7 @@ func (f *folder) Read(path string, name string, callback func([]byte) fail.Error
         func() error {
             return f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
         },
-        10*time.Second,
+        temporal.GetCommunicationTimeout(),
     )
     if xerr != nil {
         return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)

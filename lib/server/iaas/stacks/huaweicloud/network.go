@@ -33,6 +33,7 @@ import (
     "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
     "github.com/gophercloud/gophercloud/pagination"
 
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
     "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
@@ -349,7 +350,7 @@ func wouldOverlap(allSubnets []subnets.Subnet, subnet net.IPNet) fail.Error {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
+func (s *Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -387,13 +388,13 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
             entry = s.(map[string]interface{})
             id = entry["id"].(string)
         }
-        return s.GetNetwork(id)
+        return s.InspectNetwork(id)
     }
     return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
+func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
     subnet, xerr := s.getSubnet(id)
     if xerr != nil {
         spew.Dump(xerr)
@@ -739,7 +740,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
     asu := true
 
-    asg, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+    asg, xerr := s.InspectSecurityGroup(stacks.DefaultSecurityGroupName)
     if xerr != nil {
         return nil, xerr
     }

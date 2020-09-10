@@ -47,7 +47,7 @@ func NewImageHandler(job server.Job) ImageHandler {
     return &imageHandler{job: job}
 }
 
-// ErrorList returns the image list
+// List returns the image list
 func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.Error) {
     if handler == nil {
         return nil, fail.InvalidInstanceError()

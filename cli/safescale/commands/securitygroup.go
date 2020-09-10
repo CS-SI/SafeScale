@@ -18,8 +18,6 @@ package commands
 
 import (
     "encoding/json"
-    "fmt"
-    "strings"
 
     "github.com/sirupsen/logrus"
     "github.com/urfave/cli/v2"
@@ -199,8 +197,8 @@ var securityGroupDelete = &cli.Command{
     },
 }
 
-// SecurityGroupRuleCommand command
-var SecurityGroupRuleCommand = &cli.Command{
+// securityGroupRuleCommand command
+var securityGroupRuleCommand = &cli.Command{
     Name:  "rule",
     Aliases: []string{"sg"},
     Usage: "rule COMMAND",

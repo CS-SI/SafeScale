@@ -17,27 +17,22 @@
 package listeners
 
 import (
-    "context"
-    "reflect"
-    "strings"
+	"context"
 
-    "github.com/asaskevich/govalidator"
-    googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-    "github.com/sirupsen/logrus"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
+	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    "github.com/CS-SI/SafeScale/lib/server/handlers"
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
-    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-    srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
-    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // SecurityGroupListener security-group service server grpc
@@ -45,378 +40,395 @@ type SecurityGroupListener struct{}
 
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityGroupListRequest) (sgl *protocol.SecurityGroupListResponse, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot list hosts")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list security groups")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-        logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-    }
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
 
-    job, err := PrepareJob(ctx, "", "host list")
-    if err != nil {
-        return nil, err
-    }
-    defer job.Close()
+	job, err := PrepareJob(ctx, "", "security-group list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-    all := in.GetAll()
-    tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	all := in.GetAll()
+	task := job.GetTask()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%v)", all).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    handler := handlers.NewHostHandler(job)
-    hosts, err := handler.List(all)
-    if err != nil {
-        return nil, err
-    }
+	rsg, xerr := securitygroupfactory.New(job.GetService())
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    // build response mapping abstract.Host to protocol.Host
-    var pbhost []*protocol.Host
-    for _, host := range hosts {
-        pbhost = append(pbhost, converters.HostFullFromAbstractToProtocol(host))
-    }
-    rv := &protocol.HostList{Hosts: pbhost}
-    return rv, nil
+	sgl = nil
+	xerr = rsg.Browse(task, func(asg *abstract.SecurityGroup) fail.Error {
+		sgl.List = append(sgl.List, converters.SecurityGroupFromAbstractToProtocol(*asg))
+		return nil
+	})
+	return sgl, xerr
 }
 
 // Create creates a new host
-func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot create host")
+func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.SecurityGroupRequest) (_ *protocol.SecurityGroupResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot create security group")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-        logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-    }
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
 
-    job, err := PrepareJob(ctx, "", "host create")
-    if err != nil {
-        return nil, err
-    }
-    defer job.Close()
+	job, err := PrepareJob(ctx, "", "security-group create")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-    name := in.GetName()
-    task := job.GetTask()
-    tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
-    var sizing *abstract.HostSizingRequirements
-    if in.SizingAsString != "" {
-        sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.SizingAsString)
-        if err != nil {
-            return nil, err
-        }
-    } else if in.Sizing != nil {
-        sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Sizing)
-    }
-    if sizing == nil {
-        sizing = &abstract.HostSizingRequirements{MinGPU: -1}
-    }
-    sizing.Image = in.GetImageId()
+	name := in.GetName()
+	task := job.GetTask()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    network, xerr := networkfactory.Load(task, job.GetService(), in.GetNetwork())
-    if xerr != nil {
-        return nil, xerr
-    }
+	rsg, xerr := securitygroupfactory.New(job.GetService())
+	if xerr != nil {
+		return nil, xerr
+	}
+	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.Rules)
+	if xerr != nil {
+		return nil, xerr
+	}
+	xerr = rsg.Create(task, name, in.Description, rules)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    domain := in.Domain
-    if domain == "" {
-        xerr = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-            an, ok := clonable.(*abstract.Network)
-            if !ok {
-                return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-            }
-            domain = an.Domain
-            return nil
-        })
-        if xerr != nil {
-            return nil, xerr
-        }
-    }
-    domain = strings.Trim(domain, ".")
-    if domain != "" {
-        domain = "." + domain
-    }
-
-    hostReq := abstract.HostRequest{
-        ResourceName:  name,
-        HostName:      name + domain,
-        PublicIP:      in.GetPublic(),
-        KeepOnFailure: in.GetKeepOnFailure(),
-    }
-    err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-        networkCore, ok := clonable.(*abstract.Network)
-        if !ok {
-            return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-        }
-        hostReq.Networks = []*abstract.Network{networkCore}
-        return nil
-    })
-
-    handler := handlers.NewHostHandler(job)
-    host, err := handler.Create(hostReq, *sizing, in.Force)
-    if err != nil {
-        return nil, err
-    }
-    // logrus.Infof("Host '%s' created", name)
-    return host.ToProtocol(task)
+	return rsg.ToProtocol(task)
 }
 
-// Clear ...
-func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.HostDefinition) (empty *googleprotobuf.Empty, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot resize host")
+// Clear calls the clear method to remove all rules from a security group
+func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot clear security group")
 
-    if s == nil {
-        return empty, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return empty, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err == nil {
-        if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-        }
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		}
+	}
 
-    job, err := PrepareJob(ctx, "", "host resize")
-    if err != nil {
-        return empty, err
-    }
-    defer job.Close()
+	ref, refLabel := srvutils.GetReference(in)
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
+	}
 
-    name := in.GetName()
-    task := job.GetTask()
-    tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	job, err := PrepareJob(ctx, in.TenantId, "security-group clear")
+	if err != nil {
+		return empty, err
+	}
+	defer job.Close()
 
-    handler := handlers.NewHostHandler(job)
-    host, err := handler.Resize(
-        name,
-        abstract.HostSizingRequirements{
-            MinCores:    int(in.GetCpuCount()),
-            MinRAMSize:  in.GetRam(),
-            MinDiskSize: int(in.GetDisk()),
-            MinGPU:      int(in.GetGpuCount()),
-            MinCPUFreq:  in.GetCpuFreq(),
-        },
-    )
-    if err != nil {
-        return empty, err
-    }
-    tracer.Trace("Host '%s' successfully resized", name)
-    return empty, nil
+	task := job.GetTask()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rsg, xerr := securitygroupfactory.New(job.GetService())
+	if xerr != nil {
+		return empty, xerr
+	}
+	xerr = rsg.Clear(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	tracer.Trace("Security Group '%s' successfully cleared", ref)
+	return empty, nil
 }
 
 // Reset clears the rules of a security group and readds the ones stored in metadata
 func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot reset security group")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot reset security group")
 
-    if s == nil {
-        return empty, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return empty, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err == nil {
-        if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-        }
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		}
+	}
 
-    job, err := PrepareJob(ctx, "", "host resize")
-    if err != nil {
-        return empty, err
-    }
-    defer job.Close()
+	ref, refLabel := srvutils.GetReference(in)
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
+	}
 
-    name := in.GetName()
-    task := job.GetTask()
-    tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	job, err := PrepareJob(ctx, "", "security-group reset")
+	if err != nil {
+		return empty, err
+	}
+	defer job.Close()
 
-    handler := handlers.NewHostHandler(job)
-    host, err := handler.Resize(
-        name,
-        abstract.HostSizingRequirements{
-            MinCores:    int(in.GetCpuCount()),
-            MinRAMSize:  in.GetRam(),
-            MinDiskSize: int(in.GetDisk()),
-            MinGPU:      int(in.GetGpuCount()),
-            MinCPUFreq:  in.GetCpuFreq(),
-        },
-    )
-    if err != nil {
-        return nil, err
-    }
-    tracer.Trace("Host '%s' successfully resized", name)
-    return empty, nil
+	task := job.GetTask()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return empty, xerr
+	}
+	xerr = rsg.Reset(task)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	tracer.Trace("Security Group %s successfully cleared", refLabel)
+	return empty, nil
 }
 
 // Inspect an host
-func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot inspect host")
+func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.SecurityGroupResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect security group")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err == nil {
-        if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-        }
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		}
+	}
 
-    ref := srvutils.GetReference(in)
-    if ref == "" {
-        return nil, fail.InvalidRequestError("neither name nor id given as reference")
-    }
+	ref, refLabel := srvutils.GetReference(in)
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
+	}
 
-    job, err := PrepareJob(ctx, "", "host inspect")
-    if err != nil {
-        return nil, err
-    }
-    defer job.Close()
+	job, err := PrepareJob(ctx, in.TenantId, "security-group inspect")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-    task := job.GetTask()
-    tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	task := job.GetTask()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    handler := handlers.NewHostHandler(job)
-    host, err := handler.Inspect(ref)
-    if err != nil {
-        return nil, err
-    }
-    return host.ToProtocol(task)
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return rsg.ToProtocol(task)
 }
 
 // Delete an host
 func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot delete host")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete security-group")
 
-    empty = &googleprotobuf.Empty{}
-    if s == nil {
-        return empty, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return empty, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err == nil {
-        if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-        }
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
 
-    ref := srvutils.GetReference(in)
-    if ref == "" {
-        return empty, status.Errorf(codes.FailedPrecondition, "cannot get host status: neither name nor id given as reference")
-    }
+	ref, refLabel := srvutils.GetReference(in)
+	if ref == "" {
+		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
+	}
 
-    job, err := PrepareJob(ctx, "", "host delete")
-    if err != nil {
-        return nil, err
-    }
-    defer job.Close()
+	job, err := PrepareJob(ctx, in.TenantId, "security-group delete")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+	task := job.GetTask()
 
-    tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    handler := handlers.NewHostHandler(job)
-    err = handler.Delete(ref)
-    if err != nil {
-        return empty, err
-    }
-    tracer.Trace("Host '%s' successfully deleted.", ref)
-    return empty, nil
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return empty, xerr
+	}
+	xerr = rsg.Delete(task)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	tracer.Trace("Security Group %s successfully deleted.", refLabel)
+	return empty, nil
 }
 
 // AddRule creates a new rule and add it to an eisting security group
 func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.SecurityGroupRuleRequest) (sgr *protocol.SecurityGroupResponse, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot add rule to security group")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err == nil {
-        if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-        }
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
 
-    ref := srvutils.GetReference(in)
-    if ref == "" {
-        return nil, fail.InvalidRequestError("cannot get ssh config of host: neither name nor id given as reference")
-    }
+	ref, refLabel := srvutils.GetReference(in.Group)
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
+	}
 
-    job, err := PrepareJob(ctx, "", "host ssh")
-    if err != nil {
-        return nil, err
-    }
-    defer job.Close()
+	rule, xerr := converters.SecurityGroupRuleFromProtocolToAbstract(in.Rule)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	job, err := PrepareJob(ctx, "", "security-group add-rule")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+	task := job.GetTask()
 
-    handler := handlers.NewHostHandler(job)
-    sshConfig, err := handler.SSH(ref)
-    if err != nil {
-        return nil, err
-    }
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    tracer.Trace("SSH config of host '%s' successfully loaded", ref)
-    return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = rsg.AddRule(task, rule)
+	if xerr != nil {
+		return nil, xerr
+	}
+	tracer.Trace("Rule successfully added to security group %s", refLabel)
+	return rsg.ToProtocol(task)
+}
+
+// Sanitize checks if provider-side rules are coherent with registered ones in metadata
+func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+	empty = &googleprotobuf.Empty{}
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot sanitize security group")
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
+
+	ref, refLabel := srvutils.GetReference(in)
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
+	}
+
+	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group sanitize")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+	task := job.GetTask()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = rsg.CheckConsistency(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	tracer.Trace("Security Group %s is in sync with metadata %s")
+	return empty, nil
 }

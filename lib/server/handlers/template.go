@@ -44,7 +44,7 @@ func NewTemplateHandler(job server.Job) TemplateHandler {
     return &templateHandler{job: job}
 }
 
-// ErrorList returns the template list
+// List returns the template list
 func (handler *templateHandler) List(all bool) (tlist []abstract.HostTemplate, xerr fail.Error) {
     if handler == nil {
         return nil, fail.InvalidInstanceError()

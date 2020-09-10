@@ -28,8 +28,8 @@ func (s *Stack) createSecurityGroup(vpcID string, name string) (string, fail.Err
     return "", fail.NotImplementedError("createSecurityGroup() not implemented yet") // FIXME: Technical debt
 }
 
-// ListSecurityGroup lists existing security groups
-func (s Stack) ListSecurityGroup() ([]*abstract.SecurityGroup, fail.Error) {
+// ListSecurityGroups lists existing security groups
+func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
     // if s == nil {
     //     return nil, fail.InvalidInstanceError()
     // }

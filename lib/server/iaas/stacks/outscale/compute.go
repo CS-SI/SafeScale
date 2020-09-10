@@ -318,7 +318,7 @@ func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Er
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
+func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -361,7 +361,7 @@ func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (s *Stack) GetTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
+func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -610,7 +610,7 @@ func (s *Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, 
 }
 
 func (s *Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
-    tpl, xerr := s.GetTemplate(request.TemplateID)
+    tpl, xerr := s.InspectTemplate(request.TemplateID)
     if xerr != nil {
         return xerr
     }
@@ -740,7 +740,7 @@ func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, fail.Error) {
 }
 
 func (s *Stack) setHostProperties(host *abstract.HostFull, networks []*abstract.Network, vm *osc.Vm, nics []osc.Nic) fail.Error {
-    vmType, xerr := s.GetTemplate(vm.VmType)
+    vmType, xerr := s.InspectTemplate(vm.VmType)
     if xerr != nil {
         return xerr
     }
@@ -800,7 +800,7 @@ func (s *Stack) initHostProperties(request *abstract.HostRequest, host *abstract
     //	}
     //	return ""
     // }()
-    template, err := s.GetTemplate(request.TemplateID)
+    template, err := s.InspectTemplate(request.TemplateID)
     if err != nil {
         return err
     }
@@ -1172,7 +1172,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 }
 
 // GetHostByName returns the host identified by name
-func (s *Stack) GetHostByName(name string) (ahc *abstract.HostCore, xerr fail.Error) {
+func (s *Stack) InspectHostByName(name string) (ahc *abstract.HostCore, xerr fail.Error) {
     nullAhc := abstract.NewHostCore()
     if s == nil {
         return nullAhc, fail.InvalidInstanceError()

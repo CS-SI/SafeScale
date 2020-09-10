@@ -80,11 +80,11 @@ func (provider *provider) ListRegions() ([]string, fail.Error) {
 func (provider *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
     return nil, gReport
 }
-func (provider *provider) GetImage(id string) (*abstract.Image, fail.Error) {
+func (provider *provider) InspectImage(id string) (*abstract.Image, fail.Error) {
     return nil, gReport
 }
 
-func (provider *provider) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+func (provider *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
     return nil, gReport
 }
 func (provider *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
@@ -94,7 +94,7 @@ func (provider *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail
 func (provider *provider) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
     return nil, gReport
 }
-func (provider *provider) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (provider *provider) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
     return nil, gReport
 }
 func (provider *provider) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
@@ -107,10 +107,10 @@ func (provider *provider) DeleteKeyPair(id string) fail.Error {
 func (provider *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
     return nil, gReport
 }
-func (provider *provider) GetNetwork(id string) (*abstract.Network, fail.Error) {
+func (provider *provider) InspectNetwork(id string) (*abstract.Network, fail.Error) {
     return nil, gReport
 }
-func (provider *provider) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
+func (provider *provider) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
     return nil, gReport
 }
 func (provider *provider) ListNetworks() ([]*abstract.Network, fail.Error) {
@@ -145,7 +145,7 @@ func (provider *provider) ResizeHost(hostParam stacks.HostParameter, request abs
 func (provider *provider) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
     return nil, gReport
 }
-func (provider *provider) GetHostByName(string) (*abstract.HostCore, fail.Error) {
+func (provider *provider) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
     return nil, gReport
 }
 func (provider *provider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
@@ -170,7 +170,7 @@ func (provider *provider) RebootHost(hostParam stacks.HostParameter) fail.Error 
 func (provider *provider) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
     return nil, gReport
 }
-func (provider *provider) GetVolume(id string) (*abstract.Volume, fail.Error) {
+func (provider *provider) InspectVolume(id string) (*abstract.Volume, fail.Error) {
     return nil, gReport
 }
 func (provider *provider) ListVolumes() ([]abstract.Volume, fail.Error) {
@@ -183,7 +183,7 @@ func (provider *provider) DeleteVolume(id string) fail.Error {
 func (provider *provider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
     return "", gReport
 }
-func (provider *provider) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (provider *provider) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
     return nil, gReport
 }
 func (provider *provider) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
@@ -217,7 +217,7 @@ func (provider *provider) UnbindSecurityGroupFromHost(hostParam stacks.HostParam
 
 
 // ListSecurityGroup lists existing security groups
-func (provider *provider) ListSecurityGroup() ([]*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
     return nil, gReport
 }
 

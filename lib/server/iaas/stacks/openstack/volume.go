@@ -97,7 +97,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
-    volume, xerr = s.GetVolume(request.Name)
+    volume, xerr = s.InspectVolume(request.Name)
     if xerr != nil {
         if _, ok := xerr.(*fail.ErrNotFound); !ok {
             return nil, xerr
@@ -180,8 +180,8 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
     return &v, nil
 }
 
-// GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
+// InspectVolume returns the volume identified by id
+func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -329,7 +329,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }

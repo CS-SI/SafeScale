@@ -168,7 +168,7 @@ func (s *Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
+func (s *Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) {
     nullImage := &abstract.Image{}
     if s == nil {
         return nullImage, fail.InvalidInstanceError()
@@ -197,7 +197,7 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
+func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
     nullTemplate := &abstract.HostTemplate{}
     if s == nil {
         return nullTemplate, fail.InvalidInstanceError()
@@ -254,7 +254,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
                 if err != nil {
                     return false, err
                 }
-                flvList = make([]abstract.HostTemplate, len(list))
+                flvList = make([]abstract.HostTemplate, 0, len(list))
                 for _, v := range list {
                     flvList = append(flvList, abstract.HostTemplate{
                         Cores:    v.VCPUs,
@@ -302,7 +302,7 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 
 // TODO: replace with openstack code to get keypair (if it exits)
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -397,7 +397,7 @@ func (s *Stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEf
         if !ok {
             return hostSizing
         }
-        tpl, xerr := s.GetTemplate(fid)
+        tpl, xerr := s.InspectTemplate(fid)
         if xerr != nil {
             return hostSizing
         }
@@ -557,7 +557,7 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
             continue
         }
 
-        net, xerr := s.GetNetworkByName(netname)
+        net, xerr := s.InspectNetworkByName(netname)
         if xerr != nil {
             logrus.Debugf("failed to get data for network '%s'", netname)
             errors = append(errors, xerr)
@@ -583,7 +583,7 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
     networksByName := map[string]string{}
     for netid, netname := range networksByID {
         if netname == "" {
-            net, xerr := s.GetNetwork(netid)
+            net, xerr := s.InspectNetwork(netid)
             if xerr != nil {
                 switch xerr.(type) {
                 case *fail.ErrNotFound:
@@ -620,7 +620,7 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
 // returns id of the host if found
 // returns abstract.ErrResourceNotFound if not found
 // returns abstract.ErrResourceNotAvailable if provider doesn't provide the id of the host in its response
-func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
+func (s *Stack) InspectHostByName(name string) (*abstract.HostCore, fail.Error) {
     nullAhc := abstract.NewHostCore()
     if s == nil {
         return nullAhc, fail.InvalidInstanceError()
@@ -739,7 +739,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
         return nullAhf, nullUdc, xerr
     }
 
-    template, xerr := s.GetTemplate(request.TemplateID)
+    template, xerr := s.InspectTemplate(request.TemplateID)
     if xerr != nil {
         return nullAhf, nullUdc, fail.Prepend(xerr, "failed to get image")
     }
@@ -757,7 +757,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
     }
     srvOpts := servers.CreateOpts{
         Name:             request.ResourceName,
-        SecurityGroups:   []string{s.DefaultSecurityGroupName},
+        SecurityGroups:   []string{stacks.DefaultSecurityGroupName},
         Networks:         nets,
         FlavorRef:        request.TemplateID,
         ImageRef:         request.ImageID,

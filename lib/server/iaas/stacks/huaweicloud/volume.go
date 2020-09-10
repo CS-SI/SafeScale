@@ -90,7 +90,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
         return nil, fail.InvalidInstanceError()
     }
 
-    volume, xerr := s.GetVolume(request.Name)
+    volume, xerr := s.InspectVolume(request.Name)
     if xerr == nil && volume != nil {
         return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
     }
@@ -129,7 +129,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 
 // GetVolume returns the volume identified by id
 // If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
-func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
+func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -210,9 +210,9 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 // 	return s.Stack.CreateVolumeAttachment(request)
 // }
 //
-// // GetVolumeAttachment returns the volume attachment identified by id
-// func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-// 	return s.Stack.GetVolumeAttachment(serverID, id)
+// // InspectVolumeAttachment returns the volume attachment identified by id
+// func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+// 	return s.Stack.InspectVolumeAttachment(serverID, id)
 // }
 //
 // // ListVolumeAttachments lists available volume attachment

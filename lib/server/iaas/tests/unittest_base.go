@@ -121,18 +121,18 @@ func (tester *ServiceTester) KeyPairs(t *testing.T) {
     assert.NotEqual(t, kp.PrivateKey, "")
     assert.NotEqual(t, kp.PublicKey, "")
 
-    // GetKeyPair test
+    // InspectKeyPair test
     kp, err = tester.Service.CreateKeyPair("unit_test_kp")
     require.Nil(t, err)
 
-    kp2, err := tester.Service.GetKeyPair("unit_test_kp")
+    kp2, err := tester.Service.InspectKeyPair("unit_test_kp")
     require.Nil(t, err)
 
     assert.Equal(t, kp.ID, kp2.ID)
     assert.Equal(t, kp.Name, kp2.Name)
     assert.Equal(t, kp.PublicKey, kp2.PublicKey)
     assert.Equal(t, "", kp2.PrivateKey)
-    _, err = tester.Service.GetKeyPair("notfound")
+    _, err = tester.Service.InspectKeyPair("notfound")
     assert.NotNil(t, err)
 
     defer func() {
@@ -284,7 +284,7 @@ func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
         }
     }
 
-    net, err := tester.Service.GetNetwork("unit_test_network_6")
+    net, err := tester.Service.InspectNetwork("unit_test_network_6")
 
     require.NotNil(t, net)
     require.Nil(t, err)
@@ -359,7 +359,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
     }
     assert.Equal(t, 2, found)
 
-    n1, err := tester.Service.GetNetwork(network1.ID)
+    n1, err := tester.Service.InspectNetwork(network1.ID)
     assert.Nil(t, err)
     assert.Equal(t, n1.CIDR, network1.CIDR)
     assert.Equal(t, n1.ID, network1.ID)
@@ -421,7 +421,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
         _ = tester.Service.DeleteHost(host2.Core.ID)
     }()
 
-    network, err = tester.Service.GetNetwork(network.ID)
+    network, err = tester.Service.InspectNetwork(network.ID)
     assert.NoError(t, err)
     hosts, err = tester.Service.ListHosts(false)
     require.Nil(t, err)
@@ -455,7 +455,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
         _ = tester.Service.DeleteHost(gw.Core.ID)
         _ = tester.Service.DeleteNetwork(net.ID)
     }()
-    host, err := tester.Service.GetHostByName("gw-" + net.Name)
+    host, err := tester.Service.InspectHostByName("gw-" + net.Name)
     require.Nil(t, err)
     require.NotNil(t, host)
     {
@@ -547,7 +547,7 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
         _ = tester.Service.DeleteNetwork(net.ID)
     }()
 
-    host, err := tester.Service.GetHostByName("gw-" + net.Name)
+    host, err := tester.Service.InspectHostByName("gw-" + net.Name)
     require.Nil(t, err)
     require.NotNil(t, host)
 
@@ -598,10 +598,10 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
         _ = tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
     }()
 
-    va1, err := tester.Service.GetVolumeAttachment(host.ID, v1.ID)
+    va1, err := tester.Service.InspectVolumeAttachment(host.ID, v1.ID)
     assert.Nil(t, err)
 
-    va2, err := tester.Service.GetVolumeAttachment(host.ID, v2.ID)
+    va2, err := tester.Service.InspectVolumeAttachment(host.ID, v2.ID)
     assert.Nil(t, err)
 
     lst, err := tester.Service.ListVolumeAttachments(host.ID)

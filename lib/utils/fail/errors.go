@@ -191,10 +191,10 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 // Cause returns an error's cause
 func (e errorCore) Cause() error {
     if e.IsNull() {
-        logrus.Errorf("invalid call of errorCore.RootCause() from null instance")
+        logrus.Errorf("invalid call of 'errorCore.RootCause()' from null instance")
         return nil
     }
-    return Cause(e)
+    return e.cause
 }
 
 // CauseError returns the string of the error cause

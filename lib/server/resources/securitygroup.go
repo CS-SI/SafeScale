@@ -29,9 +29,11 @@ type SecurityGroup interface {
     Metadata
     data.NullValue
 
-    AddRule(task concurrency.Task, rule *abstract.SecurityGroupRule) fail.Error                                      // returns true if the host is member of a cluster
-    Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                      // ...
-    Create(task concurrency.Task, rules []*abstract.SecurityGroupRule) fail.Error                                    // creates a new host and its metadata
-    CheckConsistency(task concurrency.Task, ref string) fail.Error                                                   // tells if the security group described exists on Provider side with exact same parameters
-    ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                                  // converts a SecurityGroup to equivalent gRPC message
+    AddRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error                                      // returns true if the host is member of a cluster
+    Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                     // ...
+    Create(task concurrency.Task, name, description string, rules []abstract.SecurityGroupRule) fail.Error          // creates a new host and its metadata
+    CheckConsistency(task concurrency.Task) fail.Error                                                              // tells if the security group described exists on Provider side with exact same parameters
+    Clear(task concurrency.Task) fail.Error                                                                         // removes rules from the security group
+    Reset(task concurrency.Task) fail.Error                                                                         // resets the rules of the security group from the ones registered in metadata
+    ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                                 // converts a SecurityGroup to equivalent gRPC message
 }

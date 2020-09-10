@@ -45,7 +45,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
     defer tracer.Exiting()
     defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-    v, _ := s.GetVolumeByName(request.Name)
+    v, _ := s.InspectVolumeByName(request.Name)
     if v != nil {
         return nil, abstract.ResourceDuplicateError("volume", request.Name)
     }
@@ -146,7 +146,7 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xer
 
     return retry.WhileUnsuccessfulDelay5SecondsTimeout(
         func() error {
-            vol, innerErr := s.GetVolume(volumeID)
+            vol, innerErr := s.InspectVolume(volumeID)
             if innerErr != nil {
                 return innerErr
             }
@@ -159,8 +159,8 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xer
     )
 }
 
-// GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (av *abstract.Volume, xerr fail.Error) {
+// InspectVolume returns the volume identified by id
+func (s *Stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
     nullAv := abstract.NewVolume()
     if s == nil {
         return nullAv, fail.InvalidInstanceError()
@@ -201,8 +201,8 @@ func (s *Stack) GetVolume(id string) (av *abstract.Volume, xerr fail.Error) {
     return av, nil
 }
 
-// GetVolumeByName returns the volume with name name
-func (s *Stack) GetVolumeByName(name string) (av *abstract.Volume, xerr fail.Error) {
+// InspectVolumeByName returns the volume with name name
+func (s *Stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.Error) {
     nullAv := abstract.NewVolume()
     if s == nil {
         return nullAv, fail.InvalidInstanceError()
@@ -269,7 +269,7 @@ func (s *Stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
         return emptySlice, normalizeError(err)
     }
 
-    volumes := make([]abstract.Volume, len(res.Volumes))
+    volumes := make([]abstract.Volume, 0, len(res.Volumes))
     for _, ov := range res.Volumes {
         volume := abstract.NewVolume()
         volume.ID = ov.VolumeId
@@ -369,7 +369,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by volumeID
-func (s *Stack) GetVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
+func (s *Stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
     nullVa := abstract.NewVolumeAttachment()
     if s == nil {
         return nullVa, fail.InvalidInstanceError()
@@ -439,9 +439,9 @@ func (s *Stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttac
     if err != nil {
         return nil, err
     }
-    atts := make([]abstract.VolumeAttachment, len(volumes))
+    atts := make([]abstract.VolumeAttachment, 0, len(volumes))
     for _, v := range volumes {
-        att, _ := s.GetVolumeAttachment(serverID, v.ID)
+        att, _ := s.InspectVolumeAttachment(serverID, v.ID)
         if att != nil {
             atts = append(atts, *att)
         }

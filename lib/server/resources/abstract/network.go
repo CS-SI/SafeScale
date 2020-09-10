@@ -176,7 +176,7 @@ func (vip *VirtualIP) Clone() data.Clonable {
 func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
     src := p.(*VirtualIP)
     *vip = *src
-    vip.Hosts = make([]*HostCore, len(src.Hosts))
+    vip.Hosts = make([]*HostCore, 0, len(src.Hosts))
     for _, v := range src.Hosts {
         vip.Hosts = append(vip.Hosts, v.Clone().(*HostCore))
     }

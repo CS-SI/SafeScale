@@ -366,7 +366,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 }
 
 // GetNetwork ...
-func (s *Stack) GetNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
+func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -392,7 +392,7 @@ func (s *Stack) GetNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
+func (s *Stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -481,7 +481,7 @@ func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
     defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
     defer fail.OnExitLogError(&xerr)
 
-    vpcnet, xerr := s.GetNetwork(id)
+    vpcnet, xerr := s.InspectNetwork(id)
     if xerr != nil {
         return xerr
     }

@@ -333,7 +333,7 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-    return nil, fail.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
+    return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 // ListKeyPairs lists available key pairs
@@ -470,7 +470,7 @@ func getVolumesFromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connec
     var volumeDescriptions []*libvirtxml.StorageVolume
     var domainVolumePaths []string
 
-    // ErrorList paths of domain disks
+    // List paths of domain disks
     domainXML, err := domain.GetXMLDesc(0)
     if err != nil {
         return nil, fail.Wrap(err, "failed get xml description of domain")
@@ -603,7 +603,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
                             }
                             for _, dhcpLease := range dhcpLeases {
                                 if dhcpLease.Mac == iface.MAC.Address {
-                                    net, err := s.GetNetwork(iface.Source.Network.Network)
+                                    net, err := s.InspectNetwork(iface.Source.Network.Network)
                                     if err != nil {
                                         return fail.NotFoundError("unknown Network %s", iface.Source.Network.Network)
                                     }
@@ -872,7 +872,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
         request.Password = password
     }
 
-    template, err = s.GetTemplate(templateID)
+    template, err = s.InspectTemplate(templateID)
     if err != nil {
         return nil, nil, userData, fail.Wrap(err, "failed to get template infos")
     }
@@ -902,7 +902,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
         if bridgedVMs {
             command = "ip route get 8.8.8.8 |awk -F\"src \" 'NR==1{split($2,a,\" \");print a[1]}'"
         } else {
-            networkDefault, err := s.GetNetwork("default")
+            networkDefault, err := s.InspectNetwork("default")
             if err != nil {
                 switch err.(type) {
                 case fail.ErrNotFound:
