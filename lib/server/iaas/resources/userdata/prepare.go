@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"text/template"
 
+	"github.com/asaskevich/govalidator"
+
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/sirupsen/logrus"
@@ -43,67 +45,67 @@ import (
 // Content is the structure to apply to userdata.sh template
 type Content struct {
 	// BashLibrary contains the bash library
-	BashLibrary string
+	BashLibrary string `valid:"notnull"`
 	// Header is the bash header for scripts
-	Header string
+	Header string `valid:"-"`
 	// User is the name of the default user (api.DefaultUser)
-	User string
+	User string `valid:"-"`
 	// ExitOnError helper to quit script on error
-	ExitOnError string
+	ExitOnError string `valid:"-"`
 	// Password for the user safescale (for troubleshoot use, usable only in console)
-	Password string
+	Password string `valid:"-"`
 	// PublicKey is the public key used to create the Host
-	PublicKey string
+	PublicKey string `valid:"-"`
 	// PrivateKey is the private key used to create the Host
-	PrivateKey string
+	PrivateKey string `valid:"-"`
 	// ConfIF, if set to true, configure all interfaces to DHCP
-	ConfIF bool
+	ConfIF bool `valid:"-"`
 	// IsGateway, if set to true, activate IP forwarding
-	IsGateway bool
-	// PublicIP contains a public IP binded to the host
-	PublicIP string
+	IsGateway bool `valid:"-"`
+	// PublicIP contains a public IP bound to the host
+	PublicIP string `valid:"-"`
 	// AddGateway, if set to true, configure default gateway
-	AddGateway bool
+	AddGateway bool `valid:"-"`
 	// DNSServers contains the list of DNS servers to use
 	// Used only if IsGateway is true
-	DNSServers []string
+	DNSServers []string `valid:"-"`
 	// CIDR contains the cidr of the network
-	CIDR string
+	CIDR string `valid:"-"`
 	// DefaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
-	DefaultRouteIP string
+	DefaultRouteIP string `valid:"-"`
 	// PrimaryGatewayPrivateIP is the private IP of the primary gateway
-	PrimaryGatewayPrivateIP string
+	PrimaryGatewayPrivateIP string `valid:"-"`
 	// PrimaryGatewayPublicIP is the public IP of the primary gateway
-	PrimaryGatewayPublicIP string
+	PrimaryGatewayPublicIP string `valid:"-"`
 	// SecondaryGatewayPrivateIP is the private IP of the secondary gateway
-	SecondaryGatewayPrivateIP string
+	SecondaryGatewayPrivateIP string `valid:"-"`
 	// SecondaryGatewayPublicIP is the public IP of the secondary gateway
-	SecondaryGatewayPublicIP string
+	SecondaryGatewayPublicIP string `valid:"-"`
 	// EmulatedPublicNet is a private network which is used to emulate a public one
-	EmulatedPublicNet string
+	EmulatedPublicNet string `valid:"-"`
 	// HostName contains the name wanted as host name (default == name of the Cloud resource)
-	HostName string
+	HostName string `valid:"notnull"`
 	// Tags contains tags and their content(s); a tag is named #<tag> in the template
-	Tags map[string]map[string][]string
+	Tags map[string]map[string][]string `valid:"-"`
 	// IsPrimaryGateway tells if the host is a primary gateway
-	IsPrimaryGateway bool
+	IsPrimaryGateway bool `valid:"-"`
 	// UsesVIP tells if VIP feature is activated
-	UsesVIP bool
+	UsesVIP bool `valid:"-"`
 	// PrivateVIP contains the private IP of the VIP instance if it exists
-	PublicVIP string // VPL: TODO: change to EndpointIP
+	PublicVIP string `valid:"ipv4,required"` // VPL: change to EndpointIP
 	// PrivateVIP contains the private IP of the VIP instance if it exists
-	PrivateVIP                  string // VPL: TODO: change to DefaultRouteIP
-	GatewayHAKeepalivedPassword string
+	PrivateVIP                  string `valid:"ipv4,required"` // VPL: change to DefaultRouteIP
+	GatewayHAKeepalivedPassword string `valid:"-"`
 
-	ProviderName     string
-	BuildSubnetworks bool
+	ProviderName     string `valid:"-"`
+	BuildSubnetworks bool   `valid:"-"`
 	// Dashboard bool // Add kubernetes dashboard
 
 	// Template parameters
-	TemplateOperationTimeout     string
-	TemplateLongOperationTimeout string
-	TemplatePullImagesTimeout    string
-	TemplateOperationDelay       uint
+	TemplateOperationTimeout     string `valid:"-"`
+	TemplateLongOperationTimeout string `valid:"-"`
+	TemplatePullImagesTimeout    string `valid:"-"`
+	TemplateOperationDelay       uint   `valid:"-"`
 }
 
 var (
@@ -122,6 +124,15 @@ func (ud Content) OK() bool {
 	result := true
 	result = result && ud.BashLibrary != ""
 	result = result && ud.HostName != ""
+
+	if ud.UsesVIP {
+		valid, err := govalidator.ValidateStruct(ud)
+		if err != nil {
+			valid = false
+		}
+		result = result && valid
+	}
+
 	return result
 }
 
@@ -199,6 +210,10 @@ func (ud *Content) Prepare(
 		ud.HostName = request.HostName
 	} else {
 		ud.HostName = request.ResourceName
+	}
+
+	if !ud.OK() {
+		logrus.Warn("Invalid userdata")
 	}
 
 	return nil
