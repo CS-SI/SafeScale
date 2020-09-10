@@ -27,8 +27,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/libvirt/libvirt-go"

@@ -82,10 +82,8 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 	handler := ShareHandler(tenant.Service)
 	share, err := handler.Create(
 		ctx, shareName, hostRef, sharePath, in.GetSecurityModes(), in.GetOptions().GetReadOnly(),
-		in.GetOptions().GetRootSquash(),
-		in.GetOptions().GetSecure(), in.GetOptions().GetAsync(), in.GetOptions().GetNoHide(),
-		in.GetOptions().GetCrossMount(),
-		in.GetOptions().GetSubtreeCheck(),
+		in.GetOptions().GetRootSquash(), in.GetOptions().GetSecure(), in.GetOptions().GetAsync(),
+		in.GetOptions().GetNoHide(), in.GetOptions().GetCrossMount(), in.GetOptions().GetSubtreeCheck(),
 	)
 	if err != nil {
 		tbr := scerr.Wrap(err, fmt.Sprintf("cannot create share '%s'", shareName)+adaptedUserMessage(err))

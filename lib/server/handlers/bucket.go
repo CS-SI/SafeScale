@@ -139,6 +139,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 		if err == stow.ErrNotFound { // FIXME: Implementation detail
 			return nil, resources.ResourceNotFoundError("bucket", name)
 		}
+
 		return nil, err
 	}
 

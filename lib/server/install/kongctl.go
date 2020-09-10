@@ -132,8 +132,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 					return false, scerr.NotAvailableError(
 						fmt.Sprintf(
 							"failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s",
-							err.Error(),
-							addressedGateway.Name,
+							err.Error(), addressedGateway.Name,
 						),
 					)
 				}
