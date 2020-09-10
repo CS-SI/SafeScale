@@ -19,11 +19,13 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+
 	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
 
 	"github.com/sirupsen/logrus"
@@ -161,6 +163,11 @@ func (handler *NetworkHandler) Create(
 	newNetwork := network
 	// Starting from here, delete network if exiting with error
 	defer func() {
+		if err != nil && keeponfailure {
+			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+				return
+			}
+		}
 		if err != nil && !keeponfailure {
 			if newNetwork != nil {
 				derr := handler.service.DeleteNetwork(newNetwork.ID)
@@ -203,9 +210,14 @@ func (handler *NetworkHandler) Create(
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
+			if err != nil && keeponfailure {
+				if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+					return
+				}
+			}
 			if err != nil && !keeponfailure {
-				if newNetwork != nil {
-					derr := handler.service.DeleteVIP(newNetwork.VIP)
+				if network != nil {
+					derr := handler.service.DeleteVIP(network.VIP)
 					if derr != nil {
 						logrus.Errorf("failed to delete VIP: %+v", derr)
 						err = scerr.AddConsequence(err, derr)
@@ -223,6 +235,11 @@ func (handler *NetworkHandler) Create(
 
 	// Starting from here, delete network metadata if exits with error
 	defer func() {
+		if err != nil && keeponfailure {
+			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+				return
+			}
+		}
 		if err != nil && !keeponfailure {
 			if mn != nil {
 				derr := mn.Delete()
@@ -366,6 +383,11 @@ func (handler *NetworkHandler) Create(
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
 			if err != nil && !keeponfailure {
+				if keeponfailure {
+					if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+						return
+					}
+				}
 				derr := handler.deleteGateway(primaryGateway)
 				if derr != nil {
 					switch derr.(type) {
@@ -404,6 +426,11 @@ func (handler *NetworkHandler) Create(
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if err != nil && !keeponfailure {
+					if keeponfailure {
+						if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+							return
+						}
+					}
 					derr := handler.deleteGateway(secondaryGateway)
 					if derr != nil {
 						switch derr.(type) {
@@ -616,6 +643,11 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 
 	// Starting from here, deletes the primary gateway if exiting with error
 	defer func() {
+		if err != nil && !nokeep {
+			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+				return
+			}
+		}
 		if err != nil && nokeep {
 			logrus.Warnf("Cleaning up on failure, deleting gateway '%s' host resource...", request.Name)
 			derr := handler.service.DeleteHost(gw.ID)
@@ -715,7 +747,9 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	}
 
 	logrus.Debugf("Provisioning gateway '%s', phase 1", gw.Name)
-	_, err = ssh.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
+
+	var out string
+	out, err = ssh.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err
@@ -735,6 +769,11 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	}
 
 	logrus.Infof("SSH service of gateway '%s' started.", gw.Name)
+
+	if out != "" {
+		logrus.Warnf("received output from phase 1: %s", out)
+		return out, nil
+	}
 
 	return nil, nil
 }
@@ -790,8 +829,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 
 		return nil, fmt.Errorf(
 			"failed to finalize gateway '%s' installation: errorcode '%d', warnings '%s', errors '%s'", gw.Name,
-			returnCode,
-			warnings, errs,
+			returnCode, warnings, errs,
 		)
 	}
 
@@ -807,7 +845,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	if err != nil {
 		return nil, err
 	}
-	if returnCode != 0 {
+	if returnCode != 0 && returnCode != 255 {
 		logrus.Warnf("Unexpected problem rebooting (retcode=%d)", returnCode)
 	}
 

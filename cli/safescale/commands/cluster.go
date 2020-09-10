@@ -623,7 +623,11 @@ var clusterDeleteCommand = cli.Command{
 			return clitools.SuccessResponse("Aborted")
 		}
 		if force {
-			logrus.Println("'-f,--force' does nothing yet")
+			err = clusterInstance.Wipe(concurrency.RootTask())
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+			}
+			return clitools.SuccessResponse(nil)
 		}
 
 		err = clusterInstance.Delete(concurrency.RootTask())
@@ -1653,6 +1657,8 @@ var clusterNodeDeleteCommand = cli.Command{
 		if force {
 			logrus.Println("'-f,--force' does nothing yet")
 		}
+
+		// FIXME No more does nothing yet
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
 	},

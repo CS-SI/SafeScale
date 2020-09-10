@@ -102,6 +102,8 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 		return nil, scerr.InvalidParameterError("req.CIDR", "cannot be empty!")
 	}
 
+	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
+
 	tenant, err := client.New().Tenant.Get(temporal.GetExecutionTimeout())
 	if err != nil {
 		return nil, err
