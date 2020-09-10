@@ -272,6 +272,18 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	if err != nil {
 		return nil, scerr.Wrap(err, "error creating internet gateway")
 	}
+	defer func() {
+		if err != nil {
+			_, derr := s.EC2Service.DeleteInternetGateway(
+				&ec2.DeleteInternetGatewayInput{
+					InternetGatewayId: gw.InternetGateway.InternetGatewayId,
+				},
+			)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
 
 	_, err = s.EC2Service.AttachInternetGateway(
 		&ec2.AttachInternetGatewayInput{
@@ -340,7 +352,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 
 	// First result should be the public interface
 	sn := subnetsResult[0]
-	_, err = s.EC2Service.AssociateRouteTable(
+	art, err := s.EC2Service.AssociateRouteTable(
 		&ec2.AssociateRouteTableInput{
 			RouteTableId: table.RouteTables[0].RouteTableId,
 			SubnetId:     sn.Subnet.SubnetId,
@@ -349,6 +361,19 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	if err != nil {
 		return nil, scerr.Wrap(err, "AssociateRouteTable")
 	}
+
+	defer func() {
+		if err != nil {
+			_, derr := s.EC2Service.DisassociateRouteTable(
+				&ec2.DisassociateRouteTableInput{
+					AssociationId: art.AssociationId,
+				},
+			)
+			if derr != nil {
+				err = scerr.AddConsequence(err, derr)
+			}
+		}
+	}()
 
 	defer func() {
 		if err != nil {
