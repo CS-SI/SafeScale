@@ -17,33 +17,81 @@
 package ipversion
 
 import (
-    "net"
-    "strings"
-)
+	"fmt"
+	"net"
+	"strings"
 
-//go:generate stringer -type=Enum
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
 
 // Enum is an enum defining IP versions
 type Enum int
 
 const (
-    Unknown = iota
-    // IPv4 is IP v4 version
-    IPv4 Enum = 4
-    // IPv6 is IP v6 version
-    IPv6 Enum = 6
+	UNKNOWN = iota
+	// IPv4 is IP v4 version
+	IPv4 Enum = 4
+	// IPv6 is IP v6 version
+	IPv6 Enum = 6
 )
 
 // Is checks the version of a IP address in string representation
 func (i Enum) Is(str string) bool {
-    ip := net.ParseIP(str)
-    isV6 := ip != nil && strings.Contains(str, ":")
-    switch i {
-    case IPv4:
-        return !isV6
-    case IPv6:
-        return isV6
-    default:
-        return false
-    }
+	ip := net.ParseIP(str)
+	isV6 := ip != nil && strings.Contains(str, ":")
+	switch i {
+	case IPv4:
+		return !isV6
+	case IPv6:
+		return isV6
+	default:
+		return false
+	}
+}
+
+var (
+	stringMap = map[string]Enum{
+		"ipv4": IPv4,
+		"ipv6": IPv6,
+	}
+
+	enumMap = map[Enum]string{
+		UNKNOWN: "unknown",
+		IPv4:    "IPv4",
+		IPv6:    "IPv6",
+	}
+)
+
+// Parse returns a Enum corresponding to the string parameter
+// If the string doesn't correspond to any Enum, returns an error (nil otherwise)
+// This function is intended to be used to parse user input.
+func Parse(v string) (Enum, fail.Error) {
+	var (
+		e  Enum
+		ok bool
+	)
+	lowered := strings.ToLower(v)
+	if e, ok = stringMap[lowered]; !ok {
+		return UNKNOWN, fail.NotFoundError("failed to find a securitygroupruledirection.Enum corresponding to '%s'", v)
+	}
+	return e, nil
+
+}
+
+// FromString returns a Enum corresponding to the string parameter
+// This method is intended to be used from validated input.
+func FromString(v string) (e Enum) {
+	e, err := Parse(v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return
+}
+
+// String returns a string representaton of an Enum
+func (e Enum) String() string {
+	if str, found := enumMap[e]; found {
+		return str
+	}
+	panic(fmt.Sprintf("failed to find a Action.Enum string corresponding to value '%d'!", e))
 }
