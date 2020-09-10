@@ -91,7 +91,11 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 		tbr := scerr.Wrap(err, fmt.Sprintf("cannot create share '%s'", shareName)+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
-	return srvutils.ToPBShare(in.GetName(), share), err
+	if share == nil {
+		return nil, status.Errorf(codes.Internal, "share operation failure with nil result and nil error")
+	}
+
+	return srvutils.ToPBShare(in.GetName(), share)
 }
 
 // Delete call share service deletion
@@ -176,7 +180,12 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (sl 
 	var pbshares []*pb.ShareDefinition
 	for k, item := range shares {
 		for _, share := range item {
-			pbshares = append(pbshares, srvutils.ToPBShare(k, share))
+			pbs, err := srvutils.ToPBShare(k, share)
+			if err != nil {
+				log.Warn(err)
+				continue
+			}
+			pbshares = append(pbshares, pbs)
 		}
 	}
 	list := &pb.ShareList{ShareList: pbshares}
@@ -222,7 +231,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 		tbr := scerr.Wrap(err, fmt.Sprintf("cannot mount share '%s'", shareRef)+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
-	return srvutils.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
+	return srvutils.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount)
 }
 
 // Unmount unmounts share from the given host
@@ -306,5 +315,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, resources.ResourceNotFoundError("share", shareRef)
 	}
 
-	return srvutils.ToPBShareMountList(host.Name, share, mounts), nil
+	return srvutils.ToPBShareMountList(host.Name, share, mounts)
 }

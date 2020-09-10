@@ -411,9 +411,19 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(
 				func(clonable data.Clonable) error {
 					defaultsV2 := clonable.(*clusterpropsv2.Defaults)
-					defaultsV2.GatewaySizing = srvutils.FromPBHostSizing(gatewaysDef.Sizing)
-					defaultsV2.MasterSizing = srvutils.FromPBHostSizing(mastersDef.Sizing)
-					defaultsV2.NodeSizing = srvutils.FromPBHostSizing(nodesDef.Sizing)
+					var merr error
+					defaultsV2.GatewaySizing, merr = srvutils.FromPBHostSizing(gatewaysDef.Sizing)
+					if merr != nil {
+						return merr
+					}
+					defaultsV2.MasterSizing, merr = srvutils.FromPBHostSizing(mastersDef.Sizing)
+					if merr != nil {
+						return merr
+					}
+					defaultsV2.NodeSizing, merr = srvutils.FromPBHostSizing(nodesDef.Sizing)
+					if merr != nil {
+						return merr
+					}
 					defaultsV2.Image = imageID
 					return nil
 				},
@@ -495,7 +505,11 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if err != nil {
 		return err
 	}
-	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskInstallGateway, srvutils.ToPBHost(primaryGateway))
+	pbPrimaryGateway, err := srvutils.ToPBHost(primaryGateway)
+	if err != nil {
+		return err
+	}
+	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskInstallGateway, pbPrimaryGateway)
 	if err != nil {
 		return err
 	}
@@ -504,9 +518,11 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil {
 			return err
 		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(
-			b.taskInstallGateway, srvutils.ToPBHost(secondaryGateway),
-		)
+		pbSecondaryGateway, err := srvutils.ToPBHost(secondaryGateway)
+		if err != nil {
+			return err
+		}
+		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskInstallGateway, pbSecondaryGateway)
 		if err != nil {
 			return err
 		}
@@ -587,7 +603,12 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	if err != nil {
 		return err
 	}
-	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskConfigureGateway, srvutils.ToPBHost(primaryGateway))
+	pbPrimaryGateway, err = srvutils.ToPBHost(primaryGateway)
+	if err != nil {
+		return err
+	}
+
+	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskConfigureGateway, pbPrimaryGateway)
 	if err != nil {
 		return err
 	}
@@ -596,9 +617,11 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		if err != nil {
 			return err
 		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(
-			b.taskConfigureGateway, srvutils.ToPBHost(secondaryGateway),
-		)
+		pbSecondaryGateway, err := srvutils.ToPBHost(secondaryGateway)
+		if err != nil {
+			return err
+		}
+		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskConfigureGateway, pbSecondaryGateway)
 		if err != nil {
 			return err
 		}

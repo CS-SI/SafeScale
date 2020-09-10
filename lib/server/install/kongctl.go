@@ -119,7 +119,11 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(
 			network.Name, func() (interface{}, error) {
-				target, err := NewNodeTarget(srvutils.ToPBHost(addressedGateway))
+				pbHost, err := srvutils.ToPBHost(addressedGateway)
+				if err != nil {
+					return false, err
+				}
+				target, err := NewNodeTarget(pbHost)
 				if err != nil {
 					return false, err
 				}

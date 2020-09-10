@@ -31,10 +31,16 @@ import (
 )
 
 // ToPBSshConfig converts a system.SSHConfig into a SshConfig
-func ToPBSshConfig(from *system.SSHConfig) *pb.SshConfig {
-	var gw *pb.SshConfig
+func ToPBSshConfig(from *system.SSHConfig) (gw *pb.SshConfig, err error) {
+	if from == nil {
+		return nil, scerr.InvalidParameterError("from", "cannot be nil")
+	}
+
 	if from.GatewayConfig != nil {
-		gw = ToPBSshConfig(from.GatewayConfig)
+		gw, err = ToPBSshConfig(from.GatewayConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &pb.SshConfig{
 		Gateway:    gw,
@@ -42,17 +48,23 @@ func ToPBSshConfig(from *system.SSHConfig) *pb.SshConfig {
 		Port:       int32(from.Port),
 		PrivateKey: from.PrivateKey,
 		User:       from.User,
-	}
+	}, nil
 }
 
 // ToSystemSSHConfig converts a pb.SshConfig into a system.SSHConfig
-func ToSystemSSHConfig(from *pb.SshConfig) *system.SSHConfig {
+func ToSystemSSHConfig(from *pb.SshConfig) (gw *system.SSHConfig, err error) {
+	if from == nil {
+		return nil, scerr.InvalidParameterError("from", "cannot be nil")
+	}
 	if from.Host == "" {
 		logrus.Error(scerr.DecorateWithCallTrace("invalid parameter content:", "from.Host", "cannot be empty string"))
+		return nil, scerr.InvalidParameterError("from.Host", "cannot be empty")
 	}
-	var gw *system.SSHConfig
 	if from.Gateway != nil {
-		gw = ToSystemSSHConfig(from.Gateway)
+		gw, err = ToSystemSSHConfig(from.Gateway)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &system.SSHConfig{
 		User:          from.User,
@@ -60,31 +72,41 @@ func ToSystemSSHConfig(from *pb.SshConfig) *system.SSHConfig {
 		PrivateKey:    from.PrivateKey,
 		Port:          int(from.Port),
 		GatewayConfig: gw,
-	}
+	}, nil
 }
 
 // ToPBVolume converts an api.Volume to a *Volume
-func ToPBVolume(in *resources.Volume) *pb.Volume {
+func ToPBVolume(in *resources.Volume) (*pb.Volume, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.Volume{
 		Id:    in.ID,
 		Name:  in.Name,
 		Size:  int32(in.Size),
 		Speed: pb.VolumeSpeed(in.Speed),
-	}
+	}, nil
 }
 
 // ToPBVolumeAttachment converts an api.Volume to a *Volume
-func ToPBVolumeAttachment(in *resources.VolumeAttachment) *pb.VolumeAttachment {
+func ToPBVolumeAttachment(in *resources.VolumeAttachment) (*pb.VolumeAttachment, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.VolumeAttachment{
 		Volume:    &pb.Reference{Id: in.VolumeID},
 		Host:      &pb.Reference{Id: in.ServerID},
 		MountPath: in.MountPoint,
 		Device:    in.Device,
-	}
+	}, nil
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
-func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount) *pb.VolumeInfo {
+func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount) (*pb.VolumeInfo, error) {
+	if volume == nil {
+		return nil, scerr.InvalidParameterError("volume", "cannot be nil")
+	}
+
 	pbvi := &pb.VolumeInfo{
 		Id:    volume.ID,
 		Name:  volume.Name,
@@ -101,52 +123,66 @@ func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLoc
 			break
 		}
 	}
-	return pbvi
+	return pbvi, nil
 }
 
 // ToPBBucketList convert a list of string into a *ContainerLsit
-func ToPBBucketList(in []string) *pb.BucketList {
+func ToPBBucketList(in []string) (*pb.BucketList, error) {
 	var buckets []*pb.Bucket
 	for _, name := range in {
 		buckets = append(buckets, &pb.Bucket{Name: name})
 	}
 	return &pb.BucketList{
 		Buckets: buckets,
-	}
+	}, nil
 }
 
 // ToPBBucketMountPoint convert a Bucket into a BucketMountingPoint
-func ToPBBucketMountPoint(in *resources.Bucket) *pb.BucketMountingPoint {
+func ToPBBucketMountPoint(in *resources.Bucket) (*pb.BucketMountingPoint, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.BucketMountingPoint{
 		Bucket: in.Name,
 		Path:   in.MountPoint,
 		Host:   &pb.Reference{Name: in.Host},
-	}
+	}, nil
 }
 
 // ToPBShare convert a share from model to protocolbuffer format
-func ToPBShare(hostName string, share *propsv1.HostShare) *pb.ShareDefinition {
+func ToPBShare(hostName string, share *propsv1.HostShare) (*pb.ShareDefinition, error) {
+	if share == nil {
+		return nil, scerr.InvalidParameterError("share", "cannot be nil")
+	}
 	return &pb.ShareDefinition{
 		Id:   share.ID,
 		Name: share.Name,
 		Host: &pb.Reference{Name: hostName},
 		Path: share.Path,
 		Type: "nfs",
-	}
+	}, nil
 }
 
 // ToPBShareMount convert share mount on host to protocolbuffer format
-func ToPBShareMount(shareName string, hostName string, mount *propsv1.HostRemoteMount) *pb.ShareMountDefinition {
+func ToPBShareMount(shareName string, hostName string, mount *propsv1.HostRemoteMount) (*pb.ShareMountDefinition, error) {
+	if mount == nil {
+		return nil, scerr.InvalidParameterError("mount", "cannot be nil")
+	}
+
 	return &pb.ShareMountDefinition{
 		Share: &pb.Reference{Name: shareName},
 		Host:  &pb.Reference{Name: hostName},
 		Path:  mount.Path,
 		Type:  mount.FileSystem,
-	}
+	}, nil
 }
 
 // ToPBShareMountList converts share mounts to protocol buffer
-func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[string]*propsv1.HostRemoteMount) *pb.ShareMountList {
+func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[string]*propsv1.HostRemoteMount) (*pb.ShareMountList, error) {
+	if share == nil {
+		return nil, scerr.InvalidParameterError("share", "cannot be nil")
+	}
+
 	var pbMounts []*pb.ShareMountDefinition
 	for k, v := range mounts {
 		pbMounts = append(
@@ -158,20 +194,30 @@ func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[st
 			},
 		)
 	}
-	return &pb.ShareMountList{
-		Share:     ToPBShare(hostName, share),
-		MountList: pbMounts,
+
+	pbs, err := ToPBShare(hostName, share)
+	if err != nil {
+		return nil, err
 	}
+
+	return &pb.ShareMountList{
+		Share:     pbs,
+		MountList: pbMounts,
+	}, nil
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
-func ToPBHost(in *resources.Host) *pb.Host {
+func ToPBHost(in *resources.Host) (*pb.Host, error) {
 	var (
 		hostNetworkV1 *propsv1.HostNetwork
 		hostSizingV1  *propsv1.HostSizing
 		hostVolumesV1 *propsv1.HostVolumes
 		volumes       []string
 	)
+
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 
 	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(
 		func(clonable data.Clonable) error {
@@ -193,7 +239,7 @@ func ToPBHost(in *resources.Host) *pb.Host {
 		},
 	)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	return &pb.Host{
 		Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
@@ -208,11 +254,15 @@ func ToPBHost(in *resources.Host) *pb.Host {
 		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
 		State:               pb.HostState(in.LastState),
 		AttachedVolumeNames: volumes,
-	}
+	}, nil
 }
 
 // ToPBHostDefinition ...
-func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
+func ToPBHostDefinition(in *resources.HostDefinition) (*pb.HostDefinition, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
+
 	return &pb.HostDefinition{
 		ImageId: in.ImageID,
 		Sizing: &pb.HostSizing{
@@ -224,11 +274,14 @@ func ToPBHostDefinition(in *resources.HostDefinition) *pb.HostDefinition {
 			GpuCount:    int32(in.GPUNumber),
 			MinCpuFreq:  in.CPUFreq,
 		},
-	}
+	}, nil
 }
 
 // ToPBGatewayDefinition converts a resources.HostDefinition tp .GatewayDefinition
-func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
+func ToPBGatewayDefinition(in *resources.HostDefinition) (*pb.GatewayDefinition, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.GatewayDefinition{
 		Cpu:      int32(in.Cores),
 		Ram:      in.RAMSize,
@@ -236,7 +289,7 @@ func ToPBGatewayDefinition(in *resources.HostDefinition) *pb.GatewayDefinition {
 		ImageId:  in.ImageID,
 		GpuCount: int32(in.GPUNumber),
 		GpuType:  in.GPUType,
-	}
+	}, nil
 }
 
 // FromPBHostDefinitionToPBGatewayDefinition converts a pb.HostDefinition to pb.GatewayDefinition
@@ -265,15 +318,21 @@ func FromPBHostDefinitionToPBGatewayDefinition(in *pb.HostDefinition) *pb.Gatewa
 }
 
 // ToHostStatus ...
-func ToHostStatus(in *resources.Host) *pb.HostStatus {
+func ToHostStatus(in *resources.Host) (*pb.HostStatus, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.HostStatus{
 		Name:   in.Name,
 		Status: pb.HostState(in.LastState).String(),
-	}
+	}, nil
 }
 
 // ToPBHostTemplate convert an template from api to protocolbuffer format
-func ToPBHostTemplate(in *resources.HostTemplate) *pb.HostTemplate {
+func ToPBHostTemplate(in *resources.HostTemplate) (*pb.HostTemplate, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.HostTemplate{
 		Id:       in.ID,
 		Name:     in.Name,
@@ -282,19 +341,25 @@ func ToPBHostTemplate(in *resources.HostTemplate) *pb.HostTemplate {
 		Disk:     int32(in.DiskSize),
 		GpuCount: int32(in.GPUNumber),
 		GpuType:  in.GPUType,
-	}
+	}, nil
 }
 
 // ToPBImage convert an image from api to protocolbuffer format
-func ToPBImage(in *resources.Image) *pb.Image {
+func ToPBImage(in *resources.Image) (*pb.Image, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	return &pb.Image{
 		Id:   in.ID,
 		Name: in.Name,
-	}
+	}, nil
 }
 
 // ToPBNetwork convert a network from api to protocolbuffer format
-func ToPBNetwork(in *resources.Network) *pb.Network {
+func ToPBNetwork(in *resources.Network) (*pb.Network, error) {
+	if in == nil {
+		return nil, scerr.InvalidParameterError("in", "cannot be nil")
+	}
 	var pbVIP *pb.VirtualIp
 	if in.VIP != nil {
 		pbVIP = ToPBVirtualIP(*in.VIP)
@@ -307,7 +372,7 @@ func ToPBNetwork(in *resources.Network) *pb.Network {
 		SecondaryGatewayId: in.SecondaryGatewayID,
 		VirtualIp:          pbVIP,
 		Failover:           in.SecondaryGatewayID != "",
-	}
+	}, nil
 }
 
 // ToPBFileList convert a list of file names from api to protocolbuffer FileList format
@@ -315,8 +380,9 @@ func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, f
 	var files []*pb.File
 	nbFiles := int(
 		math.Min(
-			math.Min(math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes))),
-			float64(len(fileBuckets)),
+			math.Min(
+				math.Min(float64(len(fileNames)), float64(len(uploadDates))), float64(len(fileSizes)),
+			), float64(len(fileBuckets)),
 		),
 	)
 	for i := 0; i < nbFiles; i++ {
@@ -341,7 +407,10 @@ func ToPBHostSizing(src resources.SizingRequirements) *pb.HostSizing {
 }
 
 // FromPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
-func FromPBHostSizing(src *pb.HostSizing) resources.SizingRequirements {
+func FromPBHostSizing(src *pb.HostSizing) (resources.SizingRequirements, error) {
+	if src == nil {
+		return resources.SizingRequirements{}, scerr.InvalidParameterError("src", "cannot be nil")
+	}
 	return resources.SizingRequirements{
 		MinCores:    int(src.MinCpuCount),
 		MaxCores:    int(src.MaxCpuCount),
@@ -350,7 +419,7 @@ func FromPBHostSizing(src *pb.HostSizing) resources.SizingRequirements {
 		MinRAMSize:  src.MinRamSize,
 		MaxRAMSize:  src.MaxRamSize,
 		MinDiskSize: int(src.MinDiskSize),
-	}
+	}, nil
 }
 
 // ToPBVirtualIP converts a resources.VirtualIP to a pb.VirtualIp

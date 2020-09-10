@@ -214,7 +214,12 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	// Map resources.Host to pb.Host
 	var pbhost []*pb.Host
 	for _, host := range hosts {
-		pbhost = append(pbhost, srvutils.ToPBHost(host))
+		pbHost, err := srvutils.ToPBHost(host)
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		pbhost = append(pbhost, pbHost)
 	}
 	rv := &pb.HostList{Hosts: pbhost}
 	return rv, nil
@@ -259,7 +264,10 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 			MinFreq:     in.GetCpuFreq(),
 		}
 	} else {
-		s := srvutils.FromPBHostSizing(in.Sizing)
+		s, err := srvutils.FromPBHostSizing(in.Sizing)
+		if err != nil {
+			return nil, err
+		}
 		sizing = &s
 	}
 
@@ -278,8 +286,12 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
+	if host == nil {
+		return nil, status.Errorf(codes.Internal, "host operation failure with nil result and nil error")
+	}
+
 	log.Infof("Host '%s' created", name)
-	return srvutils.ToPBHost(host), nil
+	return srvutils.ToPBHost(host)
 }
 
 // Resize an host
@@ -323,7 +335,7 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	log.Infof("Host '%s' resized", name)
-	return srvutils.ToPBHost(host), nil
+	return srvutils.ToPBHost(host)
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -361,7 +373,7 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
-	return srvutils.ToHostStatus(host), nil
+	return srvutils.ToHostStatus(host)
 }
 
 // Inspect an host
@@ -399,7 +411,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("cannot inspect host: %s", getUserMessage(err)))
 	}
-	return srvutils.ToPBHost(host), nil
+	return srvutils.ToPBHost(host)
 }
 
 // Delete an host
@@ -480,5 +492,5 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
-	return srvutils.ToPBSshConfig(sshConfig), nil
+	return srvutils.ToPBSshConfig(sshConfig)
 }

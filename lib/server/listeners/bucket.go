@@ -71,7 +71,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
-	return srvutils.ToPBBucketList(buckets), nil
+	return srvutils.ToPBBucketList(buckets)
 }
 
 // Create a new bucket
@@ -195,7 +195,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	if resp == nil {
 		return nil, status.Errorf(codes.NotFound, "cannot inspect bucket '%s': not found", in.GetName())
 	}
-	return srvutils.ToPBBucketMountPoint(resp), nil
+	return srvutils.ToPBBucketMountPoint(resp)
 }
 
 // Mount a bucket on the filesystem of the host

@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/sethvargo/go-password/password"
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -103,12 +102,12 @@ func loadRsaPrivateKey(keyFilePath string) (*rsa.PrivateKey, error) {
 }
 
 // Hash will compute and return a SHA-256 hash of the datas of the reader
-func Hash(reader io.Reader) string {
+func Hash(reader io.Reader) (string, error) {
 	h := sha256.New()
 	if _, err := io.Copy(h, reader); err != nil {
-		logrus.Fatal(err)
+		return "", err
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 //
@@ -214,9 +213,14 @@ func (s *Shard) GenerateNonce(nonceSize int) ([]byte, error) {
 }
 
 // SetCheckSum will hash the file in the reader and store the result as a string
-func (s *Shard) SetCheckSum(reader io.Reader) string {
-	s.CheckSum = Hash(reader)
-	return s.CheckSum
+func (s *Shard) SetCheckSum(reader io.Reader) (string, error) {
+	checkSum, err := Hash(reader)
+	if err != nil {
+		return "", err
+	}
+	s.CheckSum = checkSum
+
+	return s.CheckSum, nil
 }
 
 // ToString return a string representation on a shard ready to be displayed
@@ -331,9 +335,7 @@ func (cg *ChunkGroup) GetNbBatchs() int {
 }
 
 // InitShards initialize the shard array and return the number of data shards and parity shards
-func (cg *ChunkGroup) InitShards(
-	chunkSize int, maxBatchSize int, ratioNumerator int, ratioDenominator int, bucketGenerator *BucketGenerator,
-) (dataShards int, parityShards int, err error) {
+func (cg *ChunkGroup) InitShards(chunkSize int, maxBatchSize int, ratioNumerator int, ratioDenominator int, bucketGenerator *BucketGenerator) (dataShards int, parityShards int, err error) {
 	cg.ChunkSize = chunkSize
 	cg.PaddingSize = chunkSize - int(cg.FileSize%int64(chunkSize))
 
@@ -373,7 +375,7 @@ func (cg *ChunkGroup) ComputeShardCheckSum(shardNum int, reader io.Reader) (stri
 	if shardNum >= len(cg.Shards) {
 		return "", fmt.Errorf("there is only %d shards", len(cg.Shards))
 	}
-	return cg.Shards[shardNum].SetCheckSum(reader), nil
+	return cg.Shards[shardNum].SetCheckSum(reader)
 }
 
 // GenerateNonce generate a nonce for a given shard, return the nonce

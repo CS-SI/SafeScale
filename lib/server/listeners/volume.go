@@ -85,7 +85,12 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	// Map resources.Volume to pb.Volume
 	var pbvolumes []*pb.Volume
 	for _, volume := range volumes {
-		pbvolumes = append(pbvolumes, srvutils.ToPBVolume(&volume))
+		pbv, err := srvutils.ToPBVolume(&volume)
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		pbvolumes = append(pbvolumes, pbv)
 	}
 	rv := &pb.VolumeList{Volumes: pbvolumes}
 	return rv, nil
@@ -129,9 +134,12 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
+	if vol == nil {
+		return nil, status.Errorf(codes.Internal, "volume operation failure with nil result and nil error")
+	}
 
 	log.Infof("Volume '%s' created", name)
-	return srvutils.ToPBVolume(vol), nil
+	return srvutils.ToPBVolume(vol)
 }
 
 // Extend extends a volume
@@ -376,5 +384,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect volume '%s': volume not found", ref))
 	}
 
-	return srvutils.ToPBVolumeInfo(volume, mounts), nil
+	return srvutils.ToPBVolumeInfo(volume, mounts)
 }
