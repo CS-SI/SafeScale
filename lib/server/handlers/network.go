@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -310,8 +311,9 @@ func (handler *NetworkHandler) Create(
 		ImageID: img.ID,
 		Network: network,
 		// KeyPair:    keypair,
-		TemplateID: template.ID,
-		CIDR:       network.CIDR,
+		OriginalOsRequest: theos,
+		TemplateID:        template.ID,
+		CIDR:              network.CIDR,
 	}
 
 	var (
@@ -491,14 +493,27 @@ func (handler *NetworkHandler) Create(
 			return nil, err
 		}
 	}
-	_, primaryErr = primaryTask.Wait()
+
+	var out interface{}
+	var out2 interface{}
+
+	out, primaryErr = primaryTask.Wait()
 	if primaryErr != nil {
 		return nil, primaryErr
 	}
+
+	if outCast, ok := out.(string); ok {
+		compareOsWithRequestedOs(outCast, theos)
+	}
+
 	if failover && secondaryTask != nil {
-		_, secondaryErr = secondaryTask.Wait()
+		out2, secondaryErr = secondaryTask.Wait()
 		if secondaryErr != nil {
 			return nil, secondaryErr
+		}
+
+		if out2Cast, ok := out2.(string); ok {
+			compareOsWithRequestedOs(out2Cast, theos)
 		}
 	}
 
@@ -580,9 +595,57 @@ func (handler *NetworkHandler) Create(
 	return network, nil
 }
 
-func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurrency.TaskParameters) (
-	result concurrency.TaskResult, err error,
-) {
+func compareOsWithRequestedOs(os string, requestedOs string) {
+	logrus.Debugf("Analysis of %s vs %s", os, requestedOs)
+
+	var err error
+
+	verRequested := -1
+	ver := -1
+
+	osReqName := ""
+	osName := ""
+
+	if strings.Contains(requestedOs, " ") {
+		fragments := strings.Split(requestedOs, " ")
+		if len(fragments) >= 2 {
+			osReqName = strings.ToUpper(fragments[0])
+			version := fragments[1]
+
+			verRequested, err = strconv.Atoi(version)
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+
+	if strings.Contains(os, " ") {
+		fragments := strings.Split(os, " ")
+		if len(fragments) >= 2 {
+			osName = strings.ToUpper(fragments[0])
+			version := fragments[1]
+
+			ver, err = strconv.Atoi(version)
+			if err != nil {
+				return
+			}
+		}
+		return
+	}
+
+	if ver < verRequested {
+		logrus.Warnf(
+			"Requested OS version was (%d) and the OS version of the allocated machine (%d) is lower", ver, verRequested,
+		)
+	}
+
+	if !strings.Contains(osReqName, osName) {
+		logrus.Warnf("Requested OS (%s) doesn't seem to match obtained OS (%s)", osReqName, osName)
+	}
+}
+
+func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		inputs data.Map
 		ok     bool
