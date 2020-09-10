@@ -152,17 +152,30 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	_, r.Err = s.ComputeClient.Get(
-		s.NetworkClient.ServiceURL("networks?name="+name), &r.Body, &gophercloud.RequestOpts{
-			OkCodes: []int{200, 203},
+	getErr := retry.WhileSuccessfulDelay1Second(
+		func() error {
+			_, r.Err = s.ComputeClient.Get(
+				s.NetworkClient.ServiceURL("networks?name="+name), &r.Body, &gophercloud.RequestOpts{
+					OkCodes: []int{200, 203},
+				},
+			)
+			if r.Err != nil {
+				return ReinterpretGophercloudErrorCode(
+					r.Err, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 404, 409}, func(ferr error) error {
+						return scerr.Errorf(fmt.Sprintf("query for network '%s' failed: %v", name, ferr), ferr)
+					},
+				)
+			}
+
+			return nil
 		},
+		temporal.GetContextTimeout(),
 	)
-	if r.Err != nil {
-		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
-			return nil, resources.ResourceForbiddenError("network", name)
-		}
-		return nil, scerr.Errorf(fmt.Sprintf("query for network '%s' failed: %v", name, r.Err), r.Err)
+
+	if getErr != nil {
+		return nil, getErr
 	}
+
 	nets, found := r.Body.(map[string]interface{})["networks"].([]interface{})
 	if found && len(nets) > 0 {
 		entry := nets[0].(map[string]interface{})
@@ -173,7 +186,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(id string) (_ *resources.Network, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -185,12 +198,31 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 
 	// If not found, we look for any network from provider
 	// 1st try with id
-	network, err := networks.Get(s.NetworkClient, id).Extract()
-	if err != nil {
-		if _, ok := err.(gophercloud.ErrDefault404); !ok {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error getting network '%s': %s", id, ProviderErrorToString(err)))
-		}
+	var network *networks.Network
+
+	getErr := retry.WhileSuccessfulDelay1Second(
+		func() error {
+			network, err = networks.Get(s.NetworkClient, id).Extract()
+
+			if err != nil {
+				return ReinterpretGophercloudErrorCode(
+					err, []int64{404}, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
+						return scerr.Wrap(
+							ferr, fmt.Sprintf("error getting network '%s': %s", id, ProviderErrorToString(ferr)),
+						)
+					},
+				)
+			}
+
+			return nil
+		},
+		temporal.GetContextTimeout(),
+	)
+
+	if getErr != nil {
+		return nil, getErr
 	}
+
 	if network != nil && network.ID != "" {
 		sns, err := s.listSubnets(id)
 		if err != nil {
@@ -486,20 +518,29 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		opts.GatewayIP = &noGateway
 	}
 
-	// Execute the operation and get back a subnets.Subnet struct
-	r := subnets.Create(s.NetworkClient, opts)
-	subnet, err := r.Extract()
-	if err != nil {
-		switch r.Err.(type) {
-		case gophercloud.ErrDefault400:
-			neutronError := ParseNeutronError(r.Err.Error())
-			if neutronError != nil {
-				msg := fmt.Sprintf("error creating subnet: bad request: %s\n", neutronError["message"])
-				return nil, scerr.Errorf(fmt.Sprintf(msg), err)
+	var subnet *subnets.Subnet
+	createErr := retry.WhileSuccessfulDelay1Second(
+		func() error {
+			// Execute the operation and get back a subnets.Subnet struct
+			r := subnets.Create(s.NetworkClient, opts)
+			subnet, err = r.Extract()
+			if err != nil {
+				return ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 409, 425, 429, 500, 503, 504}, nil, func(ferr error) error {
+						return scerr.AbortedError(
+							fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)), ferr,
+						)
+					},
+				)
 			}
-		default:
-			return nil, scerr.Wrap(err, fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)))
-		}
+
+			return nil
+		},
+		temporal.GetContextTimeout(),
+	)
+
+	if createErr != nil {
+		return nil, createErr
 	}
 
 	// Starting from here, delete subnet if exit with error

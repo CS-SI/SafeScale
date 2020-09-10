@@ -321,17 +321,29 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	_, r.Err = s.Stack.NetworkClient.Get(
-		s.Stack.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
-			OkCodes: []int{200, 203},
+	getErr := retry.WhileSuccessfulDelay1Second(
+		func() error {
+			_, r.Err = s.Stack.NetworkClient.Get(
+				s.Stack.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
+					OkCodes: []int{200, 203},
+				},
+			)
+			if r.Err != nil {
+				return openstack.ReinterpretGophercloudErrorCode(
+					r.Err, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 404, 409}, func(ferr error) error {
+						return scerr.Errorf(fmt.Sprintf("query for network '%s' failed: %v", name, ferr), ferr)
+					},
+				)
+			}
+			return nil
 		},
+		temporal.GetContextTimeout(),
 	)
-	if r.Err != nil {
-		if _, ok := r.Err.(gophercloud.ErrDefault403); ok {
-			return nil, resources.ResourceForbiddenError("network", name)
-		}
-		return nil, scerr.Errorf(fmt.Sprintf("query for network '%s' failed: %v", name, r.Err), r.Err)
+
+	if getErr != nil {
+		return nil, getErr
 	}
+
 	subnetworks, found := r.Body.(map[string]interface{})["subnets"].([]interface{})
 	if found && len(subnetworks) > 0 {
 		var (

@@ -178,7 +178,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 	if s == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -188,21 +188,42 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	r := volumesv2.Get(s.VolumeClient, id)
-	volume, err := r.Extract()
-	if err != nil {
-		if _, ok := err.(gc.ErrDefault404); ok {
-			return nil, resources.ResourceNotFoundError("volume", id)
+	var vol *volumesv2.Volume
+	unwrap := false
+	getErr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			r := volumesv2.Get(s.VolumeClient, id)
+			vol, err = r.Extract()
+			if err != nil {
+				return ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
+						if _, ok := ferr.(gc.ErrDefault404); ok {
+							unwrap = true
+							return scerr.AbortedError("", resources.ResourceNotFoundError("volume", id))
+						}
+
+						return scerr.Wrap(ferr, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(ferr)))
+					},
+				)
+			}
+			return nil
+		},
+		temporal.GetContextTimeout(),
+	)
+
+	if getErr != nil {
+		if unwrap {
+			return nil, scerr.Cause(getErr)
 		}
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(err)))
+		return nil, getErr
 	}
 
 	av := resources.Volume{
-		ID:    volume.ID,
-		Name:  volume.Name,
-		Size:  volume.Size,
-		Speed: s.getVolumeSpeed(volume.VolumeType),
-		State: toVolumeState(volume.Status),
+		ID:    vol.ID,
+		Name:  vol.Name,
+		Size:  vol.Size,
+		Speed: s.getVolumeSpeed(vol.VolumeType),
+		State: toVolumeState(vol.Status),
 	}
 	return &av, nil
 }
@@ -265,13 +286,13 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 			r := volumesv2.Delete(s.VolumeClient, id, nil)
 			err := r.ExtractErr()
 			if err != nil {
-				switch err.(type) {
-				case gc.ErrDefault400:
-					return scerr.Errorf(fmt.Sprintf("volume not in state 'available'"), err)
-				default:
-					return err
-				}
+				return ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
+						return scerr.Errorf(fmt.Sprintf("volume not in state 'available'"), ferr)
+					},
+				)
 			}
+
 			return nil
 		},
 		timeout,

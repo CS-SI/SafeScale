@@ -917,18 +917,11 @@ func (s *Stack) DeleteHost(id string) error {
 			// 1st, send delete host order
 			innerErr := servers.Delete(s.Stack.ComputeClient, id).ExtractErr()
 			if innerErr != nil {
-				switch innerErr.(type) { // FIXME: Is a mistake, all 40x errors should be considered
-				case gc.ErrDefault404:
-					// Resource not found, consider deletion succeeded (if the entry doesn't exist at all,
-					// metadata deletion will return an error)
-					return nil
-				default:
-					return scerr.Errorf(
-						fmt.Sprintf(
-							"failed to submit host '%s' deletion: %s", id, openstack.ProviderErrorToString(innerErr),
-						), innerErr,
-					)
-				}
+				return openstack.ReinterpretGophercloudErrorCode(
+					innerErr, []int64{404}, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
+						return scerr.AbortedError("", ferr)
+					},
+				)
 			}
 			// 2nd, check host status every 5 seconds until check failed.
 			// If check succeeds but state is Error, retry the deletion.
@@ -944,11 +937,18 @@ func (s *Stack) DeleteHost(id string) error {
 						return scerr.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), innerErr)
 					}
 
-					switch innerErr.(type) { // nolint
-					case gc.ErrDefault404: // FIXME Is a mistake, all 40x errors should be considered
-						resourcePresent = false
-						return nil
+					if innerErr != nil {
+						rerr := openstack.ReinterpretGophercloudErrorCode(
+							innerErr, []int64{404}, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
+								return scerr.AbortedError("", ferr)
+							},
+						)
+						if rerr == nil {
+							resourcePresent = false
+						}
+						return rerr
 					}
+
 					return innerErr
 				},
 				temporal.GetContextTimeout(),
@@ -957,8 +957,9 @@ func (s *Stack) DeleteHost(id string) error {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
 					return resources.TimeoutError(
-						fmt.Sprintf("host '%s' not deleted after %v", id, temporal.GetContextTimeout()),
-						temporal.GetContextTimeout(),
+						fmt.Sprintf(
+							"host '%s' not deleted after %v", id, temporal.GetContextTimeout(),
+						), temporal.GetContextTimeout(),
 					)
 				}
 				return innerRetryErr
@@ -1100,7 +1101,9 @@ func (s *Stack) disableHostRouterMode(host *resources.Host) error {
 	}
 	if portID == nil {
 		return scerr.Errorf(
-			fmt.Sprintf("failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name), nil,
+			fmt.Sprintf(
+				"failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Name,
+			), nil,
 		)
 	}
 
@@ -1227,60 +1230,10 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 		func() error {
 			server, err = servers.Get(s.ComputeClient, host.ID).Extract()
 			if err != nil {
-				switch err.(type) {
-				case gc.ErrDefault404:
-					// If error is "resource not found", we want to return GopherCloud error as-is to be able
-					// to behave differently in this special case. To do so, stop the retry
-					return scerr.AbortedError("", resources.ResourceNotFoundError("host", host.ID))
-				case gc.ErrDefault408:
-					// Server timeout
-					return err
-				case gc.ErrDefault409:
-					// specific handling for error 409
-					return scerr.AbortedError(
-						"", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err),
-					)
-				case gc.ErrDefault429:
-					// rate limiting defined by provider, retry
-					return err
-				case gc.ErrDefault503:
-					// service unavailable, retry
-					return err
-				case gc.ErrDefault500:
-					// When the response is "Internal Server Error", retries
-					return err
-				}
-
-				errorCode, failed := openstack.GetUnexpectedGophercloudErrorCode(err)
-				if failed == nil {
-					switch errorCode {
-					case 408:
-						return err
-					case 429:
-						return err
-					case 500:
-						return err
-					case 503:
-						return err
-					default:
-						return scerr.AbortedError(
-							"",
-							scerr.Errorf(
-								fmt.Sprintf(
-									"error getting host '%s': code: %d, reason: %s", host.ID, errorCode, err,
-								), err,
-							),
-						)
-					}
-				}
-
-				if openstack.IsServiceUnavailableError(err) {
-					return err
-				}
-
-				// Any other error stops the retry
-				return scerr.AbortedError(
-					"", scerr.Errorf(fmt.Sprintf("error getting host '%s': %s", host.ID, err), err),
+				return openstack.ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
+						return scerr.AbortedError("", ferr)
+					},
 				)
 			}
 
