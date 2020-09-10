@@ -34,7 +34,7 @@ import (
 // ImageListener image service server grpc
 type ImageListener struct{}
 
-// ErrorList available images
+// List available images
 func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
     defer fail.OnExitConvertToGRPCStatus(&err)
     defer fail.OnExitWrapError(&err, "cannot list image")

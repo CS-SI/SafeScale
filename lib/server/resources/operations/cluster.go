@@ -129,53 +129,62 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 
 // upgradePropertyNodesIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
 func (c *cluster) upgradePropertyNodesIfNeeded(task concurrency.Task) fail.Error {
-    xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+    return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
         if !props.Lookup(clusterproperty.NodesV2) {
-            // Replace NodesV1 by NodesV2 properties
+            var (
+                nodesV1 *propertiesv1.ClusterNodes
+                ok bool
+            )
+
+            innerXErr := props.Inspect(task, clusterproperty.NodesV1, func(clonable data.Clonable) fail.Error {
+                nodesV1, ok = clonable.(*propertiesv1.ClusterNodes)
+                if !ok {
+                    return fail.InconsistentError("'*propertiesv1.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+                }
+                return nil
+            })
+            if innerXErr != nil {
+                return innerXErr
+            }
+
             return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
                 nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
                 if !ok {
                     return fail.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
                 }
-                return props.Alter(task, clusterproperty.NodesV1, func(clonable data.Clonable) fail.Error {
-                    nodesV1, ok := clonable.(*propertiesv1.ClusterNodes)
-                    if !ok {
-                        return fail.InconsistentError("'*propertiesv1.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-                    }
-                    for _, i := range nodesV1.Masters {
-                        nodesV2.GlobalLastIndex++
 
-                        node := &propertiesv2.ClusterNode{
-                            ID:          i.ID,
-                            NumericalID: nodesV2.GlobalLastIndex,
-                            Name:        i.Name,
-                            PrivateIP:   i.PrivateIP,
-                            PublicIP:    i.PublicIP,
-                        }
-                        nodesV2.Masters = append(nodesV2.Masters, node)
-                    }
-                    for _, i := range nodesV1.PrivateNodes {
-                        nodesV2.GlobalLastIndex++
+                for _, i := range nodesV1.Masters {
+                    nodesV2.GlobalLastIndex++
 
-                        node := &propertiesv2.ClusterNode{
-                            ID:          i.ID,
-                            NumericalID: nodesV2.GlobalLastIndex,
-                            Name:        i.Name,
-                            PrivateIP:   i.PrivateIP,
-                            PublicIP:    i.PublicIP,
-                        }
-                        nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
+                    node := &propertiesv2.ClusterNode{
+                        ID:          i.ID,
+                        NumericalID: nodesV2.GlobalLastIndex,
+                        Name:        i.Name,
+                        PrivateIP:   i.PrivateIP,
+                        PublicIP:    i.PublicIP,
                     }
-                    nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
-                    nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
-                    // nodesV1 = &propertiesv1.ClusterNodes{}
-                    return nil
-                })
+                    nodesV2.Masters = append(nodesV2.Masters, node)
+                }
+                for _, i := range nodesV1.PrivateNodes {
+                    nodesV2.GlobalLastIndex++
+
+                    node := &propertiesv2.ClusterNode{
+                        ID:          i.ID,
+                        NumericalID: nodesV2.GlobalLastIndex,
+                        Name:        i.Name,
+                        PrivateIP:   i.PrivateIP,
+                        PublicIP:    i.PublicIP,
+                    }
+                    nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
+                }
+                nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
+                nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
+                // nodesV1 = &propertiesv1.ClusterNodes{}
+                return nil
             })
         }
         return nil
     })
-    return xerr
 }
 
 // IsNull tells if the instance represents a null value of cluster
@@ -2964,7 +2973,7 @@ func (c *cluster) ToProtocol(task concurrency.Task) (*protocol.ClusterResponse, 
         } else {
             // Legacy
             innerXErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-                networkV1, ok := clonable.(*propertiesv1.ClusterDefaults)
+                networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
                 if !ok {
                     return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
                 }

@@ -238,7 +238,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
+func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -260,7 +260,7 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
+func (s *Stack) InspectNetworkByName(ref string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -344,7 +344,7 @@ func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
     tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
     defer tracer.Exiting()
 
-    theNetwork, xerr := s.GetNetwork(ref)
+    theNetwork, xerr := s.InspectNetwork(ref)
     if xerr != nil {
         if _, ok := xerr.(*fail.ErrNotFound); !ok {
             return xerr

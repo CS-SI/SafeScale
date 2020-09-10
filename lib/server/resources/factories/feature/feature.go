@@ -23,7 +23,7 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// // ErrorList lists all features suitable for hosts
+// // List lists all features suitable for hosts
 // func ErrorList() ([]interface{}, error) {
 // 	cfgFiles := mapset.NewSet()
 

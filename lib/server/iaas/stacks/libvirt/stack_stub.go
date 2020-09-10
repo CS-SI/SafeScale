@@ -55,12 +55,12 @@ func (s *Stack) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // GetImage stub
-func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
+func (s *Stack) InspectImage(id string) (*abstract.Image, fail.Error) {
     return &abstract.Image{}, gError
 }
 
 // GetTemplate stub
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+func (s *Stack) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
     return &abstract.HostTemplate{}, gError
 }
 
@@ -75,7 +75,7 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 }
 
 // GetKeyPair stub
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
     return &abstract.KeyPair{}, gError
 }
 
@@ -95,12 +95,12 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
 }
 
 // GetNetwork stub
-func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
+func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
     return &abstract.Network{}, gError
 }
 
 // GetNetworkByName stub
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
+func (s *Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
     return &abstract.Network{}, gError
 }
 
@@ -165,7 +165,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull,
 }
 
 // GetHostByName stub
-func (s *Stack) GetHostByName(string) (*abstract.HostCore, fail.Error) {
+func (s *Stack) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
     return abstract.NewHostCore(), gError
 }
 
@@ -204,8 +204,8 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
     return &abstract.Volume{}, gError
 }
 
-// GetVolume stub
-func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
+// InspectVolume stub
+func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
     return &abstract.Volume{}, gError
 }
 
@@ -225,7 +225,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment stub
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
     return &abstract.VolumeAttachment{}, gError
 }
 

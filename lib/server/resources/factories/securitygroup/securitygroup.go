@@ -21,7 +21,6 @@ import (
     "github.com/CS-SI/SafeScale/lib/server/resources"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/operations"
-    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
     "github.com/CS-SI/SafeScale/lib/utils/concurrency"
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -35,7 +34,7 @@ func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.Securi
     // FIXME: get code from HostListener
 
     if all {
-        return svc.ListSecurityGroups(all)
+        return svc.ListSecurityGroups()
     }
 
     rsg, err := New(svc)

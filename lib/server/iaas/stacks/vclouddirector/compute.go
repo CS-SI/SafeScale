@@ -204,8 +204,8 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
     }
 
     // TODO: use concurrency.Tracer
-    logrus.Debugf(">>> stacks.vclouddirector::GetTemplate(%s)", id)
-    defer logrus.Debugf("<<< stacks.vclouddirector::GetTemplate(%s)", id)
+    logrus.Debugf(">>> stacks.vclouddirector::InspectTemplate(%s)", id)
+    defer logrus.Debugf("<<< stacks.vclouddirector::InspectTemplate(%s)", id)
 
     // "Cores:%d,Disk:%d,Memory:%d"
     if strings.HasPrefix(id, "Cores:") {
@@ -755,8 +755,8 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
     }
 
     // TODO: use concurrency.Tracer
-    logrus.Debug("vclouddirector.Client.GetHostByName() called")
-    defer logrus.Debug("vclouddirector.Client.GetHostByName() done")
+    logrus.Debug("vclouddirector.Client.InspectHostByName() called")
+    defer logrus.Debug("vclouddirector.Client.InspectHostByName() done")
 
     _, vdc, xerr := s.getOrgVdc()
     if xerr != nil {

@@ -349,7 +349,7 @@ func (s *Stack) getVpc(id string) (_ *osc.Net, xerr fail.Error) {
     return &resNet.Nets[0], nil
 }
 
-// GetNetworkByName returns the network identified by name)
+// InspectNetworkByName returns the network identified by name)
 func (s *Stack) getVpcByName(name string) (_ *osc.Net, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()

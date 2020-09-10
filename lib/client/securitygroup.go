@@ -126,8 +126,9 @@ func (sg securityGroup) Clear(ref string, timeout time.Duration) error {
         return xerr
     }
 
-    service := protocol.NewHostServiceClient(sg.session.connection)
-    return service.Clear(ctx, &protocol.Reference{Name: ref})
+    service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
+    _, err := service.Clear(ctx, &protocol.Reference{Name: ref})
+    return err
 }
 
 // Reset ...
@@ -140,8 +141,9 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
         return xerr
     }
 
-    service := protocol.NewHostServiceClient(sg.session.connection)
-    return service.Reset(ctx, &protocol.Reference{Name: ref})
+    service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
+    _, err := service.Reset(ctx, &protocol.Reference{Name: ref})
+    return err
 }
 
 // AddRule ...
@@ -155,5 +157,6 @@ func (sg securityGroup) AddRule(def *protocol.SecurityGroupRuleRequest, duration
     }
 
     service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-    return service.AddRule(ctx, def)
+    _, err := service.AddRule(ctx, def)
+    return err
 }

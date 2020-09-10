@@ -28,8 +28,6 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
 
-// FIXME ROBUSTNESS All functions MUST propagate context
-
 // Stack is the interface to cloud stack
 type Stack interface {
     // ListAvailabilityZones lists the usable Availability Zones
@@ -38,21 +36,23 @@ type Stack interface {
     // ListRegions returns a list with the regions available
     ListRegions() ([]string, fail.Error)
 
-    // GetImage returns the Image referenced by id
-    GetImage(id string) (*abstract.Image, fail.Error)
+    // InspectImage returns the Image referenced by id
+    InspectImage(id string) (*abstract.Image, fail.Error)
 
-    // GetTemplate returns the Template referenced by id
-    GetTemplate(id string) (*abstract.HostTemplate, fail.Error)
+    // InspectTemplate returns the Template referenced by id
+    InspectTemplate(id string) (*abstract.HostTemplate, fail.Error)
 
     // CreateKeyPair creates and import a key pair
     CreateKeyPair(name string) (*abstract.KeyPair, fail.Error)
-    // GetKeyPair returns the key pair identified by id
-    GetKeyPair(id string) (*abstract.KeyPair, fail.Error)
+    // InspectKeyPair returns the key pair identified by id
+    InspectKeyPair(id string) (*abstract.KeyPair, fail.Error)
     // ListKeyPairs lists available key pairs
     ListKeyPairs() ([]abstract.KeyPair, fail.Error)
     // DeleteKeyPair deletes the key pair identified by id
     DeleteKeyPair(id string) fail.Error
 
+    // ListSecurityGroups lists the security groups
+    ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error)
     // CreateSecurityGroup creates a security group
     CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
     // InspectSecurityGroup returns information about a security group
@@ -66,10 +66,10 @@ type Stack interface {
 
     // CreateNetwork creates a network named name
     CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error)
-    // GetNetwork returns the network identified by id
-    GetNetwork(id string) (*abstract.Network, fail.Error)
-    // GetNetworkByName returns the network identified by name)
-    GetNetworkByName(name string) (*abstract.Network, fail.Error)
+    // InspectNetwork returns the network identified by id
+    InspectNetwork(id string) (*abstract.Network, fail.Error)
+    // InspectNetworkByName returns the network identified by name)
+    InspectNetworkByName(name string) (*abstract.Network, fail.Error)
     // ListNetworks lists all networks
     ListNetworks() ([]*abstract.Network, fail.Error)
     // DeleteNetwork deletes the network identified by id
@@ -94,8 +94,8 @@ type Stack interface {
     CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
     // InspectHost returns the host identified by id or updates content of a *abstract.HostFull
     InspectHost(stacks.HostParameter) (*abstract.HostFull, fail.Error)
-    // GetHostByName returns the ID of the host identified by name
-    GetHostByName(string) (*abstract.HostCore, fail.Error)
+    // InspectHostByName returns the ID of the host identified by name
+    InspectHostByName(string) (*abstract.HostCore, fail.Error)
     // GetHostState returns the current state of the host identified by id
     GetHostState(stacks.HostParameter) (hoststate.Enum, fail.Error)
     // ListHosts lists all hosts
@@ -119,8 +119,8 @@ type Stack interface {
 
     // CreateVolume creates a block volume
     CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error)
-    // GetVolume returns the volume identified by id
-    GetVolume(id string) (*abstract.Volume, fail.Error)
+    // InspectVolume returns the volume identified by id
+    InspectVolume(id string) (*abstract.Volume, fail.Error)
     // ListVolumes list available volumes
     ListVolumes() ([]abstract.Volume, fail.Error)
     // DeleteVolume deletes the volume identified by id
@@ -128,8 +128,8 @@ type Stack interface {
 
     // CreateVolumeAttachment attaches a volume to an host
     CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error)
-    // GetVolumeAttachment returns the volume attachment identified by id
-    GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error)
+    // InspectVolumeAttachment returns the volume attachment identified by id
+    InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error)
     // ListVolumeAttachments lists available volume attachment
     ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error)
     // DeleteVolumeAttachment deletes the volume attachment identified by id

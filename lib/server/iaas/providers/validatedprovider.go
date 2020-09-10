@@ -125,7 +125,7 @@ func (w ValidatedProvider) ListRegions() ([]string, fail.Error) {
 
 // GetImage ...
 func (w ValidatedProvider) GetImage(id string) (res *abstract.Image, err fail.Error) {
-    res, err = w.InnerProvider.GetImage(id)
+    res, err = w.InnerProvider.InspectImage(id)
     if err != nil {
         if res != nil {
             if !res.OK() {
@@ -139,7 +139,7 @@ func (w ValidatedProvider) GetImage(id string) (res *abstract.Image, err fail.Er
 
 // GetTemplate ...
 func (w ValidatedProvider) GetTemplate(id string) (res *abstract.HostTemplate, err fail.Error) {
-    res, err = w.InnerProvider.GetTemplate(id)
+    res, err = w.InnerProvider.InspectTemplate(id)
     if err != nil {
         if res != nil {
             if !res.OK() {
@@ -163,7 +163,7 @@ func (w ValidatedProvider) CreateKeyPair(name string) (kp *abstract.KeyPair, err
 
 // GetKeyPair ...
 func (w ValidatedProvider) GetKeyPair(id string) (kp *abstract.KeyPair, err fail.Error) {
-    kp, err = w.InnerProvider.GetKeyPair(id)
+    kp, err = w.InnerProvider.InspectKeyPair(id)
     if err != nil {
         if kp == nil {
             logrus.Warn("Invalid keypair !")
@@ -197,7 +197,7 @@ func (w ValidatedProvider) CreateNetwork(req abstract.NetworkRequest) (res *abst
 
 // GetNetwork ...
 func (w ValidatedProvider) GetNetwork(id string) (res *abstract.Network, err fail.Error) {
-    res, err = w.InnerProvider.GetNetwork(id)
+    res, err = w.InnerProvider.InspectNetwork(id)
     if err != nil {
         if res != nil {
             if !res.OK() {
@@ -210,7 +210,7 @@ func (w ValidatedProvider) GetNetwork(id string) (res *abstract.Network, err fai
 
 // GetNetworkByName ...
 func (w ValidatedProvider) GetNetworkByName(name string) (res *abstract.Network, err fail.Error) {
-    res, err = w.InnerProvider.GetNetworkByName(name)
+    res, err = w.InnerProvider.InspectNetworkByName(name)
     if err != nil {
         if res != nil {
             if !res.OK() {
@@ -302,7 +302,7 @@ func (w ValidatedProvider) WaitHostReady(hostParam stacks.HostParameter, timeout
 
 // GetHostByName ...
 func (w ValidatedProvider) GetHostByName(name string) (res *abstract.HostCore, err fail.Error) {
-    res, err = w.InnerProvider.GetHostByName(name)
+    res, err = w.InnerProvider.InspectHostByName(name)
     if err != nil {
         if res != nil {
             logrus.Warnf("Invalid host: %v", *res)
@@ -379,7 +379,7 @@ func (w ValidatedProvider) CreateVolume(request abstract.VolumeRequest) (res *ab
 
 // GetVolume ...
 func (w ValidatedProvider) GetVolume(id string) (res *abstract.Volume, err fail.Error) {
-    res, err = w.InnerProvider.GetVolume(id)
+    res, err = w.InnerProvider.InspectVolume(id)
     if err != nil {
         if res != nil {
             if !res.OK() {
@@ -415,7 +415,7 @@ func (w ValidatedProvider) CreateVolumeAttachment(request abstract.VolumeAttachm
 
 // GetVolumeAttachment ...
 func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *abstract.VolumeAttachment, err fail.Error) {
-    res, err = w.InnerProvider.GetVolumeAttachment(serverID, id)
+    res, err = w.InnerProvider.InspectVolumeAttachment(serverID, id)
     if err != nil {
         if res != nil {
             if !res.OK() {

@@ -138,8 +138,8 @@ func (w ErrorTraceProvider) GetImage(id string) (images *abstract.Image, err fai
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetImage", w.Label))
-    return w.InnerProvider.GetImage(id)
+    }(fmt.Sprintf("%s:InspectImage", w.Label))
+    return w.InnerProvider.InspectImage(id)
 }
 
 // GetTemplate ...
@@ -148,8 +148,8 @@ func (w ErrorTraceProvider) GetTemplate(id string) (templates *abstract.HostTemp
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetTemplate", w.Label))
-    return w.InnerProvider.GetTemplate(id)
+    }(fmt.Sprintf("%s:InspectTemplate", w.Label))
+    return w.InnerProvider.InspectTemplate(id)
 }
 
 // CreateKeyPair ...
@@ -168,8 +168,8 @@ func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *abstract.KeyPair, err 
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetKeyPair", w.Label))
-    return w.InnerProvider.GetKeyPair(id)
+    }(fmt.Sprintf("%s:InspectKeyPair", w.Label))
+    return w.InnerProvider.InspectKeyPair(id)
 }
 
 // ListKeyPairs ...
@@ -208,8 +208,8 @@ func (w ErrorTraceProvider) GetNetwork(id string) (net *abstract.Network, err fa
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetNetwork", w.Label))
-    return w.InnerProvider.GetNetwork(id)
+    }(fmt.Sprintf("%s:InspectNetwork", w.Label))
+    return w.InnerProvider.InspectNetwork(id)
 }
 
 // GetNetworkByName ...
@@ -218,8 +218,8 @@ func (w ErrorTraceProvider) GetNetworkByName(name string) (net *abstract.Network
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetNetworkByName", w.Label))
-    return w.InnerProvider.GetNetworkByName(name)
+    }(fmt.Sprintf("%s:InspectNetworkByName", w.Label))
+    return w.InnerProvider.InspectNetworkByName(name)
 }
 
 // ListNetworks ...
@@ -338,8 +338,8 @@ func (w ErrorTraceProvider) GetHostByName(name string) (_ *abstract.HostCore, er
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetHostByName", w.Label))
-    return w.InnerProvider.GetHostByName(name)
+    }(fmt.Sprintf("%s:InspectHostByName", w.Label))
+    return w.InnerProvider.InspectHostByName(name)
 }
 
 // GetHostState ...
@@ -428,8 +428,8 @@ func (w ErrorTraceProvider) GetVolume(id string) (_ *abstract.Volume, err fail.E
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetVolume", w.Label))
-    return w.InnerProvider.GetVolume(id)
+    }(fmt.Sprintf("%s:InspectVolume", w.Label))
+    return w.InnerProvider.InspectVolume(id)
 }
 
 // ListVolumes ...
@@ -468,8 +468,8 @@ func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *abstrac
         if err != nil {
             logrus.Warnf("%s : Intercepted error: %v", prefix, err)
         }
-    }(fmt.Sprintf("%s:GetVolumeAttachment", w.Label))
-    return w.InnerProvider.GetVolumeAttachment(serverID, id)
+    }(fmt.Sprintf("%s:InspectVolumeAttachment", w.Label))
+    return w.InnerProvider.InspectVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments ...

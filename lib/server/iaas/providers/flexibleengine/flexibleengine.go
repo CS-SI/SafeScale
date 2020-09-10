@@ -206,8 +206,8 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-    tpl, xerr := p.Stack.GetTemplate(id)
+func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+    tpl, xerr := p.Stack.InspectTemplate(id)
     if xerr != nil {
         return nil, xerr
     }

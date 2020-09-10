@@ -128,7 +128,7 @@ func (c core) GetName() string {
 }
 
 // Inspect protects the data for shared read
-func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err fail.Error) {
+func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
     if c.IsNull() {
         return fail.InvalidInstanceError()
     }
@@ -143,9 +143,9 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (err 
     }
 
     // Reload reloads data from objectstorage to be sure to have the last revision
-    err = c.Reload(task)
-    if err != nil {
-        return err
+    xerr = c.Reload(task)
+    if xerr != nil {
+        return fail.Prepend(xerr, "failed to reload")
     }
 
     return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
@@ -216,11 +216,11 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Error {
     c.SafeLock(task)
     defer c.SafeUnlock(task)
 
-    if c.loaded {
-        return fail.NotAvailableError("already carrying a shielded value")
-    }
     if c.shielded == nil {
         return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
+    }
+    if c.loaded {
+        return fail.NotAvailableError("already carrying a value")
     }
 
     c.shielded = concurrency.NewShielded(clonable)
@@ -229,6 +229,7 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Error {
     if err != nil {
         return err
     }
+    c.committed = false
     return c.write(task)
 }
 
@@ -264,12 +265,13 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
     if ref == "" {
         return fail.InvalidParameterError("ref", "cannot be empty string")
     }
-    if c.loaded {
-        return fail.NotAvailableError("metadata is already carrying a value")
-    }
 
     c.SafeLock(task)
     defer c.SafeUnlock(task)
+
+    if c.loaded {
+        return fail.NotAvailableError("metadata is already carrying a value")
+    }
 
     xerr := retry.WhileUnsuccessfulDelay1Second(
         func() error {
@@ -296,27 +298,24 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
     }
 
     c.loaded = true
+    c.committed = true
     return c.updateIdentity(task)
 }
 
 // readByReference gets the data from Object Storage
 // if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
 func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
-    var (
-        errors []error
-        ok     bool
-    )
     if xerr = c.readByID(task, ref); xerr != nil {
-        if _, ok = xerr.(*fail.ErrNotFound); !ok {
-            errors = append(errors, xerr)
+        if _, ok := xerr.(*fail.ErrNotFound); !ok {
+            return xerr
         }
         xerr = c.readByName(task, ref)
-        if _, ok = xerr.(*fail.ErrNotFound); !ok {
-            errors = append(errors, xerr)
+        if _, ok := xerr.(*fail.ErrNotFound); !ok {
+            return xerr
         }
     }
     if xerr != nil {
-        return fail.NewErrorList(errors)
+        return fail.NotFoundError("failed to find '%s'", ref)
     }
     return nil
 }
@@ -363,12 +362,18 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
         return fail.InvalidParameterError("task", "cannot be nil")
     }
 
-    if xerr := c.readByID(task, c.GetID()); xerr != nil {
+    if c.loaded && !c.committed {
+        return fail.OverloadError("altered and not committed")
+    }
+
+    if xerr := c.readByReference(task, c.GetID()); xerr != nil {
         if _, ok := xerr.(*fail.ErrNotFound); ok {
-            return fail.NotFoundError("the metadata of %s '%s' vanished", c.kind, c.name)
+            return fail.NotFoundError("the metadata of %s '%s' vanished", c.kind, c.GetName())
         }
         return xerr
     }
+    c.loaded = true
+    c.committed = true
     return nil
 }
 
@@ -405,11 +410,12 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
     id := c.GetID()
     name := c.GetName()
 
+    var errors []error
     // Checks entries exist in Object Storage
     if xerr := c.folder.Search(byIDFolderName, id); xerr != nil {
         // If not found, consider it not an error
         if _, ok := xerr.(*fail.ErrNotFound); !ok {
-            return xerr
+            errors = append(errors, xerr)
         }
     } else {
         idFound = true
@@ -418,7 +424,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
     if xerr := c.folder.Search(byNameFolderName, name); xerr != nil {
         // If entry not found, consider it not an error
         if _, ok := xerr.(*fail.ErrNotFound); !ok {
-            return xerr
+            errors = append(errors, xerr)
         }
     } else {
         nameFound = true
@@ -427,17 +433,21 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
     // Deletes entries found
     if idFound {
         if xerr := c.folder.Delete(byIDFolderName, id); xerr != nil {
-            return xerr
+            errors = append(errors, xerr)
         }
     }
     if nameFound {
         if xerr := c.folder.Delete(byNameFolderName, name); xerr != nil {
-            return xerr
+            errors = append(errors, xerr)
         }
     }
 
     c.loaded = false
     c.committed = false
+
+    if len(errors) > 0 {
+        return fail.NewErrorList(errors)
+    }
     return nil
 }
 

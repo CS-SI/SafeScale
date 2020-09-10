@@ -89,7 +89,7 @@ func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
+func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -167,7 +167,7 @@ func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr
 }
 
 // GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
+func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -210,8 +210,8 @@ func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-    return nil, fail.NotImplementedError("GetKeyPair() not implemented yet") // FIXME: Technical debt
+func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+    return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
@@ -291,7 +291,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     }
 
     // Determine system disk size based on vcpus count
-    template, xerr := s.GetTemplate(request.TemplateID)
+    template, xerr := s.InspectTemplate(request.TemplateID)
     if xerr != nil {
         return nullAhf, nullUd, fail.Wrap(xerr, "failed to get image")
     }
@@ -309,7 +309,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
         }
     }
 
-    rim, xerr := s.GetImage(request.ImageID)
+    rim, xerr := s.InspectImage(request.ImageID)
     if xerr != nil {
         return nullAhf, nullUd, xerr
     }
@@ -744,7 +744,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
+func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }

@@ -330,7 +330,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
         return nil, userData, xerr
     }
 
-    template, xerr := s.GetTemplate(request.TemplateID)
+    template, xerr := s.InspectTemplate(request.TemplateID)
     if xerr != nil {
         return nil, userData, fail.Wrap(xerr, "failed to get image")
     }
@@ -354,7 +354,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
         return nil, userData, xerr
     }
 
-    asg, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+    asg, xerr := s.InspectSecurityGroup(stacks.DefaultSecurityGroupName)
     if xerr != nil {
         return nil, userData, xerr
     }
@@ -682,7 +682,7 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
     var errors []error
     for netid, netname := range completedHost.Network.NetworksByID {
         if netname == "" {
-            network, xerr := s.GetNetwork(netid)
+            network, xerr := s.InspectNetwork(netid)
             if xerr != nil {
                 logrus.Errorf("failed to get network '%s'", netid)
                 errors = append(errors, xerr)
@@ -1105,7 +1105,7 @@ func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error
 // 		if !ok {
 // 			return nil
 // 		}
-// 		tpl, err := s.GetTemplate(fid)
+// 		tpl, err := s.InspectTemplate(fid)
 // 		if err != nil {
 // 			return nil
 // 		}

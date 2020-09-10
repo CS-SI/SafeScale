@@ -64,7 +64,7 @@ func NewVolumeHandler(job server.Job) VolumeHandler {
     return &volumeHandler{job: job}
 }
 
-// ErrorList returns the network list
+// List returns the network list
 func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr fail.Error) {
     if handler == nil {
         return nil, fail.InvalidInstanceError()

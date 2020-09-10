@@ -15,7 +15,6 @@ As much as possible, follow the [godoc documentation tool formalism](https://blo
 
 ## code indentation
 
-- uses 4 spaces for indentation
-- uses spaces instead of tab character for indentation
+- uses tab for indentation, with a tab size of 4 spaces
 
 Good documentation is an everyday job (we still have to respect this mantra ourselves ;-) ).

@@ -128,7 +128,7 @@ func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
     return objs.Delete(task)
 }
 
-// ErrorList return the list of all shares from all servers
+// List return the list of all shares from all servers
 func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.HostShare, xerr fail.Error) {
     if handler == nil {
         return nil, fail.InvalidInstanceError()

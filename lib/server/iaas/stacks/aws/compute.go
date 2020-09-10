@@ -102,7 +102,7 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 
 // GetKeyPair loads a keypair from AWS
 // Note: the private key is not stored by AWS...
-func (s *Stack) GetKeyPair(id string) (_ *abstract.KeyPair, xerr fail.Error) {
+func (s *Stack) InspectKeyPair(id string) (_ *abstract.KeyPair, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -231,7 +231,7 @@ func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // GetImage loads information about an image stored in AWS
-func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
+func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -256,7 +256,7 @@ func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
 }
 
 // GetTemplate loads information about a template stored in AWS
-func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
+func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
     template = &abstract.HostTemplate{}
     if s == nil {
         return nil, fail.InvalidInstanceError()
@@ -615,12 +615,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
     }
 
     // Determine system disk size based on vcpus count
-    template, xerr := s.GetTemplate(request.TemplateID)
+    template, xerr := s.InspectTemplate(request.TemplateID)
     if xerr != nil {
         return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
     }
 
-    rim, err := s.GetImage(request.ImageID)
+    rim, err := s.InspectImage(request.ImageID)
     if err != nil {
         return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
     }
@@ -660,7 +660,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
         return nullAhf, nullUdc, xerr
     }
 
-    vpcnet, xerr := s.GetNetworkByName(s.AwsConfig.NetworkName)
+    vpcnet, xerr := s.InspectNetworkByName(s.AwsConfig.NetworkName)
     if err != nil {
         return nullAhf, nullUdc, xerr
     }
@@ -1269,7 +1269,7 @@ func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
 }
 
 // GetHostByName returns host information by its name
-func (s *Stack) GetHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
+func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
     nullAhc := abstract.NewHostCore()
     if s == nil {
         return nullAhc, fail.InvalidInstanceError()

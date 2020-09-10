@@ -21,8 +21,8 @@ import (
     "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// ListSecurityGroup lists existing security groups
-func (s *Stack) ListSecurityGroup() ([]*abstract.SecurityGroup, fail.Error) {
+// ListSecurityGroups lists existing security groups
+func (s *Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
     return nil, fail.NotImplementedError()
 }
 

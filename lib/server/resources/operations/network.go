@@ -22,6 +22,7 @@ import (
     "strings"
     "time"
 
+    "github.com/CS-SI/SafeScale/lib/utils"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
     "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
     "github.com/CS-SI/SafeScale/lib/utils/net"
@@ -86,23 +87,23 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
         return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
     }
 
-    objn, err := NewNetwork(svc)
-    if err != nil {
-        return nullNetwork(), err
+    objn, xerr := NewNetwork(svc)
+    if xerr != nil {
+        return nullNetwork(), xerr
     }
-    err = retry.WhileUnsuccessfulDelay1Second(
+    xerr = retry.WhileUnsuccessfulDelay1Second(
         func() error {
             return objn.Read(task, ref)
         },
         10*time.Second, // FIXME: parameterize
     )
-    if err != nil {
+    if xerr != nil {
         // If retry timed out, log it and return error ErrNotFound
-        if _, ok := err.(*retry.ErrTimeout); ok {
+        if _, ok := xerr.(*retry.ErrTimeout); ok {
             logrus.Debugf("timeout reading metadata of network '%s'", ref)
-            err = fail.NotFoundError("network '%s' not found: %s", ref, fail.RootCause(err).Error())
+            xerr = fail.NotFoundError("network '%s' not found: %s", ref, fail.RootCause(xerr).Error())
         }
-        return nullNetwork(), err
+        return nullNetwork(), xerr
     }
     return objn, nil
 }
@@ -137,7 +138,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
     }
 
     // Verify if the network already exist and in this case is not managed by SafeScale
-    if _, xerr = svc.GetNetworkByName(req.Name); xerr != nil {
+    if _, xerr = svc.InspectNetworkByName(req.Name); xerr != nil {
         switch xerr.(type) {
         case *fail.ErrNotFound:
         case *fail.ErrInvalidRequest, *fail.ErrTimeout:
@@ -318,6 +319,11 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
         return xerr
     }
 
+    keepalivedPassword, err := utils.GeneratePassword(16)
+    if err != nil {
+        return fail.ToError(err)
+    }
+
     gwRequest := abstract.HostRequest{
         ImageID:       img.ID,
         Networks:      []*abstract.Network{an},
@@ -333,6 +339,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
         secondaryErr                       fail.Error
         secondaryResult                    concurrency.TaskResult
     )
+
 
     // Starts primary gateway creation
     primaryRequest := gwRequest
@@ -373,6 +380,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
         }
         primaryGateway = result["host"].(*host)
         primaryUserdata = result["userdata"].(*userdata.Content)
+        primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
         // Starting from here, deletes the primary gateway if exiting with error
         defer func() {
@@ -406,6 +414,7 @@ func (objn *network) Create(task concurrency.Task, req abstract.NetworkRequest, 
 
             secondaryGateway = result["host"].(*host)
             secondaryUserdata = result["userdata"].(*userdata.Content)
+            secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
             // Starting from here, deletes the secondary gateway if exiting with error
             defer func() {
@@ -882,7 +891,7 @@ func (objn *network) Delete(task concurrency.Task) (xerr fail.Error) {
         if waitMore {
             errWaitMore := retry.WhileUnsuccessfulDelay1Second(
                 func() error {
-                    recNet, recErr := svc.GetNetwork(an.ID)
+                    recNet, recErr := svc.InspectNetwork(an.ID)
                     if recNet != nil {
                         return fmt.Errorf("still there")
                     }

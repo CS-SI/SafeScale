@@ -1161,8 +1161,8 @@ var clusterCheckFeatureCommand = &cli.Command{
             return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
         }
 
-        xerr = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0) // FIXME: define duration
-        if xerr != nil {
+        err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0) // FIXME: define duration
+        if err != nil {
             err = fail.FromGRPCStatus(err)
             msg := fmt.Sprintf("error checking feature '%s' on host '%s': %s", featureName, hostName, err.Error())
             return clitools.FailureResponse(clitools.ExitOnRPC(msg))

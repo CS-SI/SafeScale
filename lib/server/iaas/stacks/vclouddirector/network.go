@@ -606,15 +606,15 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
     return network, nil
 }
 
-// GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
+// InspectNetwork returns the network identified by ref (id or name)
+func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
 
     // TODO: use concurrency.Tracer
-    logrus.Debug("vclouddirector.Client.GetNetwork() called")
-    defer logrus.Debug("vclouddirector.Client.GetNetwork() done")
+    logrus.Debug("vclouddirector.Client.InspectNetwork() called")
+    defer logrus.Debug("vclouddirector.Client.InspectNetwork() done")
 
     org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
     if err != nil {
@@ -655,8 +655,8 @@ func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
     }
 
     // TODO: use concurrency.Tracer
-    logrus.Debug("vclouddirector.Client.GetNetworkByName() called")
-    defer logrus.Debug("vclouddirector.Client.GetNetworkByName() done")
+    logrus.Debug("vclouddirector.Client.InspectNetworkByName() called")
+    defer logrus.Debug("vclouddirector.Client.InspectNetworkByName() done")
 
     _, vdc, err := s.getOrgVdc()
     if err != nil {

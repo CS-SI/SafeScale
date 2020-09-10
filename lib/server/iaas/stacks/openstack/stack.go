@@ -35,10 +35,10 @@ type Stack struct {
     authOpts stacks.AuthenticationOptions
     cfgOpts  stacks.ConfigurationOptions
 
-    // DefaultSecurityGroupName is the name of the default security groups
-    DefaultSecurityGroupName string
-    // DefaultSecurityGroupDescription contains a description for the default security groups
-    DefaultSecurityGroupDescription string
+    // // DefaultSecurityGroupName is the name of the default security groups
+    // DefaultSecurityGroupName string
+    // // DefaultSecurityGroupDescription contains a description for the default security groups
+    // DefaultSecurityGroupDescription string
     // // SecurityGroup is an instance of the default security group
     // SecurityGroup     *abstract.SecurityGroup
     ProviderNetworkID string
@@ -71,6 +71,9 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
     }
 
     s := Stack{
+        // DefaultSecurityGroupName: "safescale-default-sg",
+        // DefaultSecurityGroupDescription: "Default Security Group for SafeScale resources",
+
         authOpts: auth,
         cfgOpts:  cfg,
     }

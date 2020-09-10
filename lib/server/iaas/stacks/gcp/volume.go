@@ -103,7 +103,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+func (s *Stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -272,7 +272,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, vaID string) (*abstract.VolumeAttachment, fail.Error) {
+func (s *Stack) InspectVolumeAttachment(serverID, vaID string) (*abstract.VolumeAttachment, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }

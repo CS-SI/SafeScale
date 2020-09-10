@@ -333,3 +333,14 @@ func SecurityGroupRulesFromAbstractToProtocol(in []abstract.SecurityGroupRule) [
     }
     return out
 }
+
+
+// SecurityGroupFromAbstractToProtocol converts a abstract.SecurityGroup to a *protocol.SecurityGroup
+func SecurityGroupFromAbstractToProtocol(in abstract.SecurityGroup) *protocol.SecurityGroupResponse {
+    return &protocol.SecurityGroupResponse{
+        Id: in.ID,
+        Name: in.Name,
+        Description: in.Description,
+        Rules: SecurityGroupRulesFromAbstractToProtocol(in.Rules),
+    }
+}

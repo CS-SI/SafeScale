@@ -17,8 +17,6 @@
 package fail
 
 import (
-    "fmt"
-
     "github.com/sirupsen/logrus"
     "google.golang.org/grpc/codes"
     grpcstatus "google.golang.org/grpc/status"
@@ -138,44 +136,49 @@ func Prepend(err error, msg ...interface{}) Error {
         return err.(Error)
     }
 
-    return NewError("%s: %s", fmt.Errorf(strprocess.FormatStrings(msg...), err.Error()))
+    return NewError("%s: %s", strprocess.FormatStrings(msg...), err.Error())
 }
 
 // Wrap creates a new error with a message 'msg' and a causer error 'cause'
 func Wrap(cause error, msg ...interface{}) Error {
-    newErr := &errorCore{
-        message:      strprocess.FormatStrings(msg...),
-        cause:        cause,
-        consequences: []error{},
-        grpcCode:     codes.Unknown,
+    switch cause.(type) {
+    case Error:
+        return Prepend(cause, msg...)
+    default:
+        newErr := newError(cause, nil, msg...)
+        if cause != nil {
+            switch v := cause.(type) {
+            case Error:
+                newErr.grpcCode = v.GRPCCode()
+            }
+        }
+        return newErr
     }
-    return newErr
 }
 
 // RootCause returns the root cause of an error, or nil if there no root cause
 func RootCause(err error) (resp error) {
     resp = err
-
     for err != nil {
-        cause, ok := err.(Error)
+        realErr, ok := err.(Error)
         if !ok {
             break
         }
-        err = cause.Cause()
-        if err != nil {
-            resp = err
+        cause := realErr.Cause()
+        if cause != nil {
+            resp = cause
         }
+        err = cause
     }
-
     return resp
 }
 
 // Cause returns the first immediate cause of an error, or nil if there no cause
 func Cause(err error) (resp error) {
     resp = err
-    cause, ok := err.(Error)
+    core, ok := err.(Error)
     if ok {
-        err = cause.Cause()
+        err = core.Cause()
         if err != nil {
             resp = err
         }

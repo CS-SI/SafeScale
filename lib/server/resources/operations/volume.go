@@ -239,7 +239,7 @@ func (objv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
             }
             nbAttach := uint(len(volumeAttachmentsV1.Hosts))
             if nbAttach > 0 {
-                list := make([]string, len(volumeAttachmentsV1.Hosts))
+                list := make([]string, 0, len(volumeAttachmentsV1.Hosts))
                 for _, v := range volumeAttachmentsV1.Hosts {
                     // Abort if asked for
                     if task.Aborted() {

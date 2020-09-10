@@ -121,13 +121,13 @@ func TestMock_GetGpuTemplate_Mock(t *testing.T) {
 		// TODO Make it return a NVIDIA 1080 TI only for mocks
 		// TODO Create HostTemplateGenerator
 		amok.EXPECT().ListTemplates(false).Return(nil, nil)
-		amok.EXPECT().GetTemplate("g3-120")
+		amok.EXPECT().InspectTemplate("g3-120")
 	}
 
 	tpls, err := cli.Service.ListTemplates(false)
 	assert.NoError(t, err)
 
-	_, err = cli.Service.GetTemplate("g3-120")
+	_, err = cli.Service.InspectTemplate("g3-120")
 
 	if err == nil {
 		for _, tpl := range tpls {
@@ -198,7 +198,7 @@ func TestMock_GetKeyPair_Mock(t *testing.T) {
 	// TODO use Mock object
 	_ = amok
 
-	cli.GetKeyPair(t)
+	cli.InspectKeyPair(t)
 }
 
 func TestMock_ListKeyPairs_Mock(t *testing.T) {
@@ -296,13 +296,13 @@ func TestMock_ListImages(t *testing.T) {
 	// TODO use Mock object
 }
 
-// GetImage returns the Image referenced by id
+// InspectImage returns the Image referenced by id
 func TestMock_GetImage(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
 }
 
-// GetTemplate returns the Template referenced by id
+// InspectTemplate returns the Template referenced by id
 func TestMock_GetTemplate(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
@@ -321,7 +321,7 @@ func TestMock_CreateKeyPair(t *testing.T) {
 	// TODO use Mock object
 }
 
-// GetKeyPair returns the key pair identified by id
+// InspectKeyPair returns the key pair identified by id
 func TestMock_GetKeyPair(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
@@ -345,7 +345,7 @@ func TestMock_CreateNetwork(t *testing.T) {
 	// TODO use Mock object
 }
 
-// GetNetwork returns the network identified by ref (id or name)
+// InspectNetwork returns the network identified by ref (id or name)
 func TestMock_GetNetwork(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
@@ -426,7 +426,7 @@ func TestMock_CreateVolume(t *testing.T) {
 	// TODO use Mock object
 }
 
-// GetVolume returns the volume identified by id
+// InspectVolume returns the volume identified by id
 func TestMock_GetVolume(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
@@ -453,7 +453,7 @@ func TestMock_CreateVolumeAttachment(t *testing.T) {
 	// TODO use Mock object
 }
 
-// GetVolumeAttachment returns the volume attachment identified by id
+// InspectVolumeAttachment returns the volume attachment identified by id
 func TestMock_GetVolumeAttachment(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object

@@ -270,8 +270,8 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
     return volume, nil
 }
 
-// GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(ref string) (*abstract.Volume, fail.Error) {
+// InspectVolume returns the volume identified by id
+func (s *Stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
     // FIXME: validate parameters
     defer debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().Exiting()
 

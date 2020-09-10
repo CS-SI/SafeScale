@@ -101,15 +101,15 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
     return revol, nil
 }
 
-// GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(ref string) (*abstract.Volume, fail.Error) {
+// InspectVolume returns the volume identified by id
+func (s *Stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
 
     // TODO: use concurrency.Tracer
-    logrus.Debug("vclouddirector.Client.GetVolume() called")
-    defer logrus.Debug("vclouddirector.Client.GetVolume() done")
+    logrus.Debug("vclouddirector.Client.InspectVolume() called")
+    defer logrus.Debug("vclouddirector.Client.InspectVolume() done")
 
     var volume abstract.Volume
 
@@ -253,8 +253,8 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
     }
 
     // TODO: use concurrency.Tracer
-    logrus.Debugf(">>> stacks.vclouddirector::GetVolumeAttachment(%s)", id)
-    defer logrus.Debugf("<<< stacks.vclouddirector::GetVolumeAttachment(%s)", id)
+    logrus.Debugf(">>> stacks.vclouddirector::InspectVolumeAttachment(%s)", id)
+    defer logrus.Debugf("<<< stacks.vclouddirector::InspectVolumeAttachment(%s)", id)
 
     vats, xerr := s.ListVolumeAttachments(serverID)
     if xerr != nil {

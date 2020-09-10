@@ -71,9 +71,7 @@ func (handler *networkHandler) Create(
     }
 
     task := handler.job.GetTask()
-    tracer := debug.NewTracer(
-        task,
-        tracing.ShouldTrace("handlers.network"),
+    tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.network"),
         "('%s', '%s', %s, <sizing>, '%s', '%s', %v)", name, cidr, ipVersion.String(), theos, gwname, failover,
     ).WithStopwatch().Entering()
     defer tracer.Exiting()
@@ -100,7 +98,7 @@ func (handler *networkHandler) Create(
     return objn, nil
 }
 
-// ErrorList returns the network list
+// List returns the network list
 func (handler *networkHandler) List(all bool) (netList []*abstract.Network, xerr fail.Error) {
     if handler == nil {
         return nil, fail.InvalidInstanceError()

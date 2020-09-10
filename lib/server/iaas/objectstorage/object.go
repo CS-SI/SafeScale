@@ -141,7 +141,7 @@ func (o *object) reloadFromItem(item stow.Item) fail.Error {
 }
 
 // Read reads the content of the object from Object Storage and writes it in 'target'
-func (o object) Read(target io.Writer, from, to int64) fail.Error {
+func (o *object) Read(target io.Writer, from, to int64) fail.Error {
     if o.IsNull() {
         return fail.InvalidInstanceError()
     }
@@ -218,7 +218,7 @@ func (o object) Read(target io.Writer, from, to int64) fail.Error {
 }
 
 // Write the source to the object in Object Storage
-func (o object) Write(source io.Reader, sourceSize int64) fail.Error {
+func (o *object) Write(source io.Reader, sourceSize int64) fail.Error {
     if o.IsNull() {
         return fail.InvalidInstanceError()
     }
@@ -240,7 +240,7 @@ func (o object) Write(source io.Reader, sourceSize int64) fail.Error {
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (o object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
+func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
     if o.IsNull() {
         return fail.InvalidInstanceError()
     }

@@ -30,6 +30,7 @@ import (
     "github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
     "github.com/gophercloud/gophercloud/pagination"
 
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
     "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
     "github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
     "github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -151,8 +152,8 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
     return newNet, nil
 }
 
-// GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
+// InspectNetworkByName ...
+func (s *Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -192,13 +193,13 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
         if !ok {
             return nil, fail.InvalidParameterError("entry['id']", "is not a string")
         }
-        return s.GetNetwork(id)
+        return s.InspectNetwork(id)
     }
     return nil, abstract.ResourceNotFoundError("network", name)
 }
 
-// GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
+// InspectNetwork returns the network identified by id
+func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
     if s == nil {
         return nil, fail.InvalidInstanceError()
     }
@@ -249,7 +250,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
     }
 
     // At this point, no network has been found with given reference
-    errNotFound := abstract.ResourceNotFoundError("network(GetNetwork)", id)
+    errNotFound := abstract.ResourceNotFoundError("network(InspectNetwork)", id)
     logrus.Debug(errNotFound)
     return nil, errNotFound
 }
@@ -565,28 +566,30 @@ func (s *Stack) deleteSubnet(id string) (xerr fail.Error) {
                 },
                 temporal.GetCommunicationTimeout(),
             )
-            switch innerXErr.(type) {
-            case *fail.ErrInvalidRequest:
-                msg := "hosts or services are still attached"
-                logrus.Warnf(strprocess.Capitalize(msg))
-                return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
-            default: //case gophercloud.ErrUnexpectedResponseCode:
-                neutronError, innerErr := ParseNeutronError(innerXErr.Error())
-                if innerErr != nil {
-                    switch innerErr.(type) {
-                    case *fail.ErrSyntax:
-                    default:
-                        return retry.StopRetryError(innerXErr)
-                    }
-                }
-
-                switch neutronError["type"] {
-                case "SubnetInUse":
+            if innerXErr != nil {
+                switch innerXErr.(type) {
+                case *fail.ErrInvalidRequest:
                     msg := "hosts or services are still attached"
                     logrus.Warnf(strprocess.Capitalize(msg))
                     return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
-                default:
-                    logrus.Debugf("NeutronError: type = %s", neutronError["type"])
+                default: // case gophercloud.ErrUnexpectedResponseCode:
+                    neutronError, innerErr := ParseNeutronError(innerXErr.Error())
+                    if innerErr != nil {
+                        switch innerErr.(type) {
+                        case *fail.ErrSyntax:
+                        default:
+                            return retry.StopRetryError(innerXErr)
+                        }
+                    }
+
+                    switch neutronError["type"] {
+                    case "SubnetInUse":
+                        msg := "hosts or services are still attached"
+                        logrus.Warnf(strprocess.Capitalize(msg))
+                        return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
+                    default:
+                        logrus.Debugf("NeutronError: type = %s", neutronError["type"])
+                    }
                 }
             }
             return innerXErr
@@ -737,7 +740,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, f
         return nil, fail.InvalidParameterError("name", "cannot be empty string")
     }
 
-    asg, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+    asg, xerr := s.InspectSecurityGroup(stacks.DefaultSecurityGroupName)
     if xerr != nil {
         return nil, xerr
     }

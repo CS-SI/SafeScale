@@ -46,13 +46,13 @@ func (objn *network) taskCreateGateway(task concurrency.Task, params concurrency
     }
     hostReq, ok := inputs["request"].(abstract.HostRequest)
     if !ok {
-        return nil, fail.InvalidParameterError("params['request']", "must be a abstract.GatewayRequest")
+        return nil, fail.InvalidParameterError("params['request']", "must be an abstract.GatewayRequest")
     }
     if hostReq.TemplateID == "" {
-        return nil, fail.InvalidRequestError("params['request'].TemplateID", "cannot be empty string")
+        return nil, fail.InvalidRequestError("params['request'].TemplateID cannot be empty string")
     }
     if len(hostReq.Networks) == 0 {
-        return nil, fail.InvalidRequestError("params['request'].Networks", "cannot be an empty '[]*abstract.Network'")
+        return nil, fail.InvalidRequestError("params['request'].Networks cannot be an empty '[]*abstract.Network'")
     }
     hostSizing, ok := inputs["sizing"].(abstract.HostSizingRequirements)
     if !ok {
