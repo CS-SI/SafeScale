@@ -35,6 +35,9 @@ type GatewayRequest struct {
 	KeyPair *KeyPair
 	// Name is the name to give to the gateway
 	Name string
+
+	// OriginalOsRequest is the original os requested
+	OriginalOsRequest string
 }
 
 // NetworkRequest represents network requirements to create a subnet where Mask is defined in CIDR notation
