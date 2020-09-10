@@ -225,7 +225,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		imageID = b.makers.DefaultImage(task, b)
 	}
 	if imageID == "" {
-		imageID = "Ubuntu 18.04"
+		imageID = "Ubuntu 18.04" // FIXME: Remove hardcoded default
 	}
 
 	// Determine Gateway sizing

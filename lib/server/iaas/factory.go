@@ -148,7 +148,11 @@ func UseService(tenantName string) (newService Service, err error) {
 		// Initializes Provider
 		providerInstance, err := svc.Build( /*tenantClient*/ tenant)
 		if err != nil {
-			return nil, fmt.Errorf("error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error())
+			return nil, scerr.Errorf(
+				fmt.Sprintf(
+					"error creating tenant '%s' on provider '%s': %s", tenantName, provider, err.Error(),
+				), nil,
+			)
 		}
 		serviceCfg, err := providerInstance.GetConfigurationOptions()
 		if err != nil {
@@ -171,7 +175,9 @@ func UseService(tenantName string) (newService Service, err error) {
 			}
 			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
 			if err != nil {
-				return nil, fmt.Errorf("error connecting to Object Storage Location: %s", err.Error())
+				return nil, scerr.Errorf(
+					fmt.Sprintf("error connecting to Object Storage Location: %s", err.Error()), nil,
+				)
 			}
 		} else {
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
@@ -190,20 +196,23 @@ func UseService(tenantName string) (newService Service, err error) {
 			}
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
-				return nil, fmt.Errorf("error connecting to Object Storage Location to store metadata: %s", err.Error())
+				return nil, scerr.Errorf(
+					fmt.Sprintf(
+						"error connecting to Object Storage Location to store metadata: %s", err.Error(),
+					), nil,
+				)
 			}
 			anon, found := serviceCfg.Get("MetadataBucketName")
 			if !found {
-				return nil, fmt.Errorf("missing configuration option 'MetadataBucketName'")
+				return nil, scerr.Errorf(fmt.Sprintf("missing configuration option 'MetadataBucketName'"), nil)
 			}
 			bucketName, ok := anon.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid bucket name, it's not a string")
+				return nil, scerr.Errorf(fmt.Sprintf("invalid bucket name, it's not a string"), nil)
 			}
 			found, err = metadataLocation.FindBucket(bucketName)
 			if err != nil {
-				return nil, fmt.Errorf("error accessing metadata location: %s", err.Error())
-				//
+				return nil, scerr.Errorf(fmt.Sprintf("error accessing metadata location: %s", err.Error()), nil)
 			}
 			if found {
 				metadataBucket, err = metadataLocation.GetBucket(bucketName)
@@ -243,7 +252,7 @@ func UseService(tenantName string) (newService Service, err error) {
 	}
 
 	if !tenantInCfg {
-		return nil, fmt.Errorf("tenant '%s' not found in configuration", tenantName)
+		return nil, scerr.Errorf(fmt.Sprintf("tenant '%s' not found in configuration", tenantName), nil)
 	}
 	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
 }
@@ -259,7 +268,11 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fmt.Errorf("invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error())
+			return scerr.Errorf(
+				fmt.Sprintf(
+					"invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error(),
+				), nil,
+			)
 		}
 		svc.whitelistTemplateRE = re
 	}
@@ -267,7 +280,11 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fmt.Errorf("invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error())
+			return scerr.Errorf(
+				fmt.Sprintf(
+					"invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error(),
+				), nil,
+			)
 		}
 		svc.blacklistTemplateRE = re
 	}
@@ -275,7 +292,11 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fmt.Errorf("invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error())
+			return scerr.Errorf(
+				fmt.Sprintf(
+					"invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error(),
+				), nil,
+			)
 		}
 		svc.whitelistImageRE = re
 	}
@@ -283,7 +304,11 @@ func validateRegexps(svc *service, tenant map[string]interface{}) error {
 		// Validate regular expression
 		re, err := regexp.Compile(reStr)
 		if err != nil {
-			return fmt.Errorf("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
+			return scerr.Errorf(
+				fmt.Sprintf(
+					"invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error(),
+				), nil,
+			)
 		}
 		svc.blacklistImageRE = re
 	}
@@ -302,7 +327,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
-		return config, fmt.Errorf("missing setting 'Type' in 'objectstorage' section")
+		return config, scerr.Errorf(fmt.Sprintf("missing setting 'Type' in 'objectstorage' section"), nil)
 	}
 
 	if config.Domain, ok = ostorage["Domain"].(string); !ok {
@@ -380,7 +405,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		}
 		for _, key := range keys {
 			if _, ok = identity[key].(string); !ok {
-				return config, fmt.Errorf("problem parsing %s", key)
+				return config, scerr.Errorf(fmt.Sprintf("problem parsing %s", key), nil)
 			}
 		}
 
@@ -559,7 +584,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 		for _, key := range keys {
 			if _, ok = identity[key].(string); !ok {
-				return config, fmt.Errorf("problem parsing %s", key)
+				return config, scerr.Errorf(fmt.Sprintf("problem parsing %s", key), nil)
 			}
 		}
 
@@ -603,12 +628,18 @@ func loadConfig() error {
 				allTenants[name] = provider
 
 			} else {
-				return fmt.Errorf(
-					"invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name,
+				return scerr.Errorf(
+					fmt.Sprintf(
+						"invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name,
+					), nil,
 				)
 			}
 		} else {
-			return fmt.Errorf("invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed())
+			return scerr.Errorf(
+				fmt.Sprintf(
+					"invalid configuration file. A tenant has no 'name' entry in '%s'", v.ConfigFileUsed(),
+				), nil,
+			)
 		}
 	}
 	return nil
@@ -626,10 +657,14 @@ func getTenantsFromCfg() ([]interface{}, error) {
 
 	if err := v.ReadInConfig(); err != nil { // Handle errors reading the config file
 		msg := fmt.Sprintf("error reading configuration file: %s", err.Error())
-		logrus.Errorf(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, scerr.Errorf(fmt.Sprintf(msg), nil)
 	}
 	settings := v.AllSettings()
-	tenantsCfg, _ := settings["tenants"].([]interface{})
+	tenantsCfg, ok := settings["tenants"].([]interface{})
+
+	if !ok {
+		return nil, scerr.Errorf("invalid tenants.toml configuration file", nil)
+	}
+
 	return tenantsCfg, nil
 }

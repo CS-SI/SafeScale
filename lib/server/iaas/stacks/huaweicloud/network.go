@@ -80,10 +80,6 @@ type vpcGetResult struct {
 	vpcCommonResult
 }
 
-// type vpcDeleteResult struct {
-// 	gophercloud.ErrResult
-// }
-
 // CreateVPC creates a network, which is managed by VPC in FlexibleEngine
 func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Only one VPC allowed by client instance
