@@ -184,6 +184,7 @@ func (mh *Host) mayReadByID(id string) (err error) {
 	if err != nil {
 		return err
 	}
+
 	mh.id = &(host.ID)
 	mh.name = &(host.Name)
 	return nil
@@ -205,6 +206,7 @@ func (mh *Host) mayReadByName(name string) (err error) {
 	if err != nil {
 		return err
 	}
+
 	mh.name = &(host.Name)
 	mh.id = &(host.ID)
 	return nil

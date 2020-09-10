@@ -69,8 +69,7 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 
 			for _, image := range resp.Items {
 				images = append(
-					images,
-					resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10)},
+					images, resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10)},
 				)
 			}
 			token := resp.NextPageToken
@@ -363,8 +362,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		func() error {
 			server, err := buildGcpMachine(
 				s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region,
-				s.GcpConfig.Zone,
-				s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template,
+				s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway,
+				template,
 			)
 			if err != nil {
 				if server != nil {

@@ -236,6 +236,7 @@ func (m *Network) mayReadByID(id string) (err error) {
 	if err != nil {
 		return err
 	}
+
 	m.id = &(network.ID)
 	m.name = &(network.Name)
 	// m.inside = metadata.NewFolder(m.item.GetService(), strings.Trim(m.item.GetPath()+"/"+id, "/"))
@@ -258,6 +259,7 @@ func (m *Network) mayReadByName(name string) (err error) {
 	if err != nil {
 		return err
 	}
+
 	m.name = &(network.Name)
 	m.id = &(network.ID)
 	return nil
