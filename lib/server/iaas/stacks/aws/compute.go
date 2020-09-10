@@ -64,6 +64,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = s.ImportKeyPair(keypair)
+	if err != nil {
+		return nil, err
+	}
+
 	return keypair, nil
 }
 
@@ -272,12 +278,11 @@ func createFilters() []*ec2.Filter {
 		aws.String("099720109477"), // Ubuntu
 		aws.String("013116697141"), // Fedora
 		aws.String("379101102735"), // Debian
+		aws.String("125523088429"), // CentOS 8
 		aws.String("161831738826"), // Centos 7 with ENA
 		aws.String("057448758665"), // Centos 7
 		aws.String("679593333241"), // Centos 6 AND Others
 		aws.String("595879546273"), // CoreOS
-		aws.String("902460189751"), // Gentoo
-		aws.String("341857463381"), // Gentoo
 	}
 	filters = append(
 		filters, &ec2.Filter{
@@ -975,10 +980,7 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 	return &host, nil
 }
 
-func buildAwsMachine(
-	EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool,
-	template *resources.HostTemplate, sgID string,
-) (*resources.Host, error) {
+func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *resources.HostTemplate, sgID string) (*resources.Host, error) {
 	logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
