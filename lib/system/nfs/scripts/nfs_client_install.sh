@@ -48,16 +48,14 @@ case $LINUX_KIND in
         touch /var/log/lastlog
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
-        sfWaitForApt
-        finishPreviousInstall
 
-        sfRetry 3m 5 "sfWaitForApt && apt -y update"
-        sfRetry 5m 5 "sfWaitForApt && apt-get install -qqy nfs-common"
+        sfRetry 3m 5 "sfApt -y update"
+        sfRetry 5m 5 "sfApt install -qqy nfs-common"
         ;;
 
     rhel|centos)
         sfRetry 3m 5 "yum makecache"
-        yum install -y nfs-utils
+        sfRetry 3m 5 "sfYum install -y nfs-utils"
         setsebool -P use_nfs_home_dirs 1
         sfFirewallAdd --add-service=nfs
         sfFirewallAdd --add-service=mountd

@@ -27,9 +27,9 @@ install_common_requirements() {
 
     # Upgrade to last CentOS revision
     rm -rf /usr/lib/python2.7/site-packages/backports.ssl_match_hostname-3.5.0.1-py2.7.egg-info && \
-    yum install -y python-backports-ssl_match_hostname && \
-    yum upgrade --assumeyes --tolerant && \
-    yum update --assumeyes
+    sfRetry 3m 5 "sfYum install -y python-backports-ssl_match_hostname" && \
+    sfRetry 3m 5 "sfYum upgrade --assumeyes --tolerant" && \
+    sfRetry 3m 5 "sfYum update --assumeyes"
     [ $? -ne 0 ] && exit 192
 
     # Create group nogroup
@@ -81,14 +81,14 @@ EOF
     done
 
     # Disables installation of docker-python from yum and adds some requirements
-    yum remove -y python-docker-py &>/dev/null
-    yum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq rclone && \
-    yum versionlock exclude python-docker-py || exit 193
+    sfRetry 3m 5 "sfYum remove -y python-docker-py &>/dev/null"
+    sfRetry 3m 5 "sfYum install -y yum-versionlock yum-utils tar xz curl wget unzip ipset pigz bind-utils jq rclone" && \
+    sfYum versionlock exclude python-docker-py || exit 193
 
     # Installs PIP
     sfRetry 3m 5 "yum install -y epel-release" || exit 194
     sfRetry 3m 5 "yum makecache" || exit 194
-    yum install -y python-pip || yum install -y python2-pip || exit 194
+    sfRetry 3m 5 "sfYum install -y python-pip" || sfRetry 3m 5 "sfYum install -y python2-pip" || exit 194
 
     # Installs docker-python with pip
     pip install -q docker-py==1.10.6 || exit 195
@@ -108,12 +108,12 @@ baseurl=http://opensource.wandisco.com/centos/7/svn-1.9/RPMS/$basearch/
 gpgcheck=1
 gpgkey=http://opensource.wandisco.com/RPM-GPG-KEY-WANdisco
 EOF
-    yum install -y subversion
+    sfRetry 3m 5 "sfYum install -y subversion"
 
     echo "Common requirements successfully installed."
 }
 export -f install_common_requirements
 
 sfRetry 3m 5 "yum makecache"
-yum install -y time
+sfRetry 3m 5 "sfYum install -y time"
 /usr/bin/time -p bash -c install_common_requirements

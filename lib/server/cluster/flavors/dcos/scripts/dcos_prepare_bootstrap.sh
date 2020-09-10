@@ -82,7 +82,7 @@ sfRetry 3m 5 "yum makecache" || exit 204
 
 mkdir -p ${SF_VARDIR}/dcos/genconf/serve/docker && \
 cd ${SF_VARDIR}/dcos && \
-yum install -y wget curl time jq unzip || exit 204
+sfRetry 3m 5 "sfYum install -y wget curl time jq unzip" || exit 204
 
 # Launch downloads in parallel
 sfAsyncStart DDCG 15m bash -c download_dcos_config_generator

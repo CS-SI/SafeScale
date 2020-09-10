@@ -101,12 +101,11 @@ case $(sfGetFact "linux_kind") in
         ;;
     redhat|rhel|centos|fedora)
         if [[ -n $(which dnf) ]]; then
-          sfRetry 3m 5 "dnf makecache -y"
-          dnf install -y wget curl time rclone jq unzip
+          sfRetry 3m 5 "sfYum makecache -y"
         else
-          sfRetry 3m 5 "yum makecache"
-          yum install -y wget curl time rclone jq unzip
+          sfRetry 3m 5 "sfYum makecache"
         fi
+        sfRetry 3m 5 "sfYum install -y wget curl time rclone jq unzip"
         ;;
     *)
         echo "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"

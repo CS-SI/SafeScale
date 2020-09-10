@@ -25,8 +25,8 @@ install_common_requirements() {
 
     # Upgrade to last CentOS revision
     if [ "$(sfGetFact "redhat_like")" = "1" ]; then
-        yum upgrade --assumeyes --tolerant && \
-        yum update --assumeyes
+        sfYum upgrade --assumeyes --tolerant && \
+        sfYum update --assumeyes
         [ $? -ne 0 ] && sfFail 192
     fi
 
@@ -89,5 +89,5 @@ EOF
 export -f install_common_requirements
 
 sfRetry 3m 5 "yum makecache"
-yum install -y wget curl time rclone jq unzip
+sfRetry 3m 5 "sfYum install -y wget curl time rclone jq unzip"
 /usr/bin/time -p bash -c install_common_requirements

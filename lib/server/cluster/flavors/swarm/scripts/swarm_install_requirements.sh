@@ -70,10 +70,11 @@ export -f install_common_requirements
 case $LINUX_KIND in
     centos|fedora|redhat|rhel)
         sfRetry 3m 5 "yum makecache"
-        yum install -y curl wget time jq rclone unzip
+        sfRetry 3m 5 "sfYum install -y curl wget time jq rclone unzip"
         ;;
     debian|ubuntu)
-        sfApt update && sfApt install -y curl wget time jq unzip
+        sfRetry 3m 5 "sfApt update"
+        sfRetry 3m 5 "sfApt install -y curl wget time jq unzip"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cd rclone-*-linux-amd64 && \
