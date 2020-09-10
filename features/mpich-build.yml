@@ -48,16 +48,16 @@ feature:
                             case $LINUX_KIND in
                                 redhat|rhel|fedora|centos)
                                     if [[ -n $(which dnf) ]]; then
-                                        sfRetry 3m 5 "dnf makecache -y"
+                                        sfRetry 3m 5 "sfYum makecache -y"
                                     else
-                                        sfRetry 3m 5 "yum makecache fast"
+                                        sfRetry 3m 5 "sfYum makecache fast"
                                     fi
-                                    yum groupinstall -y "Development Tools"
-                                    yum install -y wget
+                                    sfYum groupinstall -y "Development Tools"
+                                    sfRetry 3m 5 "sfYum install -y wget"
                                     ;;
                                 debian|ubuntu)
-                                    apt update
-                                    apt install -y build-essential wget
+                                    sfRetry 3m 5 "sfApt update"
+                                    sfRetry 3m 5 "sfApt install -y build-essential wget"
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

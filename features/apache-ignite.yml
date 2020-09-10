@@ -45,16 +45,16 @@ feature:
                 gpgkey=https://apache.org/dist/ignite/KEYS
                 https://bintray.com/user/downloadSubjectPublicKey?username=bintray
                 EOF
-                        yum check-update
-                        yum install -y apache-ignite
+                        sfYum check-update
+                        sfRetry 3m 5 "sfYum install -y apache-ignite"
                         systemctl enable apache-ignite
                         systemctl start apache-ignite
                         ;;
                     debian|ubuntu)
                         echo "deb http://apache.org/dist/ignite/deb/ apache-ignite main" >/etc/apt/sources.list.d/ignite.list
                         apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
-                        apt update
-                        apt install -y --no-install-recommends apache-ignite
+                        sfRetry 3m 5 "sfApt update"
+                        sfRetry 3m 5 "sfApt install -y --no-install-recommends apache-ignite"
                         systemctl enable apache-ignite
                         systemctl start apache-ignite
                         ;;
@@ -69,11 +69,11 @@ feature:
                 systemctl disable apache-ignite
                 case $LINUX_KIND in
                     redhat|rhel|fedora|centos)
-                        yum remove -y apache-ignite
+                        sfYum remove -y apache-ignite
                         rm -f /etc/yum.repos.d/ignite.repo
                         ;;
                     debian|ubuntu)
-                        apt remove -y apache-ignite
+                        sfApt remove -y apache-ignite
                         rm -f /etc/apt/sources.list.d/ignite.list
                         ;;
 

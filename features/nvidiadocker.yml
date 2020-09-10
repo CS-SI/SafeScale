@@ -76,7 +76,7 @@ feature:
                                     update-initramfs -u || true
 
                                     dpkg --compare-versions $(sfGetFact "version_id") ge 18.04 && DIST=ubuntu18.04 || DIST=ubuntu16.04
-                                    sfWaitForApt && apt install -y gcc linux-headers-$(uname -r) || sfFail $?
+                                    sfRetry 3m 5 "sfApt install -y gcc linux-headers-$(uname -r)" || sfFail $?
                                     if dpkg --compare-versions $DOCKER_VERSION ge 19.03; then
                                         # first install cuda-drivers
                                         apt-get install linux-headers-$(uname -r)
@@ -89,8 +89,8 @@ feature:
                                         # Second install nvidia-docker
                                         curl -s -L ${NVIDIA_DOCKER_URL}/gpgkey | apt-key add -
                                         curl -s -L ${NVIDIA_DOCKER_URL}/${DIST}/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
-                                        sfApt update
-                                        sfApt install -y nvidia-container-toolkit
+                                        sfRetry 3m 5 "sfApt update"
+                                        sfRetry 3m 5 "sfApt install -y nvidia-container-toolkit"
                                         systemctl restart docker
                                     else
                                         wget -O cuda-repo.deb ${NVIDIA_URL}/${DIST}/x86_64/cuda-repo-${DIST}_9.2.148-1_amd64.deb || sfFail $?
@@ -101,16 +101,16 @@ feature:
                                         curl -s -L ${NVIDIA_DOCKER_URL}/gpgkey | apt-key add -
                                         curl -s -L ${NVIDIA_DOCKER_URL}/${DIST}/nvidia-docker.list | \
                                             tee /etc/apt/sources.list.d/nvidia-docker.list
-                                        sfWaitForApt && apt update
-                                        sfWaitForApt && apt install -y cuda || sfFail $?
-                                        sfWaitForApt && yes | apt install -y nvidia-docker2 || sfFail $?
+                                        sfRetry 3m 5 "sfApt update"
+                                        sfRetry 3m 5 "sfApt install -y cuda" || sfFail $?
+                                        sfRetry 3m 5 "sfApt install -y nvidia-docker2" || sfFail $?
                                     fi
                                     ;;
 
                                 debian)
                                     wget -O cuda-repo.deb ${NVIDIA_URL}/ubuntu1710/x86_64/cuda-repo-ubuntu1710_9.2.148-1_amd64.deb || sfFail $?
                                     dpkg -i cuda-repo.deb || sfFail $?
-                                    sfWaitForApt && apt install -y dirmngr gcc linux-headers-$(uname -r) || sfFail $?
+                                    sfRetry 3m 5 "sfApt install -y dirmngr gcc linux-headers-$(uname -r)" || sfFail $?
                                     apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1710/x86_64/7fa2af80.pub
                                     rm -f cuda-repo.deb
                                     curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
@@ -119,27 +119,27 @@ feature:
                                         tee /etc/apt/sources.list.d/nvidia-docker.list
                                     wget -O screen-resolution-extra.deb http://security.ubuntu.com/ubuntu/pool/main/s/screen-resolution-extra/screen-resolution-extra_0.17.1.1_all.deb || sfFail $?
                                     wget -O python3-xkit.deb http://archive.ubuntu.com/ubuntu/pool/main/x/x-kit/python3-xkit_0.5.0ubuntu2_all.deb || sfFail $?
-                                    apt -y install libgtk-3-0 policykit-1-gnome || sfFail $?
+                                    sfApt -y install libgtk-3-0 policykit-1-gnome || sfFail $?
                                     dpkg -i python3-xkit.deb screen-resolution-extra.deb || sfFail $?
-                                    sfWaitForApt && apt update
-                                    sfWaitForApt && apt install -y cuda || sfFail $?
-                                    sfWaitForApt && yes | apt install -y nvidia-docker2 || sfFail $?
+                                    sfRetry 3m 5 "sfApt update"
+                                    sfRetry 3m 5 "sfApt install -y cuda" || sfFail $?
+                                    sfRetry 3m 5 "sfApt install -y nvidia-docker2" || sfFail $?
                                     ;;
 
                                 centos|fedora|redhat|rhel)
-                                    sfRetry 3m 5 "yum install -y epel-release"
-                                    yum install -y gcc yum kernel-devel kernel-headers
+                                    sfRetry 3m 5 "sfYum install -y epel-release"
+                                    sfRetry 3m 5 "sfYum install -y gcc yum kernel-devel kernel-headers"
                                     DIST=$(. /etc/os-release;echo $ID$VERSION_ID)
                                     if docker_version >= 19.03; then
                                         curl -s -L https://nvidia.github.io/nvidia-docker/${DIST}/nvidia-docker.repo | \
                                             tee /etc/yum.repos.d/nvidia-docker.repo
-                                        yum install -y nvidia-container-toolkit
+                                        sfRetry 3m 5 "sfYum install -y nvidia-container-toolkit"
                                         sfSystem restart docker
                                     else
                                         curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.repo | \
                                             tee /etc/yum.repos.d/nvidia-docker.repo || sfFail $?
-                                        yum clean expire-cache
-                                        yum install -y cuda nvidia-docker2 || sfFail $?
+                                        sfYum clean expire-cache
+                                        sfRetry 3m 5 "sfYum install -y cuda nvidia-docker2" || sfFail $?
                                     fi
                                     ;;
                                 *)
@@ -160,10 +160,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfWaitForApt && apt remove -y nvidia-docker2
+                                    sfApt remove -y nvidia-docker2
                                     ;;
                                 centos|fedora|redhat|rhel)
-                                    yum remove -y nvidia-docker2
+                                    sfYum remove -y nvidia-docker2
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
