@@ -19,6 +19,7 @@ package metadata
 import (
 	"fmt"
 
+	"github.com/graymeta/stow"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -138,16 +139,30 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	var errors []error
-	err = mh.mayReadByID(ref) // First read by ID ...
-	if err != nil {
-		errors = append(errors, err)
-		err = mh.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice if the 2 exist)
-		if err != nil {
-			errors = append(errors, err)
-		}
+	err1 := mh.mayReadByID(ref) // First read by ID ...
+	if err1 != nil {
+		errors = append(errors, err1)
 	}
-	if err != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+
+	err2 := mh.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice if the 2 exist)
+	if err2 != nil {
+		errors = append(errors, err2)
+	}
+
+	if len(errors) == 2 { // FIXME This is false, is not a 404
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Implementation detail
+			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+		}
+
+		if _, ok := err1.(scerr.ErrNotFound); ok {
+			if _, ok := err2.(scerr.ErrNotFound); ok {
+				return scerr.NotFoundErrorWithCause(
+					fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors),
+				)
+			}
+		}
+
+		return scerr.ErrListError(errors)
 	}
 
 	return nil
@@ -385,6 +400,11 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
+
+				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+					return retry.AbortedError("no metadata found", innerErr)
+				}
+
 				return innerErr
 			}
 			return nil
@@ -400,6 +420,15 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 		default:
 			return nil, scerr.Cause(realErr)
 		}
+	}
+
+	ok, err := mh.OK()
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		return nil, scerr.NotFoundError(fmt.Sprintf("reference %s not found", ref))
 	}
 
 	return mh, nil

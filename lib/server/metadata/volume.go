@@ -19,10 +19,11 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/graymeta/stow"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -140,16 +141,30 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	}
 
 	var errors []error
-	err = mv.mayReadByID(ref) // First read by ID ...
-	if err != nil {
-		errors = append(errors, err)
-		err = mv.mayReadByName(ref) // ... then read by name only if by id failed (no need to read twice if the 2 exist)
-		if err != nil {
-			errors = append(errors, err)
-		}
+	err1 := mv.mayReadByID(ref) // First read by ID ...
+	if err1 != nil {
+		errors = append(errors, err1)
 	}
-	if err != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+
+	err2 := mv.mayReadByName(ref) // ... then read by name only if by id failed (no need to read twice if the 2 exist)
+	if err2 != nil {
+		errors = append(errors, err2)
+	}
+
+	if len(errors) == 2 {
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Implementation detail
+			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+		}
+
+		if _, ok := err1.(scerr.ErrNotFound); ok {
+			if _, ok := err2.(scerr.ErrNotFound); ok {
+				return scerr.NotFoundErrorWithCause(
+					fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors),
+				)
+			}
+		}
+
+		return scerr.ErrListError(errors)
 	}
 
 	return nil
@@ -373,6 +388,11 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
+
+				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+					return retry.AbortedError("no metadata found", innerErr)
+				}
+
 				return innerErr
 			}
 			return nil

@@ -19,6 +19,8 @@ package metadata
 import (
 	"fmt"
 
+	"github.com/graymeta/stow"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
@@ -144,17 +146,30 @@ func (ms *Share) ReadByReference(ref string) (err error) {
 	}
 
 	var errors []error
-	err = ms.mayReadByID(ref) // First read by id ...
-	if err != nil {
-		errors = append(errors, err)
-		err = ms.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice)
-		if err != nil {
-			errors = append(errors, err)
-		}
+	err1 := ms.mayReadByID(ref) // First read by id ...
+	if err1 != nil {
+		errors = append(errors, err1)
 	}
 
-	if err != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+	err2 := ms.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice)
+	if err2 != nil {
+		errors = append(errors, err2)
+	}
+
+	if len(errors) == 2 {
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Implementation detail
+			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+		}
+
+		if _, ok := err1.(scerr.ErrNotFound); ok {
+			if _, ok := err2.(scerr.ErrNotFound); ok {
+				return scerr.NotFoundErrorWithCause(
+					fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors),
+				)
+			}
+		}
+
+		return scerr.ErrListError(errors)
 	}
 
 	return nil
@@ -441,6 +456,11 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
+
+				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+					return retry.AbortedError("no metadata found", innerErr)
+				}
+
 				return innerErr
 			}
 

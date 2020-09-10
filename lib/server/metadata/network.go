@@ -19,6 +19,8 @@ package metadata
 import (
 	"fmt"
 
+	"github.com/graymeta/stow"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
@@ -190,17 +192,30 @@ func (m *Network) ReadByReference(ref string) (err error) {
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var errors []error
-	err = m.mayReadByID(ref) // First read by id...
-	if err != nil {
-		errors = append(errors)
-		err = m.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice if the 2 exist)
-		if err != nil {
-			errors = append(errors)
-		}
+	err1 := m.mayReadByID(ref) // First read by id...
+	if err1 != nil {
+		errors = append(errors, err1)
 	}
 
-	if err != nil {
-		return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+	err2 := m.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice if the 2 exist)
+	if err2 != nil {
+		errors = append(errors, err2)
+	}
+
+	if len(errors) == 2 {
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Implementation detail
+			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+		}
+
+		if _, ok := err1.(scerr.ErrNotFound); ok {
+			if _, ok := err2.(scerr.ErrNotFound); ok {
+				return scerr.NotFoundErrorWithCause(
+					fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors),
+				)
+			}
+		}
+
+		return scerr.ErrListError(errors)
 	}
 	return nil
 }
@@ -211,9 +226,9 @@ func (m *Network) mayReadByID(id string) (err error) {
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(
 		ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
-			err := network.Deserialize(buf)
-			if err != nil {
-				return nil, err
+			ierr := network.Deserialize(buf)
+			if ierr != nil {
+				return nil, ierr
 			}
 			return network, nil
 		},
@@ -233,9 +248,9 @@ func (m *Network) mayReadByName(name string) (err error) {
 	network := resources.NewNetwork()
 	err = m.item.ReadFrom(
 		ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
-			err := network.Deserialize(buf)
-			if err != nil {
-				return nil, err
+			ierr := network.Deserialize(buf)
+			if ierr != nil {
+				return nil, ierr
 			}
 			return network, nil
 		},
@@ -542,6 +557,11 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 				if _, ok := innerErr.(scerr.ErrNotFound); ok {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
+
+				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+					return retry.AbortedError("no metadata found", innerErr)
+				}
+
 				return innerErr
 			}
 
@@ -558,6 +578,15 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 		default:
 			return nil, scerr.Cause(realErr)
 		}
+	}
+
+	ok, err := mn.OK()
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		return nil, scerr.NotFoundError(fmt.Sprintf("reference %s not found", ref))
 	}
 
 	return mn, nil
