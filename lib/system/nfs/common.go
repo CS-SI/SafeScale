@@ -183,7 +183,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			return err
 		},
 		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(temporal.GetContextTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.BackoffSelector()(temporal.GetDefaultDelay()),
 		nil, nil, nil,
 	)
 	if retryErr != nil {
