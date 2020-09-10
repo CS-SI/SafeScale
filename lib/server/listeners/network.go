@@ -88,7 +88,10 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 			MinFreq:     in.Gateway.Sizing.MinCpuFreq,
 		}
 	} else {
-		s := srvutils.FromPBHostSizing(in.Gateway.Sizing)
+		s, err := srvutils.FromPBHostSizing(in.Gateway.Sizing)
+		if err != nil {
+			return nil, err
+		}
 		sizing = &s
 	}
 	if in.Gateway != nil {
@@ -112,9 +115,12 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
+	if network == nil {
+		return nil, status.Errorf(codes.Internal, "network operation failure with nil result and nil error")
+	}
 
 	log.Infof("Network '%s' successfully created.", networkName)
-	return srvutils.ToPBNetwork(network), nil
+	return srvutils.ToPBNetwork(network)
 }
 
 // List existing networks
@@ -152,7 +158,13 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	// Map resources.Network to pb.Network
 	var pbnetworks []*pb.Network
 	for _, network := range networks {
-		pbnetworks = append(pbnetworks, srvutils.ToPBNetwork(network))
+		pbn, err := srvutils.ToPBNetwork(network)
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+
+		pbnetworks = append(pbnetworks, pbn)
 	}
 	rv = &pb.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -197,7 +209,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 		return nil, status.Errorf(codes.NotFound, fmt.Sprintf("cannot inspect network '%s': not found", ref))
 	}
 
-	return srvutils.ToPBNetwork(network), nil
+	return srvutils.ToPBNetwork(network)
 }
 
 // Delete a network

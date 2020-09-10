@@ -269,7 +269,7 @@ func (s *ssh) getSSHConfigFromName(name string, timeout time.Duration) (*system.
 	if err != nil {
 		return nil, err
 	}
-	return utils.ToSystemSSHConfig(sshConfig), nil
+	return utils.ToSystemSSHConfig(sshConfig)
 }
 
 // Connect ...
@@ -292,6 +292,7 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 }
 
 func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
+	log.Warnf("Getting ssh config of machine %s", name)
 	sshCfg, err := s.getSSHConfigFromName(name, timeout)
 	if err != nil {
 		return err

@@ -69,7 +69,12 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 	// Map resources.Image to pb.Image
 	var pbImages []*pb.Image
 	for _, image := range images {
-		pbImages = append(pbImages, srvutils.ToPBImage(&image))
+		pbi, err := srvutils.ToPBImage(&image)
+		if err != nil {
+			logrus.Warn(err)
+			continue
+		}
+		pbImages = append(pbImages, pbi)
 	}
 	rv := &pb.ImageList{Images: pbImages}
 	return rv, nil

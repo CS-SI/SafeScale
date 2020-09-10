@@ -756,7 +756,11 @@ func (handler *HostHandler) Create(
 	}
 
 	filepath := utils.TempFolder + "/user_data.phase2.sh"
-	err = install.UploadStringToRemoteFile(string(userDataPhase2), srvutils.ToPBHost(host), filepath, "", "", "")
+	pbHost, err := srvutils.ToPBHost(host)
+	if err != nil {
+		return nil, err
+	}
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), pbHost, filepath, "", "", "")
 	if err != nil {
 		return nil, err
 	}

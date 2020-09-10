@@ -70,7 +70,12 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	// Map resources.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
 	for _, template := range templates {
-		pbTemplates = append(pbTemplates, srvutils.ToPBHostTemplate(&template))
+		pbt, err := srvutils.ToPBHostTemplate(&template)
+		if err != nil {
+			log.Warn(err)
+			continue
+		}
+		pbTemplates = append(pbTemplates, pbt)
 	}
 	rv := &pb.TemplateList{Templates: pbTemplates}
 	return rv, nil

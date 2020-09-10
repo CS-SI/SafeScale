@@ -121,7 +121,6 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	c.Lock(task)
 

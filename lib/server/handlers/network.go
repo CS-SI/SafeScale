@@ -765,9 +765,11 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	if err != nil {
 		return nil, err
 	}
-	err = install.UploadStringToRemoteFile(
-		string(content), safescaleutils.ToPBHost(gw), utils.TempFolder+"/user_data.phase2.sh", "", "", "",
-	)
+	pbHost, err := safescaleutils.ToPBHost(gw)
+	if err != nil {
+		return nil, err
+	}
+	err = install.UploadStringToRemoteFile(string(content), pbHost, utils.TempFolder+"/user_data.phase2.sh", "", "", "")
 	if err != nil {
 		return nil, err
 	}
