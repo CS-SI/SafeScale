@@ -306,8 +306,9 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 			Port:          sshCfg.Port,
 			GatewayConfig: nil,
 		}
+		sshCfg.Host = "127.0.0.1"
 	}
-	sshCfg.Host = "127.0.0.1"
+
 	sshCfg.Port = remotePort
 	sshCfg.LocalPort = localPort
 

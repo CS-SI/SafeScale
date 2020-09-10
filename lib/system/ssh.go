@@ -264,7 +264,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 
 	options := sshOptions + " -oServerAliveInterval=60"
 	cmdString := fmt.Sprintf(
-		"ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -p %d",
+		"ssh -i %s -C -NL 127.0.0.1:%d:%s:%d %s@%s %s -p %d",
 		f.Name(),
 		localPort,
 		cfg.Host,
@@ -274,6 +274,20 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		options,
 		cfg.GatewayConfig.Port,
 	)
+	if cfg.Host != "127.0.0.1" {
+		cmdString = fmt.Sprintf(
+			"ssh -i %s -C -NL %d:%s:%d %s@%s %s -p %d",
+			f.Name(),
+			localPort,
+			cfg.Host,
+			cfg.Port,
+			cfg.GatewayConfig.User,
+			cfg.GatewayConfig.Host,
+			options,
+			cfg.GatewayConfig.Port,
+		)
+	}
+
 	cmd := exec.Command("sh", "-c", cmdString)
 	err = cmd.Start()
 	//	err = cmd.Wait()
@@ -281,20 +295,22 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, error) {
 		return nil, err
 	}
 
-	/*
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			if cmdString != "" {
-				logrus.Debugf("[TRACE] %s", cmdString)
-			}
-			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
-			partials := strings.Split(f.Name(), "/")
-			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1]))
-			err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
-			if err != nil {
-				logrus.Warnf("[TRACE] Failure storing key in %s", dumpName)
-			}
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if cmdString != "" {
+			logrus.Debugf("[TRACE] %s", cmdString)
 		}
-	*/
+		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", cfg.Host)), 0777)
+		partials := strings.Split(f.Name(), "/")
+		dumpName := utils.AbsPathify(
+			fmt.Sprintf(
+				"$HOME/.safescale/forensics/%s/%s.sshkey", cfg.Host, partials[len(partials)-1],
+			),
+		)
+		err = ioutil.WriteFile(dumpName, []byte(cfg.GatewayConfig.PrivateKey), 0644)
+		if err != nil {
+			logrus.Warnf("[TRACE] Failure storing key in %s", dumpName)
+		}
+	}
 
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
@@ -870,6 +886,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 
 			if stdout != "" {
 				if !strings.HasPrefix(stdout, "0,") {
+					logrus.Warn(stdout)
 					if strings.Contains(stdout, ",") {
 						splitted := strings.Split(stdout, ",")
 						return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
@@ -880,6 +897,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 
 			if stderr != "" {
 				if !strings.HasPrefix(stderr, "0,") {
+					logrus.Warn(stderr)
 					if strings.Contains(stderr, ",") {
 						splitted := strings.Split(stderr, ",")
 						return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
