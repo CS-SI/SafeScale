@@ -136,7 +136,7 @@ type HostRequest struct {
 	TemplateID string
 	// ImageID is the UUID of the image that contains the server's OS and initial state.
 	ImageID string
-	// KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
+	// KeyPair is the (mandatory) specific KeyPair to use (if not provided, a new KeyPair will be generated) // FIXME Add govalidator here
 	KeyPair *KeyPair
 	// Password contains the safescale password usable on host console only
 	Password string
