@@ -235,9 +235,11 @@ func UseService(tenantName string) (newService Service, err error) {
 				}
 			}
 		} else {
-			return nil, fmt.Errorf(
-				"failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'",
-				tenantName,
+			return nil, scerr.Errorf(
+				fmt.Sprintf(
+					"failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'",
+					tenantName,
+				), nil,
 			)
 		}
 
@@ -453,20 +455,31 @@ func validateOVHObjectStorageRegionNaming(context, region, authURL string) error
 }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, error) {
+func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (_ objectstorage.Config, err error) {
+	defer scerr.OnPanic(&err)()
+
 	var (
 		config objectstorage.Config
 		ok     bool
 	)
 
-	identity, _ := tenant["identity"].(map[string]interface{})
-	compute, _ := tenant["compute"].(map[string]interface{})
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
+	identity, ok := tenant["identity"].(map[string]interface{})
+	if !ok {
+		return config, scerr.Errorf(fmt.Sprintf("problem parsing tenants.toml"), nil)
+	}
+	compute, ok := tenant["compute"].(map[string]interface{})
+	if !ok {
+		return config, scerr.Errorf(fmt.Sprintf("problem parsing tenants.toml"), nil)
+	}
+	ostorage, ok := tenant["objectstorage"].(map[string]interface{})
+	if !ok {
+		return config, scerr.Errorf(fmt.Sprintf("problem parsing tenants.toml"), nil)
+	}
 	metadata, _ := tenant["metadata"].(map[string]interface{})
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
-			return config, fmt.Errorf("missing setting 'Type' in 'metadata' section")
+			return config, scerr.Errorf(fmt.Sprintf("missing setting 'Type' in 'metadata' section"), nil)
 		}
 	}
 
@@ -620,7 +633,11 @@ func loadConfig() error {
 		return err
 	}
 	for _, t := range tenantsCfg {
-		tenant, _ := t.(map[string]interface{})
+		tenant, ok := t.(map[string]interface{})
+		if !ok {
+			return scerr.Errorf(fmt.Sprintf("invalid configuration file '%s'.", v.ConfigFileUsed()), nil)
+		}
+
 		if name, ok := tenant["name"].(string); ok {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
