@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-
 	log "github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -581,6 +581,13 @@ func (svc *service) ListImages(all bool) ([]resources.Image, error) {
 	return svc.reduceImages(imgs), nil
 }
 
+func insensitiveContains(haystack string, needle string) bool {
+	upperHaystack := strings.ToUpper(haystack)
+	upperNeedle := strings.ToUpper(needle)
+
+	return strings.Contains(upperHaystack, upperNeedle)
+}
+
 // SearchImage search an image corresponding to OS Name
 func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 	if svc == nil {
@@ -595,14 +602,55 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 	log.Debugf("We are looking for an image for %s", svc.GetName())
 
 	if svc.GetName() == "aws" {
-		// FIXME AWS Mappings
+		region := ""
 
-		if strings.EqualFold(osname, "CentOS 7.3") {
-			osname = "ami-0ec8d2a455affc7e4"
+		if authopts, err := svc.GetAuthenticationOptions(); err == nil {
+			if regionCandidate, ok := authopts.Get("Region"); ok {
+				region, ok = regionCandidate.(string)
+				if !ok {
+					return nil, scerr.Errorf("unable to retrieve Region", nil)
+				}
+			}
 		}
 
-		if strings.EqualFold(osname, "Ubuntu 18.04") {
-			osname = "ami-0cc0a36f626a4fdf5"
+		// FIXME Fix AWS Mappings for other regions other than eu-central-1
+		if region == "eu-central-1" {
+			// CentOS
+			if insensitiveContains(osname, "Centos 7.3") {
+				osname = "ami-0ec8d2a455affc7e4"
+			}
+
+			if insensitiveContains(osname, "Centos 8") {
+				osname = "ami-032025b3afcbb6b34"
+			}
+
+			// Ubuntu
+			if insensitiveContains(osname, "Ubuntu 18.04") {
+				osname = "ami-0cc0a36f626a4fdf5"
+			}
+
+			if insensitiveContains(osname, "Ubuntu 19.10") {
+				osname = "ami-0279a50572ef10ca3"
+			}
+
+			if insensitiveContains(osname, "Ubuntu 19.04") {
+				osname = "ami-066866b740d9ce5a7"
+			}
+
+			if insensitiveContains(osname, "Ubuntu 20.04") {
+				osname = "ami-078bc46c55d0e1238"
+			}
+
+			// Debian
+			if insensitiveContains(osname, "Debian 9") {
+				osname = "ami-0f58cbd7f9b556613"
+			}
+
+			if insensitiveContains(osname, "Debian 10") {
+				osname = "ami-04989b617bd4f8f95"
+			}
+		} else {
+			return nil, scerr.Errorf(fmt.Sprintf("unsupported region: %s", region), nil)
 		}
 	}
 
@@ -638,9 +686,7 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 }
 
 // CreateHostWithKeyPair creates an host
-func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (
-	*resources.Host, *userdata.Content, *resources.KeyPair, error,
-) {
+func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, _ *resources.KeyPair, errx error) {
 	if svc == nil {
 		return nil, nil, nil, scerr.InvalidInstanceError()
 	}
@@ -661,6 +707,14 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	defer func() {
+		if err != nil {
+			cleanErr := svc.DeleteKeyPair(kpName)
+			if cleanErr != nil {
+				errx = scerr.AddConsequence(errx, cleanErr)
+			}
+		}
+	}()
 
 	// Create host
 	hostReq := resources.HostRequest{
