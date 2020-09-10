@@ -434,12 +434,19 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}()
 
+	// Adding disabled features to cluster identity
+	var disabledFeatures []string
+	for k, _ := range req.DisabledDefaultFeatures {
+		disabledFeatures = append(disabledFeatures, k)
+	}
+
 	// Saving Cluster metadata, with status 'Creating'
 	b.cluster.Identity.Name = req.Name
 	b.cluster.Identity.Flavor = req.Flavor
 	b.cluster.Identity.Complexity = req.Complexity
 	b.cluster.Identity.Keypair = kp
 	b.cluster.Identity.AdminPassword = cladmPassword
+	b.cluster.Identity.DisabledProperties = disabledFeatures
 	err = b.cluster.UpdateMetadata(
 		task, func() error {
 			err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(
