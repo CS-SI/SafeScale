@@ -66,9 +66,9 @@ feature:
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf install -y chrony || sfFail 192
+                                        sfRetry 3m 5 "sfYum install -y chrony" || sfFail 192
                                     else
-                                        yum install -y ntp || sfFail 192
+                                        sfRetry 3m 5 "sfYum install -y ntp" || sfFail 192
                                     fi
                                     ;;
                                 *)
@@ -157,9 +157,9 @@ feature:
                                     else
                                         sfService disable ntpd
                                         sfService stop ntpd
-                                        yum remove -y ntp*
+                                        sfYum remove -y ntp*
                                     fi
-                                    yum autoremove -y
+                                    sfYum autoremove -y
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

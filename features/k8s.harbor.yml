@@ -128,7 +128,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ebtables socat || sfFail 194
                                     ;;
                                 redhat|rhel|centos|fedora)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ebtables socat || sfFail 195
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y ebtables socat || sfFail 195
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
                             net.bridge.bridge-nf-call-iptables = 1
@@ -194,11 +194,12 @@ feature:
 
                                 case $(sfGetFact "linux_kind") in
                                     debian|ubuntu)
-                                        sfApt update && sfApt install -y audit audit-libs quota || sfFail 192
+                                        sfRetry 3m 5 "sfApt update"
+                                        sfRetry 3m 5 "sfApt install -y audit audit-libs quota" || sfFail 192
                                         ;;
 
                                     centos|fedora|redhat|rhel)
-                                        yum -y install audit audit-libs quota || sfFail 192
+                                        sfYum -y install audit audit-libs quota || sfFail 192
                                         ;;
 
                                     *) echo "unsupported linux distribution ''"
@@ -241,7 +242,8 @@ feature:
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
-                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 192
+                                    sfRetry 3m 5 "sfApt update"
+                                    sfRetry 3m 5 "sfApt install -y kubelet kubeadm kubectl" || sfFail 192
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
 
@@ -257,7 +259,7 @@ feature:
                             exclude=kube*
                             EOF
 
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 192
+                                    sfYum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 192
                                     ;;
 
                                 *) echo "unsupported linux distribution ''"
@@ -655,11 +657,12 @@ feature:
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
                                         debian|ubuntu)
-                                            sfApt update && sfApt install -y patch || sfFail 202
+                                            sfRetry 3m 5 "sfApt update"
+                                            sfRetry 3m 5 "sfApt install -y patch" || sfFail 202
                                             ;;
 
                                         centos|fedora|redhat|rhel)
-                                            yum -y install patch || sfFail 203
+                                            sfYum -y install patch || sfFail 203
                                             ;;
 
                                         *) echo "unsupported linux distribution ''"
@@ -817,7 +820,7 @@ feature:
                                     sfApt purge -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 223 "exiture purging kubernetes"
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    yum remove -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 224 "exiture purging kubernetes"
+                                    sfYum remove -y kubectl-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubelet-{{.KubeVersion}} || sfFail 224 "exiture purging kubernetes"
                                     ;;
                             esac
                             sfFirewallReload || sfFail 204 "Firewall problem"

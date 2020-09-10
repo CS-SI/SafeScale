@@ -41,7 +41,7 @@ feature:
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf list installed | grep chrony &>/dev/null || sfFail 192
+                                        sfYum list installed | grep chrony &>/dev/null || sfFail 192
                                     else
                                         rpm -qa | grep ntpdate &>/dev/null || sfFail 192
                                     fi
@@ -70,9 +70,9 @@ feature:
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        dnf install -y chrony || sfFail 192
+                                        sfRetry 3m 5 "sfYum install -y chrony" || sfFail 192
                                     else
-                                        yum install -y ntpdate || sfFail 192
+                                        sfRetry 3m 5 "sfYum install -y ntpdate" || sfFail 192
                                     fi
                                     ;;
                                 *)
@@ -109,7 +109,7 @@ feature:
                                         {{ end }}
                                     else
                                         sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} ntpdate -u pool.ntp.org || sfFail 194
-                                        yum install -y ntp || sfFail 195
+                                        sfRetry 3m 5 "sfYum install -y ntp" || sfFail 195
                                         {{ if .Peers }}
                                         sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 196
                                         {{ end }}
@@ -223,9 +223,9 @@ feature:
                                     else
                                         sfService disable ntpd
                                         sfService stop ntpd
-                                        yum remove -y ntp*
+                                        sfYum remove -y ntp*
                                     fi
-                                    yum autoremove -y
+                                    sfYum autoremove -y
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

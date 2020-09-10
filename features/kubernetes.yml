@@ -123,7 +123,7 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ebtables socat || sfFail 192
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ebtables socat || sfFail 193
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y ebtables socat || sfFail 193
 
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
@@ -182,7 +182,7 @@ feature:
                                     ;;
 
                                 centos|fedora|redhat|rhel)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum -y install audit audit-libs quota || sfFail 195
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfYum -y install audit audit-libs quota || sfFail 195
                                     ;;
 
                                 *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
@@ -232,9 +232,10 @@ feature:
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
                             {{ if .KubeVersion }}
-                                    sfApt update && sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00 || sfFail 199
+                                    sfRetry 3m 5 "sfApt update"
+                                    sfRetry 3m 5 "sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00" || sfFail 199
                             {{ else }}
-                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 199
+                                    sfRetry 3m 5 "sfApt update && sfApt install -y kubelet kubeadm kubectl" || sfFail 199
                             {{ end }}
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
@@ -252,9 +253,9 @@ feature:
                             EOF
 
                             {{ if .KubeVersion }}
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
+                                    sfYum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
                             {{ else }}
-                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 199
+                                    sfYum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 199
                             {{ end }}
                                     ;;
 
@@ -274,10 +275,11 @@ feature:
                             {{ if .ControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
-                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 202
+                                    sfRetry 3m 5 "sfApt update"
+                                    sfRetry 3m 5 "sfApt -y install keepalived haproxy" || sfFail 202
                                     ;;
                                 redhat|rhel|centos|fedora)
-                                    yum install -q -y keepalived haproxy || sfFail 202
+                                    sfRetry 3m 5 "sfYum install -q -y keepalived haproxy" || sfFail 202
                                     ;;
                                 *)
                                     sfFail 203 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
@@ -329,7 +331,7 @@ feature:
                                 # Use systemd to ensure keepalived is restarted if network is restarted
                                 # (otherwise, keepalived is in undetermined state)
                                 mkdir -p /etc/systemd/system/keepalived.service.d
-                                cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+                                    cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
                             [Unit]
                             Requires=${NETWORK_SERVICE}
                             PartOf=${NETWORK_SERVICE}
@@ -755,11 +757,12 @@ feature:
                                     # Installs the 'patch' command
                                     case $(sfGetFact "linux_kind") in
                                         debian|ubuntu)
-                                            sfApt update && sfApt install -y patch || sfFail 221
+                                            sfRetry 3m 5 "sfApt update"
+                                            sfRetry 3m 5 "sfApt install -y patch" || sfFail 221
                                             ;;
 
                                         centos|fedora|redhat|rhel)
-                                            yum -y install patch || sfFail 222
+                                            sfYum -y install patch || sfFail 222
                                             ;;
 
                                         *) echo "unsupported linux distribution ''"
@@ -935,7 +938,7 @@ feature:
                                     sfApt purge --allow-change-held-packages -y kubectl kubeadm kubelet || sfFail 223 "failure purging kubernetes"
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    yum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
+                                    sfYum remove -y kubectl kubeadm kubelet || sfFail 224 "failure purging kubernetes"
                                     ;;
                             esac
                             sfFirewallReload || sfFail 225 "Firewall problem"

@@ -49,10 +49,10 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 centos|fedora|redhat|rhel)
-                                    yum install -y openssl || sfFail 192 "Unable to install openssl"
+                                    sfRetry 3m 5 "sfYum install -y openssl" || sfFail 192 "Unable to install openssl"
                                     ;;
                                 debian|ubuntu)
-                                    sfApt install -y openssl || sfFail 192 "Unable to install openssl"
+                                    sfRetry 3m 5 "sfApt install -y openssl" || sfFail 192 "Unable to install openssl"
                                     ;;
                                 *)
                                     sfFail 1 "unmanaged Linux distribution '$LINUX_KIND'"

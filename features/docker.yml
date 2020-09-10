@@ -72,38 +72,38 @@ feature:
                                     sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -qqy docker-ce" || sfFail 194
                                     ;;
                                 centos|redhat|rhel)
-                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || sfFail 193
                                     kop=0
                                     op=-1
-                                    yum install -y curl --nobest &>/dev/null && op=$? || true
+                                    sfRetry 3m 5 "sfYum install -y curl --nobest &>/dev/null" && op=$? || true
                                     if [ $op -ne 0 ]; then
-                                        yum install -y curl &>/dev/null && op=$? || true
+                                        sfRetry 3m 5 "sfYum install -y curl &>/dev/null" && op=$? || true
                                         if [ $op -ne 0 ]; then
                                             sfFail 194
                                         else
-                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce || sfFail 194
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce || sfFail 194
                                         fi
                                     else
-                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y docker-ce --nobest || sfFail 194
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce --nobest || sfFail 194
                                     fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
                                 fedora)
-                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
-                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo
                                     kop=0
                                     op=-1
-                                    dnf install -y curl --nobest &>/dev/null && op=$? || true
+                                    sfRetry 3m 5 "sfYum install -y curl --nobest &>/dev/null" && op=$? || true
                                     if [ $op -ne 0 ]; then
-                                        dnf install -y curl &>/dev/null && op=$? || true
+                                        sfRetry 3m 5 "sfYum install -y curl &>/dev/null" && op=$? || true
                                         if [ $op -ne 0 ]; then
                                             sfFail 194
                                         else
-                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf install -y docker-ce || sfFail 194
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce || sfFail 194
                                         fi
                                     else
-                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf install -y docker-ce --nobest || sfFail 194
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce --nobest || sfFail 194
                                     fi
                                     systemctl enable --now docker || true
                                     ;;
@@ -231,10 +231,10 @@ feature:
                                     sfApt purge -y docker-ce*
                                     ;;
                                 centos|redhat|rhel)
-                                    yum remove -y docker-ce*
+                                    sfYum remove -y docker-ce*
                                     ;;
                                 fedora)
-                                    dnf remove -y docker-ce*
+                                    sfYum remove -y docker-ce*
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
