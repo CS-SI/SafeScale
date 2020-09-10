@@ -76,6 +76,24 @@ func (m *Network) GetPath() (string, error) {
 	return m.item.GetPath(), nil
 }
 
+func (m *Network) OK() (bool, error) {
+	if m == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+
+	if m.id == nil && m.name == nil {
+		if m.item == nil {
+			return false, nil
+		}
+
+		if ok, err := m.item.OK(); err != nil || !ok {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 // Carry links a Network instance to the Metadata instance
 func (m *Network) Carry(network *resources.Network) (*Network, error) {
 	if m == nil {

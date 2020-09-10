@@ -56,6 +56,24 @@ func NewHost(svc iaas.Service) (*Host, error) {
 	}, nil
 }
 
+func (mh *Host) OK() (bool, error) {
+	if mh == nil {
+		return false, scerr.InvalidInstanceError()
+	}
+
+	if mh.id == nil && mh.name == nil {
+		if mh.item == nil {
+			return false, nil
+		}
+
+		if ok, err := mh.item.OK(); err != nil || !ok {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 // Carry links an host instance to the Metadata instance
 func (mh *Host) Carry(host *resources.Host) (*Host, error) {
 	if host == nil {
