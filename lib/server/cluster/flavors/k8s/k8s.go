@@ -133,6 +133,11 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 
 	// If hardening is disabled, set the appropriate parameter of the kubernetes feature
 	_, ok := req.DisabledDefaultFeatures["hardening"]
+	for _, prop := range identity.DisabledProperties {
+		if prop == "hardening" {
+			ok = true
+		}
+	}
 	v["Hardening"] = strconv.FormatBool(!ok)
 
 	// If cluster complexity is not small or cloud provider provides support for VIP, creates such a VIP if not already done
@@ -211,6 +216,11 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 
 	// Disable dashboard if requested
 	_, ok = req.DisabledDefaultFeatures["dashboard"]
+	for _, prop := range identity.DisabledProperties {
+		if prop == "dashboard" {
+			ok = true
+		}
+	}
 	v["Dashboard"] = strconv.FormatBool(!ok)
 
 	// Installs kubernetes feature
@@ -227,7 +237,17 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 	logrus.Println(fmt.Sprintf("[cluster %s] feature 'kubernetes' addition successful.", clusterName))
 
 	// If helm is not disabled, installs it
-	if _, ok = req.DisabledDefaultFeatures["helm"]; !ok {
+	enabledHelm := true
+	if _, ok = req.DisabledDefaultFeatures["helm"]; ok {
+		enabledHelm = false
+	}
+	for _, prop := range identity.DisabledProperties {
+		if prop == "helm" {
+			enabledHelm = false
+		}
+	}
+
+	if enabledHelm {
 		logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'k8s.helm2'...", clusterName))
 
 		feature, err = install.NewFeature(task, "k8s.helm2")

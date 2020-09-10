@@ -33,6 +33,9 @@ type Identity struct {
 	// AdminPassword contains the password of cladm account. This password
 	// is used to connect via Guacamole, but cannot be used with SSH
 	AdminPassword string `json:"admin_password"`
+
+	// list of disabled properties
+	DisabledProperties []string `json:"disabled_properties"`
 }
 
 // NewIdentity ...
