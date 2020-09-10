@@ -51,7 +51,7 @@ all: begin ground getdevdeps ensure generate lib cli err vet-light
 common: begin ground getdevdeps ensure generate
 
 versioncut:
-	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
+	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14)) || ($(GO) version | grep go1.15)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins ...$(NO_COLOR)\n";
