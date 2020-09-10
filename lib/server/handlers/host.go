@@ -388,7 +388,7 @@ func (handler *HostHandler) Create(
 			return nil, err
 		}
 		if defaultNetwork == nil {
-			return nil, fmt.Errorf("failed to find network '%s'", net)
+			return nil, scerr.Errorf(fmt.Sprintf("failed to find network '%s'", net), nil)
 		}
 		networks = append(networks, defaultNetwork)
 
@@ -397,7 +397,7 @@ func (handler *HostHandler) Create(
 			return nil, err
 		}
 		if mgw == nil {
-			return nil, fmt.Errorf("failed to find gateway of network '%s'", net)
+			return nil, scerr.Errorf(fmt.Sprintf("failed to find gateway of network '%s'", net), nil)
 		}
 		primaryGateway, err = mgw.Get()
 		if err != nil {
@@ -445,7 +445,7 @@ func (handler *HostHandler) Create(
 			msg += ")"
 			logrus.Infof(msg)
 		} else {
-			return nil, fmt.Errorf("failed to find template corresponding to requested resources")
+			return nil, scerr.Errorf(fmt.Sprintf("failed to find template corresponding to requested resources"), nil)
 		}
 	} else {
 		template, err = handler.service.SelectTemplateByName(templateName)
@@ -543,10 +543,10 @@ func (handler *HostHandler) Create(
 	}()
 
 	if host == nil {
-		return nil, fmt.Errorf("unexpected error creating host instance: host is nil")
+		return nil, scerr.Errorf(fmt.Sprintf("unexpected error creating host instance: host is nil"), nil)
 	}
 	if host.Properties == nil {
-		return nil, fmt.Errorf("error populating host properties: host.Properties is nil")
+		return nil, scerr.Errorf(fmt.Sprintf("error populating host properties: host.Properties is nil"), nil)
 	}
 
 	// Updates host metadata
@@ -716,7 +716,9 @@ func (handler *HostHandler) Create(
 		if client.IsProvisioningError(derr) {
 			logrus.Errorf("%+v", derr)
 			retrieveForensicsData(ctx, sshHandler, host)
-			return nil, fmt.Errorf("failed to provision host '%s', please check safescaled logs", host.Name)
+			return nil, scerr.Wrap(
+				derr, fmt.Sprintf("failed to provision host '%s', please check safescaled logs", host.Name),
+			)
 		}
 
 		return nil, scerr.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
@@ -835,7 +837,7 @@ func (handler *HostHandler) Create(
 		return nil, err
 	}
 	if retcode != 0 && retcode != 255 {
-		return nil, scerr.Wrap(fmt.Errorf("retcode=%d", retcode), "reboot command failed")
+		return nil, scerr.Errorf(fmt.Sprintf("reboot command failed: retcode=%d", retcode), nil)
 	}
 
 	// Wait like 2 min for the machine to reboot
@@ -847,8 +849,10 @@ func (handler *HostHandler) Create(
 
 		if client.IsProvisioningError(err) {
 			retrieveForensicsData(ctx, sshHandler, host)
-			return nil, fmt.Errorf(
-				"error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name,
+			return nil, scerr.Wrap(
+				err, fmt.Sprintf(
+					"error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name,
+				),
 			)
 		}
 
@@ -858,7 +862,7 @@ func (handler *HostHandler) Create(
 
 	select {
 	case <-ctx.Done():
-		err = fmt.Errorf("host creation cancelled by safescale")
+		err = scerr.Errorf("host creation cancelled by safescale", nil)
 		logrus.Warn(err)
 		return nil, err
 	default:
@@ -987,7 +991,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	}
 
 	if network == nil {
-		return nil, fmt.Errorf("failure getting or creating default network")
+		return nil, scerr.Errorf(fmt.Sprintf("failure getting or creating default network"), nil)
 	}
 
 	return network, nil
@@ -1064,10 +1068,10 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 		0,
 	)
 	if err != nil {
-		return host, err
+		return nil, err
 	}
 	if host == nil {
-		return nil, fmt.Errorf("failure inspecting host [%s]", ref)
+		return nil, scerr.Errorf(fmt.Sprintf("failure inspecting host [%s]", ref), nil)
 	}
 
 	return host, nil
@@ -1155,8 +1159,11 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 				count := len(share.ClientsByID)
 				if count > 0 {
 					count = len(shares)
-					return fmt.Errorf(
-						"cannot delete host, exports %d share%s where at least one is used", count, utils.Plural(count),
+					return scerr.Errorf(
+						fmt.Sprintf(
+							"cannot delete host, exports %d share%s where at least one is used", count,
+							utils.Plural(count),
+						), nil,
 					)
 				}
 			}
@@ -1172,7 +1179,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		func(clonable data.Clonable) error {
 			nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
 			if nAttached > 0 {
-				return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+				return scerr.Errorf(
+					fmt.Sprintf("host has %d volume%s attached", nAttached, utils.Plural(nAttached)), nil,
+				)
 			}
 			return nil
 		},
@@ -1185,7 +1194,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(
 		func(clonable data.Clonable) error {
 			if clonable.(*propsv1.HostNetwork).IsGateway {
-				return fmt.Errorf("cannot delete host, it's a gateway that can only be deleted through its network")
+				return scerr.Errorf(
+					fmt.Sprintf("cannot delete host, it's a gateway that can only be deleted through its network"), nil,
+				)
 			}
 			return nil
 		},
@@ -1312,7 +1323,10 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	}
 
 	if deleteMetadataOnly {
-		return fmt.Errorf("unable to find the host even if it is described by metadata. Dirty metadata have been deleted")
+		return scerr.Errorf(
+			fmt.Sprintf("unable to find the host even if it is described by metadata. Dirty metadata have been deleted"),
+			nil,
+		)
 	}
 
 	select {
@@ -1345,7 +1359,9 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 									hostDescriptionV1.Domain, false,
 								)
 								if err3 != nil {
-									return fmt.Errorf("failed to stop host deletion : %s", err3.Error())
+									return scerr.Errorf(
+										fmt.Sprintf("failed to stop host deletion : %s", err3.Error()), err3,
+									)
 								}
 								return nil
 							},
@@ -1355,14 +1371,14 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 			},
 		)
 		if err2 != nil {
-			return fmt.Errorf("failed to cancel host deletion : %s", err2.Error())
+			return scerr.Errorf(fmt.Sprintf("failed to cancel host deletion : %s", err2.Error()), err2)
 		}
 
 		buf, err2 := hostBis.Serialize()
 		if err2 != nil {
-			return fmt.Errorf("deleted Host recreated by safescale")
+			return scerr.Errorf(fmt.Sprintf("deleted Host recreated by safescale"), err2)
 		}
-		return fmt.Errorf("deleted Host recreated by safescale : %s", buf)
+		return scerr.Errorf(fmt.Sprintf("deleted Host recreated by safescale : %s", buf), nil)
 
 	default:
 	}

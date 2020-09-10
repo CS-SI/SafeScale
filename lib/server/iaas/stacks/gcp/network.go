@@ -187,7 +187,6 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		}
 	}
 
-	// FIXME Replace project name "safescale", use network name from configuration
 	buildNewNATRule := true
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, gcpSubNet.Name)
 

@@ -863,9 +863,8 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
 				return scerr.AbortedError(
-					"", fmt.Errorf(
-						"remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr,
-					),
+					"",
+					fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr),
 				)
 			}
 

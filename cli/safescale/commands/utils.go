@@ -63,7 +63,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to copy file '%s'", rfc.Local)
+		return scerr.Errorf(fmt.Sprintf("failed to copy file '%s'", rfc.Local), nil)
 	}
 
 	// Updates owner and access rights if asked for
@@ -84,7 +84,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to update owner and/or access rights of the remote file")
+		return scerr.Errorf(fmt.Sprintf("failed to update owner and/or access rights of the remote file"), nil)
 	}
 
 	return nil
@@ -98,7 +98,7 @@ func (rfc RemoteFileItem) RemoveRemote(hostname string) error {
 		hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
 	)
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to remove file '%s:%s'", hostname, rfc.Remote)
+		return scerr.Errorf(fmt.Sprintf("failed to remove file '%s:%s'", hostname, rfc.Remote), nil)
 	}
 	return nil
 }

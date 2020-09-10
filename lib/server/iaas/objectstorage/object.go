@@ -98,7 +98,7 @@ func (o *object) Reload() error {
 	return o.reloadFromItem(item)
 }
 
-// reloadFromItem reloads objet instance with stow.Item
+// reloadFromItem reloads object instance with stow.Item
 func (o *object) reloadFromItem(item stow.Item) error {
 	o.item = item
 	newMetadata, err := item.Metadata()
