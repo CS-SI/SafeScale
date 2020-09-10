@@ -70,7 +70,7 @@ func GetTenants() ([]interface{}, error) {
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
 func UseService(tenantName string) (newService Service, err error) {
-	defer scerr.OnPanic(&err)
+	defer scerr.OnPanic(&err)()
 
 	tenants, err := getTenantsFromCfg()
 	if err != nil {
