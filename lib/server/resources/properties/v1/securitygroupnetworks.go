@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // SecurityGroupNetworks contains information about attached networks to a security group
@@ -27,36 +27,47 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupNetworks struct {
-    ByID   []string `json:"by_id"`      // contains the ID of the hosts using a security group
-    ByName []string `json:"by_name"`    // contains the names of the hosts using a security group
+	ByID   map[string]bool `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network ID
+	ByName map[string]bool `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network Name
 }
 
 // NewSecurityGroupNetworks ...
 func NewSecurityGroupNetworks() *SecurityGroupNetworks {
-    return &SecurityGroupNetworks{}
+	return &SecurityGroupNetworks{
+		ByID:   map[string]bool{},
+		ByName: map[string]bool{},
+	}
 }
 
 // Reset ...
-func (sgn *SecurityGroupNetworks) Reset() {
-    *sgn = SecurityGroupNetworks{}
+func (sgn *SecurityGroupNetworks) Reset() *SecurityGroupNetworks {
+	if sgn != nil {
+		sgn.ByID = map[string]bool{}
+		sgn.ByName = map[string]bool{}
+		return sgn
+	}
+	return NewSecurityGroupNetworks()
 }
 
 // Clone ...
 func (sgn *SecurityGroupNetworks) Clone() data.Clonable {
-    return NewSecurityGroupNetworks().Replace(sgn)
+	return NewSecurityGroupNetworks().Replace(sgn)
 }
 
 // Replace ...
 func (sgn *SecurityGroupNetworks) Replace(p data.Clonable) data.Clonable {
-    src := p.(*SecurityGroupNetworks)
-    sgn.ByID = make([]string, len(src.ByID))
-    copy(sgn.ByID, src.ByID)
-
-    sgn.ByName = make([]string, len(src.ByName))
-    copy(sgn.ByName, src.ByName)
-    return p
+	src := p.(*SecurityGroupNetworks)
+	sgn.ByID = make(map[string]bool, len(src.ByID))
+	for k, v := range src.ByID {
+		sgn.ByID[k] = v
+	}
+	sgn.ByName = make(map[string]bool, len(src.ByName))
+	for k, v := range src.ByName {
+		sgn.ByName[k] = v
+	}
+	return sgn
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.security-group", securitygroupproperty.NetworksV1, NewHostVolumes())
+	serialize.PropertyTypeRegistry.Register("resources.security-group", securitygroupproperty.NetworksV1, NewSecurityGroupNetworks())
 }

@@ -19,13 +19,13 @@
 package local
 
 import (
-    "time"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var gError = fail.NewError("libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)")
@@ -36,82 +36,82 @@ type Stack struct {
 
 // WaitHostReady ...
 func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-    return abstract.NewHostCore(), gError
+	return abstract.NewHostCore(), gError
 }
 
 // ListAvailabilityZones stub
 func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
-    return map[string]bool{}, gError
+	return map[string]bool{}, gError
 }
 
 // ListRegions stub
 func (s *Stack) ListRegions() ([]string, fail.Error) {
-    return []string{}, gError
+	return []string{}, gError
 }
 
 // ListImages stub
 func (s *Stack) ListImages(all bool) ([]abstract.Image, fail.Error) {
-    return []abstract.Image{}, gError
+	return []abstract.Image{}, gError
 }
 
 // GetImage stub
 func (s *Stack) InspectImage(id string) (*abstract.Image, fail.Error) {
-    return &abstract.Image{}, gError
+	return &abstract.Image{}, gError
 }
 
 // GetTemplate stub
 func (s *Stack) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-    return &abstract.HostTemplate{}, gError
+	return &abstract.HostTemplate{}, gError
 }
 
 // ListTemplates stub
 func (s *Stack) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-    return []abstract.HostTemplate{}, gError
+	return []abstract.HostTemplate{}, gError
 }
 
 // CreateKeyPair stub
 func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-    return &abstract.KeyPair{}, gError
+	return &abstract.KeyPair{}, gError
 }
 
 // GetKeyPair stub
 func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-    return &abstract.KeyPair{}, gError
+	return &abstract.KeyPair{}, gError
 }
 
 // ListKeyPairs stub
 func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-    return []abstract.KeyPair{}, gError
+	return []abstract.KeyPair{}, gError
 }
 
 // DeleteKeyPair stub
 func (s *Stack) DeleteKeyPair(id string) fail.Error {
-    return gError
+	return gError
 }
 
 // CreateNetwork stub
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-    return &abstract.Network{}, gError
+	return &abstract.Network{}, gError
 }
 
 // GetNetwork stub
 func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
-    return &abstract.Network{}, gError
+	return &abstract.Network{}, gError
 }
 
 // GetNetworkByName stub
 func (s *Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
-    return &abstract.Network{}, gError
+	return &abstract.Network{}, gError
 }
 
 // ListNetworks stub
 func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
-    return []*abstract.Network{}, gError
+	return []*abstract.Network{}, gError
 }
 
 // DeleteNetwork stub
 func (s *Stack) DeleteNetwork(id string) fail.Error {
-    return gError
+	return gError
 }
 
 // // CreateGateway stub
@@ -126,135 +126,135 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 
 // CreateVIP stub
 func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
-    return &abstract.VirtualIP{}, gError
+	return &abstract.VirtualIP{}, gError
 }
 
 // AddPublicIPToVIP stub
 func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
-    return gError
+	return gError
 }
 
 // BindHostToVIP stub
 func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-    return gError
+	return gError
 }
 
 // UnbindHostFromVIP stub
 func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-    return gError
+	return gError
 }
 
 // DeleteVIP stub
 func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
-    return gError
+	return gError
 }
 
 // CreateHost stub
 func (s *Stack) CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
-    return abstract.NewHostFull(), userdata.NewContent(), gError
+	return abstract.NewHostFull(), userdata.NewContent(), gError
 }
 
 // ResizeHost stub
 func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-    return abstract.NewHostFull(), gError
+	return abstract.NewHostFull(), gError
 }
 
 // InspectHost stub
 func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
-    return abstract.NewHostFull(), gError
+	return abstract.NewHostFull(), gError
 }
 
 // GetHostByName stub
 func (s *Stack) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
-    return abstract.NewHostCore(), gError
+	return abstract.NewHostCore(), gError
 }
 
 // GetHostState stub
 func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-    return hoststate.ERROR, gError
+	return hoststate.ERROR, gError
 }
 
 // ListHosts stub
 func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
-    return abstract.HostList{}, gError
+	return abstract.HostList{}, gError
 }
 
 // DeleteHost stub
 func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-    return gError
+	return gError
 }
 
 // StartHost stub
 func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
-    return gError
+	return gError
 }
 
 // StopHost stub
 func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
-    return gError
+	return gError
 }
 
 // RebootHost stub
 func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
-    return gError
+	return gError
 }
 
 // CreateVolume stub
 func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-    return &abstract.Volume{}, gError
+	return &abstract.Volume{}, gError
 }
 
 // InspectVolume stub
 func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-    return &abstract.Volume{}, gError
+	return &abstract.Volume{}, gError
 }
 
 // ListVolumes stub
 func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-    return []abstract.Volume{}, gError
+	return []abstract.Volume{}, gError
 }
 
 // DeleteVolume stub
 func (s *Stack) DeleteVolume(id string) fail.Error {
-    return gError
+	return gError
 }
 
 // CreateVolumeAttachment stub
 func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-    return "", gError
+	return "", gError
 }
 
 // GetVolumeAttachment stub
 func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-    return &abstract.VolumeAttachment{}, gError
+	return &abstract.VolumeAttachment{}, gError
 }
 
 // ListVolumeAttachments stub
 func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-    return []abstract.VolumeAttachment{}, gError
+	return []abstract.VolumeAttachment{}, gError
 }
 
 // DeleteVolumeAttachment stub
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
-    return gError
+	return gError
 }
 
 // GetConfigurationOptions stub
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-    return stacks.ConfigurationOptions{}
+	return stacks.ConfigurationOptions{}
 }
 
 // GetAuthenticationOptions stub
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-    return stacks.AuthenticationOptions{}
+	return stacks.AuthenticationOptions{}
 }
 
 // BindSecurityGroupToHost ...
 func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
-    return gError
+	return gError
 }
 
 // UnbindSecurityGroupFromHost ...
 func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
-    return gError
+	return gError
 }
