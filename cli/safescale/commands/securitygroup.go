@@ -33,13 +33,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-var securityGroupCmdName = "security-group"
+var securityGroupCmdLabel = "security-group"
 
 // SecurityGroupCommand command
 var SecurityGroupCommand = &cli.Command{
-	Name:    securityGroupCmdName,
+	Name:    securityGroupCmdLabel,
 	Aliases: []string{"sg"},
-	Usage:   securityGroupCmdName + " COMMAND",
+	Usage:   securityGroupCmdLabel + " COMMAND",
 	Subcommands: []*cli.Command{
 		securityGroupList,
 		securityGroupCreate,
@@ -60,7 +60,7 @@ var securityGroupList = &cli.Command{
 			Usage:   "List all Security Groups on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s '%s' with args '%s'", securityGroupCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s '%s' with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -72,13 +72,16 @@ var securityGroupList = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
 		}
-		jsoned, _ := json.Marshal(list)
-		var result []map[string]interface{}
-		err = json.Unmarshal([]byte(jsoned), &result)
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+		if len(list.List) > 0 {
+			jsoned, _ := json.Marshal(list.List)
+			var result []interface{}
+			err = json.Unmarshal([]byte(jsoned), &result)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+			}
+			return clitools.SuccessResponse(result)
 		}
-		return clitools.SuccessResponse(result)
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -88,7 +91,7 @@ var securityGroupInspect = &cli.Command{
 	Usage:     "inspect GROUPNAME",
 	ArgsUsage: "GROUPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
@@ -121,7 +124,7 @@ var securityGroupCreate = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
@@ -150,7 +153,7 @@ var securityGroupClear = &cli.Command{
 	Usage:     "deletes all rules of a Security Group",
 	ArgsUsage: "GROUPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
@@ -175,7 +178,7 @@ var securityGroupDelete = &cli.Command{
 	Usage:     "Delete Security Group",
 	ArgsUsage: "GROUPNAME [GROUPNAME ...]",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
@@ -206,6 +209,7 @@ var securityGroupRuleCommand = &cli.Command{
 	Usage:   "rule COMMAND",
 	Subcommands: []*cli.Command{
 		securityGroupRuleAdd,
+		securityGroupRuleDelete,
 	},
 }
 
@@ -215,6 +219,10 @@ var securityGroupRuleAdd = &cli.Command{
 	Usage:     "add a new rule to a Security Group",
 	ArgsUsage: "GROUPNAME",
 	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "description",
+			Value: "",
+		},
 		&cli.StringFlag{
 			Name:    "direction",
 			Aliases: []string{"D"},
@@ -248,28 +256,13 @@ var securityGroupRuleAdd = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
 		}
-		askedGpus := int32(c.Int("gpu"))
-		if askedGpus <= -1 {
-			logrus.Debug("No GPU parameters used")
-		} else {
-			if askedGpus == 0 {
-				logrus.Debug("NO GPU explicitly required")
-			} else {
-				logrus.Debugf("GPUs required: %d", askedGpus)
-			}
-		}
 
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		etherType, xerr := ipversion.Parse(c.String("type)"))
+		etherType, xerr := ipversion.Parse(c.String("type"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 		}
@@ -279,8 +272,16 @@ var securityGroupRuleAdd = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
 		}
 
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
 		req := protocol.SecurityGroupRuleRequest{
-			Group: &protocol.Reference{TenantId: c.Args().First()},
+			Group: &protocol.Reference{
+				TenantId: "", // FUTURE: to be set to tenant to use
+				Name:     c.Args().First(),
+			},
 			Rule: &protocol.SecurityGroupRule{
 				Description: c.String("description"),
 				EtherType:   protocol.SecurityGroupRuleEtherType(etherType),
@@ -296,6 +297,32 @@ var securityGroupRuleAdd = &cli.Command{
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var securityGroupRuleDelete = &cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove", "destroy"},
+	Usage:     "delete a rule identified by id from a Security Group",
+	ArgsUsage: "GROUPNAME RULEID",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
+		if c.NArg() != 2 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err := clientSession.SecurityGroup.DeleteRule(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
 		}
 		return clitools.SuccessResponse(nil)
 	},
