@@ -328,7 +328,7 @@ func (c cluster) RemoveFeature(clusterName, featureName string, params map[strin
 }
 
 // ListInstalledFeatures ...
-func (c cluster) ListInstalledFeatures(clusterName string, duration time.Duration) (*protocol.FeatureListResponse, error) {
+func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration time.Duration) (*protocol.FeatureListResponse, error) {
 	// if c == nil {
 	// 	return nil, fail.InvalidInstanceError()
 	// }
@@ -344,6 +344,7 @@ func (c cluster) ListInstalledFeatures(clusterName string, duration time.Duratio
 		return nil, xerr
 	}
 	_ = ctx
+
 	// service := protocol.NewFeatureServiceClient(c.session.connection)
 	return nil, fail.NotImplementedError()
 }
