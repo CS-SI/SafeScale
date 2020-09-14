@@ -72,7 +72,7 @@ func Parse(v string) (Enum, fail.Error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return UNKNOWN, fail.NotFoundError("failed to find a securitygroupruledirection.Enum corresponding to '%s'", v)
+		return UNKNOWN, fail.NotFoundError("failed to find a ipversion.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 

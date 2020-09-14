@@ -17,116 +17,117 @@
 package local
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
-    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
+
 // ListSecurityGroups lists existing security groups
 func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
-    // if s == nil {
-    //     return nil, fail.InvalidInstanceError()
-    // }
+	// if s == nil {
+	//     return nil, fail.InvalidInstanceError()
+	// }
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    return nil, fail.NotImplementedError()
+	return nil, fail.NotImplementedError()
 }
 
 // CreateSecurityGroup creates a security group
 func (s Stack) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-    // if s == nil {
-    //     return nil, fail.InvalidInstanceError()
-    // }
-    if name == "" {
-        return nil, fail.InvalidParameterError("name", "cannot be empty string")
-    }
+	// if s == nil {
+	//     return nil, fail.InvalidInstanceError()
+	// }
+	if name == "" {
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    return &abstract.SecurityGroup{}, fail.NotImplementedError()
+	return &abstract.SecurityGroup{}, fail.NotImplementedError()
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
 func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
-    // if s == nil {
-    //     return fail.InvalidInstanceError()
-    // }
-    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-    if xerr != nil {
-        return xerr
-    }
+	// if s == nil {
+	//     return fail.InvalidInstanceError()
+	// }
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)",  asg.ID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    return fail.NotImplementedError()
+	return fail.NotImplementedError()
 }
 
 // InspectSecurityGroup returns information about a security group
 func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-    // if s == nil {
-    //     return nil, fail.InvalidInstanceError()
-    // }
-    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-    if xerr != nil {
-        return asg, xerr
-    }
+	// if s == nil {
+	//     return nil, fail.InvalidInstanceError()
+	// }
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return asg, xerr
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    return asg, fail.NotImplementedError()
+	return asg, fail.NotImplementedError()
 }
 
 // ClearSecurityGroup removes all rules but keep group
 func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-    // if s == nil {
-    //     return nullAsg, fail.InvalidInstanceError()
-    // }
-    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-    if xerr != nil {
-        return asg, xerr
-    }
+	// if s == nil {
+	//     return nullAsg, fail.InvalidInstanceError()
+	// }
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return asg, xerr
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    return asg, fail.NotImplementedError()
+	return asg, fail.NotImplementedError()
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
 func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-    // if s == nil {
-    //     return nullAsg, fail.InvalidInstanceError()
-    // }
-    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-    if xerr != nil {
-        return asg, xerr
-    }
+	// if s == nil {
+	//     return nullAsg, fail.InvalidInstanceError()
+	// }
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return asg, xerr
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    return asg, fail.NotImplementedError()
+	return asg, fail.NotImplementedError()
 }
 
+// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
+// Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
+	// if s == nil {
+	//     return false, fail.InvalidInstanceError()
+	// }
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-// LookuRuleInSecurityGroup searchs for a rule already set in Security Group
-func (s Stack) LookupRuleInSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (bool, fail.Error) {
-    // if s == nil {
-    //     return false, fail.InvalidInstanceError()
-    // }
-    asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-    if xerr != nil {
-        return false, xerr
-    }
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", asg.ID, ruleID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", asg.ID, rule).WithStopwatch().Entering()
-    defer tracer.Exiting()
-
-    return false, fail.NotImplementedError()
+	return nil, fail.NotImplementedError()
 }

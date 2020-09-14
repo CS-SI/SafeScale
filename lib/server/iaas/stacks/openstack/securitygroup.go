@@ -422,12 +422,14 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return asg, xerr
 	}
 
-	found, xerr := stacks.LookupRuleInSecurityGroup(asg, rule)
+	_, xerr = asg.Rules.IndexOfEquivalentRule(rule)
 	if xerr != nil {
-		return asg, xerr
-	}
-	if found {
-		return asg, fail.DuplicateError("rule already in Security Group")
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		// continue
+		default:
+			return asg, xerr
+		}
 	}
 
 	etherType := convertEtherTypeFromAbstract(rule.EtherType)
@@ -439,13 +441,24 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule", rule.Direction)
 	}
 
+	portFrom := rule.PortFrom
+	portTo := rule.PortTo
+	if portFrom == 0 && portTo != 0 {
+		portFrom = portTo
+	}
+	if portFrom != 0 && portTo == 0 {
+		portTo = portFrom
+	}
+	if portFrom < portTo {
+		portFrom, portTo = portTo, portFrom
+	}
 	createOpts := secrules.CreateOpts{
 		SecGroupID:     asg.ID,
 		EtherType:      etherType,
 		Direction:      direction,
 		Description:    rule.Description,
-		PortRangeMin:   int(rule.PortFrom),
-		PortRangeMax:   int(rule.PortTo),
+		PortRangeMin:   int(portFrom),
+		PortRangeMax:   int(portTo),
 		Protocol:       secrules.RuleProtocol(rule.Protocol),
 		RemoteIPPrefix: rule.CIDR,
 	}
@@ -457,6 +470,44 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 			}
 			rule.ID = r.ID
 			asg.Rules = append(asg.Rules, rule)
+			return nil
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+}
+
+// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
+// Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (asg *abstract.SecurityGroup, xerr fail.Error) {
+	// if s == nil {
+	//     return fail.InvalidInstanceError()
+	// }
+	asg, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return asg, xerr
+	}
+
+	asg, xerr = s.InspectSecurityGroup(asg)
+	if xerr != nil {
+		return asg, xerr
+	}
+
+	index, xerr := asg.Rules.IndexOfRuleByID(ruleID)
+	if xerr != nil {
+		return asg, xerr
+	}
+
+	return asg, netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			innerErr := secrules.Delete(s.NetworkClient, ruleID).ExtractErr()
+			if innerErr != nil {
+				return NormalizeError(innerErr)
+			}
+
+			asg.Rules, innerErr = asg.Rules.RemoveRuleByIndex(index)
+			if innerErr != nil {
+				return innerErr
+			}
 			return nil
 		},
 		temporal.GetCommunicationTimeout(),

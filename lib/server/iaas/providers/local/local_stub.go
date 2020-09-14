@@ -19,23 +19,23 @@
 package local
 
 import (
-    "time"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var gReport = fail.NotAvailableError("libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)")
 
 // provider is the implementation of the local driver regarding to the api.Provider
 type provider struct {
-    tenantParameters map[string]interface{}
+	tenantParameters map[string]interface{}
 }
 
 // AuthOptions fields are the union of those recognized by each identity implementation and provider.
@@ -48,205 +48,208 @@ type CfgOptions struct {
 
 // WaitHostReady ...
 func (provider *provider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // Build ...
 func (provider *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-    provider.tenantParameters = map[string]interface{}{}
-    return nil, gReport
+	provider.tenantParameters = map[string]interface{}{}
+	return nil, gReport
 }
 
 // GetAuthenticationOptions ...
 func (provider *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // GetConfigurationOptions ...
 func (provider *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // ListAvailabilityZones ...
 func (provider *provider) ListAvailabilityZones() (map[string]bool, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // ListRegions returns a list with the regions available
 func (provider *provider) ListRegions() ([]string, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 func (provider *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectImage(id string) (*abstract.Image, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 func (provider *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 func (provider *provider) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) DeleteKeyPair(id string) fail.Error {
-    return gReport
+	return gReport
 }
 
 func (provider *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectNetwork(id string) (*abstract.Network, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) ListNetworks() ([]*abstract.Network, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) DeleteNetwork(id string) fail.Error {
-    return gReport
+	return gReport
 }
 
 func (provider *provider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
-    return gReport
+	return gReport
 }
 
 func (provider *provider) CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
-    return nil, nil, gReport
+	return nil, nil, gReport
 }
 func (provider *provider) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-    return hoststate.ERROR, gReport
+	return hoststate.ERROR, gReport
 }
 func (provider *provider) ListHosts(bool) (abstract.HostList, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) StartHost(hostParam stacks.HostParameter) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) StopHost(hostParam stacks.HostParameter) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) RebootHost(hostParam stacks.HostParameter) fail.Error {
-    return gReport
+	return gReport
 }
 
 func (provider *provider) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) ListVolumes() ([]abstract.Volume, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) DeleteVolume(id string) fail.Error {
-    return gReport
+	return gReport
 }
 
 func (provider *provider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-    return "", gReport
+	return "", gReport
 }
 func (provider *provider) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 func (provider *provider) DeleteVolumeAttachment(serverID, id string) fail.Error {
-    return gReport
+	return gReport
 }
 func (provider *provider) GetName() string {
-    return "local_disabled"
+	return "local_disabled"
 }
 func (provider *provider) GetTenantParameters() map[string]interface{} {
-    return nil
+	return nil
 }
 
 // GetCapabilities returns the capabilities of the provider
 func (provider *provider) GetCapabilities() providers.Capabilities {
-    return providers.Capabilities{}
+	return providers.Capabilities{}
 }
-
 
 // BindSecurityGroupToHost ...
 func (provider *provider) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
-    return gReport
+	return gReport
 }
 
 // UnbindSecurityGroupFromHost ...
 func (provider *provider) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
-    return gReport
+	return gReport
 }
-
 
 // ListSecurityGroup lists existing security groups
 func (provider *provider) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // CreateSecurityGroup creates a security group
 func (provider *provider) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
 func (provider *provider) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
-    return gReport
+	return gReport
 }
 
 // InspectSecurityGroup returns information about a security group
 func (provider *provider) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // ClearSecurityGroup removes all rules but keep group
 func (provider *provider) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-    return nil, gReport
+	return nil, gReport
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
 func (provider *provider) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-    return nil, gReport
+	return nil, gReport
+}
+
+// DeleteRuleFromSecurityGroup adds a rule to a security group
+func (provider *provider) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
+	return nil, gReport
 }
 
 func init() {
-    // log.Debug("Registering fake local provider")
-    iaas.Register("local", &provider{})
+	// log.Debug("Registering fake local provider")
+	iaas.Register("local", &provider{})
 }

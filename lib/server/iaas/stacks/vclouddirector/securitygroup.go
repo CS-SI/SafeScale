@@ -17,36 +17,43 @@
 package vclouddirector
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // ListSecurityGroups lists existing security groups
 func (s *Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
-    return nil, fail.NotImplementedError()
+	return nil, fail.NotImplementedError()
 }
 
 // CreateSecurityGroup creates a security group
 func (s *Stack) CreateSecurityGroup(name string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-    return nil, fail.NotImplementedError()
+	return nil, fail.NotImplementedError()
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
 func (s *Stack) DeleteSecurityGroup(ref string) fail.Error {
-    return fail.NotImplementedError()
+	return fail.NotImplementedError()
 }
 
 // InspectSecurityGroup returns information about a security group
 func (s *Stack) InspectSecurityGroup(ref string) (*abstract.SecurityGroup, fail.Error) {
-    return nil, fail.NotImplementedError()
+	return nil, fail.NotImplementedError()
 }
 
 // ClearSecurityGroup removes all rules but keep group
 func (s *Stack) ClearSecurityGroup(ref string) fail.Error {
-    return fail.NotImplementedError()
+	return fail.NotImplementedError()
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
 func (s *Stack) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGroupRule) fail.Error {
-    return fail.NotImplementedError()
+	return fail.NotImplementedError()
+}
+
+// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
+// Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
+	return nil, fail.NotImplementedError()
 }

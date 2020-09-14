@@ -26,7 +26,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -39,7 +38,7 @@ import (
 type SecurityGroupListener struct{}
 
 // List lists hosts managed by SafeScale only, or all hosts.
-func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityGroupListRequest) (sgl *protocol.SecurityGroupListResponse, err error) {
+func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityGroupListRequest) (_ *protocol.SecurityGroupListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list security groups")
 
@@ -66,17 +65,17 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.New(job.GetService())
+	list, xerr := securitygroupfactory.List(task, job.GetService(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgl = nil
-	xerr = rsg.Browse(task, func(asg *abstract.SecurityGroup) fail.Error {
-		sgl.List = append(sgl.List, converters.SecurityGroupFromAbstractToProtocol(*asg))
-		return nil
-	})
-	return sgl, xerr
+	out := &protocol.SecurityGroupListResponse{}
+	out.List = make([]*protocol.SecurityGroupResponse, 0, len(list))
+	for _, v := range list {
+		out.List = append(out.List, converters.SecurityGroupFromAbstractToProtocol(*v))
+	}
+	return out, nil
 }
 
 // Create creates a new host
@@ -374,6 +373,62 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	}
 
 	xerr = rsg.AddRule(task, rule)
+	if xerr != nil {
+		return nil, xerr
+	}
+	tracer.Trace("Rule successfully added to security group %s", refLabel)
+	return rsg.ToProtocol(task)
+}
+
+// DeleteRule deletes a rule identified by id from a security group
+func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.SecurityGroupRuleDeleteRequest) (_ *protocol.SecurityGroupResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete rule from security group")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		}
+	}
+
+	ref, refLabel := srvutils.GetReference(in.GetGroup())
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference")
+	}
+
+	ruleID := in.GetRuleId()
+	if ruleID == "" {
+		return nil, fail.InvalidRequestError("rule id cannot be empty string")
+	}
+
+	job, err := PrepareJob(ctx, "", "security-group delete-rule")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+	task := job.GetTask()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = rsg.DeleteRule(task, ruleID)
 	if xerr != nil {
 		return nil, xerr
 	}
