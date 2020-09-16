@@ -69,7 +69,7 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 
 			for _, image := range resp.Items {
 				images = append(
-					images, resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10)},
+					images, resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10), DiskSize: image.DiskSizeGb},
 				)
 			}
 			token := resp.NextPageToken
@@ -278,9 +278,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if err != nil {
 		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", err), err)
 	}
-	if request.DiskSize > template.DiskSize {
-		template.DiskSize = request.DiskSize
-	} else if template.DiskSize == 0 {
+
+	if template.DiskSize == 0 {
 		// Determines appropriate disk size
 		if template.Cores < 16 { // nolint
 			template.DiskSize = 100
@@ -291,9 +290,19 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}
 
+	if request.DiskSize > template.DiskSize {
+		template.DiskSize = request.DiskSize
+	}
+
+	logrus.Warnf("Requesting a disksize of %d", template.DiskSize)
+
 	rim, err := s.GetImage(request.ImageID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if int(rim.DiskSize) > template.DiskSize {
+		template.DiskSize = int(rim.DiskSize)
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
@@ -542,6 +551,8 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 	if !isPublic {
 		tag = fmt.Sprintf("no-ip-%s", subnetwork)
 	}
+
+	logrus.Warnf("Receiving a disk request of %d", template.DiskSize)
 
 	instance := &compute.Instance{
 		Name:         instanceName,
