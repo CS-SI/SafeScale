@@ -459,9 +459,11 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 		Networks:     []*resources.Network{req.Network},
 		PublicIP:     true,
 	}
+
 	if sizing != nil && sizing.MinDiskSize > 0 {
 		hostReq.DiskSize = sizing.MinDiskSize
 	}
+
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
