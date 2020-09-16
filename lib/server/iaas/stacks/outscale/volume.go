@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/antihax/optional"
+	"github.com/sirupsen/logrus"
 
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
@@ -315,8 +316,10 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 	firstDeviceName, err := s.getFirstFreeDeviceName(request.HostID)
 	if err != nil {
-		return "", err
+		return "", normalizeError(err)
 	}
+
+	logrus.Warnf("Trying to attach a device with name %s", firstDeviceName)
 
 	linkVolumeRequest := osc.LinkVolumeRequest{
 		DeviceName: firstDeviceName,
@@ -329,7 +332,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 		},
 	)
 	if err != nil {
-		return "", normalizeError(err)
+		return "", normalizeErrorWithReason("linking volume api", err)
 	}
 	return request.VolumeID, nil
 }
