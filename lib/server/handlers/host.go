@@ -511,7 +511,7 @@ func (handler *HostHandler) Create(
 		},
 		0,
 	)
-	if err != nil {
+	if retryErr != nil {
 		logrus.Error(scerr.Errorf("failure creating host", err))
 		switch err.(type) {
 		case scerr.ErrInvalidRequest:
