@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/davecgh/go-spew/spew"
@@ -139,7 +141,7 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 			}
 
 			for _, img := range imageList {
-				imgList = append(imgList, resources.Image{ID: img.ID, Name: img.Name})
+				imgList = append(imgList, resources.Image{ID: img.ID, Name: img.Name, DiskSize: int64(img.MinDiskGigabytes)})
 
 			}
 			return true, nil
@@ -174,9 +176,11 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		func() error {
 			extractedImg, err := images.Get(s.ComputeClient, id).Extract()
 			if err != nil {
-				img = extractedImg
+				return err
 			}
-			return err
+
+			img = extractedImg
+			return nil
 		},
 		2*temporal.GetDefaultDelay(),
 	)
@@ -184,7 +188,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		return nil, scerr.Wrap(err, fmt.Sprintf("error getting image: %s", ProviderErrorToString(err)))
 	}
 
-	return &resources.Image{ID: img.ID, Name: img.Name}, nil
+	return &resources.Image{ID: img.ID, Name: img.Name, DiskSize: int64(img.MinDiskGigabytes)}, nil
 }
 
 // GetTemplate returns the Template referenced by id
@@ -791,6 +795,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	if err != nil {
 		return nil, userData, err
 	}
+
+	// FIXME: Change volume size
+
 	srvOpts := servers.CreateOpts{
 		Name:             request.ResourceName,
 		SecurityGroups:   []string{s.SecurityGroup.Name},
@@ -835,17 +842,50 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, err
 	}
 
+	// FIXME: Template resize
+
+	rim, err := s.GetImage(request.ImageID)
+	if err != nil {
+		return nil, userData, err
+	}
+
+	if request.DiskSize > template.DiskSize {
+		template.DiskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > template.DiskSize {
+		template.DiskSize = int(rim.DiskSize)
+	}
+
+	if template.DiskSize == 0 {
+		// Determines appropriate disk size
+		if template.Cores < 16 { // nolint
+			template.DiskSize = 100
+		} else if template.Cores < 32 {
+			template.DiskSize = 200
+		} else {
+			template.DiskSize = 400
+		}
+	}
+
 	// --- query provider for host creation ---
 
 	logrus.Debugf("requesting host resource creation...")
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			server, ierr := servers.Create(
-				s.ComputeClient, keypairs.CreateOptsExt{
-					CreateOptsBuilder: srvOpts,
+
+			bd := []bootfromvolume.BlockDevice{
+				bootfromvolume.BlockDevice{
+					UUID:       srvOpts.ImageRef,
+					SourceType: bootfromvolume.SourceImage,
+					VolumeSize: template.DiskSize,
 				},
-			).Extract()
+			}
+			server, ierr := bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
+				CreateOptsBuilder: srvOpts,
+				BlockDevice:       bd,
+			}).Extract()
 			if ierr != nil {
 				if server != nil {
 					servers.Delete(s.ComputeClient, server.ID)
