@@ -17,16 +17,16 @@
 package listeners
 
 import (
-    "context"
+	"context"
 
-    "github.com/asaskevich/govalidator"
-    "github.com/sirupsen/logrus"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    "github.com/CS-SI/SafeScale/lib/server/handlers"
-    "github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // safescale image list --all=false
@@ -36,47 +36,47 @@ type ImageListener struct{}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot list image")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list image")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err == nil {
-        if !ok {
-            logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-        }
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil {
+		if !ok {
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		}
+	}
 
-    job, err := PrepareJob(ctx, "", "image list")
-    if err != nil {
-        return nil, err
-    }
-    defer job.Close()
+	job, err := PrepareJob(ctx, in.GetTenantId(), "image list")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
 
-    tracer := debug.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	tracer := debug.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    handler := handlers.NewImageHandler(job)
-    images, err := handler.List(in.GetAll())
-    if err != nil {
-        return nil, err
-    }
+	handler := handlers.NewImageHandler(job)
+	images, err := handler.List(in.GetAll())
+	if err != nil {
+		return nil, err
+	}
 
-    // Build response mapping abstract.Image to protocol.Image
-    var pbImages []*protocol.Image
-    for _, image := range images {
-        pbImages = append(pbImages, converters.ImageFromAbstractToProtocol(&image))
-    }
-    rv := &protocol.ImageList{Images: pbImages}
-    return rv, nil
+	// Build response mapping abstract.Image to protocol.Image
+	var pbImages []*protocol.Image
+	for _, image := range images {
+		pbImages = append(pbImages, converters.ImageFromAbstractToProtocol(&image))
+	}
+	rv := &protocol.ImageList{Images: pbImages}
+	return rv, nil
 }

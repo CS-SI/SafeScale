@@ -72,8 +72,8 @@ var securityGroupList = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
 		}
-		if len(list.List) > 0 {
-			jsoned, _ := json.Marshal(list.List)
+		if len(list.SecurityGroups) > 0 {
+			jsoned, _ := json.Marshal(list.SecurityGroups)
 			var result []interface{}
 			err = json.Unmarshal([]byte(jsoned), &result)
 			if err != nil {

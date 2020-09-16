@@ -258,3 +258,13 @@ func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam 
 func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
 	return gError
 }
+
+// BindSecurityGroupToNetwork ...
+func (s *Stack) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+	return gError
+}
+
+// UnbindSecurityGroupFromNetwork ...
+func (s *Stack) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+	return gError
+}

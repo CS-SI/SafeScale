@@ -214,6 +214,16 @@ func (provider *provider) UnbindSecurityGroupFromHost(hostParam stacks.HostParam
 	return gReport
 }
 
+// BindSecurityGroupToHost ...
+func (provider *provider) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+	return gReport
+}
+
+// UnbindSecurityGroupFromHost ...
+func (provider *provider) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+	return gReport
+}
+
 // ListSecurityGroup lists existing security groups
 func (provider *provider) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
