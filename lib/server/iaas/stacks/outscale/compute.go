@@ -949,18 +949,42 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 		},
 		KeypairName: creationKeyPair.Name,
 	}
+
 	if request.DiskSize > 0 {
+
+		tpl, err := s.GetTemplate(request.TemplateID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if tpl == nil {
+			return nil, nil, scerr.InvalidParameterError("request.TemplateID", "Template does not exist")
+		}
+
+		var diskSize int
+		diskSize = tpl.DiskSize
+
+		if request.DiskSize > diskSize {
+			diskSize = request.DiskSize
+		}
+
+		if diskSize < 10 {
+			diskSize = 10
+		}
+
 		vmsRequest.BlockDeviceMappings = []osc.BlockDeviceMappingVmCreation{
 			{
 				Bsu: osc.BsuToCreate{
 					DeleteOnVmDeletion: true,
-					VolumeSize:         int32(request.DiskSize),
+					SnapshotId:         "",
+					VolumeSize:         int32(diskSize),
 					VolumeType:         s.volumeType(s.Options.Compute.DefaultVolumeSpeed),
 				},
-				DeviceName: "vda",
+				NoDevice:   "true",
+				DeviceName: "/dev/sda1",
 			},
 		}
 	}
+
 	resVM, _, err := s.client.VmApi.CreateVms(
 		s.auth, &osc.CreateVmsOpts{
 			CreateVmsRequest: optional.NewInterface(vmsRequest),
@@ -1016,11 +1040,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 		if err != nil {
 			return nil, userData, err
 		}
-	}
-
-	err = s.addVolume(&request, vm.VmId)
-	if err != nil {
-		return nil, userData, err
 	}
 
 	err = s.addGPUs(&request, vm.VmId)
