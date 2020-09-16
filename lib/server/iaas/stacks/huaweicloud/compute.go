@@ -345,10 +345,21 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		)
 	}
 
-	// Determines appropriate disk size
+	rim, err := s.GetImage(request.ImageID)
+	if err != nil {
+		return nil, userData, err
+	}
+
 	if request.DiskSize > template.DiskSize {
 		template.DiskSize = request.DiskSize
-	} else if template.DiskSize == 0 {
+	}
+
+	if int(rim.DiskSize) > template.DiskSize {
+		template.DiskSize = int(rim.DiskSize)
+	}
+
+	if template.DiskSize == 0 {
+		// Determines appropriate disk size
 		if template.Cores < 16 { // nolint
 			template.DiskSize = 100
 		} else if template.Cores < 32 {
