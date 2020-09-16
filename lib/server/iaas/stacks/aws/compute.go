@@ -51,6 +51,8 @@ type portDef struct {
 }
 
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
+	logrus.Warnf("Creating keypair with name %s", name)
+
 	keypair, err := resources.NewKeyPair(name)
 	if err != nil {
 		return nil, err
@@ -326,14 +328,23 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 					logrus.Warnf("ENA filtering does NOT actually work !")
 				}
 
-				images = append(
-					images, resources.Image{
-						ID:          aws.StringValue(image.ImageId),
-						Name:        aws.StringValue(image.Name),
-						Description: aws.StringValue(image.Description),
-						StorageType: aws.StringValue(image.RootDeviceType),
-					},
-				)
+				nextImage := resources.Image{
+					ID:          aws.StringValue(image.ImageId),
+					Name:        aws.StringValue(image.Name),
+					Description: aws.StringValue(image.Description),
+					StorageType: aws.StringValue(image.RootDeviceType),
+					DiskSize:    0,
+				}
+
+				if len(image.BlockDeviceMappings) > 0 {
+					if image.BlockDeviceMappings[0].Ebs != nil {
+						if image.BlockDeviceMappings[0].Ebs.VolumeSize != nil {
+							nextImage.DiskSize = aws.Int64Value(image.BlockDeviceMappings[0].Ebs.VolumeSize)
+						}
+					}
+				}
+
+				images = append(images, nextImage)
 			}
 		}
 	}
@@ -509,6 +520,17 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		logrus.Warnf("Choosing between networks: %s", spew.Sdump(request.Networks))
 	}
 
+	err = s.ImportKeyPair(request.KeyPair)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		derr := s.DeleteKeyPair(request.KeyPair.Name)
+		if derr != nil {
+			logrus.Errorf("failed to delete creation keypair: %v", derr)
+		}
+	}()
+
 	// The Default Network is the first of the provided list, by convention
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
@@ -555,6 +577,25 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	rim, err := s.GetImage(request.ImageID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if request.DiskSize > template.DiskSize {
+		template.DiskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > template.DiskSize {
+		template.DiskSize = int(rim.DiskSize)
+	}
+
+	if template.DiskSize == 0 {
+		// Determines appropriate disk size
+		if template.Cores < 16 { // nolint
+			template.DiskSize = 100
+		} else if template.Cores < 32 {
+			template.DiskSize = 200
+		} else {
+			template.DiskSize = 400
+		}
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
@@ -942,9 +983,19 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 	input := &ec2.RequestSpotInstancesInput{
 		InstanceCount: aws.Int64(1),
 		LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-			ImageId:           aws.String(imageId),
-			InstanceType:      aws.String(template.ID),
-			KeyName:           aws.String(keypairName),
+			ImageId:      aws.String(imageId),
+			InstanceType: aws.String(template.ID),
+			KeyName:      aws.String(keypairName),
+			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+				&ec2.BlockDeviceMapping{
+					DeviceName: aws.String("/dev/sda1"),
+					NoDevice:   aws.String(""),
+					Ebs: &ec2.EbsBlockDevice{
+						DeleteOnTermination: aws.Bool(true),
+						VolumeSize:          aws.Int64(int64(template.DiskSize)),
+					},
+				},
+			},
 			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
 			Placement: &ec2.SpotPlacement{
 				AvailabilityZone: aws.String(zone),
@@ -1000,6 +1051,16 @@ func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, image
 			MinCount:     aws.Int64(1),
 			Placement: &ec2.Placement{
 				AvailabilityZone: aws.String(zone),
+			},
+			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+				&ec2.BlockDeviceMapping{
+					DeviceName: aws.String("/dev/sda1"),
+					NoDevice:   aws.String(""),
+					Ebs: &ec2.EbsBlockDevice{
+						DeleteOnTermination: aws.Bool(true),
+						VolumeSize:          aws.Int64(int64(template.DiskSize)),
+					},
+				},
 			},
 			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
 			TagSpecifications: []*ec2.TagSpecification{

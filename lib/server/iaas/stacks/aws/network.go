@@ -537,9 +537,12 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	logrus.Warn(spew.Sdump(vpcnet))
 
+	var vpcId *string
+
 	for _, asnTmp := range snTmp.Subnets {
 		logrus.Warnf("Comparing %s to %s", aws.StringValue(asnTmp.VpcId), vpcnet.Parent)
 		if aws.StringValue(asnTmp.VpcId) == vpcnet.Parent {
+			vpcId = asnTmp.VpcId
 			logrus.Warnf("Actually trying to delete subnetwork %s", aws.StringValue(asnTmp.SubnetId))
 			_, err = s.EC2Service.DeleteSubnet(
 				&ec2.DeleteSubnetInput{
@@ -593,7 +596,6 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	for _, artTmp := range rtTmp.RouteTables {
 		if aws.StringValue(artTmp.VpcId) == vpcnet.Parent {
-
 			hasMain := false
 			// Dissociate
 			for _, rta := range artTmp.Associations {
@@ -624,6 +626,32 @@ func (s *Stack) DeleteNetwork(id string) error {
 				return err
 			}
 		}
+	}
+
+	table, err := s.EC2Service.DescribeRouteTables(
+		&ec2.DescribeRouteTablesInput{
+			Filters: []*ec2.Filter{
+				&ec2.Filter{
+					Name: aws.String("vpc-id"),
+					Values: []*string{
+						vpcId,
+					},
+				},
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.EC2Service.DeleteRoute(
+		&ec2.DeleteRouteInput{
+			DestinationCidrBlock: aws.String("0.0.0.0/0"),
+			RouteTableId:         table.RouteTables[0].RouteTableId,
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	logrus.Warnf("Reached DeleteVpc call")
