@@ -888,14 +888,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 		)
 	}
 
-	// keyPair, err := s.getOrCreateKeypair(request)
-	// if err != nil {
-	//	return nil, userData, err
-	// }
-	// defer func() {
-	//	_ = s.DeleteKeyPair(keyPair.ID)
-	// }()
-	// request.KeyPair = keyPair
 	password, err := s.getOrCreatePassword(request)
 	request.Password = password
 	if err != nil {
