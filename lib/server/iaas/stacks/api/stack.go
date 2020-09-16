@@ -39,7 +39,7 @@ type Stack interface {
 	// GetTemplate returns the Template referenced by id
 	GetTemplate(id string) (*resources.HostTemplate, error)
 
-	// CreateKeyPair creates and import a key pair
+	// Deprecated: CreateKeyPair creates and import a key pair
 	CreateKeyPair(name string) (*resources.KeyPair, error)
 	// GetKeyPair returns the key pair identified by id
 	GetKeyPair(id string) (*resources.KeyPair, error)
