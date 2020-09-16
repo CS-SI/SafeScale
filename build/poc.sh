@@ -1,16 +1,16 @@
 #! /bin/bash -x
 
 whydied() {
-    ./safescale-cover ssh run -c "sudo zip -r /tmp/dump.zip /opt/safescale/" $1 || return 1
-    ./safescale-cover ssh copy $1:/tmp/dump.zip ~/.safescale/$2-$1-forensics.zip || return 2
-    ./safescale-cover ssh run -c "sudo rm -rf /tmp/dump.zip" $1 || return 3
+    ./safescale ssh run -c "sudo zip -r /tmp/dump.zip /opt/safescale/" $1 || return 1
+    ./safescale ssh copy $1:/tmp/dump.zip ~/.safescale/$2-$1-forensics.zip || return 2
+    ./safescale ssh run -c "sudo rm -rf /tmp/dump.zip" $1 || return 3
     return 0
 }
 
 whylives() {
-    ./safescale-cover ssh run -c "sudo zip -r /tmp/dump.zip /opt/safescale/" $1 || return 1
-    ./safescale-cover ssh copy $1:/tmp/dump.zip ~/.safescale/$2-$1-alive.zip || return 2
-    ./safescale-cover ssh run -c "sudo rm -rf /tmp/dump.zip" $1 || return 3
+    ./safescale ssh run -c "sudo zip -r /tmp/dump.zip /opt/safescale/" $1 || return 1
+    ./safescale ssh copy $1:/tmp/dump.zip ~/.safescale/$2-$1-alive.zip || return 2
+    ./safescale ssh run -c "sudo rm -rf /tmp/dump.zip" $1 || return 3
     return 0
 }
 
@@ -27,6 +27,7 @@ settos() {
         export SAFESCALE_HOST_TIMEOUT=$1
         export SAFESCALE_HOST_CREATION_TIMEOUT=$1
         export SAFESCALE_SSH_CONNECT_TIMEOUT=$1
+        export SAFESCALE_METADATA_SUFFIX=citests
         export SAFESCALE_FORENSICS=True
         export SAFESCALED_PORT=$((((RANDOM + RANDOM) % 43001) + 22000))
     fi
@@ -85,8 +86,8 @@ do
     stamp=`date +"%s"`
     nfrag=$(( $frag + $i ));
     
-    ./safescale-cover cluster delete clu-$TENANT-$stamp-$fla-r$i -y
-    ./safescale-cover cluster create -k -C $CLUSIZE -F $fla --os "$OSTESTED" --sizing "cpu=2,ram>=2,disk>=8" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-$fla-r$i
+    ./safescale cluster delete clu-$TENANT-$stamp-$fla-r$i -y
+    ./safescale cluster create -C $CLUSIZE -F $fla --os "$OSTESTED" --sizing "cpu=2,ram>=2,disk>=10" --cidr 10.$frag.$i.0/24 clu-$TENANT-$stamp-$fla-r$i
     RUN=$?
     if [[ $RUN -ne 0 ]]; then
       CODE=$((CODE + 1))
@@ -104,7 +105,7 @@ do
     done
 
     for j in $(seq $ROUNDS); do
-      ./safescale-cover cluster delete clu-$TENANT-$stamp-$fla-r$i -y
+      ./safescale cluster delete clu-$TENANT-$stamp-$fla-r$i -y
       if [[ $? -ne 0 ]]; then
         CLEAN=$((CLEAN + 1))
       else
