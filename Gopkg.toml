@@ -9,8 +9,8 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
   version = "=v1.20.12"
 
 [[override]]
-  name = "github.com/outscale-dev/osc-sdk-go"
-  version = "=v1.0.0"
+  name = "github.com/outscale/osc-sdk-go"
+  version = "=v1.3.0"
 
 #[[override]]
 #  name = "github.com/Azure/azure-sdk-for-go"
@@ -130,6 +130,10 @@ required = ["github.com/GeertJohan/go.rice", "golang.org/x/tools/cmd/stringer", 
 [[constraint]]
   name = "github.com/asaskevich/govalidator"
   version = "=v9"
+
+[[constraint]]
+  name = "github.com/savaki/jq"
+  branch = "master"
 
 [[override]]
   name = "github.com/libvirt/libvirt-go"
