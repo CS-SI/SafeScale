@@ -277,6 +277,21 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", err), err)
 	}
 
+	rim, err := s.GetImage(request.ImageID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// select disk size
+
+	if request.DiskSize > template.DiskSize {
+		template.DiskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > template.DiskSize {
+		template.DiskSize = int(rim.DiskSize)
+	}
+
 	if template.DiskSize == 0 {
 		// Determines appropriate disk size
 		if template.Cores < 16 { // nolint
@@ -288,22 +303,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}
 
-	if request.DiskSize > template.DiskSize {
-		template.DiskSize = request.DiskSize
-	}
-
 	logrus.Warnf("Requesting a disksize of %d", template.DiskSize)
-
-	rim, err := s.GetImage(request.ImageID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if int(rim.DiskSize) > template.DiskSize {
-		template.DiskSize = int(rim.DiskSize)
-	}
-
-	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
+	logrus.Debugf("Selected template: '%s', '%s', '%d Gb'", template.ID, template.Name, template.DiskSize)
 
 	// Select usable availability zone, the first one in the list
 	if s.GcpConfig.Zone == "" {
