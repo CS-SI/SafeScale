@@ -1363,23 +1363,19 @@ func (s *Stack) DeleteHost(id string) error {
 						return scerr.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), err)
 					}
 
-					if err != nil {
-						rei := ReinterpretGophercloudErrorCode(
-							err, []int64{404}, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
-								return scerr.Errorf(
-									fmt.Sprintf(
-										"failed to submit host '%s' deletion: %s", id, ProviderErrorToString(ferr),
-									), ferr,
-								)
-							},
-						)
-						if rei == nil {
-							resourcePresent = false
-						}
-						return rei
+					rei := ReinterpretGophercloudErrorCode(
+						err, []int64{404}, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
+							return scerr.Errorf(
+								fmt.Sprintf(
+									"failed to submit host '%s' deletion: %s", id, ProviderErrorToString(ferr),
+								), ferr,
+							)
+						},
+					)
+					if rei == nil {
+						resourcePresent = false
 					}
-
-					return err
+					return rei
 				},
 				temporal.GetContextTimeout(),
 			)
