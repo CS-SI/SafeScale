@@ -595,8 +595,14 @@ func (handler *NetworkHandler) Create(
 	return network, nil
 }
 
-func compareOsWithRequestedOs(os string, requestedOs string) {
-	logrus.Debugf("Analysis of %s vs %s", os, requestedOs)
+func compareOsWithRequestedOs(theOs string, requestedOs string) {
+	logrus.Debugf("Analysis of %s vs %s", theOs, requestedOs)
+	frags := strings.Split(theOs, ",")
+	if len(frags) < 3 {
+		return
+	}
+
+	os := fmt.Sprintf("%s %s", frags[2], frags[3])
 
 	var err error
 
@@ -616,8 +622,9 @@ func compareOsWithRequestedOs(os string, requestedOs string) {
 			if err != nil {
 				return
 			}
+		} else {
+			return
 		}
-		return
 	}
 
 	if strings.Contains(os, " ") {
@@ -630,13 +637,14 @@ func compareOsWithRequestedOs(os string, requestedOs string) {
 			if err != nil {
 				return
 			}
+		} else {
+			return
 		}
-		return
 	}
 
 	if ver < verRequested {
 		logrus.Warnf(
-			"Requested OS version was (%d) and the OS version of the allocated machine (%d) is lower", ver, verRequested,
+			"Requested OS version was (%d) and the OS version of the allocated machine (%d) is lower", verRequested, ver,
 		)
 	}
 
@@ -834,7 +842,7 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	logrus.Infof("SSH service of gateway '%s' started.", gw.Name)
 
 	if out != "" {
-		logrus.Warnf("received output from phase 1: %s", out)
+		logrus.Infof("received output from phase 1: %s", out)
 		return out, nil
 	}
 
