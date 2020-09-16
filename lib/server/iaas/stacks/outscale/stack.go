@@ -151,8 +151,8 @@ func (s *Stack) initDefaultNetwork() error {
 
 func deviceNames() []string {
 	var deviceNames []string
-	for i := int('d'); i <= int('z'); i++ {
-		deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", fmt.Sprint(i)))
+	for i := int('d') - int('a'); i <= int('z')-int('a'); i++ {
+		deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", string('a'+rune(i))))
 	}
 	return deviceNames
 }
