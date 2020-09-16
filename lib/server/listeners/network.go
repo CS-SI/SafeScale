@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -29,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -71,7 +73,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, xerr := PrepareJob(ctx, in.Tenant, fmt.Sprintf("network create '%s'", networkName))
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("network create '%s'", networkName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -144,9 +146,9 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 		}
 	}
 
-	job, err := PrepareJob(ctx, in.Tenant, "network list")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "network list")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
 
@@ -196,7 +198,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.TenantId, "network inspect")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "network inspect")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -242,7 +244,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.TenantId, "delete network")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "delete network")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -264,5 +266,116 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	}
 
 	tracer.Trace("Network %s successfully deleted.", refLabel)
+	return empty, nil
+}
+
+// BindSecurityGroup attaches a Security Group to a hostnetwork
+func (s *NetworkListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
+	if networkRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for Network")
+	}
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if networkRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network bind-security-group")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rn.BindSecurityGroup(task, sg, in.GetEnabled()); xerr != nil {
+		return empty, xerr
+	}
+
+	return empty, nil
+}
+
+// UnbindSecurityGroup detaches a Security Group from a network
+func (s *NetworkListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
+	if networkRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Network")
+	}
+
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if sgRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network unbind-security-group")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rn.UnbindSecurityGroup(task, sg); xerr != nil {
+		return empty, xerr
+	}
 	return empty, nil
 }

@@ -18,6 +18,8 @@ package listeners
 
 import (
 	"context"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	"reflect"
 	"strings"
 
@@ -30,7 +32,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -87,7 +91,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "host start")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host start")
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +135,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "host stop")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host stop")
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +176,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, in.TenantId, "host reboot")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host reboot")
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +212,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, in.Tenant, "host list")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host list")
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +257,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "host create")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host create")
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +352,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		}
 	}
 
-	job, err := PrepareJob(ctx, "", "host resize")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host resize")
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +409,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
 	}
 
-	job, err := PrepareJob(ctx, "", "host state")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host state")
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +455,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "host inspect")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host inspect")
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +502,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "host delete")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host delete")
 	if err != nil {
 		return nil, err
 	}
@@ -544,7 +548,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "host ssh")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "host ssh")
 	if err != nil {
 		return nil, err
 	}
@@ -562,4 +566,115 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 
 	tracer.Trace("SSH config of host %s successfully loaded", refLabel)
 	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
+}
+
+// BindSecurityGroup attaches a Security Group to an host
+func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	if hostRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for Host")
+	}
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if hostRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host bind-security-group")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rh.BindSecurityGroup(task, sg, in.GetEnabled()); xerr != nil {
+		return empty, xerr
+	}
+	return empty, nil
+}
+
+// UnbindSecurityGroup detaches a Security Group from an host
+func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	if hostRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
+	}
+
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if sgRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host unbind-security-group")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rh.UnbindSecurityGroup(task, sg); xerr != nil {
+		return empty, xerr
+	}
+	return empty, nil
 }

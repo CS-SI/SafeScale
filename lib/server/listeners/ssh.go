@@ -17,20 +17,20 @@
 package listeners
 
 import (
-    "context"
-    "fmt"
-    "strings"
+	"context"
+	"fmt"
+	"strings"
 
-    "github.com/asaskevich/govalidator"
-    "github.com/sirupsen/logrus"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
 
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-    "github.com/CS-SI/SafeScale/lib/system"
-    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // safescale ssh connect host2
@@ -43,148 +43,148 @@ type SSHListener struct{}
 
 // Run executes an ssh command an an host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot run by ssh")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot run by ssh")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err != nil || !ok {
-        logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
 
-    hostRef := in.GetHost().GetName()
-    if hostRef == "" {
-        hostRef = in.GetHost().GetId()
-    }
-    if hostRef == "" {
-        return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
-    }
+	hostRef := in.GetHost().GetName()
+	if hostRef == "" {
+		hostRef = in.GetHost().GetId()
+	}
+	if hostRef == "" {
+		return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
+	}
 
-    command := in.GetCommand()
+	command := in.GetCommand()
 
-    job, xerr := PrepareJob(ctx, "", "ssh run")
-    if xerr != nil {
-        return nil, xerr
-    }
-    defer job.Close()
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "ssh run")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
 
-    task := job.GetTask()
-    tracer := debug.NewTracer(task, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
-    tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	task := job.GetTask()
+	tracer := debug.NewTracer(task, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
-    if xerr != nil {
-        return nil, xerr
-    }
+	rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    retcode, stdout, stderr, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-    if xerr != nil {
-        return nil, xerr
-    }
+	retcode, stdout, stderr, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    return &protocol.SshResponse{
-        Status:    int32(retcode),
-        OutputStd: stdout,
-        OutputErr: stderr,
-    }, nil
+	return &protocol.SshResponse{
+		Status:    int32(retcode),
+		OutputStd: stdout,
+		OutputErr: stderr,
+	}, nil
 }
 
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
-    defer fail.OnExitConvertToGRPCStatus(&err)
-    defer fail.OnExitWrapError(&err, "cannot copy by ssh")
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
 
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if in == nil {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
-    if ctx == nil {
-        return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-    }
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 
-    ok, err := govalidator.ValidateStruct(in)
-    if err != nil || !ok {
-        logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-    }
+	ok, err := govalidator.ValidateStruct(in)
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+	}
 
-    job, xerr := PrepareJob(ctx, "", "ssh copy")
-    if xerr != nil {
-        return nil, xerr
-    }
-    defer job.Close()
-    task := job.GetTask()
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "ssh copy")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
 
-    source := in.Source
-    dest := in.Destination
-    tracer := debug.NewTracer(task, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	source := in.Source
+	dest := in.Destination
+	tracer := debug.NewTracer(task, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-    var (
-        pull                bool
-        hostRef             string
-        hostPath, localPath string
-        retcode             int
-        stdout, stderr      string
-    )
+	var (
+		pull                bool
+		hostRef             string
+		hostPath, localPath string
+		retcode             int
+		stdout, stderr      string
+	)
 
-    // If source contains remote host, we pull
-    parts := strings.Split(source, ":")
-    if len(parts) > 1 {
-        pull = true
-        hostRef = parts[0]
-        hostPath = strings.Join(parts[1:], ":")
-    } else {
-        localPath = source
-    }
+	// If source contains remote host, we pull
+	parts := strings.Split(source, ":")
+	if len(parts) > 1 {
+		pull = true
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		localPath = source
+	}
 
-    // if destination contains remote host, we push (= !pull)
-    parts = strings.Split(dest, ":")
-    if len(parts) > 1 {
-        if pull {
-            return nil, fail.InvalidRequestError("file copy from one remote host to another one is not supported")
-        }
-        hostRef = parts[0]
-        hostPath = strings.Join(parts[1:], ":")
-    } else {
-        if !pull {
-            return nil, fail.InvalidRequestError("failed to find a remote host in the request")
-        }
-        localPath = dest
-    }
+	// if destination contains remote host, we push (= !pull)
+	parts = strings.Split(dest, ":")
+	if len(parts) > 1 {
+		if pull {
+			return nil, fail.InvalidRequestError("file copy from one remote host to another one is not supported")
+		}
+		hostRef = parts[0]
+		hostPath = strings.Join(parts[1:], ":")
+	} else {
+		if !pull {
+			return nil, fail.InvalidRequestError("failed to find a remote host in the request")
+		}
+		localPath = dest
+	}
 
-    rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
-    if xerr != nil {
-        return nil, xerr
-    }
-    if pull {
-        retcode, stdout, stderr, xerr = rh.Pull(task, hostPath, localPath, temporal.GetLongOperationTimeout())
-    } else {
-        retcode, stdout, stderr, xerr = rh.Push(task, localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
-    }
-    if xerr != nil {
-        return nil, xerr
-    }
-    if retcode != 0 {
-        return nil, fail.NewError("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
-    }
+	rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if pull {
+		retcode, stdout, stderr, xerr = rh.Pull(task, hostPath, localPath, temporal.GetLongOperationTimeout())
+	} else {
+		retcode, stdout, stderr, xerr = rh.Push(task, localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+	}
+	if xerr != nil {
+		return nil, xerr
+	}
+	if retcode != 0 {
+		return nil, fail.NewError("copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr)
+	}
 
-    return &protocol.SshResponse{
-        Status:    int32(retcode),
-        OutputStd: stdout,
-        OutputErr: stderr,
-    }, nil
+	return &protocol.SshResponse{
+		Status:    int32(retcode),
+		OutputStd: stdout,
+		OutputErr: stderr,
+	}, nil
 }

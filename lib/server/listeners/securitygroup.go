@@ -71,9 +71,9 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	}
 
 	out := &protocol.SecurityGroupListResponse{}
-	out.List = make([]*protocol.SecurityGroupResponse, 0, len(list))
+	out.SecurityGroups = make([]*protocol.SecurityGroupResponse, 0, len(list))
 	for _, v := range list {
-		out.List = append(out.List, converters.SecurityGroupFromAbstractToProtocol(*v))
+		out.SecurityGroups = append(out.SecurityGroups, converters.SecurityGroupFromAbstractToProtocol(*v))
 	}
 	return out, nil
 }
@@ -97,7 +97,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "security-group create")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group create")
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.TenantId, "security-group clear")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group clear")
 	if err != nil {
 		return empty, err
 	}
@@ -203,7 +203,7 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, "", "security-group reset")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group reset")
 	if err != nil {
 		return empty, err
 	}
@@ -254,7 +254,7 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.TenantId, "security-group inspect")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group inspect")
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +300,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Referen
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.TenantId, "security-group delete")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group delete")
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +356,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, xerr
 	}
 
-	job, err := PrepareJob(ctx, "", "security-group add-rule")
+	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group add-rule")
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +412,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, fail.InvalidRequestError("rule id cannot be empty string")
 	}
 
-	job, err := PrepareJob(ctx, "", "security-group delete-rule")
+	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group delete-rule")
 	if err != nil {
 		return nil, err
 	}

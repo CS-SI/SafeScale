@@ -45,9 +45,7 @@ var (
 	clusterName string
 )
 
-const (
-	clusterCmdLabel = "cluster"
-)
+const clusterCmdLabel = "cluster"
 
 // ClusterCommand command
 var ClusterCommand = &cli.Command{
