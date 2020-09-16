@@ -116,6 +116,7 @@ type Image struct {
 	URL         string `json:"url,omitempty"`
 	Description string `json:"description,omitempty"`
 	StorageType string `json:"storagetype,omitempty"`
+	DiskSize    int64  `json:"disk_size_Gb,omitempty"`
 }
 
 // HostRequest represents requirements to create host
