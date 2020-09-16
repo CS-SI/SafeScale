@@ -129,11 +129,9 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 
 			for _, matype := range resp.Items {
 				ht := resources.HostTemplate{
-					Cores:   int(matype.GuestCpus),
-					RAMSize: float32(matype.MemoryMb / 1024),
-					// VPL: GCP Template disk sizing is ridiculous at best, so fill it to 0 and let us size the disk ourselves
-					// DiskSize: int(matype.ImageSpaceGb),
-					DiskSize: 0,
+					Cores:    int(matype.GuestCpus),
+					RAMSize:  float32(matype.MemoryMb / 1024),
+					DiskSize: int(matype.ImageSpaceGb),
 					ID:       strconv.FormatUint(matype.Id, 10),
 					Name:     matype.Name,
 				}
