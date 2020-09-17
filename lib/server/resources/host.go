@@ -55,7 +55,7 @@ type Host interface {
 	GetState(task concurrency.Task) hoststate.Enum                                                                                                 // returns the current state of the host, with error handling
 	GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error)                                                                      // returns the volumes attached to the host
 	IsClusterMember(task concurrency.Task) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
-	ListSecurityGroups(task concurrency.Task, all bool) ([]string, fail.Error)                                                                     // returns a slice of string corresponding to ID of Security Group binded to the host
+	ListSecurityGroups(task concurrency.Task, kind string) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                         // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
 	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
 	PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                                        // creates a file 'filename' on remote 'host' with the content 'content'

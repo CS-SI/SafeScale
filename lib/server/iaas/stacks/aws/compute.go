@@ -1466,7 +1466,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
-	// Delete volumes if there, mark errors as warnings
+	// Remove volumes if there, mark errors as warnings
 	for _, volume := range attachedVolumes {
 		_, err = s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{
 			VolumeId: aws.String(volume),
@@ -1476,7 +1476,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
-	// Delete security group
+	// Remove security group
 	if secGroupId != "" {
 		_, err = s.EC2Service.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
 			GroupId: aws.String(secGroupId),
@@ -1488,7 +1488,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		logrus.Warnf("security group %s for host '%s' not found", secGroupId, hostRef)
 	}
 
-	// Delete keypair
+	// Remove keypair
 	if keyPairName != "" {
 		_, err = s.EC2Service.DeleteKeyPair(&ec2.DeleteKeyPairInput{
 			KeyName: aws.String(keyPairName),

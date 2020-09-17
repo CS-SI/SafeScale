@@ -18,6 +18,7 @@ package commands
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -45,6 +46,7 @@ var SecurityGroupCommand = &cli.Command{
 		securityGroupCreate,
 		securityGroupDelete,
 		securityGroupInspect,
+		securityGroupBonds,
 		securityGroupRuleCommand,
 	},
 }
@@ -107,8 +109,43 @@ var securityGroupInspect = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
-		return clitools.SuccessResponse(resp)
+		formatted, err := reformatSecurityGroup(resp)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+		return clitools.SuccessResponse(formatted)
 	},
+}
+
+func reformatSecurityGroup(in *protocol.SecurityGroupResponse) (map[string]interface{}, error) {
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	jsoned, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+
+	out := map[string]interface{}{}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, err
+	}
+
+	if rules, ok := out["rules"].([]interface{}); ok {
+		for _, v := range rules {
+			item := v.(map[string]interface{})
+			direction := item["direction"].(float64)
+			etherType := item["ether_type"].(float64)
+			item["direction_label"] = strings.ToLower(securitygroupruledirection.Enum(direction).String())
+			item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
+		}
+	} else {
+		out["rules"] = nil
+	}
+
+	return out, nil
 }
 
 var securityGroupCreate = &cli.Command{
@@ -175,8 +212,15 @@ var securityGroupClear = &cli.Command{
 var securityGroupDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
-	Usage:     "Delete Security Group",
+	Usage:     "Remove Security Group",
 	ArgsUsage: "GROUPNAME [GROUPNAME ...]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "force",
+			Usage: "Force deletion, removing from hosts and networks if needed",
+			Value: false,
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
@@ -193,7 +237,7 @@ var securityGroupDelete = &cli.Command{
 		sgList = append(sgList, c.Args().First())
 		sgList = append(sgList, c.Args().Tail()...)
 
-		err := clientSession.SecurityGroup.Delete(sgList, temporal.GetExecutionTimeout())
+		err := clientSession.SecurityGroup.Delete(sgList, c.Bool("force"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
@@ -323,6 +367,73 @@ var securityGroupRuleDelete = &cli.Command{
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var securityGroupBonds = &cli.Command{
+	Name:    "bonds",
+	Aliases: []string{"links", "attachments"},
+	Usage:   "List resources Security Group is bound to",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Value:   true,
+			Usage:   "List all kinds of resources",
+		},
+		&cli.StringFlag{
+			Name:  "kind",
+			Value: "all",
+			Usage: "Narrow to the kind of resource specified; can be 'host' or 'network' or 'all' (default: 'all')",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s '%s' with args '%s'", securityGroupCmdLabel, c.Command.Name, c.Args())
+
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		kind := strings.ToLower(c.String("kind"))
+		if c.Bool("all") {
+			kind = "all"
+		}
+
+		list, err := clientSession.SecurityGroup.Bonds(c.Args().First(), kind, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+		}
+		result := map[string]interface{}{}
+		if len(list.Hosts) > 0 {
+			hosts := make([]map[string]interface{}, len(list.Hosts))
+			jsoned, _ := json.Marshal(list.Hosts)
+			err = json.Unmarshal([]byte(jsoned), &hosts)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+			}
+			result["hosts"] = hosts
+		}
+		if len(list.Networks) > 0 {
+			networks := make([]map[string]interface{}, len(list.Networks))
+			jsoned, _ := json.Marshal(list.Networks)
+			err = json.Unmarshal([]byte(jsoned), &networks)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+			}
+			result["networks"] = networks
+		}
+		if len(result) > 0 {
+			return clitools.SuccessResponse(result)
 		}
 		return clitools.SuccessResponse(nil)
 	},

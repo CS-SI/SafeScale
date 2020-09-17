@@ -401,7 +401,7 @@ var hostResize = &cli.Command{
 var hostDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
-	Usage:     "Delete host",
+	Usage:     "Remove host",
 	ArgsUsage: "<Host_name|Host_ID> [<Host_name|Host_ID>...]",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdLabel, c.Command.Name, c.Args())
@@ -559,13 +559,17 @@ var hostSecurityGroupAddCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "add security group to network not yet implemented"))
+		err := clientSession.Host.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -581,13 +585,17 @@ var hostSecurityGroupRemoveCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "remove security group from host not yet implemented"))
+		err := clientSession.Host.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -596,6 +604,19 @@ var hostSecurityGroupListCommand = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "list HOSTNAME",
 	ArgsUsage: "HOSTNAME",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Value:   true,
+			Usage:   "List all security groups no matter what is the status (enabled or disabled)",
+		},
+		&cli.StringFlag{
+			Name:  "kind",
+			Value: "all",
+			Usage: "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -603,13 +624,22 @@ var hostSecurityGroupListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		kind := strings.ToLower(c.String("kind"))
+		if c.Bool("all") {
+			kind = "all"
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "list of security groups attached to host not yet implemented"))
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		resp, err := clientSession.Host.ListSecurityGroups(c.Args().First(), kind, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
+		}
+		return clitools.SuccessResponse(resp)
 	},
 }
 
@@ -625,13 +655,17 @@ var hostSecurityGroupEnableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "activation of a security group attached to host not yet implemented"))
+		err := clientSession.Host.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enable security group of host", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -647,13 +681,17 @@ var hostSecurityGroupDisableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "activation of a security group attached to host not yet implemented"))
+		err := clientSession.Host.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disable security group of host", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 

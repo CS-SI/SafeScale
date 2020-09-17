@@ -2158,7 +2158,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 }
 
 // BindSecurityGroup binds a security group to the host; if enabled is true, apply it immediately
-func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enabled bool) fail.Error {
+func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enable bool) fail.Error {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -2170,7 +2170,7 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 	}
 
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2179,17 +2179,22 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 			sgID := sg.GetID()
 			// First check if the security group is not already registered for the host with the exact same state
 			for k, v := range hsgV1.ByID {
-				if k == sgID && v == enabled {
+				if k == sgID && v.Disabled == !enable {
 					return fail.DuplicateError("security group '%s' already binded to host")
 				}
 			}
 
 			// Not found, add it
-			hsgV1.ByID[sgID] = enabled
-			hsgV1.ByName[sg.GetName()] = enabled
+			item := &propertiesv1.SecurityGroupBond{
+				ID:       sgID,
+				Name:     sg.GetName(),
+				Disabled: !enable,
+			}
+			hsgV1.ByID[sgID] = item
+			hsgV1.ByName[sg.GetName()] = item
 
 			// If enabled, apply it
-			return sg.BindToHost(task, rh, enabled)
+			return sg.BindToHost(task, rh, enable)
 		})
 	})
 }
@@ -2207,14 +2212,14 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 	}
 
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			sgID := sg.GetID()
-			// Check if the security group is listed for the host, inot already registered for the host with the exact same state
+			// Check if the security group is listed for the host
 			found := false
 			for k := range hsgV1.ByID {
 				if k == sgID {
@@ -2238,13 +2243,25 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 }
 
 // ListSecurityGroups returns a slice of security groups binded to host
-func (rh *host) ListSecurityGroups(task concurrency.Task, all bool) (list []string, _ fail.Error) {
-	var nullList []string
+func (rh *host) ListSecurityGroups(task concurrency.Task, kind string) (list []*propertiesv1.SecurityGroupBond, _ fail.Error) {
+	var nullList []*propertiesv1.SecurityGroupBond
 	if rh.IsNull() {
 		return nullList, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nullList, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	if kind == "" {
+		kind = "all"
+	}
+	loweredKind := strings.ToLower(kind)
+	switch loweredKind {
+	case "all", "enabled", "disabled":
+		// continue
+	default:
+		return nil, fail.InvalidParameterError("kind", fmt.Sprintf("invalid value '%s'", kind))
+
 	}
 
 	return list, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2253,18 +2270,7 @@ func (rh *host) ListSecurityGroups(task concurrency.Task, all bool) (list []stri
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			list = make([]string, 0, len(hsgV1.ByID))
-			if all {
-				for k := range hsgV1.ByID {
-					list = append(list, k)
-				}
-			} else {
-				for k, v := range hsgV1.ByID {
-					if v {
-						list = append(list, k)
-					}
-				}
-			}
+			list = filterBondsByKind(hsgV1.ByID, loweredKind)
 			return nil
 		})
 	})
@@ -2302,8 +2308,8 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 			}
 
 			// found, update properties
-			hsgV1.ByID[sgID] = true
-			hsgV1.ByName[sg.GetName()] = true
+			hsgV1.ByID[sgID].Disabled = false
+			hsgV1.ByName[sg.GetName()].Disabled = false
 
 			// Bind the security group on provider side; if already binded (*fail.ErrDuplicate), consider as a success
 			innerXErr := sg.GetService().BindSecurityGroupToHost(rh.GetID(), sgID)
@@ -2330,7 +2336,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 	}
 
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2349,8 +2355,8 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 			}
 
 			// found, update properties
-			hsgV1.ByID[sgID] = false
-			hsgV1.ByName[sg.GetName()] = false
+			hsgV1.ByID[sgID].Disabled = true
+			hsgV1.ByName[sg.GetName()].Disabled = true
 
 			// Bind the security group on provider side; if security group not binded, consider as a success
 			innerXErr := sg.GetService().UnbindSecurityGroupFromHost(rh.GetID(), sgID)

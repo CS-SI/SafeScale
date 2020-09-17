@@ -18,6 +18,12 @@ package listeners
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"reflect"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -128,8 +134,9 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 // Clear calls the clear method to remove all rules from a security group
 func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot clear security group")
+	defer fail.OnExitWrapError(&err, "cannot clear Security Group")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -179,8 +186,9 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 // Reset clears the rules of a security group and readds the ones stored in metadata
 func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot reset security group")
+	defer fail.OnExitWrapError(&err, "cannot reset Security Group")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -273,9 +281,9 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 }
 
 // Delete an host
-func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.SecurityGroupDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete security-group")
+	defer fail.OnExitWrapError(&err, "cannot delete Security Group")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -295,12 +303,12 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Referen
 		}
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(in.GetGroup())
 	if ref == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group delete")
+	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group delete")
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +323,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Referen
 	if xerr != nil {
 		return empty, xerr
 	}
-	xerr = rsg.Delete(task)
+	xerr = rsg.Remove(task, in.GetForce())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -438,10 +446,10 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata
 func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
-	empty = &googleprotobuf.Empty{}
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot sanitize security group")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -486,4 +494,109 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	}
 	tracer.Trace("Security Group %s is in sync with metadata %s")
 	return empty, nil
+}
+
+// Bonds lists the resources bound to the Security Group
+func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.SecurityGroupBondsRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot list bonds of Security Group")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+	// FIXME: what if err != nil ?
+
+	ref, refLabel := srvutils.GetReference(in.GetTarget())
+	if ref == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
+	}
+
+	lowerKind := strings.ToLower(in.GetKind())
+	switch lowerKind {
+	case "":
+		lowerKind = "all"
+	case "all", "host", "network":
+		// continue
+	default:
+		return nil, fail.InvalidRequestError("invalid value '%s' in field 'Kind'", in.GetKind())
+	}
+
+	job, err := PrepareJob(ctx, in.GetTarget().GetTenantId(), "security-group delete-rule")
+	if err != nil {
+		return nil, err
+	}
+	defer job.Close()
+	task := job.GetTask()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &protocol.SecurityGroupBondsResponse{}
+	if lowerKind == "all" || lowerKind == "host" {
+		xerr = rsg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				hosts := make([]*protocol.SecurityGroupBond, 0, len(sghV1.ByID))
+				for _, v := range sghV1.ByID {
+					item := &protocol.SecurityGroupBond{
+						Id:       v.ID,
+						Name:     v.Name,
+						Disabled: v.Disabled,
+					}
+					hosts = append(hosts, item)
+				}
+				out.Hosts = hosts
+				return nil
+			})
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+	if lowerKind == "all" || lowerKind == "host" {
+		xerr = rsg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(task, securitygroupproperty.NetworksV1, func(clonable data.Clonable) fail.Error {
+				sgnV1, ok := clonable.(*propertiesv1.SecurityGroupNetworks)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SecurityGroupNetworks' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				networks := make([]*protocol.SecurityGroupBond, 0, len(sgnV1.ByID))
+				for _, v := range sgnV1.ByID {
+					item := &protocol.SecurityGroupBond{
+						Id:       v.ID,
+						Name:     v.Name,
+						Disabled: v.Disabled,
+					}
+					networks = append(networks, item)
+				}
+				out.Networks = networks
+				return nil
+			})
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+
+	return out, nil
 }

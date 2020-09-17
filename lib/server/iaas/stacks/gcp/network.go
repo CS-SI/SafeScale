@@ -389,7 +389,7 @@ func (s *Stack) DeleteNetwork(ref string) (xerr fail.Error) {
 		}
 	}
 
-	// Delete routes and firewall
+	// Remove routes and firewall
 	firewallRuleName := fmt.Sprintf("%s-%s-all-in", s.GcpConfig.NetworkName, subnetwork.Name)
 	fws, err := compuService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
 	if err != nil {

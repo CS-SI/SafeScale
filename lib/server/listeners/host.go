@@ -18,8 +18,6 @@ package listeners
 
 import (
 	"context"
-	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	"reflect"
 	"strings"
 
@@ -571,8 +569,9 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 // BindSecurityGroup attaches a Security Group to an host
 func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitWrapError(&err, "cannot bind security group to Host")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -597,7 +596,7 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host bind-security-group")
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group bind")
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -617,7 +616,7 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rh.BindSecurityGroup(task, sg, in.GetEnabled()); xerr != nil {
+	if xerr = rh.BindSecurityGroup(task, sg, !in.GetEnable()); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -626,8 +625,9 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 // UnbindSecurityGroup detaches a Security Group from an host
 func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitWrapError(&err, "cannot unbind security group from Host")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -677,4 +677,167 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 	return empty, nil
+}
+
+// EnableSecurityGroup applies a Security Group already attached (if not already applied)
+func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot enable security group on Host")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	if hostRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
+	}
+
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if sgRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group enable")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rh.EnableSecurityGroup(task, sg); xerr != nil {
+		return empty, xerr
+	}
+	return empty, nil
+}
+
+// DisableSecurityGroup applies a Security Group already attached (if not already applied)
+func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	//defer fail.OnExitWrapError(&err, "cannot disable security group on host")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	if hostRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
+	}
+
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if sgRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group enable")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rh.DisableSecurityGroup(task, sg); xerr != nil {
+		return empty, xerr
+	}
+	return empty, nil
+}
+
+// ListSecurityGroups applies a Security Group already attached (if not already applied)
+func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupBondsRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	//defer fail.OnExitWrapError(&err, "cannot disable security group on host")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	if hostRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetTarget().GetTenantId(), "host security-group list")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+	bonds, xerr := rh.ListSecurityGroups(task, in.GetKind())
+	if xerr != nil {
+		return nil, xerr
+	}
+	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "hosts")
+	return resp, nil
 }

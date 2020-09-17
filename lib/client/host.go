@@ -306,3 +306,99 @@ func (h host) RemoveFeature(hostRef, featureName string, params map[string]strin
 	_, err := service.Remove(ctx, req)
 	return err
 }
+
+// BindSecurityGroup calls the gRPC server to bind a security group to a host
+func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	req := &protocol.SecurityGroupBindRequest{
+		Group:  &protocol.Reference{Name: sgRef},
+		Target: &protocol.Reference{Name: hostRef},
+		Enable: enable,
+	}
+	service := protocol.NewHostServiceClient(h.session.connection)
+	_, err := service.BindSecurityGroup(ctx, req)
+	return err
+}
+
+// UnbindSecurityGroup calls the gRPC server to unbind a security group from a host
+func (h host) UnbindSecurityGroup(hostRef, sgRef string, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	req := &protocol.SecurityGroupBindRequest{
+		Group:  &protocol.Reference{Name: sgRef},
+		Target: &protocol.Reference{Name: hostRef},
+	}
+	service := protocol.NewHostServiceClient(h.session.connection)
+	_, err := service.UnbindSecurityGroup(ctx, req)
+	return err
+}
+
+// EnableSecurityGroup calls the gRPC server to enable a bound security group on host
+func (h host) EnableSecurityGroup(hostRef, sgRef string, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	req := &protocol.SecurityGroupBindRequest{
+		Group:  &protocol.Reference{Name: sgRef},
+		Target: &protocol.Reference{Name: hostRef},
+	}
+	service := protocol.NewHostServiceClient(h.session.connection)
+	_, err := service.EnableSecurityGroup(ctx, req)
+	return err
+}
+
+// DisableSecurityGroup calls the gRPC server to disable a bound security group on host
+func (h host) DisableSecurityGroup(hostRef, sgRef string, duration time.Duration) error {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	req := &protocol.SecurityGroupBindRequest{
+		Group:  &protocol.Reference{Name: sgRef},
+		Target: &protocol.Reference{Name: hostRef},
+	}
+	service := protocol.NewHostServiceClient(h.session.connection)
+	_, err := service.DisableSecurityGroup(ctx, req)
+	return err
+}
+
+// ListSecurityGroups calls the gRPC server to list bound security groups of a network
+func (h host) ListSecurityGroups(hostRef, kind string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+	h.session.Connect()
+	defer h.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewHostServiceClient(h.session.connection)
+
+	req := &protocol.SecurityGroupBondsRequest{
+		Target: &protocol.Reference{Name: hostRef},
+		Kind:   strings.ToLower(kind),
+	}
+	return service.ListSecurityGroups(ctx, req)
+}
