@@ -174,7 +174,6 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
-// TODO: is there code to create KeyPair inside GCP ? It should be used there...
 // CreateKeyPair creates a key pair (no import)
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 	if s == nil {
@@ -303,7 +302,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}
 
-	logrus.Warnf("Requesting a disksize of %d", template.DiskSize)
 	logrus.Debugf("Selected template: '%s', '%s', '%d Gb'", template.ID, template.Name, template.DiskSize)
 
 	// Select usable availability zone, the first one in the list
