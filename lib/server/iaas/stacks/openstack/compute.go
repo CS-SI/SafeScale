@@ -891,7 +891,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					servers.Delete(s.ComputeClient, server.ID)
 				}
 				msg := ProviderErrorToString(ierr)
-				logrus.Warnf(msg)
 				return scerr.Errorf(msg, ierr)
 			}
 
