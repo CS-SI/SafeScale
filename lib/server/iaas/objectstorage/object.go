@@ -62,7 +62,7 @@ func newObject(bucket *bucket, objectName string) (*object, error) {
 	}
 	item, err := bucket.container.Item(objectName)
 	if err != nil {
-		if err != stow.ErrNotFound { // FIXME: Implementation detail
+		if err != stow.ErrNotFound { // FIXME: Remove stow dependency
 			return nil, err
 		}
 	}

@@ -172,7 +172,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 					return retry.AbortedError("not found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
 					return retry.AbortedError("not found", innerErr)
 				}
 

@@ -83,7 +83,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
-		if err != stow.ErrNotFound { // FIXME: Implementation detail
+		if err != stow.ErrNotFound { // FIXME: Remove stow dependency
 			return err
 		}
 	}
@@ -136,7 +136,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
-		if err == stow.ErrNotFound { // FIXME: Implementation detail
+		if err == stow.ErrNotFound { // FIXME: Remove stow dependency
 			return nil, resources.ResourceNotFoundError("bucket", name)
 		}
 
