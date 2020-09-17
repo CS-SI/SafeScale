@@ -203,7 +203,7 @@ func (m *Network) ReadByReference(ref string) (err error) {
 	}
 
 	if len(errors) == 2 {
-		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Implementation detail
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
 			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
 		}
 
@@ -560,7 +560,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 

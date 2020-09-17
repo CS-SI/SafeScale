@@ -149,8 +149,8 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 		errors = append(errors, err2)
 	}
 
-	if len(errors) == 2 { // FIXME This is false, is not a 404
-		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Implementation detail
+	if len(errors) == 2 {
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
 			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
 		}
 
@@ -403,7 +403,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Implementation detail
+				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
