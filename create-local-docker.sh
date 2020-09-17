@@ -23,7 +23,7 @@ fi
 
 stamp=`date +"%s"`
 
-BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) PROTOVERSION=3.6.1 GOVERSION=1.13.5 envsubst <Dockerfile.local > Dockerfile.$stamp
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) PROTOVERSION=3.6.1 GOVERSION=1.15.2 envsubst <Dockerfile.local > Dockerfile.$stamp
 docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.$stamp -t safescale:local-$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') ${WRKDIR}
 if [ $? -ne 0 ]; then
   echo "Docker build failed !!"
