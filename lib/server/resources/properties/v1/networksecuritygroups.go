@@ -27,23 +27,23 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type NetworkSecurityGroups struct {
-	ByID   map[string]bool `json:"by_id,omitempty"`   // map of security groups by IDs; if value is true, security group is currently applied
-	ByName map[string]bool `json:"by_name,omitempty"` // map of security groups by Names; if value is true, security group is currently applied
+	ByID   map[string]*SecurityGroupBond `json:"by_id,omitempty"`   // map of security groups by IDs; if value is true, security group is currently applied
+	ByName map[string]*SecurityGroupBond `json:"by_name,omitempty"` // map of security groups by Names; if value is true, security group is currently applied
 }
 
 // NewNetworkSecurityGroups ...
 func NewNetworkSecurityGroups() *NetworkSecurityGroups {
 	return &NetworkSecurityGroups{
-		ByID:   map[string]bool{},
-		ByName: map[string]bool{},
+		ByID:   map[string]*SecurityGroupBond{},
+		ByName: map[string]*SecurityGroupBond{},
 	}
 }
 
 // Reset ...
 func (hsg *NetworkSecurityGroups) Reset() {
 	*hsg = NetworkSecurityGroups{
-		ByID:   map[string]bool{},
-		ByName: map[string]bool{},
+		ByID:   map[string]*SecurityGroupBond{},
+		ByName: map[string]*SecurityGroupBond{},
 	}
 }
 
@@ -55,13 +55,13 @@ func (hsg *NetworkSecurityGroups) Clone() data.Clonable {
 // Replace ...
 func (hsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
 	src := p.(*NetworkSecurityGroups)
-	hsg.ByID = make(map[string]bool, len(src.ByID))
+	hsg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		hsg.ByID[k] = v
+		hsg.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	hsg.ByName = make(map[string]bool, len(src.ByName))
+	hsg.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
 	for k, v := range src.ByName {
-		hsg.ByName[k] = v
+		hsg.ByName[k] = v.Clone().(*SecurityGroupBond)
 	}
 	return hsg
 }

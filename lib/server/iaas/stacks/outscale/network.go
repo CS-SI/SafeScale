@@ -358,7 +358,7 @@ func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
 	}
 
 	if len(res.Nics) > 0 {
-		// Delete should succeed only when something goes wrong when deleting VMs
+		// Remove should succeed only when something goes wrong when deleting VMs
 		xerr = s.deleteNics(res.Nics)
 		if xerr == nil {
 			logrus.Debugf("Check if nothing goes wrong deleting a VM")

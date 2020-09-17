@@ -77,7 +77,7 @@ func (sg securityGroup) Create(req *protocol.SecurityGroupRequest, timeout time.
 }
 
 // Delete deletes several hosts at the same time in goroutines
-func (sg securityGroup) Delete(names []string, timeout time.Duration) error {
+func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -95,7 +95,11 @@ func (sg securityGroup) Delete(names []string, timeout time.Duration) error {
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	taskDeleteSecurityGroup := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
+		req := &protocol.SecurityGroupDeleteRequest{
+			Group: &protocol.Reference{Name: aname},
+			Force: force,
+		}
+		_, err := service.Delete(ctx, req)
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -179,4 +183,22 @@ func (sg securityGroup) DeleteRule(group, ruleID string, duration time.Duration)
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.DeleteRule(ctx, def)
 	return err
+}
+
+// Bonds ...
+func (sg securityGroup) Bonds(group, kind string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+	sg.session.Connect()
+	defer sg.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	req := &protocol.SecurityGroupBondsRequest{
+		Target: &protocol.Reference{Name: group},
+		Kind:   strings.ToLower(kind),
+	}
+	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
+	return service.Bonds(ctx, req)
 }

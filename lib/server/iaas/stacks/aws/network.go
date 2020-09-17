@@ -720,7 +720,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) 
 //	return host, userData, err
 // }
 
-// VPL: to remove, done by resources.Network.Delete()
+// VPL: to remove, done by resources.Network.Remove()
 // func (s *Stack) DeleteGateway(ref string) error {
 //	return s.DeleteHost(ref)
 // }

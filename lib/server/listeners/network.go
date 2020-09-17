@@ -274,6 +274,7 @@ func (s *NetworkListener) BindSecurityGroup(ctx context.Context, in *protocol.Se
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -317,7 +318,7 @@ func (s *NetworkListener) BindSecurityGroup(ctx context.Context, in *protocol.Se
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rn.BindSecurityGroup(task, sg, in.GetEnabled()); xerr != nil {
+	if xerr = rn.BindSecurityGroup(task, sg, in.GetEnable()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -329,6 +330,7 @@ func (s *NetworkListener) UnbindSecurityGroup(ctx context.Context, in *protocol.
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
 
+	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
@@ -378,4 +380,166 @@ func (s *NetworkListener) UnbindSecurityGroup(ctx context.Context, in *protocol.
 		return empty, xerr
 	}
 	return empty, nil
+}
+
+// EnableSecurityGroup applies the rules of a bound security group on a network
+func (s *NetworkListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
+	if networkRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for Network")
+	}
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if networkRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network security-group enable")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rn.EnableSecurityGroup(task, sg); xerr != nil {
+		return empty, xerr
+	}
+
+	return empty, nil
+}
+
+// DisableSecurityGroup detaches a Security Group from a network
+func (s *NetworkListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot disable security group on network")
+
+	empty = &googleprotobuf.Empty{}
+	if s == nil {
+		return empty, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
+	if networkRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Network")
+	}
+
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if sgRef == "" {
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network security-group disable")
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rn.DisableSecurityGroup(task, sg); xerr != nil {
+		return empty, xerr
+	}
+	return empty, nil
+}
+
+// ListSecurityGroups applies a Security Group already attached (if not already applied)
+func (s *NetworkListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupBondsRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	//defer fail.OnExitWrapError(&err, "cannot list security groups bound to network")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
+	if networkRef == "" {
+		return nil, fail.InvalidRequestError("neither name nor id given as reference of Network")
+	}
+
+	job, xerr := PrepareJob(ctx, in.GetTarget().GetTenantId(), "network security-group list")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s)", networkRefLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+	bonds, xerr := rn.ListSecurityGroups(task, in.GetKind())
+	if xerr != nil {
+		return nil, xerr
+	}
+	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "networks")
+	return resp, nil
 }

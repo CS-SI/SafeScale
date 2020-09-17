@@ -1009,7 +1009,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	defer func() {
 		if err != nil {
 			if derr := s.DeleteHost(resourceName); derr != nil {
-				fmt.Printf("failed to Delete the host %s: %s", resourceName, err.Error())
+				fmt.Printf("failed to Remove the host %s: %s", resourceName, err.Error())
 				err = fail.AddConsequence(err, derr)
 			}
 		}

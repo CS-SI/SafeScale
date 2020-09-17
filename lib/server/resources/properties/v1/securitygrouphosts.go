@@ -27,23 +27,23 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupHosts struct {
-	ByID   map[string]bool `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host ID
-	ByName map[string]bool `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host Name
+	ByID   map[string]*SecurityGroupBond `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host ID
+	ByName map[string]*SecurityGroupBond `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host Name
 }
 
 // NewSecurityGroupHosts ...
 func NewSecurityGroupHosts() *SecurityGroupHosts {
 	return &SecurityGroupHosts{
-		ByID:   map[string]bool{},
-		ByName: map[string]bool{},
+		ByID:   map[string]*SecurityGroupBond{},
+		ByName: map[string]*SecurityGroupBond{},
 	}
 }
 
 // Reset ...
 func (sgh *SecurityGroupHosts) Reset() *SecurityGroupHosts {
 	if sgh != nil {
-		sgh.ByID = map[string]bool{}
-		sgh.ByName = map[string]bool{}
+		sgh.ByID = map[string]*SecurityGroupBond{}
+		sgh.ByName = map[string]*SecurityGroupBond{}
 		return sgh
 	}
 	return NewSecurityGroupHosts()
@@ -57,11 +57,11 @@ func (sgh *SecurityGroupHosts) Clone() data.Clonable {
 // Replace ...
 func (sgh *SecurityGroupHosts) Replace(p data.Clonable) data.Clonable {
 	src := p.(*SecurityGroupHosts)
-	sgh.ByID = make(map[string]bool, len(src.ByID))
+	sgh.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
 		sgh.ByID[k] = v
 	}
-	sgh.ByName = make(map[string]bool, len(src.ByName))
+	sgh.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
 	for k, v := range src.ByName {
 		sgh.ByName[k] = v
 	}

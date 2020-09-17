@@ -20,6 +20,7 @@ package resources
 import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -42,7 +43,7 @@ type Network interface {
 	GetEndpointIP(task concurrency.Task) (string, fail.Error)                                                                       // returns the IP address corresponding to the default route
 	HasVirtualIP(task concurrency.Task) bool                                                                                        // tells if the network is using a VIP a default route
 	ListHosts(task concurrency.Task) ([]Host, fail.Error)                                                                           // returns the list of Host attached to the network (excluding gateway)
-	ListSecurityGroups(task concurrency.Task, all bool) ([]string, fail.Error)                                                      // lists the security groups binded to the network
+	ListSecurityGroups(task concurrency.Task, kind string) ([]*propertiesv1.SecurityGroupBond, fail.Error)                          // lists the security groups bound to the network
 	ToProtocol(task concurrency.Task) (*protocol.Network, fail.Error)                                                               // converts the network to protobuf message
 	UnbindHost(task concurrency.Task, hostID string) fail.Error                                                                     // unlinks host GetID from network
 	UnbindSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                                         // unbinds a security group from the network

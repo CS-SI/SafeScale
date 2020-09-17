@@ -826,7 +826,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		return normalizeError(err)
 	}
 
-	// FIXME: Delete firewall and NAT rules
+	// FIXME: Remove firewall and NAT rules
 
 	err = dtask.WaitTaskCompletion()
 	return normalizeError(err)
