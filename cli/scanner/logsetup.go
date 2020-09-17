@@ -35,7 +35,13 @@ func init() {
 		os.Exit(1)
 	}
 
-	logFileName := utils.AbsPathify("$HOME/.safescale/scanner-session.log")
+	// DEV VAR
+	session := ""
+	if sessionCandidate := os.Getenv("SAFESCALE_LOG_SESSION"); sessionCandidate != "" {
+		session = "-" + sessionCandidate
+	}
+
+	logFileName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner%s-session.log", session))
 	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Printf("Unable to access file %s, make sure the file is writable\n", logFileName)
