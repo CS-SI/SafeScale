@@ -25,16 +25,30 @@ func (w ValidatedProvider) AddPublicIPToVIP(res *resources.VirtualIP) (err error
 	return w.InnerProvider.AddPublicIPToVIP(res)
 }
 
-func (w ValidatedProvider) BindHostToVIP(res *resources.VirtualIP, ip string) (err error) {
+func (w ValidatedProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer scerr.OnPanic(&err)()
 
-	return w.InnerProvider.BindHostToVIP(res, ip)
+	if vip == nil {
+		return scerr.InvalidParameterError("vip", "cannot be nil")
+	}
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
+	}
+
+	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(res *resources.VirtualIP, ip string) (err error) {
+func (w ValidatedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer scerr.OnPanic(&err)()
 
-	return w.InnerProvider.UnbindHostFromVIP(res, ip)
+	if vip == nil {
+		return scerr.InvalidParameterError("vip", "cannot be nil")
+	}
+	if hostID == "" {
+		return scerr.InvalidParameterError("host", "cannot be empty string")
+	}
+
+	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
 func (w ValidatedProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
@@ -132,6 +146,10 @@ func (w ValidatedProvider) ListRegions() (_ []string, err error) {
 func (w ValidatedProvider) GetImage(id string) (res *resources.Image, err error) {
 	defer scerr.OnPanic(&err)()
 
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	res, err = w.InnerProvider.GetImage(id)
 	if err != nil {
 		if res != nil {
@@ -147,6 +165,10 @@ func (w ValidatedProvider) GetImage(id string) (res *resources.Image, err error)
 // GetTemplate ...
 func (w ValidatedProvider) GetTemplate(id string) (res *resources.HostTemplate, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
 
 	res, err = w.InnerProvider.GetTemplate(id)
 	if err != nil {
@@ -164,7 +186,7 @@ func (w ValidatedProvider) CreateKeyPair(name string) (kp *resources.KeyPair, er
 	defer scerr.OnPanic(&err)()
 
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty")
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	kp, err = w.InnerProvider.CreateKeyPair(name)
@@ -179,6 +201,10 @@ func (w ValidatedProvider) CreateKeyPair(name string) (kp *resources.KeyPair, er
 // GetKeyPair ...
 func (w ValidatedProvider) GetKeyPair(id string) (kp *resources.KeyPair, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be nil")
+	}
 
 	kp, err = w.InnerProvider.GetKeyPair(id)
 	if err != nil {
@@ -199,6 +225,10 @@ func (w ValidatedProvider) ListKeyPairs() (res []resources.KeyPair, err error) {
 // DeleteKeyPair ...
 func (w ValidatedProvider) DeleteKeyPair(id string) (err error) {
 	defer scerr.OnPanic(&err)()
+
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
 
 	return w.InnerProvider.DeleteKeyPair(id)
 }
@@ -222,6 +252,10 @@ func (w ValidatedProvider) CreateNetwork(req resources.NetworkRequest) (res *res
 func (w ValidatedProvider) GetNetwork(id string) (res *resources.Network, err error) {
 	defer scerr.OnPanic(&err)()
 
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	res, err = w.InnerProvider.GetNetwork(id)
 	if err != nil {
 		if res != nil {
@@ -236,6 +270,10 @@ func (w ValidatedProvider) GetNetwork(id string) (res *resources.Network, err er
 // GetNetworkByName ...
 func (w ValidatedProvider) GetNetworkByName(name string) (res *resources.Network, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+	}
 
 	res, err = w.InnerProvider.GetNetworkByName(name)
 	if err != nil {
@@ -276,6 +314,14 @@ func (w ValidatedProvider) DeleteNetwork(id string) (err error) {
 func (w ValidatedProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (res *resources.Host, data *userdata.Content, err error) {
 	defer scerr.OnPanic(&err)()
 
+	if req.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
+
+	if req.Network == nil {
+		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+	}
+
 	res, data, err = w.InnerProvider.CreateGateway(req, sizing)
 	if err != nil {
 		if res != nil {
@@ -296,12 +342,20 @@ func (w ValidatedProvider) CreateGateway(req resources.GatewayRequest, sizing *r
 func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
 	defer scerr.OnPanic(&err)()
 
+	if networkID == "" {
+		return scerr.InvalidParameterError("networkID", "cannot be empty string")
+	}
+
 	return w.InnerProvider.DeleteGateway(networkID)
 }
 
 // CreateHost ...
 func (w ValidatedProvider) CreateHost(request resources.HostRequest) (res *resources.Host, data *userdata.Content, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if request.KeyPair == nil {
+		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
+	}
 
 	res, data, err = w.InnerProvider.CreateHost(request)
 	if err != nil {
@@ -337,6 +391,10 @@ func (w ValidatedProvider) InspectHost(something interface{}) (res *resources.Ho
 // GetHostByName ...
 func (w ValidatedProvider) GetHostByName(name string) (res *resources.Host, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if name == "" {
+		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+	}
 
 	res, err = w.InnerProvider.GetHostByName(name)
 	if err != nil {
@@ -377,12 +435,20 @@ func (w ValidatedProvider) ListHosts() (res []*resources.Host, err error) {
 func (w ValidatedProvider) DeleteHost(id string) (err error) {
 	defer scerr.OnPanic(&err)()
 
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	return w.InnerProvider.DeleteHost(id)
 }
 
 // StopHost ...
 func (w ValidatedProvider) StopHost(id string) (err error) {
 	defer scerr.OnPanic(&err)()
+
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
 
 	return w.InnerProvider.StopHost(id)
 }
@@ -391,6 +457,10 @@ func (w ValidatedProvider) StopHost(id string) (err error) {
 func (w ValidatedProvider) StartHost(id string) (err error) {
 	defer scerr.OnPanic(&err)()
 
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	return w.InnerProvider.StartHost(id)
 }
 
@@ -398,12 +468,20 @@ func (w ValidatedProvider) StartHost(id string) (err error) {
 func (w ValidatedProvider) RebootHost(id string) (err error) {
 	defer scerr.OnPanic(&err)()
 
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	return w.InnerProvider.RebootHost(id)
 }
 
 // ResizeHost ...
 func (w ValidatedProvider) ResizeHost(id string, request resources.SizingRequirements) (res *resources.Host, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
 
 	res, err = w.InnerProvider.ResizeHost(id, request)
 	if err != nil {
@@ -420,6 +498,10 @@ func (w ValidatedProvider) ResizeHost(id string, request resources.SizingRequire
 func (w ValidatedProvider) CreateVolume(request resources.VolumeRequest) (res *resources.Volume, err error) {
 	defer scerr.OnPanic(&err)()
 
+	if request.Name == "" {
+		return nil, scerr.InvalidParameterError("request.Name", "cannot be empty string")
+	}
+
 	res, err = w.InnerProvider.CreateVolume(request)
 	if err != nil {
 		if res != nil {
@@ -434,6 +516,10 @@ func (w ValidatedProvider) CreateVolume(request resources.VolumeRequest) (res *r
 // GetVolume ...
 func (w ValidatedProvider) GetVolume(id string) (res *resources.Volume, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
 
 	res, err = w.InnerProvider.GetVolume(id)
 	if err != nil {
@@ -465,6 +551,10 @@ func (w ValidatedProvider) ListVolumes() (res []resources.Volume, err error) {
 func (w ValidatedProvider) DeleteVolume(id string) (err error) {
 	defer scerr.OnPanic(&err)()
 
+	if id == "" {
+		return scerr.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	return w.InnerProvider.DeleteVolume(id)
 }
 
@@ -472,12 +562,29 @@ func (w ValidatedProvider) DeleteVolume(id string) (err error) {
 func (w ValidatedProvider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (id string, err error) {
 	defer scerr.OnPanic(&err)()
 
+	if request.Name == "" {
+		return "", scerr.InvalidParameterError("request.Name", "cannot be empty string")
+	}
+	if request.HostID == "" {
+		return "", scerr.InvalidParameterError("HostID", "cannot be empty string")
+	}
+	if request.VolumeID == "" {
+		return "", scerr.InvalidParameterError("VolumeID", "cannot be empty string")
+	}
+
 	return w.InnerProvider.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment ...
 func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *resources.VolumeAttachment, err error) {
 	defer scerr.OnPanic(&err)()
+
+	if serverID == "" {
+		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
+	}
+	if id == "" {
+		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
+	}
 
 	res, err = w.InnerProvider.GetVolumeAttachment(serverID, id)
 	if err != nil {
@@ -494,6 +601,10 @@ func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *resour
 func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []resources.VolumeAttachment, err error) {
 	defer scerr.OnPanic(&err)()
 
+	if serverID == "" {
+		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
+	}
+
 	res, err = w.InnerProvider.ListVolumeAttachments(serverID)
 	if err != nil {
 		for _, item := range res {
@@ -506,8 +617,15 @@ func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []resourc
 }
 
 // DeleteVolumeAttachment ...
-func (w ValidatedProvider) DeleteVolumeAttachment(serverID, id string) (err error) {
+func (w ValidatedProvider) DeleteVolumeAttachment(serverID, vaID string) (err error) {
 	defer scerr.OnPanic(&err)()
 
-	return w.InnerProvider.DeleteVolumeAttachment(serverID, id)
+	if serverID == "" {
+		return scerr.InvalidParameterError("serverID", "cannot be empty string")
+	}
+	if vaID == "" {
+		return scerr.InvalidParameterError("vaID", "cannot be empty string")
+	}
+
+	return w.InnerProvider.DeleteVolumeAttachment(serverID, vaID)
 }
