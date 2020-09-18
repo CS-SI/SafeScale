@@ -70,7 +70,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		}
 	}
 
-	job, err := PrepareJob(ctx, in.Tenant, "volume list")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "volume list")
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenant(), "volume create")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "volume create")
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -94,7 +94,7 @@ var bucketCreate = &cli.Command{
 var bucketDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"remove", "rm"},
-	Usage:     "Delete a bucket",
+	Usage:     "Remove a bucket",
 	ArgsUsage: "<Bucket_name> [<Bucket_name>...]",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", bucketCmdLabel, c.Command.Name, c.Args())

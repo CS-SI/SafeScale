@@ -20,8 +20,10 @@ package networkproperty
 type Enum string
 
 const (
-    // DescriptionV1 contains optional additional info describing host (purpose, ...)
-    DescriptionV1 = "1"
-    // HostsV1 contains list of hosts attached to the network
-    HostsV1 = "2"
+	// DescriptionV1 contains optional additional info describing host (purpose, ...)
+	DescriptionV1 = "1"
+	// HostsV1 contains list of hosts attached to the network
+	HostsV1 = "2"
+	// SecurityGroupsV1 contains optional additional information about security groups binded to the host
+	SecurityGroupsV1 = "3"
 )

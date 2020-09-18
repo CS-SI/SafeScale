@@ -19,6 +19,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -416,7 +417,7 @@ var networkSecurityGroupAddCommand = &cli.Command{
 		&cli.BoolFlag{
 			Name:  "disabled",
 			Value: false,
-			Usage: "adds the security group to the network but does not apply it",
+			Usage: "adds the security group to the network without applying its rules",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -426,13 +427,17 @@ var networkSecurityGroupAddCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "add security group to network not yet implemented"))
+		err := clientSession.Network.BindSecurityGroup(c.Args().First(), c.Args().Get(1), c.Bool("disabled"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "adding security group to network", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -448,21 +453,38 @@ var networkSecurityGroupRemoveCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "remove security group from network not yet implemented"))
+		err := clientSession.Network.UnbindSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "removing security group from network", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
 var networkSecurityGroupListCommand = &cli.Command{
 	Name:      "list",
 	Aliases:   []string{"show"},
-	Usage:     "list NETWORKNAME",
-	ArgsUsage: "NETWORKNAME",
+	Usage:     "list HOSTNAME",
+	ArgsUsage: "HOSTNAME",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Value:   true,
+			Usage:   "List all security groups no matter what is the status (enabled or disabled)",
+		},
+		&cli.StringFlag{
+			Name:  "kind",
+			Value: "all",
+			Usage: "Narrows to the security groups in defined state; can be 'enabled', 'disabled' or 'all' (default: 'all')",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
@@ -470,13 +492,22 @@ var networkSecurityGroupListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		kind := strings.ToLower(c.String("kind"))
+		if c.Bool("all") {
+			kind = "all"
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "list of security groups attached to network not yet implemented"))
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		resp, err := clientSession.Network.ListSecurityGroups(c.Args().First(), kind, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "listing bound security groups of network", false).Error())))
+		}
+		return clitools.SuccessResponse(resp)
 	},
 }
 
@@ -492,13 +523,17 @@ var networkSecurityGroupEnableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "activation of a security group attached to network not yet implemented"))
+		err := clientSession.Network.EnableSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -508,18 +543,22 @@ var networkSecurityGroupDisableCommand = &cli.Command{
 	Usage:     "disable NETWORKNAME GROUPNAME",
 	ArgsUsage: "NETWORKNAME GROUPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "activation of a security group attached to network not yet implemented"))
+		err := clientSession.Network.DisableSecurityGroup(c.Args().First(), c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }

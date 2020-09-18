@@ -235,7 +235,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "share mount")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "share mount")
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -17,51 +17,54 @@
 package resources
 
 import (
-    "time"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/system"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
-    propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-    "github.com/CS-SI/SafeScale/lib/system"
-    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Host links Object Storage folder and Network
+// Host links Object Storage folder and Host
 type Host interface {
-    Metadata
-    Targetable
-    data.NullValue
+	Metadata
+	Targetable
+	data.NullValue
 
-    Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) fail.Error                                                         // ...
-    Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (*userdata.Content, fail.Error)           // creates a new host and its metadata
-    IsClusterMember(task concurrency.Task) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
-    Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
-    Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
-    PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                                        // creates a file 'filename' on remote 'host' with the content 'content'
-    Reboot(task concurrency.Task) fail.Error                                                                                                       // reboots the host
-    Resize(hostSize abstract.HostSizingRequirements) fail.Error                                                                                    // resize the host (probably not yet implemented on some proviers if not all)
-    Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
-    Start(task concurrency.Task) fail.Error                                                                                                        // starts the host
-    Stop(task concurrency.Task) fail.Error                                                                                                         // stops the host
-    ToProtocol(task concurrency.Task) (*protocol.Host, fail.Error)                                                                                 // converts a host to equivalent gRPC message
-    WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err fail.Error)                                                     // Wait for remote SSH to respond
-
-    ForceGetState(task concurrency.Task) (hoststate.Enum, fail.Error) // returns the real current state of the host, with error handling
-
-    GetAccessIP(task concurrency.Task) (string, fail.Error)                                    // returns the IP to reach the host, with error handling
-    GetDefaultNetwork(task concurrency.Task) (Network, fail.Error)                             // returns the resources.Network object corresponding to the default network of the host, with error handling
-    GetMounts(task concurrency.Task) (*propertiesv1.HostMounts, fail.Error)                    // returns the mounts on the host
-    GetPrivateIP(task concurrency.Task) (ip string, err fail.Error)                            // returns the IP address of the host on the default local network, with error handling
-    GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, err fail.Error) // returns the IP address of the host on the local network requested, with error handling
-    GetPublicIP(task concurrency.Task) (ip string, err fail.Error)                             // returns the public IP address of the host, with error handling
-    GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, fail.Error)     // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-    GetShares(task concurrency.Task) (*propertiesv1.HostShares, fail.Error)                    // returns the shares hosted on the host
-    GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Error)                        // loads SSH configuration for host from metadata
-    GetState(task concurrency.Task) hoststate.Enum                                             // returns the current state of the host, with error handling
-    GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error)                  // returns the volumes attached to the host
+	BindSecurityGroup(task concurrency.Task, sg SecurityGroup, disabled bool) fail.Error                                                           // Binds a security group to host
+	Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) fail.Error                                                         // ...
+	Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (*userdata.Content, fail.Error)           // creates a new host and its metadata
+	DisableSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                                                       // disables a binded security group on host
+	EnableSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                                                        // enables a binded security group on host
+	ForceGetState(task concurrency.Task) (hoststate.Enum, fail.Error)                                                                              // returns the real current state of the host, with error handling
+	GetAccessIP(task concurrency.Task) (string, fail.Error)                                                                                        // returns the IP to reach the host, with error handling
+	GetDefaultNetwork(task concurrency.Task) (Network, fail.Error)                                                                                 // returns the resources.Network object corresponding to the default network of the host, with error handling
+	GetMounts(task concurrency.Task) (*propertiesv1.HostMounts, fail.Error)                                                                        // returns the mounts on the host
+	GetPrivateIP(task concurrency.Task) (ip string, err fail.Error)                                                                                // returns the IP address of the host on the default local network, with error handling
+	GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, err fail.Error)                                                     // returns the IP address of the host on the local network requested, with error handling
+	GetPublicIP(task concurrency.Task) (ip string, err fail.Error)                                                                                 // returns the public IP address of the host, with error handling
+	GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, fail.Error)                                                         // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
+	GetShares(task concurrency.Task) (*propertiesv1.HostShares, fail.Error)                                                                        // returns the shares hosted on the host
+	GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Error)                                                                            // loads SSH configuration for host from metadata
+	GetState(task concurrency.Task) hoststate.Enum                                                                                                 // returns the current state of the host, with error handling
+	GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error)                                                                      // returns the volumes attached to the host
+	IsClusterMember(task concurrency.Task) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
+	ListSecurityGroups(task concurrency.Task, kind string) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                         // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
+	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
+	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
+	PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                                        // creates a file 'filename' on remote 'host' with the content 'content'
+	Reboot(task concurrency.Task) fail.Error                                                                                                       // reboots the host
+	Resize(hostSize abstract.HostSizingRequirements) fail.Error                                                                                    // resize the host (probably not yet implemented on some proviers if not all)
+	Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
+	Start(task concurrency.Task) fail.Error                                                                                                        // starts the host
+	Stop(task concurrency.Task) fail.Error                                                                                                         // stops the host
+	ToProtocol(task concurrency.Task) (*protocol.Host, fail.Error)                                                                                 // converts a host to equivalent gRPC message
+	UnbindSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                                                        // Unbinds a security group from host
+	WaitSSHReady(task concurrency.Task, timeout time.Duration) (status string, err fail.Error)                                                     // Wait for remote SSH to respond
 }

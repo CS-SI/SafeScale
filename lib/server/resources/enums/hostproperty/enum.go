@@ -17,24 +17,26 @@
 package hostproperty
 
 const (
-    // DescriptionV1 contains (optional) additional info describing host (purpose, ...)
-    DescriptionV1 = "1"
-    // NetworkV1 contains additional info about the network of the host
-    NetworkV1 = "2"
-    // SizingV1 contains additional info about the sizing of the host
-    SizingV1 = "3"
-    // FeaturesV1 contains optional additional info describing installed features on a host
-    FeaturesV1 = "4"
-    // VolumesV1 contains optional additional info about attached volumes on the host
-    VolumesV1 = "5"
-    // SharesV1 contains optional additional info about Nas role of the host
-    SharesV1 = "6"
-    // MountsV1 contains optional additional info about mounted devices (locally attached or remote filesystem)
-    MountsV1 = "7"
-    // SystemV1 contains optional additional info about system
-    SystemV1 = "8"
-    // SizingV2 contains optional additional info about the sizing of the host
-    SizingV2 = "9"
-    // ClusterMembershipV1 contains optional additional information about the cluster membership of the host
-    ClusterMembershipV1 = "10"
+	// DescriptionV1 contains (optional) additional info describing host (purpose, ...)
+	DescriptionV1 = "1"
+	// NetworkV1 contains additional info about the network of the host
+	NetworkV1 = "2"
+	// SizingV1 contains additional info about the sizing of the host
+	SizingV1 = "3"
+	// FeaturesV1 contains optional additional info describing installed features on a host
+	FeaturesV1 = "4"
+	// VolumesV1 contains optional additional info about attached volumes on the host
+	VolumesV1 = "5"
+	// SharesV1 contains optional additional info about Nas role of the host
+	SharesV1 = "6"
+	// MountsV1 contains optional additional info about mounted devices (locally attached or remote filesystem)
+	MountsV1 = "7"
+	// SystemV1 contains optional additional info about system
+	SystemV1 = "8"
+	// SizingV2 contains optional additional info about the sizing of the host
+	SizingV2 = "9"
+	// ClusterMembershipV1 contains optional additional information about the cluster membership of the host
+	ClusterMembershipV1 = "10"
+	// SecurityGroupsV1 contains optional additional information about security groups binded to the host
+	SecurityGroupsV1 = "11"
 )

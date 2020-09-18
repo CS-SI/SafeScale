@@ -28,13 +28,22 @@ import (
 type SecurityGroup interface {
 	Metadata
 	data.NullValue
+	data.Identifiable
 
 	AddRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error                             // returns true if the host is member of a cluster
+	BindToHost(task concurrency.Task, host Host, disabled bool) fail.Error                                 // binds a security group to a host
+	BindToNetwork(task concurrency.Task, network Network, disabled bool) fail.Error                        // binds a security group to a network
 	Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error            // ...
-	Create(task concurrency.Task, name, description string, rules []abstract.SecurityGroupRule) fail.Error // creates a new host and its metadata
 	CheckConsistency(task concurrency.Task) fail.Error                                                     // tells if the security group described exists on Provider side with exact same parameters
 	Clear(task concurrency.Task) fail.Error                                                                // removes rules from the security group
+	Create(task concurrency.Task, name, description string, rules []abstract.SecurityGroupRule) fail.Error // creates a new host and its metadata
 	DeleteRule(task concurrency.Task, ruleID string) fail.Error                                            // deletes a rule from a Security Group
+	GetBoundHosts(task concurrency.Task) ([]string, fail.Error)                                            // returns a slice of string corresponding to ID of hosts binded to the security group
+	GetBoundNetworks(task concurrency.Task) ([]string, fail.Error)                                         // returns a slice of string corresponding to ID of networks binded to the seurity group
+	Remove(task concurrency.Task, force bool) fail.Error                                                   // deletes a security group
 	Reset(task concurrency.Task) fail.Error                                                                // resets the rules of the security group from the ones registered in metadata
-	ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                        // converts a SecurityGroup to equivalent gRPC message
+	UnbindFromHost(task concurrency.Task, host Host) fail.Error                                            // unbinds a security group from host
+	UnbindFromNetwork(task concurrency.Task, network Network) fail.Error                                   // unbinds a security group from network
+
+	ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error) // converts a SecurityGroup to equivalent gRPC message
 }

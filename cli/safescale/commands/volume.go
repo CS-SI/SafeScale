@@ -105,7 +105,7 @@ var volumeInspect = &cli.Command{
 var volumeDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"rm", "remove"},
-	Usage:     "Delete volume",
+	Usage:     "Remove volume",
 	ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", volumeCmdName, c.Command.Name, c.Args())
