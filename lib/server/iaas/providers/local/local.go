@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
@@ -40,7 +40,7 @@ type provider struct {
 }
 
 // New creates a new instance of local provider
-func New() providerapi.Provider {
+func New() apiprovider.Provider {
 	return &provider{}
 }
 
@@ -76,7 +76,7 @@ type CfgOptions struct {
 // }
 
 // Build Create and initialize a ClientAPI
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
 	authOptions := stacks.AuthenticationOptions{}
 	localConfig := stacks.LocalConfiguration{}
 	config := stacks.ConfigurationOptions{}
@@ -89,6 +89,8 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
 	}
 	config.MetadataBucket = bucketName
+
+	providerName := "libvirt"
 
 	// Add custom dns
 	// config.DNSList = []string{"1.1.1.1"}
@@ -137,7 +139,11 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		tenantParameters: params,
 	}
 
-	return localProvider, nil
+	evalid := apiprovider.NewValidatedProvider(localProvider, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
+	prov := apiprovider.NewLoggedProvider(etrace, providerName)
+
+	return prov, nil
 }
 
 // GetAuthOpts returns authentification options as a Config

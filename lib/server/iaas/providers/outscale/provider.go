@@ -23,7 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
@@ -84,7 +84,7 @@ func volumeSpeed(s string) volumespeed.Enum {
 
 }
 
-func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
+func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, error) {
 	if p == nil {
 		return nil, scerr.InvalidInstanceError()
 	}
@@ -110,6 +110,8 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 			return nil, err
 		}
 	}
+
+	providerName := "outscale"
 
 	options := &outscale.ConfigurationOptions{
 		Identity: outscale.Credentials{
@@ -160,7 +162,12 @@ func (p *provider) Build(opt map[string]interface{}) (api.Provider, error) {
 		return nil, err
 	}
 	p.Stack = *stack
-	return p, nil
+
+	evalid := apiprovider.NewValidatedProvider(p, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
+	prov := apiprovider.NewLoggedProvider(etrace, providerName)
+
+	return prov, nil
 }
 
 // GetAuthenticationOptions returns authentication parameters
