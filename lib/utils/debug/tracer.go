@@ -19,7 +19,6 @@ package debug
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -44,14 +43,6 @@ type Tracer interface {
 	Trace(format string, a ...interface{}) Tracer
 	TraceAsError(format string, a ...interface{}) Tracer
 	Stopwatch() temporal.Stopwatch
-}
-
-// IsLogActive ... FIXME:
-func IsLogActive(key string) bool {
-	if logs := os.Getenv("SAFESCALE_OPTIONAL_LOGS"); logs != "" {
-		return strings.Contains(logs, key)
-	}
-	return false
 }
 
 // tracer ...
@@ -220,7 +211,7 @@ func (t *tracer) Stopwatch() temporal.Stopwatch {
 	return t.sw
 }
 
-// removePart contains the basedir to remove from file pathes
+// removePart contains the basedir to remove from file paths
 var removePart atomic.Value
 
 func getPartToRemove() string {
