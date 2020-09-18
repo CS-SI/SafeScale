@@ -51,8 +51,6 @@ type portDef struct {
 }
 
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	logrus.Warnf("Creating keypair with name %s", name)
-
 	keypair, err := resources.NewKeyPair(name)
 	if err != nil {
 		return nil, err
@@ -77,9 +75,6 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // ImportKeyPair imports an existing resources.KeyPair inside the provider (not in the interface yet, but will come soon)
 func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if keypair == nil {
 		return scerr.InvalidParameterError("keypair", "cannot be nil")
 	}
@@ -295,7 +290,6 @@ func createFilters() []*ec2.Filter {
 	return filters
 }
 
-// FIXME Orphan method
 func (s *Stack) ListImages() ([]resources.Image, error) {
 	var images []resources.Image
 
@@ -352,7 +346,6 @@ func (s *Stack) ListImages() ([]resources.Image, error) {
 	return images, nil
 }
 
-// FIXME Orphan method
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	var templates []resources.HostTemplate
 

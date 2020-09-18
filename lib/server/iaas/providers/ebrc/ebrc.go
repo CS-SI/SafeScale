@@ -58,6 +58,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		FloatingIPPool:   "public",
 	}
 
+	providerName := "vclouddirector"
+
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName("ebrc", region, "", vdc)
 	if err != nil {
 		return nil, err
@@ -87,10 +89,16 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	return &provider{
+	newP := &provider{
 		StackEbrc:        stack,
 		tenantParameters: params,
-	}, nil
+	}
+
+	evalid := apiprovider.NewValidatedProvider(newP, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
+	prov := apiprovider.NewLoggedProvider(etrace, providerName)
+
+	return prov, nil
 }
 
 // GetAuthOpts returns the auth options

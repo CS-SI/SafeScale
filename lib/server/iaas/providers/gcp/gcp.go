@@ -147,8 +147,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		tenantParameters: params,
 	}
 
-	// evalid := apiprovider.NewValidatedProvider(p, providerName)
-	etrace := apiprovider.NewErrorTraceProvider(newP, providerName)
+	evalid := apiprovider.NewValidatedProvider(newP, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
 	prov := apiprovider.NewLoggedProvider(etrace, providerName)
 	return prov, nil
 }

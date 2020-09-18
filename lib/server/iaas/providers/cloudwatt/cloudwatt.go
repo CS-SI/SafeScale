@@ -171,7 +171,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		Stack:            stack,
 		tenantParameters: params,
 	}
-	return newP, nil
+
+	evalid := apiprovider.NewValidatedProvider(newP, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
+	prov := apiprovider.NewLoggedProvider(etrace, providerName)
+
+	return prov, nil
 }
 
 // GetAuthenticationOptions returns the auth options

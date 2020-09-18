@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
@@ -69,12 +69,12 @@ type provider struct {
 }
 
 // New creates a new instance of flexibleengine provider
-func New() providerapi.Provider {
+func New() apiprovider.Provider {
 	return &provider{}
 }
 
 // Build initializes a new FlexibleEngine instance from parameters
-func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
@@ -203,7 +203,12 @@ func (p *provider) Build(params map[string]interface{}) (providerapi.Provider, e
 		Stack:            stack,
 		tenantParameters: params,
 	}
-	return newP, nil
+
+	evalid := apiprovider.NewValidatedProvider(newP, providerName)
+	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
+	prov := apiprovider.NewLoggedProvider(etrace, providerName)
+
+	return prov, nil
 }
 
 func addGPUCfg(tpl *resources.HostTemplate) {
