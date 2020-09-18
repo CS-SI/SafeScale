@@ -8,7 +8,7 @@ generate:
 	@(cd enums && $(MAKE) $(@))
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 clean:
 	@$(RM) ./enums/*/enum_string.go || true

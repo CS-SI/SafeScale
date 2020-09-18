@@ -9,7 +9,7 @@ generate:
 	@$(GO) generate -run rice
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 clean:
 	@($(RM) -f rice-box.go || true)

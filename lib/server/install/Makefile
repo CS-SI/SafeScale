@@ -5,7 +5,7 @@ GO?=go
 all: generate
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 generate:
 	@$(GO) generate -run rice

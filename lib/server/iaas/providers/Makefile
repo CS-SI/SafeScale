@@ -14,7 +14,7 @@ generate:
 	@(cd ebrc && $(MAKE) $(@))
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 clean:
 	@(cd cloudferro && $(MAKE) $(@))

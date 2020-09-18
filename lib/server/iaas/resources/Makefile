@@ -9,7 +9,7 @@ generate:
 	@(cd userdata && $(MAKE) $(@))
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 clean: 
 	@(cd enums && $(MAKE) $(@))

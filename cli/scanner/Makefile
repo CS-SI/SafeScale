@@ -16,7 +16,7 @@ all: clean gensrc
 	@$(GO) build $(RACE_CHECK) -o $(EXEC) $(BUILD_TAGS)
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 .PHONY: clean vet
 

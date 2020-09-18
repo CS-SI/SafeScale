@@ -42,7 +42,7 @@ GOVENDOR := github.com/kardianos/govendor
 
 DEVDEPSLIST := $(RICE) $(PROTOBUF) $(DEP) $(COVER) $(XUNIT) $(COVERTOOL) $(GOVENDOR)
 
-BUILD_TAGS = ""
+BUILD_TAGS := ""
 export BUILD_TAGS
 
 all: begin ground getdevdeps ensure generate lib cli err vet-light
@@ -69,7 +69,8 @@ libvirt:
 	else \
 		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
 	fi
-	$(eval BUILD_TAGS = "--tags=libvirt")
+	@$(eval BUILD_TAGS = "--tags=libvirt")
+	@export BUILD_TAGS="--tags=libvirt"
 
 with_git:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }

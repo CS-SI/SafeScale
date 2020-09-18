@@ -9,7 +9,7 @@ generate:
 	@(cd providers && $(MAKE) $(@))
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 clean:
 	@(cd resources && $(MAKE) $(@))
