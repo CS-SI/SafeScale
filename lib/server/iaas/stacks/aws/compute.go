@@ -406,10 +406,6 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
 func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var (
 		host *resources.Host
 	)
@@ -470,15 +466,6 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*re
 }
 
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if request.KeyPair == nil {
-		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
-
-	defer scerr.OnPanic(&err)()
-
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -1097,12 +1084,6 @@ func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, image
 }
 
 func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
-	defer scerr.OnPanic(&err)()
-
 	switch hostParam := hostParam.(type) {
 	case string:
 		host = resources.NewHost()
@@ -1311,13 +1292,6 @@ func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
 }
 
 func (s *Stack) GetHostByName(name string) (_ *resources.Host, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	hosts, err := s.ListHosts()
 	if err != nil {
 		return nil, err
@@ -1333,10 +1307,6 @@ func (s *Stack) GetHostByName(name string) (_ *resources.Host, err error) {
 }
 
 func (s *Stack) GetHostState(hostParam interface{}) (_ hoststate.Enum, err error) {
-	if s == nil {
-		return hoststate.ERROR, scerr.InvalidInstanceError()
-	}
-
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return hoststate.ERROR, err

@@ -55,10 +55,6 @@ import (
 
 // ListRegions ...
 func (s *Stack) ListRegions() ([]string, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	listOpts := regions.ListOpts{
@@ -85,10 +81,6 @@ func (s *Stack) ListRegions() ([]string, error) {
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -119,10 +111,6 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 
 // ListImages lists available OS images
 func (s *Stack) ListImages() (imgList []resources.Image, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -158,13 +146,6 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -193,13 +174,6 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 
 // GetTemplate returns the Template referenced by id
 func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -229,10 +203,6 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -288,13 +258,6 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 // TODO: restore code that call Openstack API to create keypair (even if we will not use it in SafeScale)
 // CreateKeyPair creates a key pair (no import)
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -303,20 +266,12 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // ImportKeyPair imports a keypair in OpenStack
 func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
-	return scerr.NotImplementedError("ImportKeyPair is not implemented yet")
+	return scerr.NotImplementedError("ImportKeyPair is not implemented yet") // FIXME Technical debt
 }
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be nil")
-	}
-
-	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
@@ -333,10 +288,6 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -375,13 +326,6 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
@@ -428,10 +372,6 @@ func toHostState(status string) hoststate.Enum {
 
 // InspectHost updates the data inside host with the data from provider
 func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
@@ -528,10 +468,6 @@ func (s *Stack) interpretAddresses(
 
 // complementHost complements Host data with content of server parameter
 func (s *Stack) complementHost(host *resources.Host, server *servers.Server) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	networks, addresses, ipv4, ipv6 := s.interpretAddresses(server.Addresses)
 
 	// Updates intrinsic data of host if needed
@@ -671,13 +607,6 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 
 // GetHostByName returns the host using the name passed as parameter
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -707,13 +636,6 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if request.KeyPair == nil {
-		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
-
 	defer debug.NewTracer(
 		nil, fmt.Sprintf("(%s)", request.ResourceName), true,
 	).WithStopwatch().GoingIn().OnExitTrace()()
@@ -1042,10 +964,6 @@ func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
 
 // SelectedAvailabilityZone returns the selected availability zone
 func (s *Stack) SelectedAvailabilityZone() (string, error) {
-	if s == nil {
-		return "", scerr.InvalidInstanceError()
-	}
-
 	if s.selectedAvailabilityZone == "" {
 		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
@@ -1067,10 +985,6 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var host *resources.Host
 
 	switch hostParam := hostParam.(type) {
@@ -1166,10 +1080,6 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ hoststate.Enum, err error) {
-	if s == nil {
-		return hoststate.ERROR, scerr.InvalidInstanceError()
-	}
-
 	var host *resources.Host
 
 	switch hostParam := hostParam.(type) {
@@ -1237,10 +1147,6 @@ func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ ho
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *resources.Host; any other type will return an scerr.InvalidParameterError
 func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
-	if s == nil {
-		return hoststate.ERROR, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
 	hostState, err := s.getHostState(hostParam, temporal.GetDefaultDelay())
@@ -1250,10 +1156,6 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 
 // ListHosts lists all hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	pager := servers.List(s.ComputeClient, servers.ListOpts{})
@@ -1288,10 +1190,6 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var fips []floatingips.FloatingIP
 
 	pager := floatingips.List(s.ComputeClient)
@@ -1338,13 +1236,6 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Delete floating IP address if there is one
@@ -1447,13 +1338,6 @@ func (s *Stack) DeleteHost(id string) error {
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
@@ -1465,13 +1349,6 @@ func (s *Stack) StopHost(id string) error {
 
 // RebootHost reboots unconditionally the host identified by id
 func (s *Stack) RebootHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
@@ -1488,13 +1365,6 @@ func (s *Stack) RebootHost(id string) error {
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
@@ -1507,13 +1377,6 @@ func (s *Stack) StartHost(id string) error {
 
 // ResizeHost ...
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// TODO RESIZE Resize Host HERE

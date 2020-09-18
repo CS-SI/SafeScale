@@ -31,9 +31,6 @@ import (
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
 	userData := userdata.NewContent()
 
 	// Ensure network exists
@@ -82,12 +79,5 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 
 // DeleteGateway delete the public gateway of a private network
 func (s *Stack) DeleteGateway(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	return s.DeleteHost(id)
 }

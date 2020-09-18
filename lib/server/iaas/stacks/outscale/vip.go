@@ -30,9 +30,6 @@ import (
 
 // CreateVIP ...
 func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	subnet, err := s.getSubnet(subnetID)
 	if err != nil {
 		return nil, err
@@ -85,11 +82,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet")
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
@@ -130,15 +123,6 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
-	}
-	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
-	}
 	// deviceNumber, err := s.getFirstFreeDeviceNumber(hostID)
 	// if err != nil {
 	// 	return err
@@ -172,15 +156,6 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
-	}
-	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
-	}
 	// res, err := s.client.POST_ReadNics(osc.ReadNicsRequest{
 	// 	Filters: osc.FiltersNic{
 	// 		NicIds: []string{vip.ID},
@@ -205,13 +180,6 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
-	}
-
 	deleteNicRequest := osc.DeleteNicRequest{
 		NicId: vip.ID,
 	}

@@ -64,9 +64,6 @@ func normalizeImageName(name string) string {
 
 // ListImages lists available OS images
 func (s *Stack) ListImages(bool) ([]resources.Image, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
 	if err != nil {
 		return nil, scerr.Wrap(normalizeError(err), "failed to list images")
@@ -193,9 +190,6 @@ func (s *Stack) parseTemplateID(id string) (*resources.HostTemplate, error) {
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	// without GPU
 	cpus := intRange(1, 78, 1)
 	ramPerCore := intRange(1, 16, 1)
@@ -321,13 +315,6 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 
 // GetImage returns the Image referenced by id
 func (s *Stack) GetImage(id string) (_ *resources.Image, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer func() {
 		if err != nil {
 			err = scerr.Wrap(err, fmt.Sprintf("failed to get image '%s'", id))
@@ -364,10 +351,6 @@ func (s *Stack) GetImage(id string) (_ *resources.Image, err error) {
 
 // GetTemplate returns the Template referenced by id
 func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	return s.parseTemplateID(id)
 }
 
@@ -505,9 +488,6 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 
 // WaitForHostState wait for host to be in the specified state
 func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
 			hostState, err := s.hostState(hostID)
@@ -875,12 +855,6 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 
 // CreateHost creates an host that fulfils the request
 func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if request.KeyPair == nil {
-		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
 	userData := userdata.NewContent()
 	if request.DefaultGateway == nil && !request.PublicIP {
 		return nil, userData, resources.ResourceInvalidRequestError(
@@ -1071,9 +1045,6 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 }
 
 func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
-	if s == nil {
-		return "", scerr.InvalidInstanceError()
-	}
 	if len(request.Networks) == 0 {
 		return "", nil
 	}
@@ -1089,9 +1060,6 @@ func (s *Stack) getSubnetID(request resources.HostRequest) (string, error) {
 }
 
 func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	readVmsRequest := osc.ReadVmsRequest{
 		Filters: osc.FiltersVm{
 			VmIds: []string{vmID},
@@ -1112,9 +1080,6 @@ func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
 }
 
 func (s *Stack) deleteHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 	request := osc.DeleteVmsRequest{
 		VmIds: []string{id},
 	}
@@ -1131,12 +1096,6 @@ func (s *Stack) deleteHost(id string) error {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "must not be empty")
-	}
 	readPublicIpsRequest := osc.ReadPublicIpsRequest{
 		Filters: osc.FiltersPublicIp{VmIds: []string{id}},
 	}
@@ -1201,9 +1160,6 @@ func (s *Stack) DeleteHost(id string) error {
 
 // InspectHost returns the host identified by id or updates content of a *resources.Host
 func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	var host *resources.Host
 	hostName := ""
 	switch hostParam := hostParam.(type) {
@@ -1250,9 +1206,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 
 // GetHostByName returns the host identified by name
 func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	res, _, err := s.client.VmApi.ReadVms(
 		s.auth, &osc.ReadVmsOpts{
 			ReadVmsRequest: optional.NewInterface(
@@ -1276,9 +1229,6 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 
 // GetHostState returns the current state of the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
-	if s == nil {
-		return hoststate.UNKNOWN, scerr.InvalidInstanceError()
-	}
 	var host *resources.Host
 	switch hostParam := hostParam.(type) {
 	case string:
@@ -1301,9 +1251,6 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 
 // ListHosts lists all hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
 	if err != nil {
 		return nil, normalizeError(err)
@@ -1325,12 +1272,6 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 
 // StopHost stops the host identified by id
 func (s *Stack) StopHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "must not be empty")
-	}
 	stopVmsRequest := osc.StopVmsRequest{
 		VmIds:     []string{id},
 		ForceStop: true,
@@ -1345,12 +1286,6 @@ func (s *Stack) StopHost(id string) error {
 
 // StartHost starts the host identified by id
 func (s *Stack) StartHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "must not be empty")
-	}
 	startVmsRequest := osc.StartVmsRequest{
 		VmIds: []string{id},
 	}
@@ -1364,12 +1299,6 @@ func (s *Stack) StartHost(id string) error {
 
 // RebootHost Reboot host
 func (s *Stack) RebootHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "must not be empty")
-	}
 	rebootVmsRequest := osc.RebootVmsRequest{
 		VmIds: []string{id},
 	}
@@ -1397,12 +1326,6 @@ func (s *Stack) perfFromFreq(freq float32) int {
 
 // ResizeHost Resize host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "must not be empty")
-	}
 	perf := s.perfFromFreq(request.MinFreq)
 	t := gpuTemplateName(0, request.MaxCores, int(request.MaxRAMSize), perf, 0, "")
 	updateVmRequest := osc.UpdateVmRequest{

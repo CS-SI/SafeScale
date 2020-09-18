@@ -50,10 +50,6 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 	logrus.Debug(">>> stacks.ebrc::ListImages()")
 	defer logrus.Debug("<<< stacks.ebrc::ListImages()")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var empty []resources.Image
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
@@ -91,10 +87,6 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 
 // GetImage returns the Image referenced by id
 func (s *StackEbrc) GetImage(id string) (*resources.Image, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	images, err := s.ListImages(true)
 	if err != nil {
 		return nil, err
@@ -115,10 +107,6 @@ func (s *StackEbrc) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var empty []resources.HostTemplate
 	empty = append(empty, resources.HostTemplate{Name: "Default", Cores: 1, DiskSize: 20, ID: "None...", RAMSize: 2})
 
@@ -129,10 +117,6 @@ func (s *StackEbrc) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, error) {
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
-
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 
 	var empty []resources.HostTemplate
 
@@ -201,10 +185,6 @@ func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 	logrus.Debugf(">>> stacks.ebrc::GetTemplate(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetTemplate(%s)", id)
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	// "Cores:%d,Disk:%d,Memory:%d"
 	if strings.HasPrefix(id, "Cores:") {
 		items := strings.Split(id, ",")
@@ -227,13 +207,6 @@ func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // CreateKeyPair creates and import a key pair
 func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -257,13 +230,6 @@ func (s *StackEbrc) DeleteKeyPair(id string) error {
 
 // CreateHost creates an host satisfying request
 func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.Host, content *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if request.KeyPair == nil {
-		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
-
 	logrus.Debug("ebrc.Client.CreateHost() called")
 	defer logrus.Debug("ebrc.Client.CreateHost() done")
 
@@ -646,10 +612,6 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	logrus.Debug("ebrc.Client.InspectHost() called")
 	defer logrus.Debug("ebrc.Client.InspectHost() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("error inspecting host"))
@@ -716,10 +678,6 @@ func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host
 		return scerr.Errorf(fmt.Sprintf("host and newHost have to been set"), nil)
 	}
 
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	host.ID = newHost.ID
 	if host.Name == "" {
 		host.Name = newHost.Name
@@ -777,10 +735,6 @@ func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
 	logrus.Debug("ebrc.Client.GetHostByName() called")
 	defer logrus.Debug("ebrc.Client.GetHostByName() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting host by name"))
@@ -813,10 +767,6 @@ func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
 func (s *StackEbrc) DeleteHost(id string) error {
 	logrus.Debug("ebrc.Client.DeleteHost() called")
 	defer logrus.Debug("ebrc.Client.DeleteHost() done")
-
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
@@ -860,10 +810,6 @@ func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
 	logrus.Debug("ebrc.Client.ListHosts() called")
 	defer logrus.Debug("ebrc.Client.ListHosts() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error listing hosts"))
@@ -886,10 +832,6 @@ func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
 func (s *StackEbrc) StopHost(id string) error {
 	logrus.Debug("ebrc.Client.StopHost() called")
 	defer logrus.Debug("ebrc.Client.StopHost() done")
-
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
@@ -916,10 +858,6 @@ func (s *StackEbrc) StartHost(id string) error {
 	logrus.Debug("ebrc.Client.StartHost() called")
 	defer logrus.Debug("ebrc.Client.StartHost() done")
 
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Error starting host"))
@@ -945,10 +883,6 @@ func (s *StackEbrc) RebootHost(id string) error {
 	logrus.Debug("ebrc.Client.RebootHost() called")
 	defer logrus.Debug("ebrc.Client.RebootHost() done")
 
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Error rebooting host"))
@@ -973,10 +907,6 @@ func (s *StackEbrc) RebootHost(id string) error {
 func (s *StackEbrc) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	logrus.Debug("ebrc.Client.RebootHost() called")
 	defer logrus.Debug("ebrc.Client.RebootHost() done")
-
-	if s == nil {
-		return hoststate.ERROR, scerr.InvalidInstanceError()
-	}
 
 	host, err := s.InspectHost(hostParam)
 	if err != nil {

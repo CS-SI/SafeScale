@@ -39,10 +39,6 @@ import (
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	// disable subnetwork auto-creation
 	ne := compute.Network{
 		Name:                  s.GcpConfig.NetworkName,
@@ -241,10 +237,6 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 
 // GetNetwork returns the network identified by ref (id or name)
 func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -260,10 +252,6 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 
 // GetNetworkByName returns the network identified by ref (id or name)
 func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -279,10 +267,6 @@ func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var networks []*resources.Network
 
 	compuService := s.ComputeService
@@ -330,10 +314,6 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) (err error) {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	theNetwork, err := s.GetNetwork(ref)
 	if err != nil {
 		if gerr, ok := err.(*googleapi.Error); ok {
@@ -438,13 +418,6 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name

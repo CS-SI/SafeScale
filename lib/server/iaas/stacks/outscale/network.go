@@ -92,10 +92,6 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, err := s.getVpc(s.Options.Network.VPCID)
 	if err != nil {
@@ -189,10 +185,6 @@ func toNetwork(subnet *osc.Subnet) *resources.Network {
 
 // GetNetwork returns the network identified by id
 func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	onet, err := s.getSubnet(id)
 	if err != nil {
 		return nil, err
@@ -206,9 +198,6 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 
 // GetNetworkByName returns the network identified by name)
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
@@ -243,9 +232,6 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 // ListNetworks lists all networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
@@ -269,9 +255,6 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // ListNetworks lists all networks
 func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []osc.Nic, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},
@@ -348,9 +331,6 @@ func (s *Stack) deleteSubnet(id string) error {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 	// Reads NIS that belong to the subnet
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{

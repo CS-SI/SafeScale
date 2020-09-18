@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	"github.com/libvirt/libvirt-go"
@@ -316,7 +317,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	if err != nil {
 		return nil, nil, err
 	}
-	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
+	gwName := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwName == "" {
 		name, err := networkLibvirt.GetName()
 		if err != nil {

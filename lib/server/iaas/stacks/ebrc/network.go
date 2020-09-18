@@ -410,10 +410,6 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 	logrus.Debug("ebrc.Client.CreateNetwork() called")
 	defer logrus.Debug("ebrc.Client.CreateNetwork() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network"))
@@ -613,10 +609,6 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 	logrus.Debug("ebrc.Client.GetNetwork() called")
 	defer logrus.Debug("ebrc.Client.GetNetwork() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network"))
@@ -655,10 +647,6 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
 	logrus.Debug("ebrc.Client.GetNetworkByName() called")
 	defer logrus.Debug("ebrc.Client.GetNetworkByName() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, err
@@ -685,10 +673,6 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
 func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
 	logrus.Debug("ebrc.Client.ListNetworks() called")
 	defer logrus.Debug("ebrc.Client.ListNetworks() done")
-
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
@@ -721,10 +705,6 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 	logrus.Debug("ebrc.Client.DeleteNetwork() called")
 	defer logrus.Debug("ebrc.Client.DeleteNetwork() done")
 
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("Error deleting network"))
@@ -752,13 +732,6 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resource
 	logrus.Debug("ebrc.Client.CreateGateway() called")
 	defer logrus.Debug("ebrc.Client.CreateGateway() done")
 
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
@@ -807,9 +780,5 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resource
 
 // DeleteGateway delete the public gateway referenced by ref (id or name)
 func (s *StackEbrc) DeleteGateway(ref string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	return s.DeleteHost(ref)
 }
