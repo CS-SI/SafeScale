@@ -216,7 +216,6 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 		logrus.Debugf("Standard output: [%s]", stdout)
 		logrus.Debugf("Standard error: [%s]", stderr)
 
-		// TODO Simplification of error message
 		collected := ""
 		errLines := strings.Split(stderr, "\n")
 		for _, errline := range errLines {

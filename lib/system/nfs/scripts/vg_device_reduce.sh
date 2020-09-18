@@ -17,8 +17,6 @@
 # block_device_unmount.sh
 # Unmount a block device and removes the corresponding entry from /etc/fstab
 
-# TODO OPP CURRENT Device reduction
-
 set -u -o pipefail
 
 function print_error {
