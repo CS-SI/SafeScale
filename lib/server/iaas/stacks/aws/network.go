@@ -708,15 +708,6 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 }
 
 func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (_ *resources.Host, _ *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-
-	defer scerr.OnPanic(&err)()
-
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name

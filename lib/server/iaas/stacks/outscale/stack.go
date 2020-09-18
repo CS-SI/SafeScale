@@ -9,7 +9,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Credentials outscale credentials
@@ -159,9 +158,6 @@ func deviceNames() []string {
 
 // ListRegions list available regions
 func (s *Stack) ListRegions() ([]string, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	return []string{
 		"cn-southeast-1",
 		"eu-west-2",
@@ -172,9 +168,6 @@ func (s *Stack) ListRegions() ([]string, error) {
 
 // ListAvailabilityZones returns availability zone in a set
 func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {
 		return nil, err

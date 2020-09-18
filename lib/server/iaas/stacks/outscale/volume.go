@@ -18,12 +18,6 @@ import (
 
 // CreateVolume creates a block volume
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volume, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if request.Name == "" {
-		return nil, scerr.InvalidParameterError("volume name", "cannot be empty string")
-	}
 	v, _ := s.GetVolumeByName(request.Name)
 	if v != nil {
 		return nil, resources.ResourceDuplicateError("volume", request.Name)
@@ -125,9 +119,6 @@ func volumeState(state string) volumestate.Enum {
 
 // WaitForVolumeState wait for volume to be in the specified state
 func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 	err := retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
 			vol, err := s.GetVolume(volumeID)
@@ -145,12 +136,6 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
@@ -183,9 +168,6 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 
 // GetVolumeByName returns the volume with name name
 func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	if name == "" {
 		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -223,9 +205,6 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 
 // ListVolumes list available volumes
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	subregion := s.Options.Compute.Subregion
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
@@ -256,12 +235,6 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
 	deleteVolumeRequest := osc.DeleteVolumeRequest{
 		VolumeId: id,
 	}
@@ -304,16 +277,6 @@ func (s *Stack) getFirstFreeDeviceName(serverID string) (string, error) {
 
 // CreateVolumeAttachment attaches a volume to an host
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
-	if s == nil {
-		return "", scerr.InvalidInstanceError()
-	}
-	if request.HostID == "" {
-		return "", scerr.InvalidParameterError("HostID", "cannot be empty string")
-	}
-	if request.VolumeID == "" {
-		return "", scerr.InvalidParameterError("VolumeID", "cannot be empty string")
-	}
-
 	firstDeviceName, err := s.getFirstFreeDeviceName(request.HostID)
 	if err != nil {
 		return "", normalizeError(err)
@@ -339,15 +302,6 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if serverID == "" {
-		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
@@ -388,12 +342,6 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if serverID == "" {
-		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
-	}
 	volumes, err := s.ListVolumes()
 	if err != nil {
 		return nil, err
@@ -410,15 +358,6 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if serverID == "" {
-		return scerr.InvalidParameterError("serverID", "cannot be empty string")
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
 	unlinkVolumeRequest := osc.UnlinkVolumeRequest{
 		VolumeId: id,
 	}
@@ -432,16 +371,3 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	}
 	return s.WaitForVolumeState(id, volumestate.AVAILABLE)
 }
-
-// func toVolumeSpeed(s string) volumespeed.Enum {
-//	if s == "COLD" {
-//		return volumespeed.COLD
-//	}
-//	if s == "HDD" {
-//		return volumespeed.HDD
-//	}
-//	if s == "SSD" {
-//		return volumespeed.SSD
-//	}
-//	return volumespeed.HDD
-// }

@@ -8,6 +8,7 @@ import (
 	"github.com/libvirt/libvirt-go"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 type Stack struct {

@@ -236,7 +236,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
 				&ec2.Filter{
-					Name:   aws.String("attachment.instance-id"), // FIXME What ?
+					Name:   aws.String("attachment.instance-id"),
 					Values: []*string{aws.String(serverID)},
 				},
 			},

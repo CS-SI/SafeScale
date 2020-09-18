@@ -312,13 +312,6 @@ func validateNetworkName(req resources.NetworkRequest) (bool, error) {
 
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
 	getErr := retry.WhileSuccessfulDelay1Second(
@@ -739,13 +732,6 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
 func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
-	}
-
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name

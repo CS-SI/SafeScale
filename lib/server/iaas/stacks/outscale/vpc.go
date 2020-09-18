@@ -365,10 +365,6 @@ func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
 }
 
 func (s *Stack) getVpc(id string) (*osc.Net, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	readNetsRequest := osc.ReadNetsRequest{
 		Filters: osc.FiltersNet{
 			NetIds: []string{id},
@@ -390,9 +386,6 @@ func (s *Stack) getVpc(id string) (*osc.Net, error) {
 
 // GetNetworkByName returns the network identified by name)
 func (s *Stack) getVpcByName(name string) (*osc.Net, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
 	readNetsRequest := osc.ReadNetsRequest{
 		Filters: osc.FiltersNet{
 			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
@@ -434,10 +427,6 @@ func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, error) {
 }
 
 func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) (err error) {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	if len(req.DNSServers) == 0 {
 		return nil
 	}

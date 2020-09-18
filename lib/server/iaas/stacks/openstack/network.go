@@ -73,10 +73,6 @@ type Subnet struct {
 
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.Network, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Checks if CIDR is valid...
@@ -141,13 +137,6 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 
 // GetNetworkByName ...
 func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -187,13 +176,6 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 
 // GetNetwork returns the network identified by id
 func (s *Stack) GetNetwork(id string) (_ *resources.Network, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// If not found, we look for any network from provider
@@ -250,10 +232,6 @@ func (s *Stack) GetNetwork(id string) (_ *resources.Network, err error) {
 
 // ListNetworks lists available networks
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -303,10 +281,6 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	network, err := networks.Get(s.NetworkClient, id).Extract()
@@ -353,13 +327,6 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 // CreateGateway creates a public Gateway for a private network
 func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, userData *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if req.KeyPair == nil {
-		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	userData = userdata.NewContent()
@@ -433,13 +400,6 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 
 // DeleteGateway delete the public gateway of a private network
 func (s *Stack) DeleteGateway(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	return s.DeleteHost(id)
@@ -455,16 +415,6 @@ func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
 	}
 	return -1
 }
-
-// func fromGopherIPversion(v gophercloud.IPVersion) ipversion.Enum {
-// 	if v == gophercloud.IPv4 {
-// 		return ipversion.IPv4
-// 	}
-// 	if v == gophercloud.IPv6 {
-// 		return ipversion.IPv6
-// 	}
-// 	return -1
-// }
 
 // FromIntIPversion ...
 func FromIntIPversion(v int) ipversion.Enum {
@@ -590,29 +540,6 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		NetworkID: subnet.NetworkID,
 	}, nil
 }
-
-// // calcDhcpAllocationPool calculates the start and the end of the DHCP allocation pool based on cidr
-// // Keeps 10 IP addresses out of the pool to allow static and VIP addresses
-// func calcDhcpAllocationPool(cidr string) (string, string, error) {
-// 	_, _, err := net.ParseCIDR(cidr)
-// 	if err != nil {
-// 		return "", "", scerr.Errorf(fmt.Sprintf("invalid cidr '%s'", cidr)
-// 	}
-
-// 	start, end, err := utils.CIDRToLongRange(cidr)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-// 	start += 11
-// 	if start >= end {
-// 		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
-// 	}
-// 	end -= 3
-// 	if end <= start {
-// 		return "", "", scerr.OverflowError(fmt.Sprintf("Not enough IP Addresses in CIDR '%s' to reserve 10 static IP addresses", cidr))
-// 	}
-// 	return utils.LongToIPv4(start), utils.LongToIPv4(end), nil
-// }
 
 // getSubnet returns the sub network identified by id
 func (s *Stack) getSubnet(id string) (*Subnet, error) {
@@ -778,10 +705,6 @@ func (s *Stack) getRouter(id string) (*Router, error) {
 
 // ListRouters lists available routers
 func (s *Stack) ListRouters() ([]Router, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var ns []Router
 	err := routers.List(s.NetworkClient, routers.ListOpts{}).EachPage(
 		func(page pagination.Page) (bool, error) {
@@ -857,10 +780,6 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -882,25 +801,11 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, 
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
-	}
-	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
-	}
-
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
 		return err
@@ -932,16 +837,6 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
-	}
-	if hostID == "" {
-		return scerr.InvalidParameterError("host", "cannot be empty string")
-	}
-
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
 		return err
@@ -974,13 +869,6 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if vip == nil {
-		return scerr.InvalidParameterError("vip", "cannot be nil")
-	}
-
 	for _, h := range vip.Hosts {
 		err := s.UnbindHostFromVIP(vip, h)
 		if err != nil {

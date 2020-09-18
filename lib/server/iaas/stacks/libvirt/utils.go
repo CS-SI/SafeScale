@@ -23,6 +23,8 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // VMInfo represents the useful informations package send from each new local vm
@@ -64,7 +66,7 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Unlock()
 
 	if !found {
-		return scerr.Errorf(fmt.Sprintf("nothing registered with the name %s", name), err)
+		return scerr.Errorf(fmt.Sprintf("nothing registered with the name %s", name), nil)
 	}
 	fmt.Println("Deregistered : ", name)
 	return nil

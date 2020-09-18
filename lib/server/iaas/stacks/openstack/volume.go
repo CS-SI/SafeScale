@@ -89,13 +89,6 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources.Volume, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if request.Name == "" {
-		return nil, scerr.InvalidParameterError("request.Name", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", request.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	volume, err = s.GetVolume(request.Name)
@@ -179,13 +172,6 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 
 // GetVolume returns the volume identified by id
 func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vol *volumesv2.Volume
@@ -230,10 +216,6 @@ func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 
 // ListVolumes returns the list of all volumes known on the current tenant
 func (s *Stack) ListVolumes() ([]resources.Volume, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vs []resources.Volume
@@ -268,13 +250,6 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 
 // DeleteVolume deletes the volume identified by id
 func (s *Stack) DeleteVolume(id string) (err error) {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, "("+id+")", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var (
@@ -311,13 +286,6 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 // - 'volume' to attach
 // - 'host' on which the volume is attached
 func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
-	if s == nil {
-		return "", scerr.InvalidInstanceError()
-	}
-	if request.Name == "" {
-		return "", scerr.InvalidParameterError("request.Name", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, "("+request.Name+")", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Creates the attachment
@@ -341,16 +309,6 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 
 // GetVolumeAttachment returns the volume attachment identified by id
 func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if serverID == "" {
-		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, "('"+serverID+"', '"+id+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
@@ -369,13 +327,6 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 // ListVolumeAttachments lists available volume attachment
 func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if serverID == "" {
-		return nil, scerr.InvalidParameterError("serverID", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, "('"+serverID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vs []resources.VolumeAttachment
@@ -405,16 +356,6 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if serverID == "" {
-		return scerr.InvalidParameterError("serverID", "cannot be empty string")
-	}
-	if vaID == "" {
-		return scerr.InvalidParameterError("vaID", "cannot be empty string")
-	}
-
 	defer debug.NewTracer(nil, "('"+serverID+"', '"+vaID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)

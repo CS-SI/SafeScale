@@ -32,13 +32,6 @@ import (
 
 // CreateKeyPair creates and import a key pair
 func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -51,9 +44,6 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
 func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 	if keypair == nil {
 		return scerr.InvalidParameterError("keyair", "cannot be nil")
 	}
@@ -72,12 +62,6 @@ func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-	if id == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
-	}
 	readKeypairsRequest := osc.ReadKeypairsRequest{
 		Filters: osc.FiltersKeypair{
 			KeypairNames: []string{id},
@@ -106,10 +90,6 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
 	if err != nil {
 		return nil, normalizeError(err)
@@ -129,13 +109,6 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(name string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	deleteKeypairRequest := osc.DeleteKeypairRequest{
 		KeypairName: name,
 	}

@@ -38,10 +38,6 @@ import (
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
 func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: &types.Disk{
 			Name:       request.Name,
@@ -105,10 +101,6 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 	logrus.Debug("ebrc.Client.GetVolume() called")
 	defer logrus.Debug("ebrc.Client.GetVolume() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var volume resources.Volume
 
 	_, vdc, err := s.getOrgVdc()
@@ -141,10 +133,6 @@ func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 	logrus.Debug("ebrc.Client.ListVolumes() called")
 	defer logrus.Debug("ebrc.Client.ListVolumes() done")
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var volumes []resources.Volume
 
 	org, vdc, err := s.getOrgVdc()
@@ -175,10 +163,6 @@ func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 func (s *StackEbrc) DeleteVolume(ref string) error {
 	logrus.Debugf("ebrc.Client.DeleteVolume(%s) called", ref)
 	defer logrus.Debugf("ebrc.Client.DeleteVolume(%s) done", ref)
-
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 
 	thed, err := s.findDiskByID(ref)
 	if err != nil {
@@ -211,10 +195,6 @@ func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentReq
 	logrus.Debugf(">>> stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 	defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 
-	if s == nil {
-		return "", scerr.InvalidInstanceError()
-	}
-
 	vm, err := s.findVMByID(request.HostID)
 	if err != nil || utils.IsEmpty(vm) {
 		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
@@ -243,10 +223,6 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 	logrus.Debugf(">>> stacks.ebrc::GetVolumeAttachment(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
 
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	vats, err := s.ListVolumeAttachments(serverID)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("Error getting attachment"))
@@ -265,10 +241,6 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 	logrus.Debugf(">>> stacks.ebrc::DeleteVolumeAttachment(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::DeleteVolumeAttachment(%s)", id)
-
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
 
 	vm, err := s.findVMByID(serverID)
 	if err != nil {
@@ -298,10 +270,6 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 
 // ListVolumeAttachments lists available volume attachments
 func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	vms, err := s.findVmNames()
 	if err != nil {
 		return []resources.VolumeAttachment{}, err

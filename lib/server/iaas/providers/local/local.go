@@ -90,7 +90,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	}
 	config.MetadataBucket = bucketName
 
-	providerName := "libvirt"
+	providerName := "local"
 
 	// Add custom dns
 	// config.DNSList = []string{"1.1.1.1"}

@@ -256,13 +256,6 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 // CreateHost creates a new host
 // On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
 func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
-	if s == nil {
-		return nil, nil, scerr.InvalidInstanceError()
-	}
-	if request.KeyPair == nil {
-		return nil, nil, scerr.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
-
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -635,10 +628,6 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 
 // InspectHost updates the data inside host with the data from provider
 func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
@@ -852,10 +841,6 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[ipversion.
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() ([]*resources.Host, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	pager := servers.List(s.Stack.ComputeClient, servers.ListOpts{})
 	var hosts []*resources.Host
 	err := pager.EachPage(
@@ -885,10 +870,6 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) error {
-	if s == nil {
-		return scerr.InvalidInstanceError()
-	}
-
 	// Delete floating IP address if there is one
 	if s.cfgOpts.UseFloatingIP {
 		fip, err := s.getFloatingIPOfHost(id)
@@ -993,10 +974,6 @@ func (s *Stack) DeleteHost(id string) error {
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
 func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	pager := floatingips.List(s.Stack.ComputeClient)
 	var fips []floatingips.FloatingIP
 	retryErr := pager.EachPage(
@@ -1213,10 +1190,6 @@ func toHostState(status string) hoststate.Enum {
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
-	if s == nil {
-		return nil, scerr.InvalidInstanceError()
-	}
-
 	var host *resources.Host
 
 	switch hostParam := hostParam.(type) {
