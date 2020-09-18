@@ -7,7 +7,7 @@ DIRECTORIES := $(sort $(dir $(wildcard */)))
 all: flavors tests
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 flavors: generate
 	@(cd flavors && $(MAKE) all)

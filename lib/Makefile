@@ -20,7 +20,7 @@ endif
 all:	sdk lib/system lib/utils lib/server lib/client
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 generate: sdk
 	@(cd server && $(MAKE) $@)

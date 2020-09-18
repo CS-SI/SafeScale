@@ -17,9 +17,10 @@ REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 default: all
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 all: clean gensrc
+	@echo "building with tags $(BUILD_TAGS)"
 	@$(GO) build $(RACE_CHECK) -o $(EXEC) $(BUILD_TAGS)
 	@if [ -z "$(GOOS)" ]; then $(GO) test -o $(EXEC-COVER) $(BUILD_TAGS) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1; fi;
 

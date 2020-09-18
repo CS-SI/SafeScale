@@ -6,7 +6,7 @@ EXEC:=safe-security
 all: safe-security
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 safe-security:	main.go
 	@$(GO) build $(RACE_CHECK) -o $(EXEC)

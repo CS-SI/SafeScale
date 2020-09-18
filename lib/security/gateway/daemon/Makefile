@@ -6,7 +6,7 @@ EXEC:=safe-securityd
 all: safe-securityd
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 safe-securityd:	proxy.go
 	@$(GO) build $(RACE_CHECK) -o $(EXEC)

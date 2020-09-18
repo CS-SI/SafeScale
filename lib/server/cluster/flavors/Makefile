@@ -12,7 +12,7 @@ generate:
 	@(cd swarm && $(MAKE) $@)
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 dcos:
 	@(cd dcos && $(MAKE))

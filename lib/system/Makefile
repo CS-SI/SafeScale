@@ -5,14 +5,14 @@ GO?=go
 all: nfs
 
 vet:
-	@$(GO) vet ./...
+	@$(GO) vet $(BUILD_TAGS) ./...
 
 nfs:
 	@(cd nfs && $(MAKE) all)
 
 generate:
 	@(cd nfs && $(MAKE) $(@))
-	@($(GO) generate .)
+	@($(GO) generate $(BUILD_TAGS) .)
 
 clean:
 	@(cd nfs && $(MAKE) $(@))
