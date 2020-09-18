@@ -20,7 +20,7 @@ type ErrorTraceProvider WrappedProvider
 func (w ErrorTraceProvider) Build(something map[string]interface{}) (p Provider, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:Build", w.Name))
 	return w.InnerProvider.Build(something)
@@ -30,7 +30,7 @@ func (w ErrorTraceProvider) Build(something map[string]interface{}) (p Provider,
 func (w ErrorTraceProvider) ListImages(all bool) (images []resources.Image, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListImages", w.Name))
 	return w.InnerProvider.ListImages(all)
@@ -40,7 +40,7 @@ func (w ErrorTraceProvider) ListImages(all bool) (images []resources.Image, err 
 func (w ErrorTraceProvider) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListTemplates", w.Name))
 	return w.InnerProvider.ListTemplates(all)
@@ -50,7 +50,7 @@ func (w ErrorTraceProvider) ListTemplates(all bool) (templates []resources.HostT
 func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetAuthenticationOptions", w.Name))
 
@@ -61,7 +61,7 @@ func (w ErrorTraceProvider) GetAuthenticationOptions() (cfg providers.Config, er
 func (w ErrorTraceProvider) GetConfigurationOptions() (cfg providers.Config, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetConfigurationOptions", w.Name))
 	return w.InnerProvider.GetConfigurationOptions()
@@ -88,7 +88,7 @@ func NewErrorTraceProvider(innerProvider Provider, name string) *ErrorTraceProvi
 func (w ErrorTraceProvider) ListAvailabilityZones() (zones map[string]bool, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListAvailabilityZones", w.Name))
 	return w.InnerProvider.ListAvailabilityZones()
@@ -98,7 +98,7 @@ func (w ErrorTraceProvider) ListAvailabilityZones() (zones map[string]bool, err 
 func (w ErrorTraceProvider) ListRegions() (regions []string, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListRegions", w.Name))
 	return w.InnerProvider.ListRegions()
@@ -108,7 +108,7 @@ func (w ErrorTraceProvider) ListRegions() (regions []string, err error) {
 func (w ErrorTraceProvider) GetImage(id string) (images *resources.Image, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetImage", w.Name))
 	return w.InnerProvider.GetImage(id)
@@ -118,7 +118,7 @@ func (w ErrorTraceProvider) GetImage(id string) (images *resources.Image, err er
 func (w ErrorTraceProvider) GetTemplate(id string) (templates *resources.HostTemplate, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetTemplate", w.Name))
 	return w.InnerProvider.GetTemplate(id)
@@ -128,7 +128,7 @@ func (w ErrorTraceProvider) GetTemplate(id string) (templates *resources.HostTem
 func (w ErrorTraceProvider) CreateKeyPair(name string) (pairs *resources.KeyPair, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateKeyPair", w.Name))
 	return w.InnerProvider.CreateKeyPair(name)
@@ -138,7 +138,7 @@ func (w ErrorTraceProvider) CreateKeyPair(name string) (pairs *resources.KeyPair
 func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *resources.KeyPair, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetKeyPair", w.Name))
 	return w.InnerProvider.GetKeyPair(id)
@@ -148,7 +148,7 @@ func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *resources.KeyPair, err
 func (w ErrorTraceProvider) ListKeyPairs() (pairs []resources.KeyPair, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListKeyPairs", w.Name))
 	return w.InnerProvider.ListKeyPairs()
@@ -158,7 +158,7 @@ func (w ErrorTraceProvider) ListKeyPairs() (pairs []resources.KeyPair, err error
 func (w ErrorTraceProvider) DeleteKeyPair(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteKeyPair", w.Name))
 	return w.InnerProvider.DeleteKeyPair(id)
@@ -168,7 +168,7 @@ func (w ErrorTraceProvider) DeleteKeyPair(id string) (err error) {
 func (w ErrorTraceProvider) CreateNetwork(req resources.NetworkRequest) (net *resources.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateNetwork", w.Name))
 	return w.InnerProvider.CreateNetwork(req)
@@ -178,7 +178,7 @@ func (w ErrorTraceProvider) CreateNetwork(req resources.NetworkRequest) (net *re
 func (w ErrorTraceProvider) GetNetwork(id string) (net *resources.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetNetwork", w.Name))
 	return w.InnerProvider.GetNetwork(id)
@@ -188,7 +188,7 @@ func (w ErrorTraceProvider) GetNetwork(id string) (net *resources.Network, err e
 func (w ErrorTraceProvider) GetNetworkByName(name string) (net *resources.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetNetworkByName", w.Name))
 	return w.InnerProvider.GetNetworkByName(name)
@@ -198,7 +198,7 @@ func (w ErrorTraceProvider) GetNetworkByName(name string) (net *resources.Networ
 func (w ErrorTraceProvider) ListNetworks() (net []*resources.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListNetworks", w.Name))
 	return w.InnerProvider.ListNetworks()
@@ -208,7 +208,7 @@ func (w ErrorTraceProvider) ListNetworks() (net []*resources.Network, err error)
 func (w ErrorTraceProvider) DeleteNetwork(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteNetwork", w.Name))
 	return w.InnerProvider.DeleteNetwork(id)
@@ -218,7 +218,7 @@ func (w ErrorTraceProvider) DeleteNetwork(id string) (err error) {
 func (w ErrorTraceProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, content *userdata.Content, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateGateway", w.Name))
 	return w.InnerProvider.CreateGateway(req, sizing)
@@ -228,7 +228,7 @@ func (w ErrorTraceProvider) CreateGateway(req resources.GatewayRequest, sizing *
 func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteGateway", w.Name))
 	return w.InnerProvider.DeleteGateway(networkID)
@@ -238,7 +238,7 @@ func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
 func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VirtualIP, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateVIP", w.Name))
 	return w.InnerProvider.CreateVIP(networkID, description)
@@ -248,7 +248,7 @@ func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *
 func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:AddPublicIPToVIP", w.Name))
 	return w.InnerProvider.AddPublicIPToVIP(vip)
@@ -258,7 +258,7 @@ func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err erro
 func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:BindHostToVIP", w.Name))
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
@@ -268,7 +268,7 @@ func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, hostID strin
 func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:UnbindHostFromVIP", w.Name))
 	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
@@ -278,7 +278,7 @@ func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID s
 func (w ErrorTraceProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteVIP", w.Name))
 	return w.InnerProvider.DeleteVIP(vip)
@@ -288,7 +288,7 @@ func (w ErrorTraceProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
 func (w ErrorTraceProvider) CreateHost(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateHost", w.Name))
 	return w.InnerProvider.CreateHost(request)
@@ -298,7 +298,7 @@ func (w ErrorTraceProvider) CreateHost(request resources.HostRequest) (_ *resour
 func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *resources.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:InspectHost", w.Name))
 	return w.InnerProvider.InspectHost(something)
@@ -308,7 +308,7 @@ func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *resources.Hos
 func (w ErrorTraceProvider) GetHostByName(name string) (_ *resources.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetHostByName", w.Name))
 	return w.InnerProvider.GetHostByName(name)
@@ -318,7 +318,7 @@ func (w ErrorTraceProvider) GetHostByName(name string) (_ *resources.Host, err e
 func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enum, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetHostState", w.Name))
 	return w.InnerProvider.GetHostState(something)
@@ -328,7 +328,7 @@ func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enu
 func (w ErrorTraceProvider) ListHosts() (_ []*resources.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListHosts", w.Name))
 	return w.InnerProvider.ListHosts()
@@ -338,7 +338,7 @@ func (w ErrorTraceProvider) ListHosts() (_ []*resources.Host, err error) {
 func (w ErrorTraceProvider) DeleteHost(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteHost", w.Name))
 	return w.InnerProvider.DeleteHost(id)
@@ -348,7 +348,7 @@ func (w ErrorTraceProvider) DeleteHost(id string) (err error) {
 func (w ErrorTraceProvider) StopHost(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:StopHost", w.Name))
 	return w.InnerProvider.StopHost(id)
@@ -358,7 +358,7 @@ func (w ErrorTraceProvider) StopHost(id string) (err error) {
 func (w ErrorTraceProvider) StartHost(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:StartHost", w.Name))
 	return w.InnerProvider.StartHost(id)
@@ -368,7 +368,7 @@ func (w ErrorTraceProvider) StartHost(id string) (err error) {
 func (w ErrorTraceProvider) RebootHost(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:RebootHost", w.Name))
 	return w.InnerProvider.RebootHost(id)
@@ -378,7 +378,7 @@ func (w ErrorTraceProvider) RebootHost(id string) (err error) {
 func (w ErrorTraceProvider) ResizeHost(id string, request resources.SizingRequirements) (_ *resources.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ResizeHost", w.Name))
 	return w.InnerProvider.ResizeHost(id, request)
@@ -388,7 +388,7 @@ func (w ErrorTraceProvider) ResizeHost(id string, request resources.SizingRequir
 func (w ErrorTraceProvider) CreateVolume(request resources.VolumeRequest) (_ *resources.Volume, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateVolume", w.Name))
 	return w.InnerProvider.CreateVolume(request)
@@ -398,7 +398,7 @@ func (w ErrorTraceProvider) CreateVolume(request resources.VolumeRequest) (_ *re
 func (w ErrorTraceProvider) GetVolume(id string) (_ *resources.Volume, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetVolume", w.Name))
 	return w.InnerProvider.GetVolume(id)
@@ -408,7 +408,7 @@ func (w ErrorTraceProvider) GetVolume(id string) (_ *resources.Volume, err error
 func (w ErrorTraceProvider) ListVolumes() (_ []resources.Volume, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListVolumes", w.Name))
 	return w.InnerProvider.ListVolumes()
@@ -418,7 +418,7 @@ func (w ErrorTraceProvider) ListVolumes() (_ []resources.Volume, err error) {
 func (w ErrorTraceProvider) DeleteVolume(id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteVolume", w.Name))
 	return w.InnerProvider.DeleteVolume(id)
@@ -428,7 +428,7 @@ func (w ErrorTraceProvider) DeleteVolume(id string) (err error) {
 func (w ErrorTraceProvider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (_ string, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:CreateVolumeAttachment", w.Name))
 	return w.InnerProvider.CreateVolumeAttachment(request)
@@ -438,7 +438,7 @@ func (w ErrorTraceProvider) CreateVolumeAttachment(request resources.VolumeAttac
 func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *resources.VolumeAttachment, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:GetVolumeAttachment", w.Name))
 	return w.InnerProvider.GetVolumeAttachment(serverID, id)
@@ -448,7 +448,7 @@ func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *resourc
 func (w ErrorTraceProvider) ListVolumeAttachments(serverID string) (_ []resources.VolumeAttachment, err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:ListVolumeAttachments", w.Name))
 	return w.InnerProvider.ListVolumeAttachments(serverID)
@@ -458,7 +458,7 @@ func (w ErrorTraceProvider) ListVolumeAttachments(serverID string) (_ []resource
 func (w ErrorTraceProvider) DeleteVolumeAttachment(serverID, id string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
-			logrus.Warnf("%s : Intercepted error: %v", prefix, err)
+			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
 		}
 	}(fmt.Sprintf("%s:DeleteVolumeAttachment", w.Name))
 	return w.InnerProvider.DeleteVolumeAttachment(serverID, id)
