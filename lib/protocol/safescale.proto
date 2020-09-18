@@ -23,132 +23,134 @@ import "google/protobuf/timestamp.proto";
 // Common
 
 message Reference {
-  string tenant_id = 1;
-  string id = 2;
-  string name = 3;
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
 }
 
 // Client Requests
 
 message ClientID {
-  string hostname = 1;
-  string userid = 2;
-  string process_id = 3;
-  string parent_process_id = 4;
+	string hostname = 1;
+	string userid = 2;
+	string process_id = 3;
+	string parent_process_id = 4;
 }
 
 message ClientRequest {
-  ClientID client_id = 1;
-  google.protobuf.Timestamp timestamp = 2;
+	ClientID client_id = 1;
+	google.protobuf.Timestamp timestamp = 2;
 }
 
 // Tenant requests
 
 message Tenant {
-  string name = 1;
-  string provider = 2;
+	string name = 1;
+	string provider = 2;
 }
 
 message TenantList {
-  repeated Tenant tenants = 1;
+	repeated Tenant tenants = 1;
 }
 
 message TenantName {
-  string name = 1;
+	string name = 1;
 }
 
 message TenantCleanupRequest {
-  string name = 1;
-  bool force = 2;
+	string name = 1;
+	bool force = 2;
 }
 
 message TenantInspectRequest {
-  string name = 1;
-  string user_id = 2;
-  string group_id = 3;
+	string name = 1;
+	string user_id = 2;
+	string group_id = 3;
 }
 
 message KeyValue {
-  string key = 1;
-  string value = 2;
+	string key = 1;
+	string value = 2;
 }
 
 message TenantIdentity {
-  KeyValue user = 1;
-  KeyValue app_key = 2;
-  KeyValue domain = 3;      // some providers need a domain (name or id)
+	KeyValue user = 1;
+	KeyValue app_key = 2;
+	KeyValue domain = 3;      // some providers need a domain (name or id)
 }
 
 message TenantCompute {
-  string region = 1;
-  string sub_region = 2;
-  string availability_zone = 3;
-  KeyValue context = 4;   // ProjectName, ProjectID, ... the data that allows to isolate the client on the provider side
-  KeyValue api_key = 5;   // The optional API key to access API
-  string whitelist_template_regex = 6;
-  string blacklist_template_regex = 7;
-  string default_image = 8;
-  string default_volume_speed = 9;
-  repeated string dns_list = 10;
-  string operator_username = 11;
+	string region = 1;
+	string sub_region = 2;
+	string availability_zone = 3;
+	KeyValue context = 4;   // ProjectName, ProjectID, ... the data that allows to isolate the client on the provider side
+	KeyValue api_key = 5;   // The optional API key to access API
+	string whitelist_template_regex = 6;
+	string blacklist_template_regex = 7;
+	string default_image = 8;
+	string default_volume_speed = 9;
+	repeated string dns_list = 10;
+	string operator_username = 11;
 }
 
 message TenantNetwork {
-  string vpc_name = 1;
-  string vpc_idr = 2;
-  string provider_network = 3;
+	string vpc_name = 1;
+	string vpc_idr = 2;
+	string provider_network = 3;
 }
 
 message TenantObjectStorage {
-  string type = 1;
-  string endpoint = 2;
-  string auth_url = 3;
-  string access_key = 4;
-  string region = 5;
+	string type = 1;
+	string endpoint = 2;
+	string auth_url = 3;
+	string access_key = 4;
+	string region = 5;
 }
 
 message TenantMetadata {
-  TenantObjectStorage storage = 1;
-  string bucket_name = 2;
-  bool crypt = 3;
+	TenantObjectStorage storage = 1;
+	string bucket_name = 2;
+	bool crypt = 3;
 }
 
 message TenantInspectResponse {
-  string name = 1;
-  string provider = 2;
-  TenantIdentity identity = 3;
-  TenantCompute compute = 4;
-  TenantObjectStorage object_storage = 5;
-  TenantMetadata metadata = 6;
+	string name = 1;
+	string provider = 2;
+	TenantIdentity identity = 3;
+	TenantCompute compute = 4;
+	TenantObjectStorage object_storage = 5;
+	TenantMetadata metadata = 6;
 }
 
 service TenantService{
-  rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
-  rpc Get (google.protobuf.Empty) returns (TenantName){}
-  rpc Inspect (TenantName) returns (TenantInspectResponse){}
-  rpc List (google.protobuf.Empty) returns (TenantList){}
-  rpc Scan (google.protobuf.Empty) returns (google.protobuf.Empty){}
-  rpc Set (TenantName) returns (google.protobuf.Empty){}
+	rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
+	rpc Get (google.protobuf.Empty) returns (TenantName){}
+	rpc Inspect (TenantName) returns (TenantInspectResponse){}
+	rpc List (google.protobuf.Empty) returns (TenantList){}
+	rpc Scan (google.protobuf.Empty) returns (google.protobuf.Empty){}
+	rpc Set (TenantName) returns (google.protobuf.Empty){}
 }
 
 // Image
 
 message Image{
-  string id = 1;
-  string name = 2;
+	string id = 1;
+	string name = 2;
 }
 
 message ImageList{
-  repeated Image images = 1;
+	repeated Image images = 1;
 }
 
 message ImageListRequest{
-  bool all = 1;
-  string tenant = 2;
+	bool all = 1;
+	string tenant_id = 2;
 }
 
 service ImageService{
-  rpc List(ImageListRequest) returns (ImageList){}
+	rpc List(ImageListRequest) returns (ImageList){}
+	//rpc Create(ImageCreateRequest) returns (Image){}
+	//rpc Delete(Image) returns (google.protobuf.Empty){}
 }
 
 
@@ -158,69 +160,75 @@ service ImageService{
 // safescale network inspect net1
 
 message VirtualIp {
-  string id = 1;
-  string name = 2;
-  string network_id = 3;
-  string private_ip = 4;
-  string public_ip = 5;
-  repeated Host hosts = 6;
+	string id = 1;
+	string name = 2;
+	string network_id = 3;
+	string private_ip = 4;
+	string public_ip = 5;
+	repeated Host hosts = 6;
 }
 
 message NetworkDefinition{
-  string name = 2;
-  string cidr = 3;
-  GatewayDefinition gateway = 4;
-  bool fail_over = 5;
-  string domain = 6;
-  bool keep_on_failure = 7;
-  string tenant = 8;
+	string name = 2;
+	string cidr = 3;
+	GatewayDefinition gateway = 4;
+	bool fail_over = 5;
+	string domain = 6;
+	bool keep_on_failure = 7;
+	string tenant_id = 8;
 }
 
 message GatewayDefinition{
-  int32 cpu = 1;  // Deprecated: replaced by sizing field
-  float ram = 2;  // Deprecated: replaced by sizing field
-  int32 disk = 3; // Deprecated: replaced by sizing field
-  string image_id = 5;
-  string name = 6;
-  int32 gpu_count = 7;    // Deprecated: replaced by sizing field
-  string gpu_type = 8;    // Deprecated: replaced by sizing field
-  HostSizing sizing = 9;  // Deprecated: replaced by sizing_as_string field
-  string sizing_as_string = 10;
+	int32 cpu = 1;  // Deprecated: replaced by sizing field
+	float ram = 2;  // Deprecated: replaced by sizing field
+	int32 disk = 3; // Deprecated: replaced by sizing field
+	string image_id = 5;
+	string name = 6;
+	int32 gpu_count = 7;    // Deprecated: replaced by sizing field
+	string gpu_type = 8;    // Deprecated: replaced by sizing field
+	HostSizing sizing = 9;  // Deprecated: replaced by sizing_as_string field
+	string sizing_as_string = 10;
 }
 
 enum NetworkState {
-  NS_UNKNOWNSTATE = 0;
-  NS_PHASE1 = 1;
-  NS_PHASE2 = 2;
-  NS_READY = 3;
-  NS_NETWORKERROR = 4;
+	NS_UNKNOWNSTATE = 0;
+	NS_PHASE1 = 1;
+	NS_PHASE2 = 2;
+	NS_READY = 3;
+	NS_NETWORKERROR = 4;
 }
 
-message Network{
-  string id = 1;
-  string name = 2;
-  string cidr = 3;
-  string gateway_id = 4;
-  string secondary_gateway_id = 5;
-  VirtualIp virtual_ip = 6;
-  bool failover = 7;
-  NetworkState state = 8;
+message Network {
+	string id = 1;
+	string name = 2;
+	string cidr = 3;
+	string gateway_id = 4;
+	string secondary_gateway_id = 5;
+	VirtualIp virtual_ip = 6;
+	bool failover = 7;
+	NetworkState state = 8;
 }
 
-message NetworkList{
-  repeated Network networks = 1;
+message NetworkList {
+	repeated Network networks = 1;
 }
 
-message NetworkListRequest{
-  bool all = 1;
-  string tenant = 2;
+message NetworkListRequest {
+	bool all = 1;
+	string tenant_id = 2;
 }
 
-service NetworkService{
-  rpc Create(NetworkDefinition) returns (Network){}
-  rpc List(NetworkListRequest) returns (NetworkList){}
-  rpc Inspect(Reference) returns (Network) {}
-  rpc Delete(Reference) returns (google.protobuf.Empty){}
+service NetworkService {
+	rpc Create(NetworkDefinition) returns (Network){}
+	rpc List(NetworkListRequest) returns (NetworkList){}
+	rpc Inspect(Reference) returns (Network) {}
+	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc BindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc UnbindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc EnableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc DisableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc ListSecurityGroups(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
+
 }
 
 // safescale host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -228,126 +236,130 @@ service NetworkService{
 // safescale host inspect host1
 // safescale host create host2 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=false
 
-
-message HostSizing{
-  int32 min_cpu_count = 1;
-  int32 max_cpu_count = 2;
-  float min_ram_size = 3;
-  float max_ram_size = 4;
-  int32 min_disk_size = 5;
-  int32 gpu_count = 6;
-  float min_cpu_freq = 7;
+message HostSizing {
+	int32 min_cpu_count = 1;
+	int32 max_cpu_count = 2;
+	float min_ram_size = 3;
+	float max_ram_size = 4;
+	int32 min_disk_size = 5;
+	int32 gpu_count = 6;
+	float min_cpu_freq = 7;
 }
 
-message HostDefinition{
-  string name = 2;
-  string network = 3;
-  int32 cpu_count = 4;    // Deprecated: replaced by 'sizing_as_string' field
-  float ram = 6;          // Deprecated: replaced by 'sizing_as_string' field
-  int32 disk = 7;         // Deprecated: replaced by 'sizing_as_string' field
-  string image_id = 9;
-  bool public = 10;
-  int32 gpu_count = 11;   // Deprecated: replaced by 'sizing_as_string' field
-  float cpu_freq = 12;    // Deprecated: replaced by 'sizing_as_string' field
-  bool force = 13;
-  HostSizing sizing = 14; // Deprecated: replaced by 'sizing_as_string' field
-  string domain = 15;
-  bool keep_on_failure = 16;
-  string sizing_as_string = 17;
-  string tenant = 18;
+message HostDefinition {
+	string name = 2;
+	string network = 3;
+	int32 cpu_count = 4;    // Deprecated: replaced by 'sizing_as_string' field
+	float ram = 6;          // Deprecated: replaced by 'sizing_as_string' field
+	int32 disk = 7;         // Deprecated: replaced by 'sizing_as_string' field
+	string image_id = 9;
+	bool public = 10;
+	int32 gpu_count = 11;   // Deprecated: replaced by 'sizing_as_string' field
+	float cpu_freq = 12;    // Deprecated: replaced by 'sizing_as_string' field
+	bool force = 13;
+	HostSizing sizing = 14; // Deprecated: replaced by 'sizing_as_string' field
+	string domain = 15;
+	bool keep_on_failure = 16;
+	string sizing_as_string = 17;
+	string tenant_id = 18;
 }
 
 
 enum HostState {
-  /*STOPPED host is stopped*/
-  HS_STOPPED = 0;
-  /*STARTING host is starting*/
-  HS_STARTING = 1;
-  /*STARTED host is started*/
-  HS_STARTED = 2;
-  /*STOPPING host is stopping*/
-  HS_STOPPING = 3;
-  /*ERROR host is in error state*/
-  HS_ERROR = 4;
-  /*TERMINATED host is terminated (in AWS, it's like DELETED)*/
-  HS_TERMINATED = 5;
-  /*UNKNOWN is unknown*/
-  HS_UNKNOWN = 6;
+	/*STOPPED host is stopped*/
+	HS_STOPPED = 0;
+	/*STARTING host is starting*/
+	HS_STARTING = 1;
+	/*STARTED host is started*/
+	HS_STARTED = 2;
+	/*STOPPING host is stopping*/
+	HS_STOPPING = 3;
+	/*ERROR host is in error state*/
+	HS_ERROR = 4;
+	/*TERMINATED host is terminated (in AWS, it's like DELETED)*/
+	HS_TERMINATED = 5;
+	/*UNKNOWN is unknown*/
+	HS_UNKNOWN = 6;
 }
 
 message Host{
-  string id = 1;
-  string name = 2;
-  int32 cpu = 3;
-  float ram = 4;
-  int32 disk = 5;
-  string public_ip = 6;
-  string private_ip = 7;
-  HostState state = 8;
-  string private_key = 9;
-  string gateway_id = 10;     // Deprecated?
-  string os_kind = 11;
-  repeated string attached_volume_names = 12;
-  string password = 13;
+	string id = 1;
+	string name = 2;
+	int32 cpu = 3;
+	float ram = 4;
+	int32 disk = 5;
+	string public_ip = 6;
+	string private_ip = 7;
+	HostState state = 8;
+	string private_key = 9;
+	string gateway_id = 10;     // Deprecated?
+	string os_kind = 11;
+	repeated string attached_volume_names = 12;
+	string password = 13;
 }
 
 message HostStatus {
-  string name = 1;
-  string status = 2;
+	string name = 1;
+	string status = 2;
 }
 
 message HostList{
-  repeated Host hosts = 1;
+	repeated Host hosts = 1;
 }
 
 message SshConfig{
-  string user = 1;
-  string host = 2;
-  string private_key = 3;
-  int32 port = 4;
-  SshConfig gateway = 5;
-  SshConfig secondary_gateway = 6;
+	string user = 1;
+	string host = 2;
+	string private_key = 3;
+	int32 port = 4;
+	SshConfig gateway = 5;
+	SshConfig secondary_gateway = 6;
 }
 
 message HostListRequest{
-  bool all = 1;
-  string tenant = 2;
+	bool all = 1;
+	string tenant_id = 2;
 }
 
-service HostService{
-  rpc Create(HostDefinition) returns (Host){}
-  rpc Inspect(Reference) returns (Host){}
-  rpc Status(Reference) returns (HostStatus){}
-  rpc List(HostListRequest) returns (HostList){}
-  rpc Delete(Reference) returns (google.protobuf.Empty){}
-  rpc Start(Reference) returns (google.protobuf.Empty){}
-  rpc Stop(Reference) returns (google.protobuf.Empty){}
-  rpc Reboot(Reference) returns (google.protobuf.Empty){}
-  rpc Resize(HostDefinition) returns (Host){}
-  rpc SSH(Reference) returns (SshConfig){}
+service HostService {
+	rpc Create(HostDefinition) returns (Host){}
+	rpc Inspect(Reference) returns (Host){}
+	rpc Status(Reference) returns (HostStatus){}
+	rpc List(HostListRequest) returns (HostList){}
+	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Start(Reference) returns (google.protobuf.Empty){}
+	rpc Stop(Reference) returns (google.protobuf.Empty){}
+	rpc Reboot(Reference) returns (google.protobuf.Empty){}
+	rpc Resize(HostDefinition) returns (Host){}
+	rpc SSH(Reference) returns (SshConfig){}
+	rpc BindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc UnbindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc EnableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc DisableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+	rpc ListSecurityGroups(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
 }
 
-message HostTemplate{
-  string id = 1;
-  string name = 2;
-  int32 cores = 3;
-  int32 ram = 4;
-  int32 disk = 5;
-  int32 gpu_count = 6;
-  string gpu_type = 7;
+message HostTemplate {
+	string id = 1;
+	string name = 2;
+	int32 cores = 3;
+	int32 ram = 4;
+	int32 disk = 5;
+	int32 gpu_count = 6;
+	string gpu_type = 7;
 }
 
-message TemplateList{
-  repeated HostTemplate templates = 1;
+message TemplateList {
+	repeated HostTemplate templates = 1;
 }
 
-message TemplateListRequest{
-  bool all = 1;
-  string tenant = 2;
+message TemplateListRequest {
+	bool all = 1;
+	string tenant_id = 2;
 }
 
-service TemplateService{
-  rpc List(TemplateListRequest) returns (TemplateList){}
+service TemplateService {
+	rpc List(TemplateListRequest) returns (TemplateList){}
 }
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
@@ -358,16 +370,16 @@ service TemplateService{
 // safescale volume update v1 --speed="HDD" --size=1000
 
 enum VolumeSpeed {
-  VS_COLD = 0;
-  VS_HDD = 1;
-  VS_SSD = 2;
+	VS_COLD = 0;
+	VS_HDD = 1;
+	VS_SSD = 2;
 }
 
 message VolumeCreateRequest {
-  string name = 2;
-  VolumeSpeed speed = 3;
-  int32 size = 4;
-  string tenant = 5;
+	string name = 2;
+	VolumeSpeed speed = 3;
+	int32 size = 4;
+	string tenant_id = 5;
 }
 
 // message VolumeCreateResponse {
@@ -378,55 +390,55 @@ message VolumeCreateRequest {
 // }
 
 message VolumeDetachmentRequest {
-  Reference volume = 1;
-  Reference host = 2;
+	Reference volume = 1;
+	Reference host = 2;
 }
 
 message VolumeInspectResponse {
-  string id = 1;
-  string name = 2;
-  VolumeSpeed speed = 3;
-  int32 size = 4;
-  Reference host = 5; // Deprecated: replaced by attachments field
-  string mount_path = 6; // Deprecated: replaced by attachments field
-  string format = 7; // Deprecated: replaced by attachments field
-  string device = 8; // Deprecated: replaced by attachments field
-  repeated VolumeAttachmentResponse attachments = 10;
+	string id = 1;
+	string name = 2;
+	VolumeSpeed speed = 3;
+	int32 size = 4;
+	Reference host = 5; // Deprecated: replaced by attachments field
+	string mount_path = 6; // Deprecated: replaced by attachments field
+	string format = 7; // Deprecated: replaced by attachments field
+	string device = 8; // Deprecated: replaced by attachments field
+	repeated VolumeAttachmentResponse attachments = 10;
 }
 
 message VolumeAttachmentRequest {
-  Reference volume = 2;
-  Reference host = 3;
-  string mount_path = 4;
-  string format = 5;
-  string device = 6;
-  bool do_not_format = 7;
+	Reference volume = 2;
+	Reference host = 3;
+	string mount_path = 4;
+	string format = 5;
+	string device = 6;
+	bool do_not_format = 7;
 }
 
 message VolumeAttachmentResponse {
-  Reference host = 1;
-  string mount_path = 2;
-  string format = 3;
-  string device = 4;
-  bool do_not_format = 5;
+	Reference host = 1;
+	string mount_path = 2;
+	string format = 3;
+	string device = 4;
+	bool do_not_format = 5;
 }
 
 message VolumeListRequest{
-  bool all = 1;
-  string tenant = 2;
+	bool all = 1;
+	string tenant_id = 2;
 }
 
 message VolumeListResponse {
-  repeated VolumeInspectResponse volumes = 1;
+	repeated VolumeInspectResponse volumes = 1;
 }
 
 service VolumeService{
-  rpc Create(VolumeCreateRequest) returns (VolumeInspectResponse) {}
-  rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
-  rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
-  rpc Delete(Reference) returns (google.protobuf.Empty){}
-  rpc List(VolumeListRequest) returns (VolumeListResponse) {}
-  rpc Inspect(Reference) returns (VolumeInspectResponse){}
+	rpc Create(VolumeCreateRequest) returns (VolumeInspectResponse) {}
+	rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
+	rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
+	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc List(VolumeListRequest) returns (VolumeListResponse) {}
+	rpc Inspect(Reference) returns (VolumeInspectResponse){}
 }
 
 // safescale bucket|container create c1
@@ -437,51 +449,53 @@ service VolumeService{
 // safescale bucket|container inspect C1
 
 message Bucket{
-  string name = 1;
+	string name = 1;
 }
 
 message BucketList{
-  repeated Bucket buckets = 1;
+	repeated Bucket buckets = 1;
 }
 
 message BucketMountingPoint{
-  string bucket = 1;
-  Reference host = 2;
-  string path = 3;
+	string bucket = 1;
+	Reference host = 2;
+	string path = 3;
 }
 
 service BucketService{
-  rpc Create(Bucket) returns (google.protobuf.Empty){}
-  rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
-  rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
-  rpc Delete(Bucket) returns (google.protobuf.Empty){}
-  rpc List(google.protobuf.Empty) returns (BucketList){}
-  rpc Inspect(Bucket) returns (BucketMountingPoint){}
+	rpc Create(Bucket) returns (google.protobuf.Empty){}
+	rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
+	rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
+	rpc Delete(Bucket) returns (google.protobuf.Empty){}
+	rpc List(google.protobuf.Empty) returns (BucketList){}
+	rpc Inspect(Bucket) returns (BucketMountingPoint){}
 }
 
 // SSH requests
 
-message SshCommand{
-  Reference host = 1;
-  string command = 2;
+message SshCommand {
+	Reference host = 1;
+	string command = 2;
+	string tenant_id = 3;
 }
 
-message SshCopyCommand{
-  string source = 1;
-  string destination = 2;
-  string owner = 3;
-  string mode = 4;
+message SshCopyCommand {
+	string source = 1;
+	string destination = 2;
+	string owner = 3;
+	string mode = 4;
+	string tenant_id = 5;
 }
 
-message SshResponse{
-  string output_std = 1;
-  string output_err = 2;
-  int32 status = 3;
+message SshResponse {
+	string output_std = 1;
+	string output_err = 2;
+	int32 status = 3;
 }
 
-service SshService{
-  rpc Run(SshCommand) returns (SshResponse){}
-  rpc Copy(SshCopyCommand) returns (SshResponse){}
+service SshService {
+	rpc Run(SshCommand) returns (SshResponse){}
+	rpc Copy(SshCopyCommand) returns (SshResponse){}
 }
 
 // safescale nas|share create share1 host1 --path="/shared/data"
@@ -492,335 +506,413 @@ service SshService{
 // safescale nas|share inspect share1
 
 message NFSExportOptions{
-  bool read_only = 1;
-  bool root_squash = 2;
-  bool secure = 3;
-  bool async = 4;
-  bool no_hide = 5;
-  bool cross_mount = 6;
-  bool subtree_check = 7;
+	bool read_only = 1;
+	bool root_squash = 2;
+	bool secure = 3;
+	bool async = 4;
+	bool no_hide = 5;
+	bool cross_mount = 6;
+	bool subtree_check = 7;
 }
 
 message ShareDefinition{
-  string id = 1;
-  string name = 2;
-  Reference host = 3;
-  string path = 4;
-  string type = 5;
-  NFSExportOptions options = 6;  // Deprecated: replaced by field options_as_string to be Network FileSystem agnostic
-  repeated string security_modes = 7;
-  string options_as_string = 8;
+	string id = 1;
+	string name = 2;
+	Reference host = 3;
+	string path = 4;
+	string type = 5;
+	NFSExportOptions options = 6;  // Deprecated: replaced by field options_as_string to be Network FileSystem agnostic
+	repeated string security_modes = 7;
+	string options_as_string = 8;
 }
 
 message ShareList{
-  repeated ShareDefinition share_list = 1;
+	repeated ShareDefinition share_list = 1;
 }
 
 message ShareMountDefinition{
-  Reference host = 1;
-  Reference share = 2;
-  string path = 3;
-  string type = 4;
-  string options = 5;
-  bool with_cache = 6;
+	Reference host = 1;
+	Reference share = 2;
+	string path = 3;
+	string type = 4;
+	string options = 5;
+	bool with_cache = 6;
 }
 
 message ShareMountList{
-  ShareDefinition share = 1;
-  repeated ShareMountDefinition mount_list = 2;
+	ShareDefinition share = 1;
+	repeated ShareMountDefinition mount_list = 2;
 }
 
 service ShareService{
-  rpc Create(ShareDefinition) returns (ShareDefinition){}
-  rpc Delete(Reference) returns (google.protobuf.Empty){}
-  rpc List(Reference) returns (ShareList){}     // Here, Reference is used to carry tenant
-  rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
-  rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
-  rpc Inspect(Reference) returns (ShareMountList){}
+	rpc Create(ShareDefinition) returns (ShareDefinition){}
+	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc List(Reference) returns (ShareList){}     // Here, Reference is used to carry tenant
+	rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
+	rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
+	rpc Inspect(Reference) returns (ShareMountList){}
 }
 
 // Job Management
 
 message JobDefinition{
-  string uuid = 1;
-  string info = 2;
+	string uuid = 1;
+	string info = 2;
 }
 
 message JobList{
-  repeated JobDefinition list = 1;
+	repeated JobDefinition list = 1;
 }
 
 service JobService{
-  rpc Stop(JobDefinition) returns (google.protobuf.Empty){}
-  rpc List(google.protobuf.Empty) returns (JobList){}
+	rpc Stop(JobDefinition) returns (google.protobuf.Empty){}
+	rpc List(google.protobuf.Empty) returns (JobList){}
 }
 
 // Cluster services
 
 enum ClusterState {
-  CS_UNKNOWN = 0;
-  CS_NOMINAL = 1;
-  CS_DEGRADED = 2;
-  CS_STOPPED = 3;
-  CS_INITIALIZING = 4;
-  CS_CREATED = 5;
-  CS_CREATING = 6;
-  CS_ERROR = 7;
-  CS_REMOVED = 8;
-  CS_STOPPING = 9;
-  CS_STARTING = 10;
+	CS_UNKNOWN = 0;
+	CS_NOMINAL = 1;
+	CS_DEGRADED = 2;
+	CS_STOPPED = 3;
+	CS_INITIALIZING = 4;
+	CS_CREATED = 5;
+	CS_CREATING = 6;
+	CS_ERROR = 7;
+	CS_REMOVED = 8;
+	CS_STOPPING = 9;
+	CS_STARTING = 10;
 }
 
 message ClusterStateResponse {
-  ClusterState state = 1;
+	ClusterState state = 1;
 }
 
 enum ClusterComplexity {
-  CC_UNKNOWN = 0;
-  CC_SMALL = 1;
-  CC_NORMAL = 2;
-  CC_LARGE = 3;
+	CC_UNKNOWN = 0;
+	CC_SMALL = 1;
+	CC_NORMAL = 2;
+	CC_LARGE = 3;
 }
 
 enum ClusterFlavor {
-  CF_UNKNOWN = 0;
-  CF_BOH = 1;
-  CF_K8S = 2;
+	CF_UNKNOWN = 0;
+	CF_BOH = 1;
+	CF_K8S = 2;
 }
 
 message ClusterListResponse {
-  repeated ClusterResponse clusters = 1;
+	repeated ClusterResponse clusters = 1;
 }
 
 message ClusterCreateRequest {
-  string name = 1;
-  ClusterComplexity complexity = 2;
-  ClusterFlavor flavor = 3;
-  bool keep_on_failure = 4;
-  string cidr = 5;
-  repeated string disabled = 6;
-  string os = 7;
-  string global_sizing = 8;
-  string gateway_sizing = 9;
-  string master_sizing = 10;
-  string node_sizing = 11;
-  string domain = 12;
-  string tenant = 13;
+	string name = 1;
+	ClusterComplexity complexity = 2;
+	ClusterFlavor flavor = 3;
+	bool keep_on_failure = 4;
+	string cidr = 5;
+	repeated string disabled = 6;
+	string os = 7;
+	string global_sizing = 8;
+	string gateway_sizing = 9;
+	string master_sizing = 10;
+	string node_sizing = 11;
+	string domain = 12;
+	string tenant_id = 13;
 }
 
 message ClusterResizeRequest {
-  string name = 1;
-  int32 count = 2;
-  string node_sizing = 3;
-  string image_id = 4;
-  bool dry_run = 5;
+	string name = 1;
+	int32 count = 2;
+	string node_sizing = 3;
+	string image_id = 4;
+	bool dry_run = 5;
+	string tenant_id = 6;
 }
 
 message ClusterDeleteRequest  {
-  string name = 1;
-  bool force = 2;     // if true, force cluster deletion no matter what
-  string tenant = 3;
+	string name = 1;
+	bool force = 2;     // if true, force cluster deletion no matter what
+	string tenant_id = 3;
 }
 
 message ClusterIdentity {
-  string name = 1;
-  ClusterComplexity complexity = 2;
-  ClusterFlavor flavor = 3;
-  string admin_password = 4;
-  //SshConfig ssh_config = 4;
-  string private_key = 5;
+	string name = 1;
+	ClusterComplexity complexity = 2;
+	ClusterFlavor flavor = 3;
+	string admin_password = 4;
+	//SshConfig ssh_config = 4;
+	string private_key = 5;
 }
 
-message ClusterDefaults{
-  HostSizing gateway_sizing = 1;
-  HostSizing master_sizing = 2;
-  HostSizing node_sizing = 3;
-  string Image = 4;
+message ClusterDefaults {
+	HostSizing gateway_sizing = 1;
+	HostSizing master_sizing = 2;
+	HostSizing node_sizing = 3;
+	string Image = 4;
 }
 
-message ClusterControlplane{
-  VirtualIp vip = 1;
+message ClusterControlplane {
+	VirtualIp vip = 1;
 }
 
-message ClusterComposite{
-  repeated string tenants = 1;
+message ClusterComposite {
+	repeated string tenants = 1;
 }
 
 message ClusterNetwork{
-  string network_id = 1;
-  string cidr = 2;
-  string domain = 3;
-  string gateway_id = 4;
-  string gateway_ip = 5;
-  string secondary_gateway_id = 6;
-  string secondary_gateway_ip = 7;
-  string default_route_ip = 8;
-  string primary_public_ip = 9;
-  string secondary_public_ip = 10;
-  string endpoint_ip = 11;
-  //ClusterNetworkState network_state = 12;      // ???
-  // repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
+	string network_id = 1;
+	string cidr = 2;
+	string domain = 3;
+	string gateway_id = 4;
+	string gateway_ip = 5;
+	string secondary_gateway_id = 6;
+	string secondary_gateway_ip = 7;
+	string default_route_ip = 8;
+	string primary_public_ip = 9;
+	string secondary_public_ip = 10;
+	string endpoint_ip = 11;
+	//ClusterNetworkState network_state = 12;      // ???
+	// repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
 }
 
 message ClusterResponse {
-  ClusterIdentity identity = 1;
-  ClusterNetwork network = 2;
-  repeated Host masters = 3;
-  repeated Host nodes = 4;
-  FeatureListResponse disabled_features = 5;
-  FeatureListResponse installed_features = 6;
-  ClusterDefaults defaults = 7;
-  ClusterState state = 8;
-  ClusterComposite composite = 9;
-  ClusterControlplane controlplane = 10;
+	ClusterIdentity identity = 1;
+	ClusterNetwork network = 2;
+	repeated Host masters = 3;
+	repeated Host nodes = 4;
+	FeatureListResponse disabled_features = 5;
+	FeatureListResponse installed_features = 6;
+	ClusterDefaults defaults = 7;
+	ClusterState state = 8;
+	ClusterComposite composite = 9;
+	ClusterControlplane controlplane = 10;
 }
 
 message ClusterNodeListResponse {
-  repeated Host nodes = 1;
+	repeated Host nodes = 1;
 }
 
 message ClusterNodeRequest {
-  string name = 1;
-  Reference host = 2;     // on deletion, if not set, requests to delete last added node
+	string name = 1;
+	Reference host = 2;     // on deletion, if not set, requests to delete last added node
 }
 
 service ClusterService{
-  rpc List(Reference) returns (ClusterListResponse){}
-  rpc Inspect(Reference) returns (ClusterResponse){}
-  rpc Create(ClusterCreateRequest) returns (ClusterResponse){}
-  rpc Delete(ClusterDeleteRequest) returns (google.protobuf.Empty){}
-  rpc Start(Reference) returns (google.protobuf.Empty){}
-  rpc Stop(Reference) returns (google.protobuf.Empty){}
-  rpc State(Reference) returns (ClusterStateResponse){}
-  rpc Expand(ClusterResizeRequest) returns (ClusterNodeListResponse){}
-  rpc Shrink(ClusterResizeRequest) returns (ClusterNodeListResponse){}
-  rpc ListNodes(Reference) returns (ClusterNodeListResponse){}
-  rpc InspectNode(ClusterNodeRequest) returns (Host){}
-  rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
-  rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
-  rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
-  rpc StateNode(ClusterNodeRequest) returns (ClusterStateResponse){}
-  rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
-  rpc FindAvailableMaster(Reference) returns (Host){}
-  rpc InspectMaster(ClusterNodeRequest) returns (Host){}
+	rpc List(Reference) returns (ClusterListResponse){}
+	rpc Inspect(Reference) returns (ClusterResponse){}
+	rpc Create(ClusterCreateRequest) returns (ClusterResponse){}
+	rpc Delete(ClusterDeleteRequest) returns (google.protobuf.Empty){}
+	rpc Start(Reference) returns (google.protobuf.Empty){}
+	rpc Stop(Reference) returns (google.protobuf.Empty){}
+	rpc State(Reference) returns (ClusterStateResponse){}
+	rpc Expand(ClusterResizeRequest) returns (ClusterNodeListResponse){}
+	rpc Shrink(ClusterResizeRequest) returns (ClusterNodeListResponse){}
+	rpc ListNodes(Reference) returns (ClusterNodeListResponse){}
+	rpc InspectNode(ClusterNodeRequest) returns (Host){}
+	rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StateNode(ClusterNodeRequest) returns (ClusterStateResponse){}
+	rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
+	rpc FindAvailableMaster(Reference) returns (Host){}
+	rpc InspectMaster(ClusterNodeRequest) returns (Host){}
 }
 
 // Feature services
 
 enum FeatureTargetType {
-  FT_ALL = 0;
-  FT_HOST = 1;
-  FT_CLUSTER = 2;
+	FT_ALL = 0;
+	FT_HOST = 1;
+	FT_CLUSTER = 2;
 }
 
 message FeatureListRequest {
-  FeatureTargetType target_type = 1;
-  Reference target_ref = 2;
-  bool installed_only = 3;
+	FeatureTargetType target_type = 1;
+	Reference target_ref = 2;
+	bool installed_only = 3;
 }
 
 message FeatureResponse {
-  string name = 1;
+	string name = 1;
 }
 
 message FeatureListResponse {
-  repeated FeatureResponse features = 1;
+	repeated FeatureResponse features = 1;
 }
 
 message FeatureSettings {
-  bool skip_proxy = 1;
-  bool serialize = 2;
-  bool ignore_feature_requirements = 3;
-  bool ignore_sizing_requirements = 4;
-  bool add_unconditionally = 5;
+	bool skip_proxy = 1;
+	bool serialize = 2;
+	bool ignore_feature_requirements = 3;
+	bool ignore_sizing_requirements = 4;
+	bool add_unconditionally = 5;
 }
 
 message FeatureActionRequest {
-  string name = 1;
-  FeatureTargetType target_type = 2;
-  Reference target_ref = 3;
-  map<string, string> variables = 4;
-  FeatureSettings settings = 5;
+	string name = 1;
+	FeatureTargetType target_type = 2;
+	Reference target_ref = 3;
+	map<string, string> variables = 4;
+	FeatureSettings settings = 5;
 }
 
 service FeatureService {
-  rpc List(FeatureListRequest) returns (FeatureListResponse){}
-  rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
-  rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
-  rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}
+	rpc List(FeatureListRequest) returns (FeatureListResponse){}
+	rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
+	rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
+	rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}
 }
 
 // SecurityGroup services
 
 enum SecurityGroupRuleDirection {
-  SGRD_UNKNOWN = 0;
-  SGRD_INGRESS = 1;
-  SGRD_EGRESS = 2;
+	SGRD_UNKNOWN = 0;
+	SGRD_INGRESS = 1;
+	SGRD_EGRESS = 2;
 }
 
 enum SecurityGroupRuleAction {
-  SGRA_UNKNOWN = 0;
-  SGRA_ALLOW = 1;
-  SGRA_DENY = 2;
+	SGRA_UNKNOWN = 0;
+	SGRA_ALLOW = 1;
+	SGRA_DENY = 2;
 }
 
 enum SecurityGroupRuleEtherType {
-  SGRET_UNKNOWN = 0;
-  SGRET_IPV4 = 4;
-  SGRET_IPV6 = 6;
+	SGRET_UNKNOWN = 0;
+	SGRET_IPV4 = 4;
+	SGRET_IPV6 = 6;
 }
 
 message SecurityGroupRule {
-  string id = 1;
-  string description = 2;
-  SecurityGroupRuleEtherType ether_type = 3;
-  SecurityGroupRuleDirection direction = 4;
-  string protocol = 5;
-  uint32 port_from = 6;
-  uint32 port_to = 7;
-  string cidr = 8;
-  SecurityGroupRuleAction action = 9;
+	string id = 1;
+	string description = 2;
+	SecurityGroupRuleEtherType ether_type = 3;
+	SecurityGroupRuleDirection direction = 4;
+	string protocol = 5;
+	uint32 port_from = 6;
+	uint32 port_to = 7;
+	string cidr = 8;
+	SecurityGroupRuleAction action = 9;
 }
 
 message SecurityGroupRuleRequest {
-  Reference group = 1;
-  SecurityGroupRule rule = 2;
+	Reference group = 1;
+	SecurityGroupRule rule = 2;
 }
 
 message SecurityGroupRuleDeleteRequest {
-  Reference group = 1;
-  string rule_id = 2;
+	Reference group = 1;
+	string rule_id = 2;
 }
 
 message SecurityGroupRequest {
-  string name = 1;
-  string description = 2;
-  repeated SecurityGroupRule rules = 3;
+	string name = 1;
+	string description = 2;
+	repeated SecurityGroupRule rules = 3;
+	string tenant_id = 4;
 }
 
 message SecurityGroupResponse {
-  string id = 1;
-  string name = 2;
-  string description = 3;
-  repeated SecurityGroupRule rules = 4;
+	string id = 1;
+	string name = 2;
+	string description = 3;
+	repeated SecurityGroupRule rules = 4;
 }
 
 message SecurityGroupListRequest{
-  bool all = 1;
+	bool all = 1;
 }
 
 message SecurityGroupListResponse {
-  repeated SecurityGroupResponse list = 1;
+	repeated SecurityGroupResponse security_groups = 1;
+}
+
+message SecurityGroupBindRequest {
+	Reference group = 1;
+	Reference target = 2;
+	bool enable = 3;
+}
+
+message SecurityGroupBondsRequest {
+	Reference target = 1;   // can be used to describe a host, a network or a group
+	string kind = 2;
+}
+
+message SecurityGroupBond {
+	string id = 1;
+	string name = 2;
+	bool disabled = 3;
+}
+
+message SecurityGroupBondsResponse {
+	repeated SecurityGroupBond hosts = 1;
+	repeated SecurityGroupBond networks = 2;
+}
+
+message SecurityGroupDeleteRequest {
+	Reference group = 1;
+	bool force = 2;
 }
 
 service SecurityGroupService {
-  rpc AddRule(SecurityGroupRuleRequest) returns (SecurityGroupResponse){}
-  rpc Clear(Reference) returns (google.protobuf.Empty){}
-  rpc Create(SecurityGroupRequest) returns (SecurityGroupResponse){}
-  rpc Delete(Reference) returns (google.protobuf.Empty){}
-  rpc DeleteRule(SecurityGroupRuleDeleteRequest) returns (SecurityGroupResponse){}
-  rpc Inspect(Reference) returns (SecurityGroupResponse){}
-  rpc List(SecurityGroupListRequest) returns (SecurityGroupListResponse){}
-  rpc Reset(Reference) returns (google.protobuf.Empty){}
-  rpc Sanitize(Reference) returns (google.protobuf.Empty){}
+	rpc AddRule(SecurityGroupRuleRequest) returns (SecurityGroupResponse){}
+	rpc Bonds(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
+	rpc Clear(Reference) returns (google.protobuf.Empty){}
+	rpc Create(SecurityGroupRequest) returns (SecurityGroupResponse){}
+	rpc Delete(SecurityGroupDeleteRequest) returns (google.protobuf.Empty){}
+	rpc DeleteRule(SecurityGroupRuleDeleteRequest) returns (SecurityGroupResponse){}
+	rpc Inspect(Reference) returns (SecurityGroupResponse){}
+	rpc List(SecurityGroupListRequest) returns (SecurityGroupListResponse){}
+	rpc Reset(Reference) returns (google.protobuf.Empty){}
+	rpc Sanitize(Reference) returns (google.protobuf.Empty){}
+}
+
+// Public IP
+
+message PublicIPCreateRequest {
+	string tenant_id = 1;
+	string name = 2;
+	string type = 3;
+	string description = 4;
+}
+
+message PublicIPResponse {
+	string id = 1;
+	string name = 2;
+	string type = 3;
+	string description = 4;
+	string ip_address = 5;
+	string mac_address = 6;
+}
+
+message PublicIPListRequest {
+	bool all = 1;
+	string tenant_id = 2;
+}
+
+message PublicIPListResponse {
+	repeated PublicIPResponse public_ips = 1;
+}
+
+message PublicIPDeleteRequest {
+	string tenant_id = 1;
+	Reference ip = 2;
+	bool force = 3;
+}
+
+message PublicIPBindRequest {
+	string tenant_id = 1;
+	Reference ip = 2;
+	Reference host = 3;
+}
+
+service PublicIPService {
+	rpc Create(PublicIPCreateRequest) returns (PublicIPResponse){}
+	rpc Delete(PublicIPDeleteRequest) returns (google.protobuf.Empty){}
+	rpc Inspect(Reference) returns (PublicIPResponse){}
+	rpc List(PublicIPListRequest) returns (PublicIPListResponse){}
+	rpc Bind(PublicIPBindRequest) returns (google.protobuf.Empty){}
+	rpc Unbind(PublicIPBindRequest) returns (google.protobuf.Empty){}
 }

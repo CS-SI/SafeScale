@@ -27,23 +27,23 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupNetworks struct {
-	ByID   map[string]bool `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network ID
-	ByName map[string]bool `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network Name
+	ByID   map[string]*SecurityGroupBond `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network ID
+	ByName map[string]*SecurityGroupBond `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network Name
 }
 
 // NewSecurityGroupNetworks ...
 func NewSecurityGroupNetworks() *SecurityGroupNetworks {
 	return &SecurityGroupNetworks{
-		ByID:   map[string]bool{},
-		ByName: map[string]bool{},
+		ByID:   map[string]*SecurityGroupBond{},
+		ByName: map[string]*SecurityGroupBond{},
 	}
 }
 
 // Reset ...
 func (sgn *SecurityGroupNetworks) Reset() *SecurityGroupNetworks {
 	if sgn != nil {
-		sgn.ByID = map[string]bool{}
-		sgn.ByName = map[string]bool{}
+		sgn.ByID = map[string]*SecurityGroupBond{}
+		sgn.ByName = map[string]*SecurityGroupBond{}
 		return sgn
 	}
 	return NewSecurityGroupNetworks()
@@ -57,13 +57,13 @@ func (sgn *SecurityGroupNetworks) Clone() data.Clonable {
 // Replace ...
 func (sgn *SecurityGroupNetworks) Replace(p data.Clonable) data.Clonable {
 	src := p.(*SecurityGroupNetworks)
-	sgn.ByID = make(map[string]bool, len(src.ByID))
+	sgn.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		sgn.ByID[k] = v
+		sgn.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	sgn.ByName = make(map[string]bool, len(src.ByName))
+	sgn.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
 	for k, v := range src.ByName {
-		sgn.ByName[k] = v
+		sgn.ByName[k] = v.Clone().(*SecurityGroupBond)
 	}
 	return sgn
 }

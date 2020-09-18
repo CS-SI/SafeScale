@@ -45,9 +45,7 @@ var (
 	clusterName string
 )
 
-const (
-	clusterCmdLabel = "cluster"
-)
+const clusterCmdLabel = "cluster"
 
 // ClusterCommand command
 var ClusterCommand = &cli.Command{
@@ -1534,7 +1532,7 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 var clusterFeatureRemoveCommand = &cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"destroy", "delete", "rm", "uninstall"},
-	Usage:     "Delete a feature from a cluster",
+	Usage:     "Remove a feature from a cluster",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{

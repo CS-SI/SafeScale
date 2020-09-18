@@ -90,7 +90,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenant(), "cluster create")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "cluster create")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -308,7 +308,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenant(), "cluster delete")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "cluster delete")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -345,7 +345,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, "", "cluster expand")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "cluster expand")
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +392,7 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(ctx, "", "host delete")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host delete")
 	if xerr != nil {
 		return nil, xerr
 	}

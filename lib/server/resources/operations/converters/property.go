@@ -19,47 +19,47 @@ package converters
 // Contains functions that are used to convert from property
 
 import (
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 )
 
 // ShareFromPropertyToProtocol convert a share from host to protocol message
 func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare) *protocol.ShareDefinition {
-    return &protocol.ShareDefinition{
-        Id:              share.ID,
-        Name:            share.Name,
-        Host:            &protocol.Reference{Name: hostName},
-        Path:            share.Path,
-        Type:            "nfs",
-        OptionsAsString: share.ShareOptions,
-    }
+	return &protocol.ShareDefinition{
+		Id:              share.ID,
+		Name:            share.Name,
+		Host:            &protocol.Reference{Name: hostName},
+		Path:            share.Path,
+		Type:            "nfs",
+		OptionsAsString: share.ShareOptions,
+	}
 }
 
 // ShareMountFromPropertyToProtocol convert share mount on host to protocol message
 func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *propertiesv1.HostRemoteMount) *protocol.ShareMountDefinition {
-    return &protocol.ShareMountDefinition{
-        Share: &protocol.Reference{Name: shareName},
-        Host:  &protocol.Reference{Name: hostName},
-        Path:  mount.Path,
-        Type:  mount.FileSystem,
-    }
+	return &protocol.ShareMountDefinition{
+		Share: &protocol.Reference{Name: shareName},
+		Host:  &protocol.Reference{Name: hostName},
+		Path:  mount.Path,
+		Type:  mount.FileSystem,
+	}
 }
 
 // ShareMountListFromPropertyToProtocol converts share mounts from host to protocol message
 func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare, mounts map[string]*propertiesv1.HostRemoteMount) *protocol.ShareMountList {
-    var pbMounts []*protocol.ShareMountDefinition
-    for k, v := range mounts {
-        pbMounts = append(pbMounts, &protocol.ShareMountDefinition{
-            Host:  &protocol.Reference{Name: k},
-            Share: &protocol.Reference{Name: share.Name},
-            Path:  v.Path,
-            Type:  "nfs",
-        })
-    }
-    return &protocol.ShareMountList{
-        Share:     ShareFromPropertyToProtocol(hostName, share),
-        MountList: pbMounts,
-    }
+	var pbMounts []*protocol.ShareMountDefinition
+	for k, v := range mounts {
+		pbMounts = append(pbMounts, &protocol.ShareMountDefinition{
+			Host:  &protocol.Reference{Name: k},
+			Share: &protocol.Reference{Name: share.Name},
+			Path:  v.Path,
+			Type:  "nfs",
+		})
+	}
+	return &protocol.ShareMountList{
+		Share:     ShareFromPropertyToProtocol(hostName, share),
+		MountList: pbMounts,
+	}
 }
 
 // // VolumeAttachmentFromPropertyToProtocol converts an api.Volume to a *VolumeInfo
@@ -75,17 +75,46 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 
 // ClusterControlplaneFromPropertyToProtocol does what the name says
 func ClusterControlplaneFromPropertyToProtocol(in propertiesv1.ClusterControlplane) *protocol.ClusterControlplane {
-    out := protocol.ClusterControlplane{}
-    if in.VirtualIP != nil {
-        out.Vip = VirtualIPFromAbstractToProtocol(*in.VirtualIP)
-    }
-    return &out
+	out := protocol.ClusterControlplane{}
+	if in.VirtualIP != nil {
+		out.Vip = VirtualIPFromAbstractToProtocol(*in.VirtualIP)
+	}
+	return &out
 }
 
-// ClusterCompositeFromPropertyTo Protocol does what the name says
+// ClusterCompositeFromPropertyToProtocol does what the name says
 func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *protocol.ClusterComposite {
-    out := protocol.ClusterComposite{}
-    out.Tenants = make([]string, len(in.Tenants))
-    copy(out.Tenants, in.Tenants)
-    return &out
+	out := protocol.ClusterComposite{}
+	out.Tenants = make([]string, len(in.Tenants))
+	copy(out.Tenants, in.Tenants)
+	return &out
+}
+
+// SecurityGroupBondsFromPropertyToProtocol does what the name says
+func SecurityGroupBondsFromPropertyToProtocol(in []*propertiesv1.SecurityGroupBond, target string) *protocol.SecurityGroupBondsResponse {
+	out := &protocol.SecurityGroupBondsResponse{}
+	switch target {
+	case "hosts":
+		out.Hosts = make([]*protocol.SecurityGroupBond, 0, len(in))
+		for _, v := range in {
+			item := &protocol.SecurityGroupBond{
+				Id:       v.ID,
+				Name:     v.Name,
+				Disabled: v.Disabled,
+			}
+			out.Hosts = append(out.Hosts, item)
+		}
+	case "networks":
+		out.Networks = make([]*protocol.SecurityGroupBond, 0, len(in))
+		for _, v := range in {
+			item := &protocol.SecurityGroupBond{
+				Id:       v.ID,
+				Name:     v.Name,
+				Disabled: v.Disabled,
+			}
+			out.Networks = append(out.Networks, item)
+		}
+	default:
+	}
+	return out
 }
