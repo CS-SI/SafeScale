@@ -52,7 +52,7 @@ if [[ $(echo $CLUSIZE | grep arge) ]]; then
   settos 45m
 fi
 
-./safescaled-cover&
+./safescaled -d -v &
 if [[ $? -ne 0 ]]; then
   echo "Failure starting safescale demon..." && exit 1
 fi
@@ -66,7 +66,7 @@ fi
 
 sleep 3
 
-ROUNDS=3
+ROUNDS=1
 
 RETCODE=0
 
@@ -105,7 +105,7 @@ do
     done
 
     for j in $(seq $ROUNDS); do
-      ./safescale cluster delete clu-$TENANT-$stamp-$fla-r$i -y
+      ./safescale cluster delete clu-$TENANT-$stamp-$fla-r$i -y -f
       if [[ $? -ne 0 ]]; then
         CLEAN=$((CLEAN + 1))
       else
