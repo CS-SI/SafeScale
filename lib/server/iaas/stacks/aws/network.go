@@ -628,6 +628,8 @@ func (s *Stack) DeleteNetwork(id string) error {
 		}
 	}
 
+	logrus.Warnf("Reached Route Table delete call")
+
 	table, err := s.EC2Service.DescribeRouteTables(
 		&ec2.DescribeRouteTablesInput{
 			Filters: []*ec2.Filter{
@@ -644,14 +646,18 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return err
 	}
 
-	_, err = s.EC2Service.DeleteRoute(
-		&ec2.DeleteRouteInput{
-			DestinationCidrBlock: aws.String("0.0.0.0/0"),
-			RouteTableId:         table.RouteTables[0].RouteTableId,
-		},
-	)
-	if err != nil {
-		return err
+	if table != nil {
+		if len(table.RouteTables) > 0 {
+			_, err = s.EC2Service.DeleteRoute(
+				&ec2.DeleteRouteInput{
+					DestinationCidrBlock: aws.String("0.0.0.0/0"),
+					RouteTableId:         table.RouteTables[0].RouteTableId,
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	logrus.Warnf("Reached DeleteVpc call")
