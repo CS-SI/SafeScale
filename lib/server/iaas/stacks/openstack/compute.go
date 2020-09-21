@@ -838,6 +838,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 			defer func() {
 				if ierr != nil {
+					logrus.Debugf("server destruction due to: %s", ierr.Error())
 					servers.Delete(s.ComputeClient, server.ID)
 				}
 			}()
@@ -846,19 +847,25 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			var srv *servers.Server
 			srv, ierr = s.waitHostState(host, []hoststate.Enum{hoststate.STARTED}, temporal.GetHostTimeout())
 			if ierr != nil {
+				logrus.Debugf("failure waiting for host state")
 				return scerr.Errorf(ProviderErrorToString(ierr), ierr)
 			}
 
 			if ierr = s.complementHost(host, srv); ierr != nil {
+				logrus.Debugf("failure complementing host data")
 				return scerr.Errorf(ProviderErrorToString(ierr), ierr)
 			}
 
+			ierr = nil
 			return nil
 		},
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		return nil, userData, scerr.Wrap(retryErr, "error creating host")
+	}
+	if host == nil {
+		return nil, userData, scerr.Errorf(fmt.Sprintf("unexpected problem creating host"), nil)
 	}
 	logrus.Debugf("host resource created.")
 
@@ -884,6 +891,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// if Floating IP are used and public address is requested
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
+		logrus.Trace("Creating floating ip")
+
 		// Create the floating IP
 		ip, err := floatingips.Create(
 			s.ComputeClient, floatingips.CreateOpts{
@@ -897,14 +906,18 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			if err != nil {
-				logrus.Debugf("Cleanup, deleting floating ip '%s'", ip.ID)
-				derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
-				if derr != nil {
-					logrus.Errorf("Error deleting Floating IP: %v", derr)
-					err = scerr.AddConsequence(err, derr)
+				if ip != nil {
+					logrus.Debugf("cleanup, deleting floating ip '%s'", ip.ID)
+					derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
+					if derr != nil {
+						logrus.Errorf("error deleting floating IP: %v", derr)
+						err = scerr.AddConsequence(err, derr)
+					}
 				}
 			}
 		}()
+
+		logrus.Trace("Creating floating ip association")
 
 		// Associate floating IP to host
 		err = floatingips.AssociateInstance(
@@ -916,6 +929,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
 			return nil, userData, scerr.Wrap(err, msg)
 		}
+
+		logrus.Trace("Editing metadata")
 
 		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(
 			func(clonable data.Clonable) error {
