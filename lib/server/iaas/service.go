@@ -304,10 +304,11 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 	}
 
 	allTpls, err := svc.ListTemplates(false)
-	scannerTpls := map[string]bool{}
 	if err != nil {
 		return nil, err
 	}
+
+	scannerTpls := map[string]bool{}
 
 	// FIXME Prevent GPUs when user sends a 0
 	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinFreq != 0
@@ -711,9 +712,13 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (_ *res
 	}
 	defer func() {
 		if err != nil {
-			cleanErr := svc.DeleteKeyPair(kpName)
-			if cleanErr != nil {
-				errx = scerr.AddConsequence(errx, cleanErr)
+			// if we have a keypair, delete it.
+			// TODO: we should handle timeout and communication errors here, and only try to delete if we have a 404, or a scerr.ErrNotFound
+			if _, kerr := svc.GetKeyPair(kpName); kerr == nil {
+				cleanErr := svc.DeleteKeyPair(kpName)
+				if cleanErr != nil {
+					errx = scerr.AddConsequence(errx, cleanErr)
+				}
 			}
 		}
 	}()
@@ -734,6 +739,10 @@ func (svc *service) CreateHostWithKeyPair(request resources.HostRequest) (_ *res
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if host == nil {
+		return nil, nil, nil, scerr.InconsistentError("host creation returned with an empty host and without reporting an error")
+	}
+
 	return host, userData, kp, nil
 }
 
