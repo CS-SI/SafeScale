@@ -26,7 +26,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/govcd"
 	"github.com/vmware/go-vcloud-director/types/v56"
@@ -54,7 +53,7 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return empty, errors.Wrap(err, fmt.Sprintf("Error listing images"))
+		return empty, scerr.Wrap(err, fmt.Sprintf("Error listing images"))
 	}
 
 	catalogName := ""
@@ -122,7 +121,7 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return empty, errors.Wrap(err, fmt.Sprintf("Error listing templates"))
+		return empty, scerr.Wrap(err, fmt.Sprintf("Error listing templates"))
 	}
 
 	catalogName := ""
@@ -256,7 +255,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, userData, errors.Wrap(err, fmt.Sprintf("Error getting host by name"))
+		return nil, userData, scerr.Wrap(err, fmt.Sprintf("Error getting host by name"))
 	}
 
 	catalogName := ""
@@ -614,7 +613,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("error inspecting host"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("error inspecting host"))
 	}
 
 	var host *resources.Host
@@ -644,12 +643,12 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	if byName {
 		vapp, err = vdc.FindVAppByName(hostRef)
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("error inspecting host"))
+			return nil, scerr.Wrap(err, fmt.Sprintf("error inspecting host"))
 		}
 	} else {
 		vapp, err = vdc.FindVAppByID(hostRef)
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("error inspecting host"))
+			return nil, scerr.Wrap(err, fmt.Sprintf("error inspecting host"))
 		}
 	}
 
@@ -737,7 +736,7 @@ func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting host by name"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting host by name"))
 	}
 
 	vapp, err := vdc.FindVAppByName(name)
@@ -770,27 +769,27 @@ func (s *StackEbrc) DeleteHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	undepTask, err := vapp.Undeploy()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	err = undepTask.WaitTaskCompletion()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	dtask, err := vapp.Delete()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	// FIXME Delete firewall and NAT rules
@@ -812,12 +811,12 @@ func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing hosts"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing hosts"))
 	}
 
 	refs, err := getLinks(org, "vnd.vmware.vcloud.vApp")
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing hosts"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing hosts"))
 	}
 
 	var nets []*resources.Host
@@ -835,17 +834,17 @@ func (s *StackEbrc) StopHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error stopping host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error stopping host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error stopping host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error stopping host"))
 	}
 
 	dtask, err := vapp.Shutdown()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error stopping host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error stopping host"))
 	}
 
 	err = dtask.WaitTaskCompletion()
@@ -860,17 +859,17 @@ func (s *StackEbrc) StartHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error starting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error starting host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error starting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error starting host"))
 	}
 
 	dtask, err := vapp.PowerOn()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error starting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error starting host"))
 	}
 
 	err = dtask.WaitTaskCompletion()
@@ -885,17 +884,17 @@ func (s *StackEbrc) RebootHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error rebooting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error rebooting host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error rebooting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error rebooting host"))
 	}
 
 	dtask, err := vapp.Reboot()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error rebooting host"))
+		return scerr.Wrap(err, fmt.Sprintf("Error rebooting host"))
 	}
 
 	err = dtask.WaitTaskCompletion()

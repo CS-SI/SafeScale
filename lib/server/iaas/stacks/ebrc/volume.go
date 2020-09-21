@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/types/v56"
 
@@ -49,7 +48,7 @@ func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Vo
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating volume"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error creating volume"))
 	}
 
 	storageProfileValue := ""
@@ -105,7 +104,7 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing volumes"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing volumes"))
 	}
 
 	// FIXME Add data
@@ -137,13 +136,13 @@ func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return volumes, errors.Wrap(err, fmt.Sprintf("Error listing volumes"))
+		return volumes, scerr.Wrap(err, fmt.Sprintf("Error listing volumes"))
 	}
 
 	// Check if network is already there
 	refs, err := getLinks(org, "vnd.vmware.vcloud.disk+xml")
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error recovering network information"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering network information"))
 	}
 	for _, ref := range refs {
 		// FIXME Add data
@@ -197,22 +196,22 @@ func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentReq
 
 	vm, err := s.findVMByID(request.HostID)
 	if err != nil || utils.IsEmpty(vm) {
-		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
+		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
 	}
 
 	disk, err := s.findDiskByID(request.VolumeID)
 	if err != nil || utils.IsEmpty(disk) {
-		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment, disk empty"))
+		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment, disk empty"))
 	}
 
 	attask, err := vm.AttachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
 	if err != nil {
-		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
+		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment"))
 	}
 
 	err = attask.WaitTaskCompletion()
 	if err != nil {
-		return "", errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
+		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment"))
 	}
 
 	return getAttachmentID(request.HostID, request.VolumeID), nil
@@ -225,7 +224,7 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 
 	vats, err := s.ListVolumeAttachments(serverID)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting attachment"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting attachment"))
 	}
 
 	for _, vat := range vats {
@@ -244,7 +243,7 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 
 	vm, err := s.findVMByID(serverID)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting attachment"))
 	}
 
 	splitted := strings.Split(id, ":")
@@ -252,17 +251,17 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 	diskId := strings.Join(splitted[len(splitted)/2:], ":")
 	disk, err := s.findDiskByID(diskId)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting attachment"))
 	}
 
 	attask, err := vm.DetachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting attachment"))
 	}
 
 	err = attask.WaitTaskCompletion()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error creating attachment"))
+		return scerr.Wrap(err, fmt.Sprintf("Error creating attachment"))
 	}
 
 	return nil
@@ -277,7 +276,7 @@ func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]resources.VolumeAt
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return []resources.VolumeAttachment{}, errors.Wrap(err, fmt.Sprintf("Error deleting volume"))
+		return []resources.VolumeAttachment{}, scerr.Wrap(err, fmt.Sprintf("Error deleting volume"))
 	}
 
 	var attachments []resources.VolumeAttachment
