@@ -61,8 +61,12 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	}
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
+		return nil, nil, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
 	}
+	if host == nil {
+		return nil, nil, scerr.InconsistentError("host creation returned with an empty host and without reporting an error")
+	}
+
 	// Updates Host Property propsv1.HostSizing
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
 		func(clonable data.Clonable) error {

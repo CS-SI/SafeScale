@@ -29,7 +29,7 @@ import (
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, error) {
+func (s *Stack) CreateVIP(subnetID string, name string) (_ *resources.VirtualIP, err error) {
 	subnet, err := s.getSubnet(subnetID)
 	if err != nil {
 		return nil, err
@@ -52,6 +52,21 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
+	/*
+		defer func() {
+			if err != nil {
+				dnr := osc.DeleteNicRequest{
+					NicId:  res.Nic.NicId,
+				}
+				_, _, cerr := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{DeleteNicRequest: optional.NewInterface(dnr)})
+				if cerr != nil {
+					err = scerr.AddConsequence(err, cerr)
+				}
+			}
+		}()
+	*/
+
 	if len(res.Nic.PrivateIps) < 1 {
 		return nil, scerr.InconsistentError("Inconsistent provider response")
 	}
@@ -72,11 +87,12 @@ func (s *Stack) CreateVIP(subnetID string, name string) (*resources.VirtualIP, e
 	}
 	// primary := deviceNumber == 0
 	return &resources.VirtualIP{
-		ID:        nic.NicId,
-		PrivateIP: nic.PrivateIps[0].PrivateIp,
-		NetworkID: netID,
-		Hosts:     nil,
-		PublicIP:  "",
+		ID:         nic.NicId,
+		PrivateIP:  nic.PrivateIps[0].PrivateIp,
+		NetworkID:  netID,
+		Hosts:      nil,
+		PublicIP:   "",
+		PublicIPID: "",
 	}, nil
 }
 
@@ -179,26 +195,33 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
+func (s *Stack) DeleteVIP(vip *resources.VirtualIP) (err error) {
+	if vip.PublicIP != "" && vip.PublicIPID != "" {
+		deletePublicIpRequest := osc.DeletePublicIpRequest{
+			PublicIp:   vip.PublicIP,
+			PublicIpId: vip.PublicIPID,
+		}
+		_, _, err = s.client.PublicIpApi.DeletePublicIp(
+			s.auth, &osc.DeletePublicIpOpts{
+				DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
+			},
+		)
+		if err != nil {
+			return normalizeErrorWithReason("failure removing public ip", err)
+		}
+	}
+
 	deleteNicRequest := osc.DeleteNicRequest{
 		NicId: vip.ID,
 	}
-	_, _, err := s.client.NicApi.DeleteNic(
+	_, _, err = s.client.NicApi.DeleteNic(
 		s.auth, &osc.DeleteNicOpts{
 			DeleteNicRequest: optional.NewInterface(deleteNicRequest),
 		},
 	)
 	if err != nil {
-		return normalizeError(err)
+		return normalizeErrorWithReason("failure removing nic", err)
 	}
-	deletePublicIpRequest := osc.DeletePublicIpRequest{
-		PublicIp: vip.PublicIP,
-	}
-	_, _, err = s.client.PublicIpApi.DeletePublicIp(
-		s.auth, &osc.DeletePublicIpOpts{
-			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-		},
-	)
 
 	return err
 }

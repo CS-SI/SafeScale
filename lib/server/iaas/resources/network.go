@@ -136,12 +136,13 @@ func (n *Network) Deserialize(buf []byte) error {
 
 // VirtualIP is a structure containing information needed to manage VIP (virtual IP)
 type VirtualIP struct {
-	ID        string
-	Name      string
-	NetworkID string
-	PrivateIP string
-	PublicIP  string
-	Hosts     []string
+	ID         string
+	Name       string
+	NetworkID  string
+	PrivateIP  string
+	PublicIP   string
+	PublicIPID string
+	Hosts      []string
 }
 
 // NewVirtualIP ...

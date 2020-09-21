@@ -853,7 +853,7 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 	return ip, nil
 }
 
-// CreateHost creates an host that fulfils the request
+// CreateHost creates an host that fulfills the request
 func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, err error) {
 	userData := userdata.NewContent()
 	if request.DefaultGateway == nil && !request.PublicIP {
