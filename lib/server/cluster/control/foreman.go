@@ -768,14 +768,6 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 		return scerr.Wrap(err, "")
 	}
 
-	// Unconfigure cluster
-	if b.makers.UnconfigureCluster != nil {
-		err = b.makers.UnconfigureCluster(task, b)
-		if err != nil {
-			return scerr.Wrap(err, "")
-		}
-	}
-
 	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
 		funcErr := cluster.wipeMaster(t, params.(string))
 		if funcErr != nil {
