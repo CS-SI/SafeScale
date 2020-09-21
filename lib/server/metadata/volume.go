@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/graymeta/stow"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
@@ -139,6 +140,10 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	if ref == "" {
 		return scerr.InvalidParameterError("ref", "cannot be empty string")
 	}
+
+	tracer := debug.NewTracer(nil, "('"+ref+"')", true).GoingIn()
+	defer tracer.OnExitTrace()()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	var errors []error
 	err1 := mv.mayReadByID(ref) // First read by ID ...
