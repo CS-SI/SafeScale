@@ -104,7 +104,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return nil, err
 	}
 
-	providerName := "huaweicloud"
+	providerName := "openstack"
 
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
 	if err != nil {
