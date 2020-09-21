@@ -17,7 +17,6 @@
 package openstack
 
 import (
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"net"
 	"strings"
 	"time"
@@ -128,6 +127,19 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 		}
 	}()
 
+	//// Gets security group to use by default
+	//// FUTURE: allow user to define default security group in tenants.json file ?
+	//asg, xerr := s.InspectSecurityGroup(stacks.DefaultNetworkSecurityGroupName)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+	//
+	//// Bind the network default security group to network
+	//xerr = s.BindSecurityGroupToNetwork(network.ID, asg)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+
 	// creates the subnet
 	subnet, xerr := s.createSubnet(req.Name, network.ID, req.CIDR, req.IPVersion, req.DNSServers)
 	if xerr != nil {
@@ -234,7 +246,7 @@ func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 			return nil, xerr
 		}
 		if len(sns) != 1 {
-			return nil, fail.InconsistentError("bad configuration, each network should have exactly one subnet")
+			return nil, fail.DuplicateError("found a network '%s' without corresponding subnet, cannot continue; cleanup is needed or choose another name", network.Name)
 		}
 		sn := sns[0]
 		// gwID, _ := client.getGateway(id)
@@ -900,60 +912,6 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			innerErr := ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
-			return NormalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-}
-
-// BindSecurityGroupToNetwork binds a security group to a network
-func (s *Stack) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
-	if ref == "" {
-		return fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
-	}
-
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			innerErr := secgroups.AddServer(s.ComputeClient, ref, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-}
-
-// UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s *Stack) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
-	if ref == "" {
-		return fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
-	}
-
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			innerErr := secgroups.RemoveServer(s.ComputeClient, ref, asg.ID).ExtractErr()
 			return NormalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),

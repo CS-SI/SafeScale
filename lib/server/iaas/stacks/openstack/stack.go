@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -37,12 +38,12 @@ type Stack struct {
 	authOpts stacks.AuthenticationOptions
 	cfgOpts  stacks.ConfigurationOptions
 
-	// // DefaultSecurityGroupName is the name of the default security groups
-	// DefaultSecurityGroupName string
+	// DefaultSecurityGroupName is the name of the default security groups
+	DefaultSecurityGroupName string
 	// // DefaultSecurityGroupDescription contains a description for the default security groups
 	// DefaultSecurityGroupDescription string
 	// // SecurityGroup is an instance of the default security group
-	// SecurityGroup     *abstract.SecurityGroup
+	SecurityGroup     *abstract.SecurityGroup
 	ProviderNetworkID string
 
 	// versions contains the last version supported for each service
@@ -54,7 +55,6 @@ type Stack struct {
 
 // New authenticates and returns a Stack pointer
 func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*Stack, fail.Error) {
-
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
@@ -72,9 +72,12 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		Scope:            authScope,
 	}
 
+	if cfg.DefaultSecurityGroupName == "" {
+		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
+	}
+
 	s := Stack{
-		// DefaultSecurityGroupName: "safescale-default-sg",
-		// DefaultSecurityGroupDescription: "Default Security Group for SafeScale resources",
+		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
 
 		authOpts: auth,
 		cfgOpts:  cfg,

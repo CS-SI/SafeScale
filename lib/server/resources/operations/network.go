@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -243,13 +244,56 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest, gw
 		}
 	}()
 
-	xerr = rn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	// Creates default network security group
+	sgName := an.Name + "-default-sg"
+	rules := stacks.DefaultTCPRules()
+	rules = append(rules, stacks.DefaultUDPRules()...)
+	rules = append(rules, stacks.DefaultICMPRules()...)
+	networkDefaultSecurityGroup, xerr := NewSecurityGroup(svc)
+	if xerr != nil {
+		return xerr
+	}
+	xerr = networkDefaultSecurityGroup.Create(task, sgName, fmt.Sprintf("network '%s' default security group", an.Name), rules)
+	if xerr != nil {
+		return xerr
+	}
+	xerr = networkDefaultSecurityGroup.BindToNetwork(task, rn, false)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Starting from here, delete the network default security group in case of failure
+	defer func() {
+		if xerr != nil {
+			derr := networkDefaultSecurityGroup.Delete(task)
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Prepend(derr, "cleaning up on failure, failed to remove network default security group"))
+			}
+		}
+	}()
+
+	xerr = rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		an.NetworkState = networkstate.GATEWAY_CREATION
-		return nil
+
+		// Creates the bind between the network default security group and the network
+		return props.Alter(task, networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+			nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			item := &propertiesv1.SecurityGroupBond{
+				ID:       an.ID,
+				Name:     an.Name,
+				Disabled: false,
+			}
+			nsgV1.ByID[networkDefaultSecurityGroup.GetID()] = item
+			nsgV1.ByName[networkDefaultSecurityGroup.GetName()] = item
+			return nil
+		})
 	})
 	if xerr != nil {
 		return xerr
@@ -293,7 +337,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest, gw
 	}
 	img, xerr := svc.SearchImage(req.Image)
 	if xerr != nil {
-		return fail.Wrap(xerr, "unable to create network gateway")
+		return fail.Wrap(xerr, "failed to create gateway: unable to find image")
 	}
 
 	networkName := rn.GetName()
@@ -474,6 +518,18 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest, gw
 	})
 	if xerr != nil {
 		return xerr
+	}
+
+	// Binds network default security group to gateway(s)
+	xerr = primaryGateway.BindSecurityGroup(task, networkDefaultSecurityGroup, false)
+	if xerr != nil {
+		return xerr
+	}
+	if failover {
+		xerr = secondaryGateway.BindSecurityGroup(task, networkDefaultSecurityGroup, false)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	// As hosts are gateways, the configuration stopped on phase 'netsec', the remaining phases 'hwga', 'sysfix' and 'final' have to be run
@@ -1153,16 +1209,19 @@ func (rn *network) BindSecurityGroup(task concurrency.Task, sg resources.Securit
 			// First check if the security group is not already registered for the host with the exact same state
 			for k, v := range nsgV1.ByID {
 				if k == sgID && v.Disabled == !enabled {
-					return fail.DuplicateError("security group '%s' already binded to host")
+					return fail.DuplicateError("security group '%s' already bound to host")
 				}
 			}
 
-			// Not found, add it
+			// Bind the security group to the network (does the security group side of things)
+			if innerXErr := sg.BindToNetwork(task, rn, !enabled); innerXErr != nil {
+				return innerXErr
+			}
+
+			// Updates network metadata
 			nsgV1.ByID[sgID].Disabled = !enabled
 			nsgV1.ByName[sg.GetName()].Disabled = !enabled
-
-			// If enabled, apply it
-			return sg.BindToNetwork(task, rn, enabled)
+			return nil
 		})
 	})
 }
@@ -1200,12 +1259,16 @@ func (rn *network) UnbindSecurityGroup(task concurrency.Task, sg resources.Secur
 				return nil
 			}
 
-			// found, delete it from properties
+			// unbind security group from network on cloud provider side
+			if innerXErr := sg.UnbindFromNetwork(task, rn); innerXErr != nil {
+				return innerXErr
+			}
+
+			// updates the metadata
 			delete(nsgV1.ByID, sgID)
 			delete(nsgV1.ByName, sg.GetName())
+			return nil
 
-			// unbind security group from host on remote service side
-			return sg.UnbindFromNetwork(task, rn)
 		})
 	})
 }
@@ -1274,18 +1337,20 @@ func (rn *network) EnableSecurityGroup(task concurrency.Task, sg resources.Secur
 				return fail.NotFoundError("security group '%s' is not binded to network '%s'", sg.GetName(), rn.GetID())
 			}
 
-			// found, update properties
+			// Do security group stuff to enable it
+			if innerXErr := sg.BindToNetwork(task, rn, false); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrDuplicate:
+					// security group already bound to network with the same state, consider as a success
+				default:
+					return innerXErr
+				}
+			}
+
+			// update metadata
 			nsgV1.ByID[sgID].Disabled = false
 			nsgV1.ByName[sg.GetName()].Disabled = false
-
-			// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
-			innerXErr := sg.GetService().BindSecurityGroupToNetwork(rn.GetID(), sgID)
-			switch innerXErr.(type) {
-			case *fail.ErrDuplicate:
-				return nil
-			default:
-				return innerXErr
-			}
+			return nil
 		})
 	})
 }
@@ -1321,18 +1386,20 @@ func (rn *network) DisableSecurityGroup(task concurrency.Task, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not binded to network '%s'", sg.GetName(), rn.GetID())
 			}
 
-			// found, update properties
+			// Do security group stuff to enable it
+			if innerXErr := sg.BindToNetwork(task, rn, true); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+				// security group not bound to network, consider as a success
+				default:
+					return innerXErr
+				}
+			}
+
+			// update metadata
 			nsgV1.ByID[sgID].Disabled = true
 			nsgV1.ByName[sg.GetName()].Disabled = true
-
-			// Bind the security group on provider side; if security group not bound (*fail.ErrNotFound), consider as a success
-			innerXErr := sg.GetService().UnbindSecurityGroupFromNetwork(rn.GetID(), sgID)
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				return nil
-			default:
-				return innerXErr
-			}
+			return nil
 		})
 	})
 }

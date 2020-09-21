@@ -2221,8 +2221,11 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 			sgID := sg.GetID()
 			// Check if the security group is listed for the host
 			found := false
-			for k := range hsgV1.ByID {
+			for k, v := range hsgV1.ByID {
 				if k == sgID {
+					if v.FromNetwork {
+						return fail.InvalidRequestError("cannot unbind a security group from host when from network")
+					}
 					found = true
 					break
 				}
@@ -2232,12 +2235,16 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 				return nil
 			}
 
+			// unbind security group from host on remote service side
+			if innerXErr := sg.UnbindFromHost(task, rh); innerXErr != nil {
+				return innerXErr
+			}
+
 			// found, delete it from properties
 			delete(hsgV1.ByID, sgID)
 			delete(hsgV1.ByName, sg.GetName())
+			return nil
 
-			// unbind security group from host on remote service side
-			return sg.UnbindFromHost(task, rh)
 		})
 	})
 }
@@ -2276,7 +2283,7 @@ func (rh *host) ListSecurityGroups(task concurrency.Task, kind string) (list []*
 	})
 }
 
-// EnableSecurityGroup enables a binded security group to host
+// EnableSecurityGroup enables a bound security group to host by applying its rules
 func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) fail.Error {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
@@ -2304,21 +2311,23 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not binded to host '%s'", sg.GetName(), rh.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sg.GetName(), rh.GetID())
 			}
 
-			// found, update properties
+			// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
+			if innerXErr := sg.GetService().BindSecurityGroupToHost(rh.GetID(), sgID); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrDuplicate:
+					return nil
+				default:
+					return innerXErr
+				}
+			}
+
+			// found and updated, update metadata
 			hsgV1.ByID[sgID].Disabled = false
 			hsgV1.ByName[sg.GetName()].Disabled = false
-
-			// Bind the security group on provider side; if already binded (*fail.ErrDuplicate), consider as a success
-			innerXErr := sg.GetService().BindSecurityGroupToHost(rh.GetID(), sgID)
-			switch innerXErr.(type) {
-			case *fail.ErrDuplicate:
-				return nil
-			default:
-				return innerXErr
-			}
+			return nil
 		})
 	})
 }
@@ -2351,21 +2360,23 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not binded to host '%s'", sg.GetName(), sg.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sg.GetName(), sg.GetID())
+			}
+
+			// Bind the security group on provider side; if security group not binded, consider as a success
+			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(rh.GetID(), sgID); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					return nil
+				default:
+					return innerXErr
+				}
 			}
 
 			// found, update properties
 			hsgV1.ByID[sgID].Disabled = true
 			hsgV1.ByName[sg.GetName()].Disabled = true
-
-			// Bind the security group on provider side; if security group not binded, consider as a success
-			innerXErr := sg.GetService().UnbindSecurityGroupFromHost(rh.GetID(), sgID)
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				return nil
-			default:
-				return innerXErr
-			}
+			return nil
 		})
 	})
 }

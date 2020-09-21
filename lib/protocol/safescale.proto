@@ -228,7 +228,6 @@ service NetworkService {
 	rpc EnableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
 	rpc DisableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
 	rpc ListSecurityGroups(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
-
 }
 
 // safescale host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true

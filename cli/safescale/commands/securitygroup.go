@@ -377,16 +377,10 @@ var securityGroupBonds = &cli.Command{
 	Aliases: []string{"links", "attachments"},
 	Usage:   "List resources Security Group is bound to",
 	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Value:   true,
-			Usage:   "List all kinds of resources",
-		},
 		&cli.StringFlag{
 			Name:  "kind",
 			Value: "all",
-			Usage: "Narrow to the kind of resource specified; can be 'host' or 'network' or 'all' (default: 'all')",
+			Usage: "Narrow to the kind of resource specified; can be 'hosts' or 'networks' or 'all' (default: 'all')",
 		},
 	},
 
@@ -404,9 +398,6 @@ var securityGroupBonds = &cli.Command{
 		}
 
 		kind := strings.ToLower(c.String("kind"))
-		if c.Bool("all") {
-			kind = "all"
-		}
 
 		list, err := clientSession.SecurityGroup.Bonds(c.Args().First(), kind, temporal.GetExecutionTimeout())
 		if err != nil {

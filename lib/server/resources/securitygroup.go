@@ -19,6 +19,7 @@ package resources
 import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -38,8 +39,8 @@ type SecurityGroup interface {
 	Clear(task concurrency.Task) fail.Error                                                                // removes rules from the security group
 	Create(task concurrency.Task, name, description string, rules []abstract.SecurityGroupRule) fail.Error // creates a new host and its metadata
 	DeleteRule(task concurrency.Task, ruleID string) fail.Error                                            // deletes a rule from a Security Group
-	GetBoundHosts(task concurrency.Task) ([]string, fail.Error)                                            // returns a slice of string corresponding to ID of hosts binded to the security group
-	GetBoundNetworks(task concurrency.Task) ([]string, fail.Error)                                         // returns a slice of string corresponding to ID of networks binded to the seurity group
+	GetBoundHosts(task concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error)                   // returns a slice of bonds corresponding to hosts bound to the security group
+	GetBoundNetworks(task concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error)                // returns a slice of bonds corresponding to networks bound to the security group
 	Remove(task concurrency.Task, force bool) fail.Error                                                   // deletes a security group
 	Reset(task concurrency.Task) fail.Error                                                                // resets the rules of the security group from the ones registered in metadata
 	UnbindFromHost(task concurrency.Task, host Host) fail.Error                                            // unbinds a security group from host

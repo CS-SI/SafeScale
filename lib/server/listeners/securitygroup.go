@@ -18,11 +18,6 @@ package listeners
 
 import (
 	"context"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"reflect"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -522,11 +517,11 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	lowerKind := strings.ToLower(in.GetKind())
-	switch lowerKind {
+	loweredKind := strings.ToLower(in.GetKind())
+	switch loweredKind {
 	case "":
-		lowerKind = "all"
-	case "all", "host", "network":
+		loweredKind = "all"
+	case "all", "host", "hosts", "network", "networks":
 		// continue
 	default:
 		return nil, fail.InvalidRequestError("invalid value '%s' in field 'Kind'", in.GetKind())
@@ -549,53 +544,21 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	}
 
 	out := &protocol.SecurityGroupBondsResponse{}
-	if lowerKind == "all" || lowerKind == "host" {
-		xerr = rsg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-				sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				hosts := make([]*protocol.SecurityGroupBond, 0, len(sghV1.ByID))
-				for _, v := range sghV1.ByID {
-					item := &protocol.SecurityGroupBond{
-						Id:       v.ID,
-						Name:     v.Name,
-						Disabled: v.Disabled,
-					}
-					hosts = append(hosts, item)
-				}
-				out.Hosts = hosts
-				return nil
-			})
-		})
+	switch loweredKind {
+	case "all", "host", "hosts":
+		bonds, xerr := rsg.GetBoundHosts(task)
 		if xerr != nil {
 			return nil, xerr
 		}
+		out.Hosts = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
 	}
-	if lowerKind == "all" || lowerKind == "host" {
-		xerr = rsg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(task, securitygroupproperty.NetworksV1, func(clonable data.Clonable) fail.Error {
-				sgnV1, ok := clonable.(*propertiesv1.SecurityGroupNetworks)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupNetworks' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				networks := make([]*protocol.SecurityGroupBond, 0, len(sgnV1.ByID))
-				for _, v := range sgnV1.ByID {
-					item := &protocol.SecurityGroupBond{
-						Id:       v.ID,
-						Name:     v.Name,
-						Disabled: v.Disabled,
-					}
-					networks = append(networks, item)
-				}
-				out.Networks = networks
-				return nil
-			})
-		})
+	switch loweredKind {
+	case "all", "network", "networks":
+		bonds, xerr := rsg.GetBoundNetworks(task)
 		if xerr != nil {
 			return nil, xerr
 		}
+		out.Networks = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
 	}
 
 	return out, nil

@@ -30,6 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
+const defaultSecurityGroupName = "default"
+
 // ListSecurityGroups lists existing security groups
 func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
 	var list []*abstract.SecurityGroup
@@ -208,28 +210,6 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if xerr != nil {
 		return nil, xerr
 	}
-	//
-	//listOpts := secrules.ListOpts{
-	//    SecGroupID: asg.ID,
-	//}
-	//xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
-	//    func() error {
-	//        pages, innerErr := secrules.List(s.NetworkClient, listOpts).AllPages()
-	//        if innerErr != nil {
-	//            return NormalizeError(innerErr)
-	//        }
-	//        rules, innerErr := secrules.ExtractRules(pages)
-	//        if innerErr != nil {
-	//            return NormalizeError(innerErr)
-	//        }
-	//        asg.Rules, innerErr = convertRulesToAbstract(rules)
-	//        return innerErr
-	//    },
-	//    temporal.GetCommunicationTimeout(),
-	//)
-	//if xerr != nil {
-	//    return nil, xerr
-	//}
 	return asg, nil
 }
 
@@ -449,7 +429,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if portFrom != 0 && portTo == 0 {
 		portTo = portFrom
 	}
-	if portFrom < portTo {
+	if portTo < portFrom {
 		portFrom, portTo = portTo, portFrom
 	}
 	createOpts := secrules.CreateOpts{
@@ -514,23 +494,35 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	)
 }
 
-// InitDefaultSecurityGroup create a SafeScale default Security Group, that will apply to every resources
-func (s *Stack) InitDefaultSecurityGroup() fail.Error {
-	rules := stacks.DefaultTCPRules()
-	rules = append(rules, stacks.DefaultUDPRules()...)
-	rules = append(rules, stacks.DefaultICMPRules()...)
-
-	_, xerr := s.CreateSecurityGroup(stacks.DefaultSecurityGroupName, stacks.DefaultSecurityGroupDescription, rules)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrDuplicate:
-			// If duplicate error contains a cause, returns the error, otherwise consider the Group already exists (and succeed)
-			if xerr.Cause() != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
-	}
-	return nil
-}
+// VPL: a default security group by network will be applied to every host, no need to create or update a default security group
+//// InitDefaultSecurityGroups create a SafeScale default Security Group, that will apply to every resource
+//func (s *Stack) InitDefaultSecurityGroups() fail.Error {
+//	rules := stacks.DefaultTCPRules()
+//	rules = append(rules, stacks.DefaultUDPRules()...)
+//	rules = append(rules, stacks.DefaultICMPRules()...)
+//
+//	_, xerr := s.InspectSecurityGroup(s.DefaultSecurityGroupName)
+//	if xerr != nil {
+//		switch xerr.(type) {
+//		case *fail.ErrNotFound:
+//			// continue to create the default security group
+//		default:
+//			return xerr
+//		}
+//	}
+//
+//	_, xerr = s.CreateSecurityGroup(s.DefaultSecurityGroupName, "Default security group", rules)
+//	if xerr != nil {
+//		switch xerr.(type) {
+//		case *fail.ErrDuplicate:
+//			// If duplicate error contains a cause, returns the error, otherwise consider the Group already exists (and succeed)
+//			if xerr.Cause() != nil {
+//				return xerr
+//			}
+//		default:
+//			return xerr
+//		}
+//	}
+//
+//	return nil
+//}

@@ -22,9 +22,10 @@ import (
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup
 type SecurityGroupBond struct {
-	Name     string `json:"name"`
-	ID       string `json:"id"`
-	Disabled bool   `json:"disabled"`
+	Name        string `json:"name"`
+	ID          string `json:"id"`
+	Disabled    bool   `json:"disabled"`
+	FromNetwork bool   `json:"from_network"`
 }
 
 // NewSecurityGroupBond ...
@@ -38,6 +39,7 @@ func (sgb *SecurityGroupBond) Reset() *SecurityGroupBond {
 		sgb.Name = ""
 		sgb.ID = ""
 		sgb.Disabled = false
+		sgb.FromNetwork = false
 		return sgb
 	}
 	return NewSecurityGroupBond()
