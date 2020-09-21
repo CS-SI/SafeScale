@@ -19,6 +19,8 @@ package converters
 // Contains functions that are used to convert from property
 
 import (
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 )
@@ -93,8 +95,8 @@ func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *p
 // SecurityGroupBondsFromPropertyToProtocol does what the name says
 func SecurityGroupBondsFromPropertyToProtocol(in []*propertiesv1.SecurityGroupBond, target string) *protocol.SecurityGroupBondsResponse {
 	out := &protocol.SecurityGroupBondsResponse{}
-	switch target {
-	case "hosts":
+	switch strings.ToLower(target) {
+	case "host", "hosts":
 		out.Hosts = make([]*protocol.SecurityGroupBond, 0, len(in))
 		for _, v := range in {
 			item := &protocol.SecurityGroupBond{
@@ -104,7 +106,7 @@ func SecurityGroupBondsFromPropertyToProtocol(in []*propertiesv1.SecurityGroupBo
 			}
 			out.Hosts = append(out.Hosts, item)
 		}
-	case "networks":
+	case "network", "networks":
 		out.Networks = make([]*protocol.SecurityGroupBond, 0, len(in))
 		for _, v := range in {
 			item := &protocol.SecurityGroupBond{
@@ -115,6 +117,20 @@ func SecurityGroupBondsFromPropertyToProtocol(in []*propertiesv1.SecurityGroupBo
 			out.Networks = append(out.Networks, item)
 		}
 	default:
+	}
+	return out
+}
+
+// SliceOfSecurityGroupBondFromPropertyToProtocol does what the name says
+func SliceOfSecurityGroupBondFromPropertyToProtocol(in []*propertiesv1.SecurityGroupBond) []*protocol.SecurityGroupBond {
+	out := make([]*protocol.SecurityGroupBond, 0, len(in))
+	for _, v := range in {
+		item := &protocol.SecurityGroupBond{
+			Id:       v.ID,
+			Name:     v.Name,
+			Disabled: v.Disabled,
+		}
+		out = append(out, item)
 	}
 	return out
 }

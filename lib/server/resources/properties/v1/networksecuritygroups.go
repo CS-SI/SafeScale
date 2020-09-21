@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// NetworkSecurityGroups contains a list of security groups binded to the network
+// NetworkSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields

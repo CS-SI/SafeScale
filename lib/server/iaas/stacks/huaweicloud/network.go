@@ -137,7 +137,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
 	}
 	vpc.Router = router
 
-	// Searching for the Network binded to the VPC
+	// Searching for the Network bound to the VPC
 	network, xerr := s.findVPCBoundNetwork(vpc.Name)
 	if xerr != nil {
 		return nil, fail.Prepend(xerr, "failed to find network binded to VPC")
