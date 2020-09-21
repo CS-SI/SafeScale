@@ -103,14 +103,14 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	}
 
 	id := mhm.ID
-	err = retryOnCommunicationFailure(
+	retryErr := retryOnCommunicationFailure(
 		func() error {
 			return handler.service.StartHost(id)
 		},
 		0,
 	)
-	if err != nil {
-		return err
+	if retryErr != nil {
+		return retryErr
 	}
 
 	return retryOnCommunicationFailure(
@@ -502,6 +502,7 @@ func (handler *HostHandler) Create(
 		KeyPair:        keypair,
 	}
 
+	host = nil
 	var userData *userdata.Content
 	retryErr = retryOnCommunicationFailure(
 		func() error {
@@ -512,16 +513,17 @@ func (handler *HostHandler) Create(
 		0,
 	)
 	if retryErr != nil {
-		logrus.Error(scerr.Errorf("failure creating host", err))
-		switch err.(type) {
+		logrus.Error(scerr.Errorf("failure creating host", retryErr))
+		switch retryErr.(type) {
 		case scerr.ErrInvalidRequest:
-			return nil, err
+			return nil, retryErr
 		case scerr.ErrNotFound, scerr.ErrTimeout:
-			return nil, err
+			return nil, retryErr
 		default:
-			return nil, err
+			return nil, retryErr
 		}
 	}
+
 	defer func() {
 		if err != nil {
 			if keeponfailure {
@@ -986,9 +988,9 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
-			return nil, err
+			return nil, retryErr
 		default:
-			return nil, err
+			return nil, retryErr
 		}
 	}
 	if network != nil {
@@ -1012,9 +1014,9 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case scerr.ErrInvalidRequest, scerr.ErrNotFound, scerr.ErrTimeout:
-			return nil, err
+			return nil, retryErr
 		default:
-			return nil, err
+			return nil, retryErr
 		}
 	}
 
@@ -1087,7 +1089,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 		return nil, err
 	}
 
-	err = retryOnCommunicationFailure(
+	retryErr := retryOnCommunicationFailure(
 		func() error {
 			var innerErr error
 			host, innerErr = handler.service.InspectHost(host)
@@ -1095,8 +1097,8 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 		},
 		0,
 	)
-	if err != nil {
-		return nil, err
+	if retryErr != nil {
+		return nil, retryErr
 	}
 	if host == nil {
 		return nil, scerr.Errorf(fmt.Sprintf("failure inspecting host [%s]", ref), nil)
@@ -1154,7 +1156,7 @@ func normalizeError(in error) (err error) {
 			}
 		default:
 			// In any other case, the error should explain the potential retry has to stop
-			return scerr.Wrap(in, "")
+			return scerr.AbortedError("", in)
 		}
 	}
 	return nil
@@ -1314,7 +1316,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		deleteMetadataOnly bool
 		moreTimeNeeded     bool
 	)
-	err = retryOnCommunicationFailure(
+	retryErr := retryOnCommunicationFailure(
 		func() error {
 			if host != nil {
 				return handler.service.DeleteHost(host.ID)
@@ -1323,14 +1325,14 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 		},
 		0,
 	)
-	if err != nil {
-		switch err.(type) {
+	if retryErr != nil {
+		switch retryErr.(type) {
 		case scerr.ErrNotFound:
 			deleteMetadataOnly = true
 		case scerr.ErrTimeout:
 			moreTimeNeeded = true
 		default:
-			return err
+			return retryErr
 		}
 	}
 
