@@ -189,7 +189,7 @@ func (m *Network) ReadByReference(ref string) (err error) {
 
 	tracer := debug.NewTracer(nil, "('"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	var errors []error
 	err1 := m.mayReadByID(ref) // First read by id...
