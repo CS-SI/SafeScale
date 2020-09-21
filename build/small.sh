@@ -44,7 +44,7 @@ fi
 
 settos 24m
 
-./safescaled-cover&
+./safescaled -d -v &
 
 sleep 3
 
