@@ -21,7 +21,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/govcd"
 	"github.com/vmware/go-vcloud-director/types/v56"
@@ -412,17 +411,17 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error creating network"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error creating network"))
 	}
 
 	if utils.IsEmpty(org) || utils.IsEmpty(vdc) {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error recovering information"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering information"))
 	}
 
 	// Check if network is already there
 	refs, err := getLinks(org, "vcloud.orgNetwork")
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error recovering network information"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering network information"))
 	}
 	for _, ref := range refs {
 		if req.Name == ref.Name {
@@ -611,17 +610,17 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting network"))
 	}
 
 	vdc, err := org.GetVdcByName(s.AuthOptions.ProjectID)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting network"))
 	}
 
 	res, err := vdc.Query(map[string]string{"type": "orgNetwork", "format": "records"})
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error getting network"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting network"))
 	}
 	if res.Results != nil {
 		for _, li := range res.Results.Link {
@@ -676,12 +675,12 @@ func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing networks"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing networks"))
 	}
 
 	refs, err := getLinks(org, "vcloud.orgNetwork")
 	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("Error listing networks"))
+		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing networks"))
 	}
 
 	var nets []*resources.Network
@@ -707,21 +706,21 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 
 	nett2, err := vdc.FindVDCNetwork(ref)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 
 	task, err := nett2.Delete()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 	err = task.WaitTaskCompletion()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 
 	return nil
