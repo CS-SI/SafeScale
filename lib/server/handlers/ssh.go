@@ -96,6 +96,9 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	if host == nil {
 		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
+	if ctx == nil {
+		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
@@ -155,11 +158,14 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 	if handler == nil {
 		return scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if ctx == nil {
+		return scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
 
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
@@ -175,12 +181,21 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
+
+	if ctx == nil {
+		return 1, "", "", scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if hostName == "" {
+		return 1, "", "", scerr.InvalidParameterError("hostName", "cannot be empty")
+	}
+	if cmd == "" {
+		return 1, "", "", scerr.InvalidParameterError("cmd", "cannot be empty")
+	}
 
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -218,12 +233,21 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
+
+	if ctx == nil {
+		return 1, "", "", scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if hostName == "" {
+		return 1, "", "", scerr.InvalidParameterError("hostName", "cannot be empty")
+	}
+	if cmd == "" {
+		return 1, "", "", scerr.InvalidParameterError("cmd", "cannot be empty")
+	}
 
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -305,11 +329,20 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	if handler == nil {
 		return -1, "", "", scerr.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if ctx == nil {
+		return 1, "", "", scerr.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if from == "" {
+		return 1, "", "", scerr.InvalidParameterError("from", "cannot be empty")
+	}
+	if to == "" {
+		return 1, "", "", scerr.InvalidParameterError("to", "cannot be empty")
+	}
 
 	hostName := ""
 	var upload bool
