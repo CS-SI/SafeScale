@@ -39,6 +39,7 @@ type provider struct {
 func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
+	metadata, _ := params["metadata"].(map[string]interface{})
 
 	username, _ := identity["User"].(string)
 	password, _ := identity["Password"].(string)
@@ -60,9 +61,16 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	providerName := "vclouddirector"
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName("ebrc", region, "", vdc)
-	if err != nil {
-		return nil, err
+	var (
+		metadataBucketName string
+		ok bool
+		err error
+	)
+	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName("ebrc", region, "", vdc)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{

@@ -79,6 +79,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		return &provider{}, fmt.Errorf("section compute not found in tenants.toml")
 	}
 
+	metadataCfg, ok := params["metadata"].(map[string]interface{})
+
 	networkName := "safescale"
 
 	networkCfg, ok := params["network"].(map[string]interface{})
@@ -166,9 +168,15 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	providerName := "aws"
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
-	if err != nil {
-		return nil, err
+	var (
+		metadataBucketName string
+		err error
+	)
+	if metadataBucketName, ok = metadataCfg["Bucket"].(string); !ok || metadataBucketName == "" {
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{

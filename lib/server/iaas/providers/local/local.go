@@ -84,9 +84,18 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	config.ProviderNetwork = "safescale"
 	config.AutoHostNetworkInterfaces = false
 	config.UseLayer3Networking = false
-	bucketName, err := objectstorage.BuildMetadataBucketName("local", "", "", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+
+	var (
+		metadataBucketName string
+		err error
+		ok bool
+	)
+	metadata, _ := params["metadata"]
+	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName("local", "", "", "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+		}
 	}
 	config.MetadataBucket = bucketName
 
