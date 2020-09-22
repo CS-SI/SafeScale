@@ -42,7 +42,7 @@ GOVENDOR := github.com/kardianos/govendor
 
 DEVDEPSLIST := $(RICE) $(PROTOBUF) $(DEP) $(COVER) $(XUNIT) $(COVERTOOL) $(GOVENDOR)
 
-BUILD_TAGS := ""
+BUILD_TAGS :=
 export BUILD_TAGS
 
 all: begin ground getdevdeps ensure generate lib cli err vet-light
