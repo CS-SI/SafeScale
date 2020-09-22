@@ -87,17 +87,17 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	var (
 		metadataBucketName string
-		err error
-		ok bool
+		err                error
 	)
-	metadata, _ := params["metadata"]
-	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
-		metadataBucketName, err = objectstorage.BuildMetadataBucketName("local", "", "", "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+	if metadata, ok := params["metadata"].(map[string]interface{}); ok {
+		if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
+			metadataBucketName, err = objectstorage.BuildMetadataBucketName("local", "", "", "")
+			if err != nil {
+				return nil, fmt.Errorf("failed to build metadata bucket name %v", err)
+			}
 		}
 	}
-	config.MetadataBucket = bucketName
+	config.MetadataBucket = metadataBucketName
 
 	providerName := "local"
 
