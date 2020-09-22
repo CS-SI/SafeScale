@@ -93,6 +93,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})
+	metadata, _ := params["metadata"].(map[string]interface{})
 
 	applicationKey, _ := identityParams["ApplicationKey"].(string)
 	openstackID, _ := identityParams["OpenstackID"].(string)
@@ -148,9 +149,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	providerName := "openstack"
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, applicationKey, projectName)
-	if err != nil {
-		return nil, err
+	var metadataBucketName string
+	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, applicationKey, projectName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{

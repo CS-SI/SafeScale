@@ -78,6 +78,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
+	metadata, _ := params["metadata"].(map[string]interface{})
 
 	identityEndpoint, _ := identity["EndPoint"].(string)
 	if identityEndpoint == "" {
@@ -127,9 +128,15 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	providerName := "huaweicloud"
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID)
-	if err != nil {
-		return nil, err
+	var (
+		metadataBucketName string
+		ok bool
+	)
+	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{

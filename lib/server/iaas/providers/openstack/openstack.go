@@ -58,6 +58,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
+	metadata, _ := params["metadata"].(map[string]interface{})
 
 	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
 	username, _ := identity["Username"].(string)
@@ -96,9 +97,16 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	providerName := "openstack"
 
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, tenantName, "0")
-	if err != nil {
-		return nil, err
+	var (
+		metadataBucketName string
+		err error
+		ok bool
+	)
+	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, tenantName, "0")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
