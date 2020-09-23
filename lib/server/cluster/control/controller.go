@@ -340,7 +340,7 @@ func (c *Controller) ListMasterIDs(task concurrency.Task) []string {
 		},
 	)
 	if err != nil {
-		log.Errorf("failed to get list of master IDs: %v", err) // FIXME Don't hide errors, return them
+		log.Errorf("failed to get list of master IDs: %v", err) // FIXME: Don't hide errors, return them
 	}
 	return list
 }

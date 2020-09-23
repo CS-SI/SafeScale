@@ -204,12 +204,12 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 // ListVPCs lists all the VPC created
 func (s *Stack) ListVPCs() ([]VPC, error) {
 	var vpcList []VPC
-	return vpcList, scerr.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME Technical debt
+	return vpcList, scerr.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVPC deletes a Network (ie a VPC in Huawei Cloud) identified by 'id'
 func (s *Stack) DeleteVPC(id string) error {
-	return scerr.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME: Technical debt
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
@@ -304,7 +304,7 @@ func validateNetworkName(req resources.NetworkRequest) (bool, error) {
 		for _, msg := range errors {
 			errs = append(errs, msg.Error())
 		}
-		// FIXME cause not nil
+		// FIXME: cause not nil
 		return false, scerr.Errorf(fmt.Sprintf(strings.Join(errs, "; ")), nil)
 	}
 	return true, nil
@@ -612,7 +612,7 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 		},
 	)
 
-	// TODO previously we ignored the error here, consider returning nil, paginationErr
+	// TODO: previously we ignored the error here, consider returning nil, paginationErr
 	if paginationErr != nil {
 		log.Warnf("We have a pagination error: %v", paginationErr)
 	}

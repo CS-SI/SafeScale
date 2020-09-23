@@ -148,7 +148,7 @@ type Object interface {
 	GetMetadata() (ObjectMetadata, error)
 }
 
-// FIXME GCP Remove specific driver code
+// FIXME: GCP Remove specific driver code
 
 // Config ...
 type Config struct {

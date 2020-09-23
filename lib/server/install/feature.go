@@ -109,7 +109,7 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 						concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1),
 					)
 					if err != nil {
-						logrus.Error(err) // FIXME Don't hide errors
+						logrus.Error(err) // FIXME: Don't hide errors
 						continue
 					}
 					if _, ok := allEmbeddedMap[feature.displayName]; !ok {

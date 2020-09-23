@@ -41,19 +41,19 @@ type provider struct {
 }
 
 func (p *provider) AddPublicIPToVIP(ip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) BindHostToVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) UnbindHostFromVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) DeleteVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) GetTenantParameters() map[string]interface{} {
@@ -192,7 +192,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		OperatorUsername: operatorUsername,
 		UseNATService:    false,
 		ProviderName:     providerName,
-		BuildSubnetworks: false, // FIXME AWS by default don't build subnetworks
+		BuildSubnetworks: false, // FIXME: AWS by default don't build subnetworks
 	}
 
 	stack, err := aws.New(authOptions, awsConf, cfgOptions)

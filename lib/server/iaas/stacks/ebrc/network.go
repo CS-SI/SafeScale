@@ -565,7 +565,7 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 		}
 	}()
 
-	// FIXME Configure SNAT before powering on
+	// FIXME: Configure SNAT before powering on
 
 	iprange, err := s.getPublicIPs()
 	if err != nil {
@@ -595,7 +595,7 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 
 	network = resources.NewNetwork()
 
-	// FIXME Remove this, get info from recently created network
+	// FIXME: Remove this, get info from recently created network
 	network.ID = createdNetwork.OrgVDCNetwork.ID
 	network.Name = req.Name
 	network.CIDR = req.CIDR

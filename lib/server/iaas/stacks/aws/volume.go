@@ -41,7 +41,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, err
 	}
 
-	// FIXME Defer volume destruction
+	// FIXME: Defer volume destruction
 
 	_, err = s.EC2Service.CreateTags(
 		&ec2.CreateTagsInput{
@@ -55,7 +55,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		},
 	)
 	if err != nil {
-		// FIXME Should we delete the volume if we cannot name it ?
+		// FIXME: Should we delete the volume if we cannot name it ?
 		return nil, err
 	}
 
@@ -86,7 +86,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	v := out.Volumes[0]
 	volume := resources.Volume{
 		ID:    aws.StringValue(v.VolumeId),
-		Name:  aws.StringValue(v.VolumeId), // FIXME Append name as Tags
+		Name:  aws.StringValue(v.VolumeId), // FIXME: Append name as Tags
 		Size:  int(aws.Int64Value(v.Size)),
 		Speed: toVolumeSpeed(v.VolumeType),
 		State: toVolumeState(v.State),

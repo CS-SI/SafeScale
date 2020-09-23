@@ -55,7 +55,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostAPI
 
-// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {

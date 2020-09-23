@@ -50,12 +50,12 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 		}
 	}
 
-	// FIXME GCP, Remove specific driver code
+	// FIXME: GCP, Remove specific driver code
 	if driver == "gcp" {
 		name = strings.Replace(name, ".", "-", -1)
 	}
 
-	// FIXME AWS, Remove specific driver code
+	// FIXME: AWS, Remove specific driver code
 	if driver == "aws" {
 		name = strings.Replace(name, ".", "-", -1)
 	}

@@ -299,7 +299,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding catalog item: %#v", err), err)
 	}
 
-	// FIXME Use template
+	// FIXME: Use template
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
@@ -440,7 +440,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		return nil, userData, err
 	}
 
-	// FIXME Remove this
+	// FIXME: Remove this
 	userdataFileName := "/tmp/userdata.sh"
 	err = ioutil.WriteFile(userdataFileName, phase1Content, 0644)
 	if err != nil {
@@ -509,7 +509,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		return nil, userData, scerr.Errorf(fmt.Sprintf("error getting machine ip: %#v", err), err)
 	}
 
-	// FIXME Populate this
+	// FIXME: Populate this
 	host = resources.NewHost()
 	host.ID = vapp.VApp.ID
 	host.Name = vapp.VApp.Name
@@ -559,7 +559,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	dsize, _ := vapptemplate.GetTemplateDiskSize()
 	memory, _ := vapptemplate.GetMemorySize()
 
-	// FIXME Extract true info
+	// FIXME: Extract true info
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
 		func(clonable data.Clonable) error {
 			hostSizingV1 := clonable.(*propsv1.HostSizing)
@@ -576,7 +576,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		return nil, userData, scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
 	}
 
-	// FIXME Edge gateway smart tunnel only if public or gateway
+	// FIXME: Edge gateway smart tunnel only if public or gateway
 	if hostMustHavePublicIP || hostIsAGateway {
 		gateways, err := s.findEdgeGatewayNames()
 		if err != nil || utils.IsEmpty(gateways) {
@@ -600,7 +600,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		}
 	}
 
-	// FIXME Remove this
+	// FIXME: Remove this
 	// logrus.Warningf(spew.Sdump(host.Properties))
 
 	return host, userData, nil
@@ -657,7 +657,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 		return nil, resources.ResourceNotFoundError("host", host.Name)
 	}
 
-	// FIXME Populate this
+	// FIXME: Populate this
 	newHost := &resources.Host{
 		ID:         vapp.VApp.ID,
 		Name:       vapp.VApp.Name,
@@ -749,12 +749,12 @@ func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
 		return nil, resources.ResourceNotFoundError("host", name)
 	}
 
-	// FIXME Populate this
+	// FIXME: Populate this
 	hr := &resources.Host{
 		ID:         vapp.VApp.ID,
 		Name:       vapp.VApp.Name,
 		LastState:  stateConvert(vapp.VApp.Status),
-		PrivateKey: "", // FIXME Recover pk and pass
+		PrivateKey: "", // FIXME: Recover pk and pass
 		Password:   "",
 		Properties: nil,
 	}
@@ -792,7 +792,7 @@ func (s *StackEbrc) DeleteHost(id string) error {
 		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
-	// FIXME Delete firewall and NAT rules
+	// FIXME: Delete firewall and NAT rules
 
 	err = dtask.WaitTaskCompletion()
 
@@ -922,25 +922,25 @@ func (s *StackEbrc) ListAvailabilityZones() (map[string]bool, error) {
 }
 
 func (s *StackEbrc) ListRegions() ([]string, error) {
-	return nil, scerr.NotImplementedError("ListRegions() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) CreateVIP(s1 string, s2 string) (*resources.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) AddPublicIPToVIP(ip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) BindHostToVIP(ip *resources.VirtualIP, s2 string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) UnbindHostFromVIP(ip *resources.VirtualIP, s2 string) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) DeleteVIP(ip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

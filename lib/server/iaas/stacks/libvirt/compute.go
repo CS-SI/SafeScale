@@ -331,17 +331,17 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("GetKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *Stack) DeleteKeyPair(id string) error {
-	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // -------------HOST MANAGEMENT------------------------------------------------------------------------------------------
@@ -579,7 +579,7 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 	hostSizing.AllocatedSize.RAMSize = float32(info.MaxMem) / 1024 / 1024
 	hostSizing.AllocatedSize.Cores = int(info.NrVirtCpu)
 	hostSizing.AllocatedSize.DiskSize = diskSize
-	// TODO GPU not implemented
+	// TODO: GPU not implemented
 	hostSizing.AllocatedSize.GPUNumber = 0
 	hostSizing.AllocatedSize.GPUType = ""
 
@@ -1019,8 +1019,8 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	var commands []string
-	// TODO gpu is ignored
-	// TODO use libvirt-go functions not bash commands
+	// TODO: gpu is ignored
+	// TODO: use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf(
 		"IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"",
 		imagePath, s.LibvirtConfig.LibvirtStorage, resourceName,
@@ -1142,7 +1142,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			hostSizingV1.RequestedSize.RAMSize = float32(template.RAMSize * 1024)
 			hostSizingV1.RequestedSize.Cores = template.Cores
 			hostSizingV1.RequestedSize.DiskSize = template.DiskSize
-			// TODO GPU not implemented
+			// TODO: GPU not implemented
 			hostSizingV1.RequestedSize.GPUNumber = template.GPUNumber
 			hostSizingV1.RequestedSize.GPUType = template.GPUType
 
@@ -1247,7 +1247,7 @@ func (s *Stack) DeleteHost(id string) error {
 
 // ResizeHost change the template used by an host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts

@@ -107,7 +107,7 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing volumes"))
 	}
 
-	// FIXME Add data
+	// FIXME: Add data
 	dr, err := vdc.QueryDisk(ref)
 	if err == nil {
 		thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
@@ -145,7 +145,7 @@ func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering network information"))
 	}
 	for _, ref := range refs {
-		// FIXME Add data
+		// FIXME: Add data
 		dr, err := vdc.QueryDisk(ref.Name)
 		if err == nil {
 			thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)

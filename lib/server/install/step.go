@@ -427,7 +427,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	host := p["host"].(*pb.Host)
 	variables := p["variables"].(Variables)
 
-	// FIXME Time and again
+	// FIXME: Time and again
 	variables["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
 	variables["TemplateOperationTimeout"] = strings.Replace(
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,

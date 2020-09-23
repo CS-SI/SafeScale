@@ -411,7 +411,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	tmpInt, err := strconv.ParseInt(lastDiskName, 36, 64)
 	newDiskName := strconv.FormatInt(tmpInt+1, 36)
 	newDiskName = strings.Replace(newDiskName, "0", "a", -1)
-	// TODO not working for a name only made of z (ex: 'zzz' will became '1aaa')
+	// TODO: not working for a name only made of z (ex: 'zzz' will became '1aaa')
 
 	requestXML := `
  <disk type='file' device='disk'>

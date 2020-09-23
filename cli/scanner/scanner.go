@@ -241,7 +241,7 @@ func RunScanner(targetedTenant string) {
 		}
 	}
 
-	// TODO Enable when several safescaled instances can run in parallel
+	// TODO: Enable when several safescaled instances can run in parallel
 	/*
 		var wtg sync.WaitGroup
 
@@ -291,7 +291,7 @@ func isTenantScannable(tenant map[string]interface{}) (isScannable bool, err err
 }
 
 func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
-	// FIXME Add trace
+	// FIXME: Add trace
 	if group != nil {
 		defer group.Done()
 	}
@@ -332,7 +332,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	there := true
 	var network *resources.Network
 
-	netName := "net-safescale" // FIXME Hardcoded string
+	netName := "net-safescale" // FIXME: Hardcoded string
 	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
 		logrus.Warnf("Network '%s' already there", netName)
 	} else {
@@ -395,7 +395,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				}
 			}
 
-			// TODO If there is a file with today's date, skip it...
+			// TODO: If there is a file with today's date, skip it...
 			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + theTenant + "#" + template.Name + ".json")
 			if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
 				return nil
@@ -440,7 +440,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.Name, err)
 				return err
 			}
-			_, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
+			_, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME: Hardcoded timeout
 			if err != nil {
 				logrus.Warnf("template [%s]: Problem running ssh command: %v", template.Name, err)
 				return err

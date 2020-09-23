@@ -266,7 +266,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // ImportKeyPair imports a keypair in OpenStack
 func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
-	return scerr.NotImplementedError("ImportKeyPair is not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("ImportKeyPair is not implemented yet") // FIXME: Technical debt
 }
 
 // GetKeyPair returns the key pair identified by id
@@ -1354,11 +1354,11 @@ func (s *Stack) StartHost(id string) error {
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	// TODO RESIZE Resize Host HERE
+	// TODO: RESIZE Resize Host HERE
 	logrus.Warn("Trying to resize a Host...")
 
-	// TODO RESIZE Call this
+	// TODO: RESIZE Call this
 	// servers.Resize()
 
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }

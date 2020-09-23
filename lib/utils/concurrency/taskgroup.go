@@ -93,7 +93,7 @@ func (tg *taskGroup) GetID() (string, error) {
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{taskgroup <id>}".
 func (tg *taskGroup) Signature() string {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, _ := tg.GetID() // FIXME: Later
 	if !Trace.Tasks {
 		return ""
 	}
@@ -126,7 +126,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
 
-	tid, _ := tg.GetID() // FIXME Later
+	tid, _ := tg.GetID() // FIXME: Later
 
 	taskStatus := tg.task.GetStatus()
 	if taskStatus != READY && taskStatus != RUNNING {
@@ -161,7 +161,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 
 // WaitGroup waits for the task to end, and returns the error (or nil) of the execution
 func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, _ := tg.GetID() // FIXME: Later
 
 	taskStatus := tg.task.GetStatus()
 	if taskStatus == DONE {
@@ -231,7 +231,7 @@ func (tg *taskGroup) TryWaitGroup() (bool, TaskGroupResult, error) {
 // If duration elapsed, returns (false, nil, nil)
 // By design, duration cannot be less than 1ms.
 func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult, error) {
-	tid, _ := tg.GetID() // FIXME Later
+	tid, _ := tg.GetID() // FIXME: Later
 
 	if tg.task.GetStatus() != RUNNING {
 		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
@@ -260,7 +260,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult
 
 // // Reset resets the task for reuse
 // func (tg *taskGroup) Reset() (Task, error) {
-// 	tid, _ := tg.GetID() // FIXME Later
+// 	tid, _ := tg.GetID() // FIXME: Later
 
 // 	if tg.task.GetStatus() == RUNNING {
 // 		return nil, fmt.Errorf("cannot reset task group '%s': group is running", tid)

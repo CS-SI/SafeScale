@@ -42,23 +42,23 @@ import (
 )
 
 func (s *Stack) CreateVIP(string, string) (*resources.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) BindHostToVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) UnbindHostFromVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("UnbindHostToVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("UnbindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) DeleteVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME Technical debt
+	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Network, err error) {
@@ -181,7 +181,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}
 		subnets = append(subnets, privateSubnetCidr)
 	} else {
-		logrus.Warn("We should NOT build subnetworks") // FIXME AWS Remove message later
+		logrus.Warn("We should NOT build subnetworks") // FIXME: AWS Remove message later
 		subnets = append(subnets, parentNet)
 	}
 
@@ -388,11 +388,11 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		}
 	}()
 
-	// FIXME Add properties and GatewayID
+	// FIXME: Add properties and GatewayID
 	subnet := resources.NewNetwork()
 	subnet.ID = aws.StringValue(sn.Subnet.SubnetId)
 	subnet.Name = req.Name
-	subnet.CIDR = req.CIDR // FIXME AWS Storing parent CIDR
+	subnet.CIDR = req.CIDR // FIXME: AWS Storing parent CIDR
 	subnet.IPVersion = ipversion.IPv4
 
 	for _, sn := range subnetsResult {
@@ -762,8 +762,8 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 		return nil, userData, err
 	}
 
-	// FIXME AWS Add routing if network is splitted...
-	// FIXME AWS Update gateway id in network
+	// FIXME: AWS Add routing if network is splitted...
+	// FIXME: AWS Update gateway id in network
 
 	return host, userData, err
 }

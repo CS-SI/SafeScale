@@ -868,7 +868,7 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 
 		for _, h := range hosts {
-			tP, _ := w.feature.task.New() // FIXME Later
+			tP, _ := w.feature.task.New() // FIXME: Later
 			primaryGatewayVariables["HostIP"] = h.PrivateIp
 			// if h.Domain != "" {
 			// 	primaryGatewayVariables["Hostname"] = h.Name+"."+h.Domain
@@ -879,7 +879,7 @@ func (w *worker) setReverseProxy() (err error) {
 
 			_, _ = tP.Start(
 				taskApplyProxyRule, data.Map{
-					// FIXME Later
+					// FIXME: Later
 					"ctrl": primaryKongController,
 					"rule": rule,
 					"vars": &primaryGatewayVariables,
@@ -888,7 +888,7 @@ func (w *worker) setReverseProxy() (err error) {
 
 			var errS error
 			if secondaryKongController != nil {
-				tS, _ := w.feature.task.New() // FIXME Later
+				tS, _ := w.feature.task.New() // FIXME: Later
 				secondaryGatewayVariables["HostIP"] = h.PrivateIp
 				// if h.Domain != "" {
 				// 	secondaryGatewayVariables["Hostname"] = h.Name+"."+h.Domain
@@ -927,7 +927,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	hostName := (*vars)["ShortHostname"].(string)
 	ruleName, err := ctrl.Apply(rule, vars)
 
-	// FIXME Check this later
+	// FIXME: Check this later
 	if err != nil {
 		msg := "failed to apply proxy rule"
 		if ruleName != "" {

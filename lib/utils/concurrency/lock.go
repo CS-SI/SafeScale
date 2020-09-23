@@ -62,7 +62,7 @@ func (tm *taskedLock) RLock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks)
 	defer tracer.GoingIn().OnExitTrace()()
 
-	tid, _ := task.GetID() // FIXME Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
 	tm.lock.Lock()
 
@@ -88,7 +88,7 @@ func (tm *taskedLock) RUnlock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
 	defer tracer.OnExitTrace()()
 
-	tid, _ := task.GetID() // FIXME Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -142,7 +142,7 @@ func (tm *taskedLock) Unlock(task Task) {
 	tracer := NewTracer(task, "", Trace.Locks).GoingIn()
 	defer tracer.OnExitTrace()()
 
-	tid, _ := task.GetID() // FIXME Fix locks later
+	tid, _ := task.GetID() // FIXME: Fix locks later
 
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -166,14 +166,14 @@ func (tm *taskedLock) Unlock(task Task) {
 
 // IsRLocked tells if the task is owning a read lock
 func (tm *taskedLock) IsRLocked(task Task) bool {
-	taskid, _ := task.GetID() // FIXME Fix locks later
+	taskid, _ := task.GetID() // FIXME: Fix locks later
 	_, ok := tm.readLocks[taskid]
 	return ok
 }
 
 // IsLocked tells if the task is owning a write lock
 func (tm *taskedLock) IsLocked(task Task) bool {
-	taskid, _ := task.GetID() // FIXME Fix locks later
+	taskid, _ := task.GetID() // FIXME: Fix locks later
 	_, ok := tm.writeLocks[taskid]
 	return ok
 }

@@ -103,7 +103,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 	return volumes, nil
 }
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // Delete deletes volume referenced by ref
 func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error) {
@@ -404,7 +404,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 		return "", err
 	}
 
-	// FIXME Handle volume.Formatted
+	// FIXME: Handle volume.Formatted
 	if volume.ManagedByLVM {
 		if len(volume.PVM) != 0 {
 			if volume.Formatted {
@@ -931,7 +931,7 @@ func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostNam
 				return scerr.Wrap(err, "can't attach volume")
 			}
 
-			// FIXME Verfication
+			// FIXME: Verfication
 			err = host.Properties.LockForRead(hostproperty.MountsV1).ThenUse(
 				func(data data.Clonable) error {
 					// Updates host properties
@@ -963,7 +963,7 @@ func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostNam
 			return scerr.Wrap(err, "can't attach volume")
 		}
 
-		// FIXME new attachment ID problematic
+		// FIXME: new attachment ID problematic
 
 		err = host.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(
 			func(data data.Clonable) error {
@@ -1047,7 +1047,7 @@ func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostNam
 			return scerr.Wrap(err, "can't attach volume")
 		}
 
-		// FIXME use functions to handle structs
+		// FIXME: use functions to handle structs
 
 		mountPoint := path
 		if path == resources.DefaultVolumeMountPoint {
@@ -1401,7 +1401,7 @@ func (handler *VolumeHandler) Expand(ctx context.Context, volumeName, hostName s
 		return err
 	}
 
-	// FIXME Use recovered info from string
+	// FIXME: Use recovered info from string
 	_, err = server.ExpandVGDevice("", volumeName, mountInfo.FileSystem, false, deviceNames)
 	if err != nil {
 		return err
@@ -1518,7 +1518,7 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 		return err
 	}
 
-	// FIXME Rename structs
+	// FIXME: Rename structs
 	type smp struct {
 		uuid       string
 		mountpoint string
@@ -1689,7 +1689,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 							}
 							err = nfsServer.UnmountBlockDevice(attachment.Device)
 							if err != nil {
-								// FIXME Think about this
+								// FIXME: Think about this
 								logrus.Error(err)
 								// return err
 							}

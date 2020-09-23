@@ -172,7 +172,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 		// finishCh:   make(chan struct{}, 1),
 	}
 
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 	t.sig = fmt.Sprintf("{task %s}", tid)
 
 	return &t, nil
@@ -371,7 +371,7 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error)
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	status := t.GetStatus()
 	if status == DONE {
@@ -395,7 +395,7 @@ func (t *task) Wait() (TaskResult, error) {
 // If task aborted, returns (true, utils.ErrAborted)
 // If task still running, returns (false, nil)
 func (t *task) TryWait() (bool, TaskResult, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	status := t.GetStatus()
 	if status == DONE {
@@ -420,7 +420,7 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 // If task aborted, returns (true, scerr.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, scerr.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
-	tid, _ := t.GetID() // FIXME Later
+	tid, _ := t.GetID() // FIXME: Later
 
 	status := t.GetStatus()
 	if status == DONE {
@@ -451,7 +451,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 // Reset resets the task for reuse
 // VPL: DISABLED; need fix or definitive removal
 // func (t *task) Reset() (Task, error) {
-// 	tid, _ := t.GetID() // FIXME Later
+// 	tid, _ := t.GetID() // FIXME: Later
 
 // 	status := t.GetStatus()
 // 	if status == RUNNING {

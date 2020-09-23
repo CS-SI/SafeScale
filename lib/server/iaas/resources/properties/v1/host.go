@@ -321,7 +321,7 @@ func (hv *HostVolumes) Clone() data.Clonable {
 	return NewHostVolumes().Replace(hv)
 }
 
-// FIXME Improve this function...
+// FIXME: Improve this function...
 func (hv *HostVolumes) AddHostVolume(hostVolID string, hostVolName string, attachmentID string, volumeUUID string) {
 	if hostVolID == "" || hostVolName == "" || attachmentID == "" || volumeUUID == "" {
 		panic("Invalid input")
@@ -337,7 +337,7 @@ func (hv *HostVolumes) AddHostVolume(hostVolID string, hostVolName string, attac
 	hv.DevicesByID[hostVolID] = volumeUUID
 }
 
-// FIXME Improve this function
+// FIXME: Improve this function
 func (hv *HostVolumes) UpdateUUID(hostVolID string, volumeUUID string) error {
 	if hostVolID == "" || volumeUUID == "" {
 		panic("Invalid input")

@@ -40,7 +40,7 @@ type Volume struct {
 	State  volumestate.Enum `json:"state,omitempty"`
 	SizeVU int              `json:"sizevu,omitempty"`
 
-	// FIXME SizeVU is a new parameter, is not initialized
+	// FIXME: SizeVU is a new parameter, is not initialized
 
 	ManagedByLVM bool `json:"managedbyLVM,omitempty"`
 	Formatted    bool `json:"formatted,omitempty"`
