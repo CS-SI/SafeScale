@@ -256,7 +256,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	gatewaysDef := complementHostDefinition(
 		req.GatewaysDef, gatewaysDefault,
-	) // FIXME OPP Issue warning if not enough size
+	) // FIXME: OPP Issue warning if not enough size
 
 	if lower, err := gatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
 		if !req.Force {
@@ -287,7 +287,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 	// Note: no way yet to define master sizing from cli...
 	mastersDefault.ImageId = imageID
-	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault) // FIXME OPP Issue warning if not enough size
+	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault) // FIXME: OPP Issue warning if not enough size
 
 	if lower, err := mastersDef.LowerThan(mastersDefault); err == nil && lower {
 		if !req.Force {
@@ -312,7 +312,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 	nodesDefault.ImageId = imageID
-	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault) // FIXME OPP Issue warning if not enough size
+	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault) // FIXME: OPP Issue warning if not enough size
 
 	if lower, err := nodesDef.LowerThan(nodesDefault); err == nil && lower {
 		if !req.Force {
@@ -604,7 +604,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Step 2: waits for gateway installation end and masters installation end
 	_, primaryGatewayStatus = primaryGatewayTask.Wait()
 	if primaryGatewayStatus != nil {
-		_ = mastersTask.Abort() // FIXME Handle aborts
+		_ = mastersTask.Abort() // FIXME: Handle aborts
 		_ = privateNodesTask.Abort()
 		return primaryGatewayStatus
 	}
@@ -1547,7 +1547,7 @@ func uploadTemplateToFile(
 		return "", fmt.Errorf("failed to parse template: %s", err.Error())
 	}
 
-	// FIXME Time and again
+	// FIXME: Time and again
 	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
 	data["TemplateOperationTimeout"] = strings.Replace(
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,

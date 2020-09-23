@@ -71,7 +71,7 @@ func TestCreate(t *testing.T) {
 
 	listeners.VolumeHandler = func(svc iaas.Service) handlers.VolumeAPI {
 		return nil
-		// TODO Fix this test
+		// TODO: Fix this test
 		// return myMockedVolService
 	}
 
@@ -84,7 +84,7 @@ func TestCreate(t *testing.T) {
 
 	underTest := &listeners.VolumeListener{}
 
-	// FIXME Rebuild mocks (nil context not allowed)
+	// FIXME: Rebuild mocks (nil context not allowed)
 	t.Skip()
 
 	// ACT
@@ -129,7 +129,7 @@ func TestCreate_Err(t *testing.T) {
 	defer func() { listeners.VolumeHandler = old }()
 
 	listeners.VolumeHandler = func(api iaas.Service) handlers.VolumeAPI {
-		// TODO Fix this test
+		// TODO: Fix this test
 		return nil
 		// return myMockedVolService
 	}
@@ -143,7 +143,7 @@ func TestCreate_Err(t *testing.T) {
 
 	underTest := &listeners.VolumeListener{}
 
-	// FIXME Rebuild mocks (nil context not allowed)
+	// FIXME: Rebuild mocks (nil context not allowed)
 	t.Skip()
 
 	// ACT
@@ -168,7 +168,7 @@ func TestCreate_Err_NoTenantSet(t *testing.T) {
 	myMockedVolService := &MyMockedVolService{err: errors.New("plop")}
 	underTest := &listeners.VolumeListener{}
 
-	// FIXME Rebuild mocks (nil context not allowed)
+	// FIXME: Rebuild mocks (nil context not allowed)
 	t.Skip()
 
 	// ACT

@@ -41,7 +41,7 @@ import (
 // safescale volume inspect v1
 // safescale volume update v1 --speed="HDD" --size=1000
 
-// FIXME Think about this
+// FIXME: Think about this
 // //go:generate mockgen -destination=../mocks/mock_volumeserviceserver.go -package=mocks github.com/CS-SI/SafeScale/lib VolumeServiceServer
 
 // VolumeHandler ...
@@ -144,7 +144,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 
 // Extend extends a volume
 func (s *VolumeListener) Expand(ctx context.Context, in *pb.VolumeSizeChange) (*googleprotobuf.Empty, error) {
-	// FIXME Change expand logs
+	// FIXME: Change expand logs
 	log.Debugf("Received expand command with %s, %d, %s", in.VolumeName.Name, in.ChangeSize, in.ChangeSizeType)
 
 	volumeName := in.GetVolumeName().GetName()
@@ -168,7 +168,7 @@ func (s *VolumeListener) Expand(ctx context.Context, in *pb.VolumeSizeChange) (*
 
 // Shrink shrinks a volume
 func (s *VolumeListener) Shrink(ctx context.Context, in *pb.VolumeSizeChange) (*googleprotobuf.Empty, error) {
-	// FIXME Change shrink logs
+	// FIXME: Change shrink logs
 	log.Debugf("Received shrink command with %s, %d, %s", in.VolumeName.Name, in.ChangeSize, in.ChangeSizeType)
 
 	volumeName := in.GetVolumeName().GetName()

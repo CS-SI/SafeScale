@@ -310,7 +310,7 @@ func (svc *service) SelectTemplatesBySize(sizing resources.SizingRequirements, f
 
 	scannerTpls := map[string]bool{}
 
-	// FIXME Prevent GPUs when user sends a 0
+	// FIXME: Prevent GPUs when user sends a 0
 	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinFreq != 0
 	if askedForSpecificScannerInfo {
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
@@ -616,7 +616,7 @@ func (svc *service) SearchImage(osname string) (*resources.Image, error) {
 			}
 		}
 
-		// FIXME Fix AWS Mappings for other regions other than eu-central-1
+		// FIXME: Fix AWS Mappings for other regions other than eu-central-1
 		if region == "eu-central-1" {
 			// CentOS
 			if insensitiveContains(osname, "Centos 7.3") {

@@ -44,7 +44,7 @@ const protocolSeparator = ":"
 
 //go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers SSHAPI
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // SSHAPI defines ssh management API
 type SSHAPI interface {

@@ -48,7 +48,7 @@ func Test_Command(t *testing.T) {
 	}
 	cmd, err := sshConf.Command("whoami")
 	assert.Nil(t, err)
-	out, err := cmd.Output() // FIXME Correct this test
+	out, err := cmd.Output() // FIXME: Correct this test
 	if err != nil {
 		t.Skip()
 	}

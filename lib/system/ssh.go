@@ -211,7 +211,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, e
 		defaultTmpDir = ""
 	}
 
-	f, err := ioutil.TempFile(defaultTmpDir, "") // TODO Windows friendly
+	f, err := ioutil.TempFile(defaultTmpDir, "") // TODO: Windows friendly
 	if err != nil {
 		return nil, err
 	}

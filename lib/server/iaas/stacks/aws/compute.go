@@ -270,7 +270,7 @@ func createFilters() []*ec2.Filter {
 		},
 	}
 
-	// FIXME AWS CentOS AND Others
+	// FIXME: AWS CentOS AND Others
 	owners := []*string{
 		aws.String("099720109477"), // Ubuntu
 		aws.String("013116697141"), // Fedora
@@ -671,7 +671,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 			var server *resources.Host
 
-			// FIXME AWS Here the defaultNetwork.ID must be different if the network is splitted
+			// FIXME: AWS Here the defaultNetwork.ID must be different if the network is splitted
 			trick := request.Spot
 			if trick {
 				netID := defaultNetwork.ID
@@ -752,7 +752,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if err != nil { // FIXME Handle error groups
+		if err != nil { // FIXME: Handle error groups
 			logrus.Infof("Cleanup, deleting host '%s'", host.Name)
 			derr := s.DeleteHost(host.ID)
 			if derr != nil {
@@ -982,7 +982,7 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 			},
 			UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
 		},
-		SpotPrice: lastPrice.SpotPrice, // FIXME Round up
+		SpotPrice: lastPrice.SpotPrice, // FIXME: Round up
 		Type:      aws.String("one-time"),
 	}
 
@@ -1002,7 +1002,7 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 
 	instance := result.SpotInstanceRequests[0]
 
-	// FIXME Listen to result.SpotInstanceRequests[0].State
+	// FIXME: Listen to result.SpotInstanceRequests[0].State
 
 	host := resources.Host{
 		ID:   aws.StringValue(instance.InstanceId),
@@ -1633,5 +1633,5 @@ func (s *Stack) RebootHost(id string) error {
 }
 
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }

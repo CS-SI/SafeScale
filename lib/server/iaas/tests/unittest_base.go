@@ -16,7 +16,7 @@
 
 package tests
 
-// TODO NOTICE Side-effects imports here
+// TODO: NOTICE Side-effects imports here
 import (
 	"fmt"
 	"testing"
@@ -576,7 +576,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	// TODO: handle kp delete
 	net, gw := tester.CreateNetwork(t, "unit_test_network_5", true, "192.168.8.0/24")
 
-	// FIXME Handle test errors
+	// FIXME: Handle test errors
 	defer func() {
 		_ = tester.Service.DeleteGateway(gw.ID)
 		defer func() {
@@ -759,12 +759,12 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 
 // GetImage ...
 func (tester *ServiceTester) GetImage(t *testing.T) {
-	// TODO Implement this test
+	// TODO: Implement this test
 }
 
 // GetTemplate ...
 func (tester *ServiceTester) GetTemplate(t *testing.T) {
-	// TODO Implement this test
+	// TODO: Implement this test
 }
 
-// TODO Implement missing methods here (Look at TODO Implement Test)
+// TODO: Implement missing methods here (Look at TODO Implement Test)

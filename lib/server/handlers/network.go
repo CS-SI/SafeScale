@@ -54,7 +54,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_networkapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers NetworkAPI
 
-// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
@@ -394,7 +394,7 @@ func (handler *NetworkHandler) Create(
 				if derr != nil {
 					switch derr.(type) {
 					case scerr.ErrTimeout:
-						logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+						logrus.Warnf("We should wait") // FIXME: Wait until gateway no longer exists
 					default:
 					}
 					err = scerr.AddConsequence(err, derr)
@@ -403,7 +403,7 @@ func (handler *NetworkHandler) Create(
 				if dmerr != nil {
 					switch dmerr.(type) {
 					case scerr.ErrTimeout:
-						logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+						logrus.Warnf("We should wait") // FIXME: Wait until gateway no longer exists
 					default:
 					}
 					err = scerr.AddConsequence(err, dmerr)
@@ -437,7 +437,7 @@ func (handler *NetworkHandler) Create(
 					if derr != nil {
 						switch derr.(type) {
 						case scerr.ErrTimeout:
-							logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+							logrus.Warnf("We should wait") // FIXME: Wait until gateway no longer exists
 						default:
 						}
 						err = scerr.AddConsequence(err, derr)
@@ -446,7 +446,7 @@ func (handler *NetworkHandler) Create(
 					if dmerr != nil {
 						switch dmerr.(type) {
 						case scerr.ErrTimeout:
-							logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+							logrus.Warnf("We should wait") // FIXME: Wait until gateway no longer exists
 						default:
 						}
 						err = scerr.AddConsequence(err, dmerr)

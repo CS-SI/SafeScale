@@ -137,7 +137,7 @@ type HostRequest struct {
 	TemplateID string
 	// ImageID is the UUID of the image that contains the server's OS and initial state.
 	ImageID string
-	// KeyPair is the (mandatory) specific KeyPair to use (if not provided, a new KeyPair will be generated) // FIXME Add govalidator here
+	// KeyPair is the (mandatory) specific KeyPair to use (if not provided, a new KeyPair will be generated) // FIXME: Add govalidator here
 	KeyPair *KeyPair
 	// Password contains the safescale password usable on host console only
 	Password string
@@ -259,7 +259,7 @@ func (h *Host) GetPrivateIP() string {
 				if ip == "" {
 					ip = hostNetworkV1.IPv6Addresses[hostNetworkV1.DefaultNetworkID]
 				}
-				if ip == "" { // FIXME AWS Fix for subnetworks
+				if ip == "" { // FIXME: AWS Fix for subnetworks
 					for _, value := range hostNetworkV1.IPv4Addresses {
 						if value != "" {
 							ip = value

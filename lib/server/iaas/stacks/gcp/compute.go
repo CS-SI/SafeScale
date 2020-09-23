@@ -164,7 +164,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 // ListKeyPairs lists available key pairs
 func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
@@ -735,7 +735,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 func fromMachineTypeToAllocatedSize(machineType string) propsv1.HostSize {
 	hz := propsv1.HostSize{}
 
-	// FIXME Implement mapping
+	// FIXME: Implement mapping
 
 	return hz
 }
@@ -830,7 +830,7 @@ func (s *Stack) DeleteHost(id string) (err error) {
 
 // ResizeHost change the template used by an host
 func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME Technical debt
+	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts

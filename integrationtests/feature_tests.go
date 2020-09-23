@@ -109,7 +109,7 @@ func RemoteDesktop(t *testing.T, provider providers.Enum) {
 	out, err = GetOutput("safescale host add-feature --skip-proxy --param Password=SafeScale " + names.Hosts[0] + " remotedesktop")
 	require.True(t, strings.Contains(out, "success"))
 
-	// TODO : try to connect to the host through guacamole?
+	// TODO: try to connect to the host through guacamole?
 	out, err = GetOutput("wget " + host.PublicIP + ":9080/guacamole")
 	fmt.Println(out)
 
@@ -274,19 +274,19 @@ func Heartbeat(t *testing.T, provider providers.Enum) {
 }
 
 func Metricbeat(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Filebeat(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func NvidiaDocker(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func ProxyCacheClient(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func ProxyCacheServer(t *testing.T, provider providers.Enum) {
@@ -338,17 +338,17 @@ func ProxyCacheServer(t *testing.T, provider providers.Enum) {
 }
 
 func ApacheIgnite(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Helm(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Kubernetes(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Spark(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
