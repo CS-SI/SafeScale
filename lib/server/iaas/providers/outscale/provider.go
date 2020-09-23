@@ -33,6 +33,8 @@ import (
 // see https://docs.outscale.com/api
 type provider struct {
 	outscale.Stack
+
+	tenantParameters map[string]interface{}
 }
 
 func remap(s interface{}) map[string]interface{} {
@@ -161,7 +163,9 @@ func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, erro
 	if err != nil {
 		return nil, err
 	}
+
 	p.Stack = *stack
+	p.tenantParameters = opt
 
 	evalid := apiprovider.NewValidatedProvider(p, providerName)
 	etrace := apiprovider.NewErrorTraceProvider(evalid, providerName)
@@ -209,9 +213,8 @@ func (p *provider) GetName() string {
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-// TODO
 func (p *provider) GetTenantParameters() map[string]interface{} {
-	return nil
+	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
@@ -223,7 +226,6 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 	}
 }
 
-// TODO init when finished
 func init() {
 	iaas.Register("outscale", &provider{})
 }
