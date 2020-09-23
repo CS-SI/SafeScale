@@ -889,18 +889,25 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		}
 	}()
 
-	// if Floating IP are used and public address is requested
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
 		logrus.Trace("Creating floating ip")
 
+		// if Floating IP are used and public address is requested
+		if s.cfgOpts.UseLegacyFloatingIP {
+			_, errFip := s.CreateFloatingIP()
+			if errFip != nil {
+				logrus.Warn("failure creating floating ip with legacy method")
+			}
+		}
+
 		// Create the floating IP
-		ip, err := floatingips.Create(
+		ip, ierr := floatingips.Create(
 			s.ComputeClient, floatingips.CreateOpts{
 				Pool: s.authOpts.FloatingIPPool,
 			},
 		).Extract()
-		if err != nil {
-			return nil, userData, scerr.Wrap(err, fmt.Sprintf(msgFail, ProviderErrorToString(err)))
+		if ierr != nil {
+			return nil, userData, scerr.Wrap(ierr, fmt.Sprintf(msgFail, ProviderErrorToString(ierr)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -1200,53 +1207,6 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 		logrus.Warnf("Hosts lists empty !")
 	}
 	return hosts, nil
-}
-
-// getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
-func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
-	var fips []floatingips.FloatingIP
-
-	pager := floatingips.List(s.ComputeClient)
-	retryErr := retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			err := pager.EachPage(
-				func(page pagination.Page) (bool, error) {
-					list, err := floatingips.ExtractFloatingIPs(page)
-					if err != nil {
-						return false, err
-					}
-
-					for _, fip := range list {
-						if fip.InstanceID == hostID {
-							fips = append(fips, fip)
-						}
-					}
-					return true, nil
-				},
-			)
-			return err
-		},
-		temporal.GetDefaultDelay()*2,
-	)
-	if len(fips) == 0 {
-		if retryErr != nil {
-			return nil, scerr.NotFoundError(
-				fmt.Sprintf(
-					"no floating IP found for host '%s': %s", hostID, ProviderErrorToString(retryErr),
-				),
-			)
-		}
-		return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s'", hostID))
-	}
-	if len(fips) > 1 {
-		return nil, scerr.InconsistentError(
-			fmt.Sprintf(
-				"Configuration error, more than one Floating IP associated to host '%s'", hostID,
-			),
-		)
-	}
-	return &fips[0], nil
 }
 
 // DeleteHost deletes the host identified by id
