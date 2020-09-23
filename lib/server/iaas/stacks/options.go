@@ -99,6 +99,9 @@ type ConfigurationOptions struct {
 	// UseFloatingIP indicates if floating IP are used (optional)
 	UseFloatingIP bool
 
+	// UseLegacyFloatingIP indicates if the api V1 must be used to create a floating IP
+	UseLegacyFloatingIP bool
+
 	// UseLayer3Networking indicates if layer 3 networking features (router) can be used
 	// if UseFloatingIP is true UseLayer3Networking must be true
 	UseLayer3Networking bool
