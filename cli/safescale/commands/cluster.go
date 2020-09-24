@@ -381,7 +381,7 @@ var clusterCreateCommand = cli.Command{
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		SWARM: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[7-16], disk=[80]), nodes(cpu=[4-8], ram=[7-16], disk=[80])
 		OHPC: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[7-16], disk=[80])
-		DCOS: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[800]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
+		DCOS: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[80]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])
 	`,
 		},

@@ -118,7 +118,7 @@ func masterSizing(task concurrency.Task, foreman control.Foreman) *pb.HostDefini
 			MaxCpuCount: 8,
 			MinRamSize:  15.0,
 			MaxRamSize:  32.0,
-			MinDiskSize: 800,
+			MinDiskSize: 80,
 			GpuCount:    -1,
 		},
 	}
