@@ -491,14 +491,16 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	}
 
 	// FIXME: AWS Remove logs
-	if len(request.Networks) == 1 {
-		if s.Config.BuildSubnetworks {
-			logrus.Warnf("We need either recalculate network segments here or pass the data through metadata")
-			logrus.Warnf("Working network: %s", spew.Sdump(request.Networks[0]))
+	/*
+		if len(request.Networks) == 1 {
+			if s.Config.BuildSubnetworks {
+				logrus.Warnf("We need either recalculate network segments here or pass the data through metadata")
+				logrus.Warnf("Working network: %s", spew.Sdump(request.Networks[0]))
+			}
+		} else {
+			logrus.Warnf("Choosing between networks: %s", spew.Sdump(request.Networks))
 		}
-	} else {
-		logrus.Warnf("Choosing between networks: %s", spew.Sdump(request.Networks))
-	}
+	*/
 
 	err = s.ImportKeyPair(request.KeyPair)
 	if err != nil {
