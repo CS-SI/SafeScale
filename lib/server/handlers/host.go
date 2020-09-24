@@ -936,7 +936,7 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 		fwDumpName1 := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/firewall-trusted.cfg", host.Name))
 		fwDumpName2 := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/firewall-public.cfg", host.Name))
 
-		_, _, _, err := sshHandler.RunWithTimeout(ctx, host.Name, "whoami", outputs.COLLECT, 10*time.Second)
+		_, _, _, err := sshHandler.RunWithTimeout(ctx, host.Name, "whoami", outputs.COLLECT, 60*time.Second)
 		if err == nil { // If there's no ssh connection, no need to wait
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
