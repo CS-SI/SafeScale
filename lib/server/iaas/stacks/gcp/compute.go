@@ -508,7 +508,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 		tag = fmt.Sprintf("no-ip-%s", subnetwork)
 	}
 
-	logrus.Warnf("Receiving a disk request of %d", template.DiskSize)
+	// logrus.Warnf("Receiving a disk request of %d", template.DiskSize)
 
 	instance := &compute.Instance{
 		Name:         instanceName,

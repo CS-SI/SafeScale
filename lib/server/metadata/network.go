@@ -546,7 +546,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 
 	tracer := debug.NewTracer(nil, "(<iaas.Service>, '"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	mn, err = NewNetwork(svc)
 	if err != nil {
