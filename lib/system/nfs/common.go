@@ -169,9 +169,6 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 				return err
 			}
 			cmdResult, err := sshCmd.Output()
-			stdout = string(cmdResult)
-			stderr = ""
-			retcode = 0
 			if err != nil {
 				if ee, ok := err.(*exec.ExitError); ok {
 					if status, ok := ee.Sys().(syscall.WaitStatus); ok {
@@ -180,6 +177,8 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 					stderr = string(ee.Stderr)
 				}
 			}
+
+			stdout = string(cmdResult)
 			return err
 		},
 		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(temporal.GetContextTimeout())),

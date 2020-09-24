@@ -350,16 +350,21 @@ func (sc *SSHCommand) closeTunneling() error {
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
 // Wait releases any resources associated with the cmd.
-func (sc *SSHCommand) Wait() error {
-	err := sc.cmd.Wait()
-	nerr := sc.cleanup()
+func (sc *SSHCommand) Wait() (err error) {
+	defer func() {
+		nerr := sc.cleanup()
+		if nerr != nil {
+			logrus.Warnf("Error waiting for command cleanup: %v", nerr)
+			err = nerr
+		}
+	}()
+
+	err = sc.cmd.Wait()
 	if err != nil {
 		return err
 	}
-	if nerr != nil {
-		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
-	}
-	return nerr
+
+	return err
 }
 
 // Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
@@ -391,29 +396,51 @@ func (sc *SSHCommand) StdinPipe() (io.WriteCloser, error) {
 // Output runs the command and returns its standard output.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
-func (sc *SSHCommand) Output() ([]byte, error) {
+func (sc *SSHCommand) Output() (_ []byte, err error) {
+	if sc.cmd.Stdout != nil {
+		return []byte(""), nil
+	}
+
+	defer func() {
+		nerr := sc.cleanup()
+		if nerr != nil {
+			logrus.Warnf("Error waiting for command cleanup: %v", nerr)
+			err = nerr
+		}
+	}()
+
 	content, err := sc.cmd.Output()
-	nerr := sc.cleanup()
 	if err != nil {
 		return nil, err
 	}
-	if nerr != nil {
-		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
-	}
+
 	return content, err
 }
 
 // CombinedOutput runs the command and returns its combined standard
 // output and standard error.
-func (sc *SSHCommand) CombinedOutput() ([]byte, error) {
+func (sc *SSHCommand) CombinedOutput() (_ []byte, err error) {
+	if sc.cmd.Stdout != nil {
+		return []byte(""), nil
+	}
+
+	if sc.cmd.Stderr != nil {
+		return []byte(""), nil
+	}
+
+	defer func() {
+		nerr := sc.cleanup()
+		if nerr != nil {
+			logrus.Warnf("Error waiting for command cleanup: %v", nerr)
+			err = nerr
+		}
+	}()
+
 	content, err := sc.cmd.CombinedOutput()
-	nerr := sc.cleanup()
 	if err != nil {
 		return nil, err
 	}
-	if nerr != nil {
-		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
-	}
+
 	return content, err
 }
 
