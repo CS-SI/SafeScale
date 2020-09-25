@@ -56,6 +56,7 @@ Each `tenants` section contains specific authentication parameters for each Clou
 >    - gcp
 >    - local (unstable, not compiled by default, cf this [documentation](LIBVIRT_PROVIDER.md))
 >    - openstack (pure OpenStack support)
+>    - outscale
 >    - opentelekom
 >    - outscale
 >    - ovh
