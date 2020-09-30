@@ -45,6 +45,7 @@ set -x
 sfApt() {
     rc=-1
     DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+    [ $rc -eq -1 ] && return 1
     return $rc
 }
 export -f sfApt
@@ -57,6 +58,7 @@ sfYum() {
     else
         yum "$@" && rc=$?
     fi
+    [ $rc -eq -1 ] && return 1
     return $rc
 }
 export -f sfYum
