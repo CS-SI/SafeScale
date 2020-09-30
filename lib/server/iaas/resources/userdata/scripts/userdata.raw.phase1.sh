@@ -61,15 +61,50 @@ sfYum() {
 }
 export -f sfYum
 
+# sfRetry <timeout> <delay> command
+# retries command until success, with sleep of <delay> seconds
+sfRetry() {
+    local timeout=$1
+    local delay=$2
+    shift 2
+    local result
+
+    { code=$(</dev/stdin); } <<-EOF
+        fn() {
+            local r
+            local rc
+            while true; do
+                r=\$($*)
+                rc=\$?
+                [ \$rc -eq 0 ] && echo \$r && break
+                sleep $delay
+            done
+            return \$rc
+        }
+        export -f fn
+EOF
+    eval "$code"
+    result=$(timeout $timeout bash -c -x fn)
+    rc=$?
+    unset fn
+    [ $rc -eq 0 ] && echo $result && return 0
+    echo "sfRetry: timeout!"
+    return $rc
+}
+export -f sfRetry
+
 LINUX_KIND=
 VERSION_ID=
 FULL_VERSION_ID=
+FULL_HOSTNAME=
+
 
 sfDetectFacts() {
     [[ -f /etc/os-release ]] && {
         . /etc/os-release
         LINUX_KIND=$ID
         FULL_HOSTNAME=$VERSION_ID
+        FULL_VERSION_ID=$VERSION_ID
     } || {
         which lsb_release &>/dev/null && {
             LINUX_KIND=$(lsb_release -is)
@@ -164,6 +199,8 @@ put_hostname_in_hosts() {
     FULL_HOSTNAME="{{ .HostName }}"
     SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
+    echo "" >>/etc/hosts
+    echo "127.0.0.1 ${SHORT_HOSTNAME}" >>/etc/hosts
     echo "${SHORT_HOSTNAME}" >/etc/hostname
     hostname "${SHORT_HOSTNAME}"
 }
@@ -347,10 +384,24 @@ function compatible_network() {
     # Try installing network-scripts if available
     case $LINUX_KIND in
     redhat | rhel | centos | fedora)
-        sfYum install -q -y network-scripts || true
+        sfRetry 3m 5 "sfYum install -q -y network-scripts" || true
         ;;
     *) ;;
     esac
+}
+
+function silent_compatible_network() {
+    # If network works, try to install network-scripts; if install fails, no need to log this because the gateway is not yet configured
+    op=-1
+    is_network_reachable && op=$? || true
+    if [[ ${op} -eq 0 ]]; then
+        case $LINUX_KIND in
+        redhat | rhel | centos | fedora)
+            sfRetry 3m 5 "sfYum install -q -y network-scripts &>/dev/null" || true
+            ;;
+        *) ;;
+        esac
+    fi
 }
 
 # ---- Main
@@ -365,7 +416,7 @@ disable_cloudinit_network_autoconf
 disable_services
 create_user
 
-compatible_network
+silent_compatible_network
 
 ensure_network_connectivity || true
 

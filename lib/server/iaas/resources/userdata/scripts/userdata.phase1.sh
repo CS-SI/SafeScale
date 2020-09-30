@@ -61,6 +61,38 @@ sfYum() {
 }
 export -f sfYum
 
+# sfRetry <timeout> <delay> command
+# retries command until success, with sleep of <delay> seconds
+sfRetry() {
+    local timeout=$1
+    local delay=$2
+    shift 2
+    local result
+
+    { code=$(</dev/stdin); } <<-EOF
+        fn() {
+            local r
+            local rc
+            while true; do
+                r=\$($*)
+                rc=\$?
+                [ \$rc -eq 0 ] && echo \$r && break
+                sleep $delay
+            done
+            return \$rc
+        }
+        export -f fn
+EOF
+    eval "$code"
+    result=$(timeout $timeout bash -c -x fn)
+    rc=$?
+    unset fn
+    [ $rc -eq 0 ] && echo $result && return 0
+    echo "sfRetry: timeout!"
+    return $rc
+}
+export -f sfRetry
+
 LINUX_KIND=
 VERSION_ID=
 FULL_VERSION_ID=
@@ -359,13 +391,17 @@ function compatible_network() {
 }
 
 function silent_compatible_network() {
-    # Try installing network-scripts if available, no need to log this because the gateway is not yet configured
-    case $LINUX_KIND in
-    redhat | rhel | centos | fedora)
-        sfRetry 3m 5 "sfYum install -q -y network-scripts &>/dev/null" || true
-        ;;
-    *) ;;
-    esac
+    # If network works, try to install network-scripts; if install fails, no need to log this because the gateway is not yet configured
+    op=-1
+    is_network_reachable && op=$? || true
+    if [[ ${op} -eq 0 ]]; then
+        case $LINUX_KIND in
+        redhat | rhel | centos | fedora)
+            sfRetry 3m 5 "sfYum install -q -y network-scripts &>/dev/null" || true
+            ;;
+        *) ;;
+        esac
+    fi
 }
 
 # ---- Main

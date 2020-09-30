@@ -661,7 +661,7 @@ func (s *Stack) deleteSubnet(id string) error {
 			if r.StatusCode == 204 || r.StatusCode == 404 {
 				return nil
 			}
-			return scerr.Errorf(fmt.Sprintf("DELETE command failed with status %d", r.StatusCode), nil)
+			return scerr.Errorf(fmt.Sprintf("DELETE command failed with status %d and body %s", r.StatusCode, r.Body), nil)
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.BackoffSelector()(temporal.GetDefaultDelay()),
