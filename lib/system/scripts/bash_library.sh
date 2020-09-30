@@ -62,18 +62,24 @@ export -f sfWaitForApt
 
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 sfApt() {
+    rc=-1
     sfWaitForApt
-    DEBIAN_FRONTEND=noninteractive apt "$@"
+    DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+    [ $rc -eq -1 ] && return 1
+    return $rc
 }
 export -f sfApt
 
 # try using dnf instead of yum if available
 sfYum() {
+    rc=-1
     if [[ -n $(which dnf) ]]; then
-        dnf "$@"
+        dnf "$@" && rc=$?
     else
-        yum "$@"
+        yum "$@" && rc=$?
     fi
+    [ $rc -eq -1 ] && return 1
+    return $rc
 }
 export -f sfYum
 
