@@ -26,9 +26,9 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -59,7 +59,7 @@ func NewHost(svc iaas.Service) (*Host, error) {
 
 func (mh *Host) OK() (bool, error) {
 	if mh == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 
 	if mh.id == nil && mh.name == nil {
@@ -78,7 +78,7 @@ func (mh *Host) OK() (bool, error) {
 // Carry links an host instance to the Metadata instance
 func (mh *Host) Carry(host *resources.Host) (*Host, error) {
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "cannot be nil!")
+		return nil, fail.InvalidParameterError("host", "cannot be nil!")
 	}
 	if host.Properties == nil {
 		host.Properties = serialize.NewJSONProperties("resources")
@@ -92,10 +92,10 @@ func (mh *Host) Carry(host *resources.Host) (*Host, error) {
 // Get returns the Network instance linked to metadata
 func (mh *Host) Get() (*resources.Host, error) {
 	if mh == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return nil, scerr.InvalidParameterError("mh.item", "cannot be nil")
+		return nil, fail.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
 	gh := mh.item.Get().(*resources.Host)
@@ -105,15 +105,15 @@ func (mh *Host) Get() (*resources.Host, error) {
 // Write updates the metadata corresponding to the host in the Object Storage
 func (mh *Host) Write() (err error) {
 	if mh == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return fail.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "('"+*mh.id+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = mh.item.WriteInto(ByNameFolderName, *mh.name)
 	if err != nil {
@@ -125,18 +125,18 @@ func (mh *Host) Write() (err error) {
 // ReadByReference ...
 func (mh *Host) ReadByReference(ref string) (err error) {
 	if mh == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidInstanceContentError("mh.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mh.item", "cannot be nil")
 	}
 	if ref == "" {
-		return scerr.InvalidParameterError("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	var errors []error
 	err1 := mh.mayReadByID(ref) // First read by ID ...
@@ -151,18 +151,18 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 
 	if len(errors) == 2 {
 		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
-			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
 		}
 
-		if _, ok := err1.(scerr.ErrNotFound); ok {
-			if _, ok := err2.(scerr.ErrNotFound); ok {
-				return scerr.NotFoundErrorWithCause(
-					fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors),
+		if _, ok := err1.(fail.ErrNotFound); ok {
+			if _, ok := err2.(fail.ErrNotFound); ok {
+				return fail.NotFoundErrorWithCause(
+					fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors),
 				)
 			}
 		}
 
-		return scerr.ErrListError(errors)
+		return fail.ErrListError(errors)
 	}
 
 	return nil
@@ -215,18 +215,18 @@ func (mh *Host) mayReadByName(name string) (err error) {
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (mh *Host) ReadByID(id string) (err error) {
 	if mh == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidInstanceContentError("mh.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mh.item", "cannot be nil")
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
+		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	return mh.mayReadByID(id)
 }
@@ -234,18 +234,18 @@ func (mh *Host) ReadByID(id string) (err error) {
 // ReadByName reads the metadata of a host identified by name
 func (mh *Host) ReadByName(name string) (err error) {
 	if mh == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "cannot be nil")
+		return fail.InvalidParameterError("mh.item", "cannot be nil")
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	return mh.mayReadByName(name)
 }
@@ -253,21 +253,21 @@ func (mh *Host) ReadByName(name string) (err error) {
 // Delete updates the metadata corresponding to the host
 func (mh *Host) Delete() (err error) {
 	if mh == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "cannot be nil")
+		return fail.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	err1 := mh.item.DeleteFrom(ByIDFolderName, *mh.id)
 	err2 := mh.item.DeleteFrom(ByNameFolderName, *mh.name)
 
 	if err1 != nil && err2 != nil {
-		return scerr.ErrListError([]error{err1, err2})
+		return fail.ErrListError([]error{err1, err2})
 	}
 
 	return nil
@@ -276,15 +276,15 @@ func (mh *Host) Delete() (err error) {
 // Browse walks through host folder and executes a callback for each entries
 func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 	if mh == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mh.item == nil {
-		return scerr.InvalidParameterError("mh.item", "cannot be nil")
+		return fail.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	return mh.item.BrowseInto(
 		ByIDFolderName, func(buf []byte) error {
@@ -301,15 +301,15 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 // SaveHost saves the Host definition in Object Storage
 func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "cannot be nil")
+		return nil, fail.InvalidParameterError("host", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	mh, err = NewHost(svc)
 	if err != nil {
@@ -349,15 +349,15 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 // RemoveHost removes the host definition from Object Storage
 func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 	if svc == nil {
-		return scerr.InvalidParameterError("svc", "cannot be nil")
+		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	mh, err := NewHost(svc)
 	if err != nil {
@@ -378,15 +378,15 @@ func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
 //        If retry times out, return errNotFound
 func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	// We first try looking for host by ID from metadata
 	mh, err = NewHost(svc)
@@ -399,7 +399,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 			innerErr := mh.ReadByReference(ref)
 			if innerErr != nil {
 				// If error is ErrNotFound, instructs retry to stop without delay
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
+				if _, ok := innerErr.(fail.ErrNotFound); ok {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
@@ -417,10 +417,10 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 		switch realErr := retryErr.(type) {
 		case retry.ErrAborted:
 			return nil, realErr.Cause()
-		case scerr.ErrTimeout:
+		case fail.ErrTimeout:
 			return nil, realErr
 		default:
-			return nil, scerr.Cause(realErr)
+			return nil, fail.Cause(realErr)
 		}
 	}
 
@@ -430,7 +430,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 	}
 
 	if !ok {
-		return nil, scerr.NotFoundError(fmt.Sprintf("reference %s not found", ref))
+		return nil, fail.NotFoundError(fmt.Sprintf("reference %s not found", ref))
 	}
 
 	return mh, nil

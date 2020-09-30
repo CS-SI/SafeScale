@@ -26,7 +26,7 @@ import (
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // OutscaleProvider safescale integration of outscale IaaS API
@@ -88,7 +88,7 @@ func volumeSpeed(s string) volumespeed.Enum {
 
 func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, error) {
 	if p == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	identity := remap(opt["identity"])
 	compute := remap(opt["compute"])
@@ -98,13 +98,13 @@ func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, erro
 
 	region := get(compute, "Region")
 	if region == "" {
-		return nil, scerr.Errorf("'Region' parameter in section 'compute' of the tenant is mandatory", nil)
+		return nil, fail.Errorf("'Region' parameter in section 'compute' of the tenant is mandatory", nil)
 	}
 	if _, ok := metadata["Bucket"]; !ok {
 		stackName := get(identity, "provider")
 		userID := get(identity, "UserID")
 		if userID == "" {
-			return nil, scerr.Errorf("'UserID' parameter in section 'identity' of the tenant is mandatory", nil)
+			return nil, fail.Errorf("'UserID' parameter in section 'identity' of the tenant is mandatory", nil)
 		}
 		var err error
 		metadata["Bucket"], err = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
@@ -177,7 +177,7 @@ func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, erro
 // GetAuthenticationOptions returns authentication parameters
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 	if p == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	m := providers.ConfigMap{}
 	m.Set("AccessKey", p.Options.Identity.AccessKey)
@@ -191,7 +191,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 // GetConfigurationOptions returns configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	if p == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	// MetadataBucketName
 	cfg := providers.ConfigMap{}

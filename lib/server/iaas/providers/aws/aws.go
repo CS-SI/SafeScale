@@ -21,7 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -41,19 +41,19 @@ type provider struct {
 }
 
 func (p *provider) AddPublicIPToVIP(ip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) BindHostToVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) UnbindHostFromVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) DeleteVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) GetTenantParameters() map[string]interface{} {

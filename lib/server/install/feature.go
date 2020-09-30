@@ -34,7 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -157,19 +157,19 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 // NewFeature searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 // error contains :
-//    - *scerr.ErrNotFound if no feature is found by its name
-//    - *scerr.ErrSyntax if feature found contains syntax error
+//    - *fail.ErrNotFound if no feature is found by its name
+//    - *fail.ErrSyntax if feature found contains syntax error
 func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	v := viper.New()
 	v.AddConfigPath(".")
@@ -187,13 +187,13 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 			err = nil
 			var ok bool
 			if _, ok = allEmbeddedMap[name]; !ok {
-				err = scerr.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
+				err = fail.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
 			} else {
 				feat = *allEmbeddedMap[name]
 				feat.task = task
 			}
 		default:
-			err = scerr.SyntaxError(
+			err = fail.SyntaxError(
 				fmt.Sprintf(
 					"failed to read the specification file of feature called '%s': %s", name, err.Error(),
 				),
@@ -214,19 +214,19 @@ func NewFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ *Feature, err error) {
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var feat Feature
 	if _, ok := allEmbeddedMap[name]; !ok {
-		err = scerr.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
+		err = fail.NotFoundError(fmt.Sprintf("failed to find a feature named '%s'", name))
 	} else {
 		feat = *allEmbeddedMap[name]
 		feat.task = task
@@ -298,14 +298,14 @@ func (f *Feature) Applyable(t Target) bool {
 // Check is ok if error is nil and Results.Successful() is true
 func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error) {
 	if f == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(
 		f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// cacheKey := f.DisplayName() + "@" + t.Name()
 	// if anon, ok := checkCache.Get(cacheKey); ok {
@@ -355,14 +355,14 @@ func (f *Feature) Check(t Target, v Variables, s Settings) (_ Results, err error
 // Installs succeeds if error == nil and Results.Successful() is true
 func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) {
 	if f == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(
 		f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	methods := t.Methods()
 	var (
@@ -435,14 +435,14 @@ func (f *Feature) Add(t Target, v Variables, s Settings) (_ Results, err error) 
 // Remove uninstalls the feature from the target
 func (f *Feature) Remove(t Target, v Variables, s Settings) (_ Results, err error) {
 	if f == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(
 		f.task, fmt.Sprintf("(): '%s' on %s '%s'", f.DisplayName(), t.Type(), t.Name()), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
 		results   Results
@@ -606,7 +606,7 @@ func (f *Feature) setImplicitParameters(t Target, v Variables) error {
 			host = hT.host
 		}
 		if host == nil {
-			return scerr.InvalidParameterError("t", "must be a HostTarget or NodeTarget")
+			return fail.InvalidParameterError("t", "must be a HostTarget or NodeTarget")
 		}
 
 		// FIXME: host may be on a network with 2 gateways + missing variables like DefaultRouteIP, ...

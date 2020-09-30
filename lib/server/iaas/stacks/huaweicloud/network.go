@@ -38,9 +38,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -84,7 +84,7 @@ type vpcGetResult struct {
 func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Only one VPC allowed by client instance
 	if s.vpc != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to create VPC '%s', a VPC with this name already exists", req.Name,
 			), nil,
@@ -93,7 +93,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 
 	b, err := gophercloud.BuildRequestBody(req, "vpc")
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -109,7 +109,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to send a POST request to provider '%s': %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -117,7 +117,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	}
 	vpc, err := resp.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -131,7 +131,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 		if nerr != nil {
 			log.Warnf("Error deleting VPC: %v", nerr)
 		}
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -142,7 +142,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	// Searching for the Network binded to the VPC
 	network, err := s.findVPCBindedNetwork(vpc.Name)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to create VPC '%s': %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -158,7 +158,7 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 	found := false
 	routerList, err := s.Stack.ListRouters()
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to list routers: %s", openstack.ProviderErrorToString(err)), err)
+		return nil, fail.Errorf(fmt.Sprintf("failed to list routers: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	for _, r := range routerList {
 		if r.Name == vpcName {
@@ -168,12 +168,12 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 		}
 	}
 	if !found || router == nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to find router associated to VPC '%s'", vpcName), nil)
+		return nil, fail.Errorf(fmt.Sprintf("failed to find router associated to VPC '%s'", vpcName), nil)
 	}
 
 	network, err := networks.Get(s.Stack.NetworkClient, router.NetworkID).Extract()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to find binded network of VPC '%s': %s", vpcName, openstack.ProviderErrorToString(err),
 			), err,
@@ -194,7 +194,7 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 	r.Err = err
 	vpc, err := r.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf("error getting Network %s: %s", id, openstack.ProviderErrorToString(err)), err,
 		)
 	}
@@ -204,12 +204,12 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 // ListVPCs lists all the VPC created
 func (s *Stack) ListVPCs() ([]VPC, error) {
 	var vpcList []VPC
-	return vpcList, scerr.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME: Technical debt
+	return vpcList, fail.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVPC deletes a Network (ie a VPC in Huawei Cloud) identified by 'id'
 func (s *Stack) DeleteVPC(id string) error {
-	return scerr.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("huaweicloud.Stack::DeleteVPC() not implemented yet") // FIXME: Technical debt
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
@@ -219,38 +219,38 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 
 	subnet, err := s.findSubnetByName(req.Name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
 	if subnet != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("network '%s' already exists", req.Name), nil)
+		return nil, fail.Errorf(fmt.Sprintf("network '%s' already exists", req.Name), nil)
 	}
 
 	if ok, err := validateNetworkName(req); !ok {
-		return nil, scerr.Errorf(fmt.Sprintf("network name '%s' invalid: %s", req.Name, err), err)
+		return nil, fail.Errorf(fmt.Sprintf("network name '%s' invalid: %s", req.Name, err), err)
 	}
 
 	// Checks if CIDR is valid...
 	// _, vpcnetDesc, _ := net.ParseCIDR(s.vpc.CIDR)
 	// _, networkDesc, err := net.ParseCIDR(req.CIDR)
 	// if err != nil {
-	//	return nil, scerr.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err)
+	//	return nil, fail.Errorf(fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err)
 	// }
 	// // .. and if CIDR is inside VPC's one
 	// if !cidrIntersects(vpcnetDesc, networkDesc) {
-	//	return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil)
+	//	return nil, fail.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR), nil)
 	// }
 	ok, err := utils.DoCIDRsIntersect(s.vpc.CIDR, req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR,
 			), nil,
 		)
 	}
 	if !ok {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, s.vpc.CIDR,
 			), nil,
@@ -260,7 +260,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 	// Creates the subnet
 	subnet, err = s.createSubnet(req.Name, req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"error creating network '%s': %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -273,7 +273,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Errorf("failed to delete subnet '%s': %v", subnet.Name, derr)
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -305,7 +305,7 @@ func validateNetworkName(req resources.NetworkRequest) (bool, error) {
 			errs = append(errs, msg.Error())
 		}
 		// FIXME: cause not nil
-		return false, scerr.Errorf(fmt.Sprintf(strings.Join(errs, "; ")), nil)
+		return false, fail.Errorf(fmt.Sprintf(strings.Join(errs, "; ")), nil)
 	}
 	return true, nil
 }
@@ -324,7 +324,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 			if r.Err != nil {
 				return openstack.ReinterpretGophercloudErrorCode(
 					r.Err, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 404, 409}, func(ferr error) error {
-						return scerr.Errorf(fmt.Sprintf("query for network '%s' failed: %v", name, ferr), ferr)
+						return fail.Errorf(fmt.Sprintf("query for network '%s' failed: %v", name, ferr), ferr)
 					},
 				)
 			}
@@ -357,7 +357,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 	subnet, err := s.getSubnet(id)
 	if err != nil {
 		if !strings.Contains(err.Error(), id) {
-			return nil, scerr.Errorf(
+			return nil, fail.Errorf(
 				fmt.Sprintf(
 					"failed getting network id '%s': %s", id, openstack.ProviderErrorToString(err),
 				), err,
@@ -380,7 +380,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf("failed to get networks list: %s", openstack.ProviderErrorToString(err)), err,
 		)
 	}
@@ -445,7 +445,7 @@ type subnetDeleteResult struct {
 // convertIPv4ToNumber converts a net.IP to a uint32 representation
 func convertIPv4ToNumber(ip net.IP) (uint32, error) {
 	if ip.To4() == nil {
-		return 0, scerr.Errorf(fmt.Sprintf("not an IPv4"), nil)
+		return 0, fail.Errorf(fmt.Sprintf("not an IPv4"), nil)
 	}
 	n := uint32(ip[0])*0x1000000 + uint32(ip[1])*0x10000 + uint32(ip[2])*0x100 + uint32(ip[3])
 	return n, nil
@@ -483,7 +483,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 			return nil, err
 		}
 		if intersects {
-			return nil, scerr.Errorf(
+			return nil, fail.Errorf(
 				fmt.Sprintf(
 					"cannot create subnet '%s (%s)', would intersect with '%s (%s)'", name, cidr, s.Name, s.CIDR,
 				), nil,
@@ -494,7 +494,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	// Calculate IP address for gateway
 	n, err := convertIPv4ToNumber(network.To4())
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to choose gateway IP address for the subnet: %s", openstack.ProviderErrorToString(err),
 			), err,
@@ -529,7 +529,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	b, err := gophercloud.BuildRequestBody(req, "subnet")
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"error preparing Subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -545,7 +545,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"error requesting subnet %s creation: %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -553,7 +553,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 	}
 	subnet, err := respCreate.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"error creating Subnet %s: %s", req.Name, openstack.ProviderErrorToString(err),
 			), err,
@@ -599,7 +599,7 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 		func(page pagination.Page) (bool, error) {
 			list, err := subnets.ExtractSubnets(page)
 			if err != nil {
-				return false, scerr.Errorf(
+				return false, fail.Errorf(
 					fmt.Sprintf(
 						"error listing subnets: %s", openstack.ProviderErrorToString(err),
 					), err,
@@ -632,7 +632,7 @@ func (s *Stack) getSubnet(id string) (*subnets.Subnet, error) {
 	r.Err = err
 	subnet, err := r.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to get information for subnet id '%s': %s", id, openstack.ProviderErrorToString(err),
 			), err,
@@ -656,12 +656,12 @@ func (s *Stack) deleteSubnet(id string) error {
 		func() error {
 			r, _ := s.Stack.Driver.Request("DELETE", url, &opts)
 			if r == nil {
-				return scerr.Errorf(fmt.Sprintf("failed to acknowledge DELETE command submission"), nil)
+				return fail.Errorf(fmt.Sprintf("failed to acknowledge DELETE command submission"), nil)
 			}
 			if r.StatusCode == 204 || r.StatusCode == 404 {
 				return nil
 			}
-			return scerr.Errorf(fmt.Sprintf("DELETE command failed with status %d and body %s", r.StatusCode, r.Body), nil)
+			return fail.Errorf(fmt.Sprintf("DELETE command failed with status %d and body %s", r.StatusCode, r.Body), nil)
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostTimeout())),
 		retry.BackoffSelector()(temporal.GetDefaultDelay()),
@@ -683,12 +683,12 @@ func (s *Stack) deleteSubnet(id string) error {
 		},
 	)
 	if err != nil {
-		return scerr.Errorf(fmt.Sprintf("failed to submit deletion of subnet id '%s': '%s", id, err.Error()), err)
+		return fail.Errorf(fmt.Sprintf("failed to submit deletion of subnet id '%s': '%s", id, err.Error()), err)
 	}
 	// Deletion submit has been executed, checking returned error code
 	err = resp.ExtractErr()
 	if err != nil {
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf("error deleting subnet id '%s': %s", id, openstack.ProviderErrorToString(err)), nil,
 		)
 	}
@@ -699,7 +699,7 @@ func (s *Stack) deleteSubnet(id string) error {
 func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf("failed to find in Subnets: %s", openstack.ProviderErrorToString(err)), err,
 		)
 	}
@@ -755,10 +755,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest:
+		case fail.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, scerr.Errorf(
+			return nil, userData, fail.Errorf(
 				fmt.Sprintf(
 					"error creating gateway : %s", openstack.ProviderErrorToString(err),
 				), err,

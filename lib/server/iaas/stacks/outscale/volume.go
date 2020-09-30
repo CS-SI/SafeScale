@@ -11,8 +11,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -50,13 +50,13 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volu
 
 	defer func() {
 		if err != nil {
-			if !scerr.ImplementsCauser(err) {
-				err = scerr.Wrap(err, "")
+			if !fail.ImplementsCauser(err) {
+				err = fail.Wrap(err, "")
 			}
 
 			derr := s.DeleteVolume(ov.VolumeId)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -123,10 +123,10 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
 		func() error {
 			vol, err := s.GetVolume(volumeID)
 			if err != nil {
-				return scerr.Errorf("", err)
+				return fail.Errorf("", err)
 			}
 			if vol.State != state {
-				return scerr.Errorf("wrong state", nil)
+				return fail.Errorf("wrong state", nil)
 			}
 			return nil
 		}, temporal.GetHostTimeout(),
@@ -150,7 +150,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 		return nil, normalizeError(err)
 	}
 	if len(res.Volumes) > 1 {
-		return nil, scerr.InconsistentError("Invalid provider response")
+		return nil, fail.InconsistentError("Invalid provider response")
 	}
 	if len(res.Volumes) == 0 {
 		return nil, nil
@@ -169,7 +169,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 // GetVolumeByName returns the volume with name name
 func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 	if name == "" {
-		return nil, scerr.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 	subregion := s.Options.Compute.Subregion
 	readVolumesRequest := osc.ReadVolumesRequest{
@@ -187,11 +187,11 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 		return nil, normalizeError(err)
 	}
 	if len(res.Volumes) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("No volume named %s", name))
+		return nil, fail.NotFoundError(fmt.Sprintf("No volume named %s", name))
 	}
 
 	if len(res.Volumes) > 1 {
-		return nil, scerr.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
+		return nil, fail.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
 	}
 	ov := res.Volumes[0]
 	volume := resources.NewVolume()
@@ -262,7 +262,7 @@ func (s *Stack) getFirstFreeDeviceName(serverID string) (string, error) {
 		if len(s.deviceNames) > 0 {
 			return s.deviceNames[0], nil
 		}
-		return "", scerr.InconsistentError("device names is empty")
+		return "", fail.InconsistentError("device names is empty")
 	}
 	for _, att := range atts {
 		usedDeviceNames = append(usedDeviceNames, att.Device)
@@ -316,7 +316,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 		return nil, normalizeError(err)
 	}
 	if len(res.Volumes) > 1 {
-		return nil, scerr.InconsistentError("Invalid provider response")
+		return nil, fail.InconsistentError("Invalid provider response")
 	}
 	if len(res.Volumes) == 0 {
 		return nil, nil

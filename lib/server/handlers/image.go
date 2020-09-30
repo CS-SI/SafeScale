@@ -24,7 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageAPI
@@ -54,7 +54,7 @@ func NewImageHandler(svc iaas.Service) ImageAPI {
 func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return handler.service.ListImages(all)
 }

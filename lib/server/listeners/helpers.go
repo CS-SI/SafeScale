@@ -1,7 +1,7 @@
 package listeners
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func getUserMessage(err error) string {
@@ -9,8 +9,8 @@ func getUserMessage(err error) string {
 		return ""
 	}
 
-	if scerr.ImplementsCauser(err) {
-		return scerr.Message(err)
+	if fail.ImplementsCauser(err) {
+		return fail.Message(err)
 	}
 
 	return err.Error()

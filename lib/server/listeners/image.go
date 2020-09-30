@@ -28,7 +28,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // ImageHandler ...
@@ -42,12 +42,12 @@ type ImageListener struct{}
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *pb.ImageList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "List Images"); err == nil {

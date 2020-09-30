@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/graymeta/stow"
 	log "github.com/sirupsen/logrus"
@@ -84,7 +84,7 @@ func newObjectFromStow(bucket *bucket, item stow.Item) *object {
 // Stored return true if the object exists in Object Storage
 func (o *object) Stored() (bool, error) {
 	if o == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 
 	return o.item != nil, nil
@@ -93,7 +93,7 @@ func (o *object) Stored() (bool, error) {
 // Reload reloads the data of the Object from the Object Storage
 func (o *object) Reload() error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -119,13 +119,13 @@ func (o *object) reloadFromItem(item stow.Item) error {
 // Read reads the content of the object from Object Storage and writes it in 'target'
 func (o *object) Read(target io.Writer, from, to int64) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if target == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if from > to {
-		return scerr.InvalidParameterError("from", "cannot be greater than 'to'")
+		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%d, %d)", from, to), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -196,13 +196,13 @@ func (o *object) Read(target io.Writer, from, to int64) error {
 // Write the source to the object in Object Storage
 func (o *object) Write(source io.Reader, sourceSize int64) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if source == nil {
-		return scerr.InvalidParameterError("source", "cannot be nil")
+		return fail.InvalidParameterError("source", "cannot be nil")
 	}
 	if o.bucket == nil {
-		return scerr.InvalidParameterError("o.bucket", "cannot be nil")
+		return fail.InvalidParameterError("o.bucket", "cannot be nil")
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -223,7 +223,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -291,10 +291,10 @@ func writeChunk(
 // Delete deletes the object from Object Storage
 func (o *object) Delete() error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if o.item == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -310,7 +310,7 @@ func (o *object) Delete() error {
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
 func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -325,7 +325,7 @@ func (o *object) ForceAddMetadata(newMetadata ObjectMetadata) error {
 // AddMetadata adds missing entries in object metadata
 func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -343,7 +343,7 @@ func (o *object) AddMetadata(newMetadata ObjectMetadata) error {
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
 func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
 	if o == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, "", false /*Trace.Controller*/).GoingIn().OnExitTrace()()
@@ -356,7 +356,7 @@ func (o *object) ReplaceMetadata(newMetadata ObjectMetadata) error {
 // GetName returns the name of the object
 func (o *object) GetName() (string, error) {
 	if o == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 
 	return o.Name, nil
@@ -365,7 +365,7 @@ func (o *object) GetName() (string, error) {
 // GetLastUpdate returns the date of last update
 func (o *object) GetLastUpdate() (time.Time, error) {
 	if o == nil {
-		return time.Time{}, scerr.InvalidInstanceError()
+		return time.Time{}, fail.InvalidInstanceError()
 	}
 
 	if o.item != nil {
@@ -377,7 +377,7 @@ func (o *object) GetLastUpdate() (time.Time, error) {
 // GetMetadata returns the metadata of the object in Object Storage
 func (o *object) GetMetadata() (ObjectMetadata, error) {
 	if o == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	return o.Metadata.Clone(), nil
@@ -391,13 +391,13 @@ func (o *object) GetSize() (int64, error) {
 			return size, nil
 		}
 	}
-	return -1, scerr.Errorf("metadata item without size", nil)
+	return -1, fail.Errorf("metadata item without size", nil)
 }
 
 // GetETag returns the value of the ETag (+/- md5sum of the content...)
 func (o *object) GetETag() (string, error) {
 	if o == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 
 	if o.item != nil {
@@ -406,18 +406,18 @@ func (o *object) GetETag() (string, error) {
 			return etag, nil
 		}
 	}
-	return "", scerr.Errorf("metadata item without etag", nil)
+	return "", fail.Errorf("metadata item without etag", nil)
 }
 
 // GetID ...
 func (o *object) GetID() (string, error) {
 	if o == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 
 	if o.item != nil {
 		return o.item.ID(), nil
 	}
 
-	return "", scerr.Errorf("metadata item without id", nil)
+	return "", fail.Errorf("metadata item without id", nil)
 }

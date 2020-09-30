@@ -45,7 +45,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -104,7 +104,7 @@ func extractClusterArgument(c *cli.Context) error {
 		var err error
 		clusterInstance, err = cluster.Load(concurrency.RootTask(), clusterName)
 		if err != nil {
-			if _, ok := err.(scerr.ErrNotFound); ok {
+			if _, ok := err.(fail.ErrNotFound); ok {
 				if !c.Command.HasName("create") {
 					return clitools.ExitOnErrorWithMessage(
 						exitcode.NotFound, fmt.Sprintf("Cluster '%s' not found.\n", clusterName),
@@ -1109,7 +1109,7 @@ func captureStringFromPipe() (string, error) {
 
 	// Checks if we have a pipe
 	if info.Mode()&os.ModeCharDevice == os.ModeCharDevice || info.Size() <= 0 {
-		return "", scerr.InvalidRequestError("the command is intended to work with pipes")
+		return "", fail.InvalidRequestError("the command is intended to work with pipes")
 	}
 	out, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {

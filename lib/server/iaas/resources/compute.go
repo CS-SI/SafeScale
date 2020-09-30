@@ -26,7 +26,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -48,7 +48,7 @@ func NewKeyPair(prefix string) (*KeyPair, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
 		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-		return nil, scerr.Errorf(msg, err)
+		return nil, fail.Errorf(msg, err)
 	}
 
 	if prefix == "" {

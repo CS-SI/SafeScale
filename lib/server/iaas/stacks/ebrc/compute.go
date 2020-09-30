@@ -36,8 +36,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 )
@@ -53,7 +53,7 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return empty, scerr.Wrap(err, fmt.Sprintf("Error listing images"))
+		return empty, fail.Wrap(err, fmt.Sprintf("Error listing images"))
 	}
 
 	catalogName := ""
@@ -121,7 +121,7 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return empty, scerr.Wrap(err, fmt.Sprintf("Error listing templates"))
+		return empty, fail.Wrap(err, fmt.Sprintf("Error listing templates"))
 	}
 
 	catalogName := ""
@@ -214,17 +214,17 @@ func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s *StackEbrc) GetKeyPair(id string) (*resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("")
+	return nil, fail.NotImplementedError("")
 }
 
 // ListKeyPairs lists available key pairs
 func (s *StackEbrc) ListKeyPairs() ([]resources.KeyPair, error) {
-	return nil, scerr.NotImplementedError("")
+	return nil, fail.NotImplementedError("")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s *StackEbrc) DeleteKeyPair(id string) error {
-	return scerr.NotImplementedError("")
+	return fail.NotImplementedError("")
 }
 
 // CreateHost creates an host satisfying request
@@ -241,21 +241,21 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	keyPair := request.KeyPair
 
 	if networks == nil || len(networks) == 0 {
-		return nil, userData, scerr.Errorf(
+		return nil, userData, fail.Errorf(
 			fmt.Sprintf(
 				"The host %s must be on at least one network (even if public)", resourceName,
 			), nil,
 		)
 	}
 	if defaultGateway == nil && !hostMustHavePublicIP {
-		return nil, userData, scerr.Errorf(
+		return nil, userData, fail.Errorf(
 			fmt.Sprintf("The host %s must have a gateway or be public", resourceName), nil,
 		)
 	}
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("Error getting host by name"))
+		return nil, userData, fail.Wrap(err, fmt.Sprintf("Error getting host by name"))
 	}
 
 	catalogName := ""
@@ -289,14 +289,14 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 	catalog, err := org.FindCatalog(catalogName)
 	if err != nil || utils.IsEmpty(catalog) {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding catalog: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error finding catalog: %#v", err), err)
 	}
 
 	logrus.Warningf("Selected image: [%s]", request.ImageID)
 
 	catalogitem, err := catalog.FindCatalogItem(itemName)
 	if err != nil || utils.IsEmpty(catalogitem) {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding catalog item: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error finding catalog item: %#v", err), err)
 	}
 
 	// FIXME: Use template
@@ -304,20 +304,20 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("failed to get image: %s", request.TemplateID), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("failed to get image: %s", request.TemplateID), err)
 	}
 	_ = template
 
 	vapptemplate, err := catalogitem.GetVAppTemplate()
 	if err != nil || utils.IsEmpty(vapptemplate) {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding VAppTemplate: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error finding VAppTemplate: %#v", err), err)
 	}
 
 	log.Printf("[DEBUG] VAppTemplate: %#v", vapptemplate)
 
 	net, err := vdc.FindVDCNetwork(request.Networks[0].Name)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error finding OrgVCD Network: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error finding OrgVCD Network: %#v", err), err)
 	}
 	nets := []*types.OrgVDCNetwork{net.OrgVDCNetwork}
 
@@ -327,7 +327,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		for _, sp := range sps.VdcStorageProfile {
 			storageProfileReference, err = vdc.FindStorageProfileReference(sp.Name)
 			if err != nil {
-				return nil, userData, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", sp.Name), err)
+				return nil, userData, fail.Errorf(fmt.Sprintf("error finding storage profile %s", sp.Name), err)
 			}
 		}
 	}
@@ -357,11 +357,11 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		)
 
 		if retryErr != nil {
-			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating vapp: %#v", err), retryErr)
+			return nil, userData, fail.Errorf(fmt.Sprintf("error creating vapp: %#v", err), retryErr)
 		}
 		vapp, err = vdc.FindVAppByName(request.ResourceName)
 		if err != nil {
-			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating vapp: %#v", err), err)
+			return nil, userData, fail.Errorf(fmt.Sprintf("error creating vapp: %#v", err), err)
 		}
 	}
 
@@ -413,14 +413,14 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		10*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error changing vmname: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error changing vmname: %#v", err), err)
 	}
 
 	// ----Initialize----
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nil, userData, scerr.Errorf(fmt.Sprintf("failed to generate password: %s", err.Error()), err)
+			return nil, userData, fail.Errorf(fmt.Sprintf("failed to generate password: %s", err.Error()), err)
 		}
 		request.Password = password
 	}
@@ -432,7 +432,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, userData, scerr.Errorf(fmt.Sprintf(msg), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf(msg), err)
 	}
 
 	phase1Content, err := userData.Generate("phase1")
@@ -444,7 +444,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	userdataFileName := "/tmp/userdata.sh"
 	err = ioutil.WriteFile(userdataFileName, phase1Content, 0644)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("Failed to write userData locally : %s", err.Error()), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("Failed to write userData locally : %s", err.Error()), err)
 	}
 
 	err = retry.WhileUnsuccessfulDelay5Seconds(
@@ -458,7 +458,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		10*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error running customization script: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error running customization script: %#v", err), err)
 	}
 
 	err = retry.WhileUnsuccessfulDelay5Seconds(
@@ -472,7 +472,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		10*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error powering on machine: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error powering on machine: %#v", err), err)
 	}
 
 	capturedIP := ""
@@ -495,7 +495,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 			PublicIPv4 := cose.NetworkConnection[0].IPAddress
 			if PublicIPv4 == "" {
-				return scerr.Errorf(fmt.Sprintf("No IP detected"), nil)
+				return fail.Errorf(fmt.Sprintf("No IP detected"), nil)
 			} else {
 				logrus.Warningf("IP Detected: [%s]", PublicIPv4)
 				capturedIP = PublicIPv4
@@ -506,7 +506,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		3*time.Minute,
 	)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("error getting machine ip: %#v", err), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("error getting machine ip: %#v", err), err)
 	}
 
 	// FIXME: Populate this
@@ -536,7 +536,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 
 				gateway, err := s.InspectHost(request.DefaultGateway)
 				if err != nil {
-					return scerr.Errorf(fmt.Sprintf("Failed to get gateway host : %s", err.Error()), err)
+					return fail.Errorf(fmt.Sprintf("Failed to get gateway host : %s", err.Error()), err)
 				}
 
 				hostNetworkV1.DefaultGatewayPrivateIP = gateway.GetPrivateIP()
@@ -573,7 +573,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		},
 	)
 	if err != nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
 	}
 
 	// FIXME: Edge gateway smart tunnel only if public or gateway
@@ -581,9 +581,9 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 		gateways, err := s.findEdgeGatewayNames()
 		if err != nil || utils.IsEmpty(gateways) {
 			if err != nil {
-				return nil, userData, scerr.Errorf(fmt.Sprintf("Unable to find edge gateways : %s", err.Error()), err)
+				return nil, userData, fail.Errorf(fmt.Sprintf("Unable to find edge gateways : %s", err.Error()), err)
 			}
-			return nil, userData, scerr.Errorf(fmt.Sprintf("Unable to find edge gateways"), err)
+			return nil, userData, fail.Errorf(fmt.Sprintf("Unable to find edge gateways"), err)
 		}
 
 		edgeGateway, err := vdc.FindEdgeGateway(gateways[0])
@@ -613,7 +613,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error inspecting host"))
+		return nil, fail.Wrap(err, fmt.Sprintf("error inspecting host"))
 	}
 
 	var host *resources.Host
@@ -624,11 +624,11 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	case *resources.Host:
 		host = hostParam.(*resources.Host)
 	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	if host == nil {
-		return nil, scerr.InvalidParameterError("host", "cannot be nil")
+		return nil, fail.InvalidParameterError("host", "cannot be nil")
 	}
 
 	byName := true
@@ -643,12 +643,12 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	if byName {
 		vapp, err = vdc.FindVAppByName(hostRef)
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error inspecting host"))
+			return nil, fail.Wrap(err, fmt.Sprintf("error inspecting host"))
 		}
 	} else {
 		vapp, err = vdc.FindVAppByID(hostRef)
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error inspecting host"))
+			return nil, fail.Wrap(err, fmt.Sprintf("error inspecting host"))
 		}
 	}
 
@@ -666,7 +666,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	}
 
 	if err := s.complementHost(host, newHost); err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("Failed to complement the host : %s", err.Error()), err)
+		return nil, fail.Errorf(fmt.Sprintf("Failed to complement the host : %s", err.Error()), err)
 	}
 
 	return host, nil
@@ -674,7 +674,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 
 func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host) error {
 	if host == nil || newHost == nil {
-		return scerr.Errorf(fmt.Sprintf("host and newHost have to been set"), nil)
+		return fail.Errorf(fmt.Sprintf("host and newHost have to been set"), nil)
 	}
 
 	host.ID = newHost.ID
@@ -695,7 +695,7 @@ func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host
 		},
 	)
 	if err != nil {
-		return scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.NetworkV1 : %s", err.Error()), err)
+		return fail.Errorf(fmt.Sprintf("Failed to update HostProperty.NetworkV1 : %s", err.Error()), err)
 	}
 
 	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
@@ -709,7 +709,7 @@ func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host
 		},
 	)
 	if err != nil {
-		return scerr.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
+		return fail.Errorf(fmt.Sprintf("Failed to update HostProperty.SizingV1 : %s", err.Error()), err)
 	}
 
 	return nil
@@ -736,7 +736,7 @@ func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting host by name"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error getting host by name"))
 	}
 
 	vapp, err := vdc.FindVAppByName(name)
@@ -769,27 +769,27 @@ func (s *StackEbrc) DeleteHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	undepTask, err := vapp.Undeploy()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	err = undepTask.WaitTaskCompletion()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	dtask, err := vapp.Delete()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting host"))
 	}
 
 	// FIXME: Delete firewall and NAT rules
@@ -801,7 +801,7 @@ func (s *StackEbrc) DeleteHost(id string) error {
 
 // ResizeHost change the template used by an host
 func (s *StackEbrc) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
-	return nil, scerr.Errorf(fmt.Sprintf("Not implemented yet"), nil)
+	return nil, fail.Errorf(fmt.Sprintf("Not implemented yet"), nil)
 }
 
 // ListHosts lists available hosts
@@ -811,12 +811,12 @@ func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing hosts"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error listing hosts"))
 	}
 
 	refs, err := getLinks(org, "vnd.vmware.vcloud.vApp")
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing hosts"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error listing hosts"))
 	}
 
 	var nets []*resources.Host
@@ -834,17 +834,17 @@ func (s *StackEbrc) StopHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error stopping host"))
+		return fail.Wrap(err, fmt.Sprintf("Error stopping host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error stopping host"))
+		return fail.Wrap(err, fmt.Sprintf("Error stopping host"))
 	}
 
 	dtask, err := vapp.Shutdown()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error stopping host"))
+		return fail.Wrap(err, fmt.Sprintf("Error stopping host"))
 	}
 
 	err = dtask.WaitTaskCompletion()
@@ -859,17 +859,17 @@ func (s *StackEbrc) StartHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error starting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error starting host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error starting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error starting host"))
 	}
 
 	dtask, err := vapp.PowerOn()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error starting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error starting host"))
 	}
 
 	err = dtask.WaitTaskCompletion()
@@ -884,17 +884,17 @@ func (s *StackEbrc) RebootHost(id string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error rebooting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error rebooting host"))
 	}
 
 	vapp, err := vdc.FindVAppByID(id)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error rebooting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error rebooting host"))
 	}
 
 	dtask, err := vapp.Reboot()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error rebooting host"))
+		return fail.Wrap(err, fmt.Sprintf("Error rebooting host"))
 	}
 
 	err = dtask.WaitTaskCompletion()
@@ -922,25 +922,25 @@ func (s *StackEbrc) ListAvailabilityZones() (map[string]bool, error) {
 }
 
 func (s *StackEbrc) ListRegions() ([]string, error) {
-	return nil, scerr.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) CreateVIP(s1 string, s2 string) (*resources.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) AddPublicIPToVIP(ip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) BindHostToVIP(ip *resources.VirtualIP, s2 string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) UnbindHostFromVIP(ip *resources.VirtualIP, s2 string) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *StackEbrc) DeleteVIP(ip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

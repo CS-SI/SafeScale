@@ -30,7 +30,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Tenant structure to handle name and clientAPI for a tenant
@@ -72,12 +72,12 @@ type TenantListener struct{}
 // List registered tenants
 func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (list *pb.TenantList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -107,12 +107,12 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn *pb.TenantName, err error) {
 	if s == nil {
 		// FIXME: return a status.Errorf
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
@@ -132,17 +132,17 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn 
 func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return empty, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
+		return empty, status.Errorf(codes.InvalidArgument, fail.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	name := in.GetName()
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error

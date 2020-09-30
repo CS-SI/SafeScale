@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func (s *StackEbrc) getOrgVdc() (govcd.Org, govcd.Vdc, error) {
@@ -185,7 +185,7 @@ func (s *StackEbrc) findDiskByID(id string) (*govcd.Disk, error) {
 		}
 	}
 
-	return nil, scerr.Errorf(fmt.Sprintf("Disk with id [%s] not found", id), nil)
+	return nil, fail.Errorf(fmt.Sprintf("Disk with id [%s] not found", id), nil)
 }
 
 func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, error) {
@@ -207,7 +207,7 @@ func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, error) {
 		}
 	}
 
-	return nil, scerr.Errorf(fmt.Sprintf("Disk with name [%s] not found", id), nil)
+	return nil, fail.Errorf(fmt.Sprintf("Disk with name [%s] not found", id), nil)
 }
 
 func (s *StackEbrc) findEdgeGatewayNames() ([]string, error) {
@@ -243,7 +243,7 @@ func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
 		return types.IPRanges{}, err
 	}
 	if len(names) == 0 {
-		return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("No edge gateway found"), nil)
+		return types.IPRanges{}, fail.Errorf(fmt.Sprintf("No edge gateway found"), nil)
 	}
 
 	eg, err := vdc.FindEdgeGateway(names[0])
@@ -258,7 +258,7 @@ func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
 		}
 	}
 
-	return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("No public IPs found"), nil)
+	return types.IPRanges{}, fail.Errorf(fmt.Sprintf("No public IPs found"), nil)
 }
 
 func ipv4MaskString(m []byte) (string, error) {
@@ -288,7 +288,7 @@ func toIPRange(cidr string) (types.IPRanges, error) {
 	ipRange := make([]*types.IPRange, 0, 1)
 
 	if first == nil || last == nil {
-		return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("error processing network mask"), nil)
+		return types.IPRanges{}, fail.Errorf(fmt.Sprintf("error processing network mask"), nil)
 	}
 
 	ipr := types.IPRange{
@@ -359,7 +359,7 @@ func toValidIPRange(cidr string) (types.IPRanges, error) {
 	ipRange := make([]*types.IPRange, 0, 1)
 
 	if first == nil || last == nil {
-		return types.IPRanges{}, scerr.Errorf(fmt.Sprintf("error processing network mask"), nil)
+		return types.IPRanges{}, fail.Errorf(fmt.Sprintf("error processing network mask"), nil)
 	}
 
 	ipr := types.IPRange{
@@ -411,21 +411,21 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error creating network"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error creating network"))
 	}
 
 	if utils.IsEmpty(org) || utils.IsEmpty(vdc) {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering information"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error recovering information"))
 	}
 
 	// Check if network is already there
 	refs, err := getLinks(org, "vcloud.orgNetwork")
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering network information"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error recovering network information"))
 	}
 	for _, ref := range refs {
 		if req.Name == ref.Name {
-			return nil, scerr.Errorf(fmt.Sprintf("network '%s' already exists", req.Name), nil)
+			return nil, fail.Errorf(fmt.Sprintf("network '%s' already exists", req.Name), nil)
 		}
 	}
 
@@ -446,21 +446,21 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 	if edgeGatewayName != "" {
 		edgeGateway, err = vdc.FindEdgeGateway(edgeGatewayName)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("unable to recover gateway: %s", err), err)
+			return nil, fail.Errorf(fmt.Sprintf("unable to recover gateway: %s", err), err)
 		}
 	}
 
 	// Checks if CIDR is valid...
 	_, networkDesc, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), nil,
 		)
 	}
 
 	stringMask, err := ipv4MaskString(networkDesc.Mask)
 	if err != nil {
-		return nil, scerr.Wrap(err, "Invalid ipv4 mask")
+		return nil, fail.Wrap(err, "Invalid ipv4 mask")
 	}
 
 	gwIP, _ := getGateway(req.CIDR)
@@ -610,17 +610,17 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting network"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error getting network"))
 	}
 
 	vdc, err := org.GetVdcByName(s.AuthOptions.ProjectID)
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting network"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error getting network"))
 	}
 
 	res, err := vdc.Query(map[string]string{"type": "orgNetwork", "format": "records"})
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting network"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error getting network"))
 	}
 	if res.Results != nil {
 		for _, li := range res.Results.Link {
@@ -675,12 +675,12 @@ func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing networks"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error listing networks"))
 	}
 
 	refs, err := getLinks(org, "vcloud.orgNetwork")
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing networks"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error listing networks"))
 	}
 
 	var nets []*resources.Network
@@ -706,21 +706,21 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 
 	nett2, err := vdc.FindVDCNetwork(ref)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 
 	task, err := nett2.Delete()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 	err = task.WaitTaskCompletion()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting network"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting network"))
 	}
 
 	return nil
@@ -751,10 +751,10 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resource
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest:
+		case fail.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, scerr.Errorf(
+			return nil, userData, fail.Errorf(
 				fmt.Sprintf(
 					"Error creating gateway : %s", openstack.ProviderErrorToString(err),
 				), err,
@@ -771,7 +771,7 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resource
 		},
 	)
 	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %s", err))
+		return nil, userData, fail.Wrap(err, fmt.Sprintf("error creating gateway : %s", err))
 	}
 
 	return host, userData, err

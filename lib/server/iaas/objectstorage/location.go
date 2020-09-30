@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	log "github.com/sirupsen/logrus"
 
@@ -110,7 +110,7 @@ func (l location) GetType() string {
 // ListBuckets ...
 func (l *location) ListBuckets(prefix string) ([]string, error) {
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", prefix), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -137,10 +137,10 @@ func (l *location) ListBuckets(prefix string) ([]string, error) {
 // findBucket returns true if a bucket with the name exists in location
 func (l *location) FindBucket(bucketName string) (bool, error) {
 	if l == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return false, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return false, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -169,10 +169,10 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 // GetBucket ...
 func (l *location) GetBucket(bucketName string) (Bucket, error) {
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -192,10 +192,10 @@ func (l *location) GetBucket(bucketName string) (Bucket, error) {
 // CreateBucket ...
 func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -214,10 +214,10 @@ func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 // DeleteBucket removes a bucket from Object Storage
 func (l *location) DeleteBucket(bucketName string) error {
 	if l == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
@@ -232,13 +232,13 @@ func (l *location) DeleteBucket(bucketName string) error {
 // GetObject ...
 func (l *location) GetObject(bucketName string, objectName string) (Object, error) {
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -261,13 +261,13 @@ func (l *location) GetObject(bucketName string, objectName string) (Object, erro
 // DeleteObject ...
 func (l *location) DeleteObject(bucketName, objectName string) error {
 	if l == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -290,10 +290,10 @@ func (l *location) DeleteObject(bucketName, objectName string) error {
 // ListObjects lists the objects in a Bucket
 func (l *location) ListObjects(bucketName string, path, prefix string) ([]string, error) {
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -316,10 +316,10 @@ func (l *location) ListObjects(bucketName string, path, prefix string) ([]string
 // Browse walks through the objects in a Bucket and apply callback to each object
 func (l *location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) error) error {
 	if l == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -342,10 +342,10 @@ func (l *location) BrowseBucket(bucketName string, path, prefix string, callback
 // ClearBucket ...
 func (l *location) ClearBucket(bucketName string, path, prefix string) error {
 	if l == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -368,13 +368,13 @@ func (l *location) ClearBucket(bucketName string, path, prefix string) error {
 // ReadObject reads the content of an object and put it in an io.Writer
 func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) error {
 	if l == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -408,16 +408,16 @@ func (l *location) WriteObject(
 ) (Object, error) {
 
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 	if source == nil {
-		return nil, scerr.InvalidParameterError("source", "cannot be nil")
+		return nil, fail.InvalidParameterError("source", "cannot be nil")
 	}
 
 	defer debug.NewTracer(
@@ -445,13 +445,13 @@ func (l *location) WriteMultiPartObject(
 ) (Object, error) {
 
 	if l == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return nil, scerr.InvalidParameterError("bucketName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("bucketName", "cannot be empty string")
 	}
 	if objectName == "" {
-		return nil, scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return nil, fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(

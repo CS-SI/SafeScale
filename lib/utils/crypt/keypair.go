@@ -24,13 +24,13 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // GenerateRSAKeyPair creates a key pair
 func GenerateRSAKeyPair(name string) (privKey string, pubKey string, err error) {
 	if name == "" {
-		return "", "", scerr.InvalidParameterError("name", "cannot be empty string")
+		return "", "", fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)

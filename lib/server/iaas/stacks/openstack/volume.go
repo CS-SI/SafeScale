@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	log "github.com/sirupsen/logrus"
@@ -93,7 +93,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 
 	volume, err = s.GetVolume(request.Name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -122,7 +122,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			break
 		}
 		if vol == nil {
-			err = scerr.Errorf(
+			err = fail.Errorf(
 				fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil,
 			)
 			break
@@ -148,7 +148,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			break
 		}
 		if vol == nil {
-			err = scerr.Errorf(
+			err = fail.Errorf(
 				fmt.Sprintf("volume creation seems to have succeeded, but returned nil value is unexpected"), nil,
 			)
 			break
@@ -161,10 +161,10 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			State: toVolumeState(vol.Status),
 		}
 	default:
-		err = scerr.Errorf(fmt.Sprintf("unmanaged service 'volume' version '%s'", s.versions["volume"]), nil)
+		err = fail.Errorf(fmt.Sprintf("unmanaged service 'volume' version '%s'", s.versions["volume"]), nil)
 	}
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
+		return nil, fail.Wrap(err, fmt.Sprintf("error creating volume : %s", ProviderErrorToString(err)))
 	}
 
 	return &v, nil
@@ -185,10 +185,10 @@ func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 					err, nil, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
 						if _, ok := ferr.(gc.ErrDefault404); ok {
 							unwrap = true
-							return scerr.AbortedError("", resources.ResourceNotFoundError("volume", id))
+							return fail.AbortedError("", resources.ResourceNotFoundError("volume", id))
 						}
 
-						return scerr.Wrap(ferr, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(ferr)))
+						return fail.Wrap(ferr, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(ferr)))
 					},
 				)
 			}
@@ -199,7 +199,7 @@ func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 
 	if getErr != nil {
 		if unwrap {
-			return nil, scerr.Cause(getErr)
+			return nil, fail.Cause(getErr)
 		}
 		return nil, getErr
 	}
@@ -241,7 +241,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	)
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
+			return nil, fail.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 		}
 		log.Warnf("Complete volume list empty")
 	}
@@ -263,7 +263,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 			if err != nil {
 				return ReinterpretGophercloudErrorCode(
 					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
-						return scerr.Errorf(fmt.Sprintf("volume not in state 'available'"), ferr)
+						return fail.Errorf(fmt.Sprintf("volume not in state 'available'"), ferr)
 					},
 				)
 			}
@@ -296,7 +296,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	)
 	va, err := r.Extract()
 	if err != nil {
-		return "", scerr.Wrap(
+		return "", fail.Wrap(
 			err, fmt.Sprintf(
 				"error creating volume attachment between server %s and volume %s: %s", request.HostID,
 				request.VolumeID, ProviderErrorToString(err),
@@ -313,7 +313,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
 	if err != nil {
-		return nil, scerr.Wrap(
+		return nil, fail.Wrap(
 			err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)),
 		)
 	}
@@ -334,7 +334,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		func(page pagination.Page) (bool, error) {
 			list, err := volumeattach.ExtractVolumeAttachments(page)
 			if err != nil {
-				return false, scerr.Wrap(err, "Error listing volume attachment: extracting attachments")
+				return false, fail.Wrap(err, "Error listing volume attachment: extracting attachments")
 			}
 			for _, va := range list {
 				ava := resources.VolumeAttachment{
@@ -349,7 +349,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
+		return nil, fail.Wrap(err, fmt.Sprintf("error listing volume types: %s", ProviderErrorToString(err)))
 	}
 	return vs, nil
 }
@@ -361,7 +361,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
 	r := volumeattach.Delete(s.ComputeClient, serverID, vaID)
 	err := r.ExtractErr()
 	if err != nil {
-		return scerr.Wrap(
+		return fail.Wrap(
 			err, fmt.Sprintf("error deleting volume attachment '%s': %s", vaID, ProviderErrorToString(err)),
 		)
 	}

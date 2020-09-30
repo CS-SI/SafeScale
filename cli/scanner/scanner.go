@@ -41,7 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	_ "github.com/CS-SI/SafeScale/lib/server" // Imported to initialise tenants
 )
@@ -359,7 +359,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 			if delerr != nil {
 				logrus.Warnf("Error deleting network '%s'", network.ID)
 			}
-			err = scerr.AddConsequence(err, delerr)
+			err = fail.AddConsequence(err, delerr)
 		}()
 
 		_, err = metadata.SaveNetwork(serviceProvider, network)

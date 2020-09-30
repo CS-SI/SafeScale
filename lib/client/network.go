@@ -24,7 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // network is the part of safescale client handling Network
@@ -145,7 +145,7 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 // Create ...
 func (n *network) Create(def *pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
 	if def == nil {
-		return nil, scerr.InvalidParameterError("def", "cannot be nil")
+		return nil, fail.InvalidParameterError("def", "cannot be nil")
 	}
 
 	n.session.Connect()

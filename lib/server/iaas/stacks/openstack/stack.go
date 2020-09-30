@@ -30,7 +30,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // ProviderErrorToString creates an error string from openstack api error
@@ -68,36 +68,36 @@ func ProviderErrorToString(err error) string {
 func TranslateError(err error) error {
 	switch e := err.(type) {
 	case gophercloud.ErrDefault401:
-		return scerr.UnauthorizedError(string(e.Body))
+		return fail.UnauthorizedError(string(e.Body))
 	case *gophercloud.ErrDefault401:
-		return scerr.UnauthorizedError(string(e.Body))
+		return fail.UnauthorizedError(string(e.Body))
 	case gophercloud.ErrDefault403:
-		return scerr.ForbiddenError(string(e.Body))
+		return fail.ForbiddenError(string(e.Body))
 	case *gophercloud.ErrDefault403:
-		return scerr.ForbiddenError(string(e.Body))
+		return fail.ForbiddenError(string(e.Body))
 	case gophercloud.ErrDefault404:
-		return scerr.NotFoundError(string(e.Body))
+		return fail.NotFoundError(string(e.Body))
 	case *gophercloud.ErrDefault404:
-		return scerr.NotFoundError(string(e.Body))
+		return fail.NotFoundError(string(e.Body))
 	case gophercloud.ErrDefault429:
-		return scerr.OverloadError(string(e.Body))
+		return fail.OverloadError(string(e.Body))
 	case *gophercloud.ErrDefault429:
-		return scerr.OverloadError(string(e.Body))
+		return fail.OverloadError(string(e.Body))
 	case gophercloud.ErrDefault500:
-		return scerr.InvalidRequestError(string(e.Body))
+		return fail.InvalidRequestError(string(e.Body))
 	case *gophercloud.ErrDefault500:
-		return scerr.InvalidRequestError(string(e.Body))
+		return fail.InvalidRequestError(string(e.Body))
 	case gophercloud.ErrUnexpectedResponseCode:
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), err,
 		)
 	case *gophercloud.ErrUnexpectedResponseCode:
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf("unexpected response code: code: %d, reason: %s", e.Actual, string(e.Body)), err,
 		)
 	default:
 		logrus.Debugf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error())
-		return scerr.Errorf(fmt.Sprintf("unhandled error received from provider: %s", err.Error()), err)
+		return fail.Errorf(fmt.Sprintf("unhandled error received from provider: %s", err.Error()), err)
 	}
 }
 
@@ -205,7 +205,7 @@ func New(
 	// Openstack client
 	s.Driver, err = openstack.AuthenticatedClient(gcOpts)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+		return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
 	}
 
 	// Compute API
@@ -217,14 +217,14 @@ func New(
 			},
 		)
 	default:
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"],
 			), nil,
 		)
 	}
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+		return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
 	}
 
 	// Network API
@@ -236,14 +236,14 @@ func New(
 			},
 		)
 	default:
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"unmanaged Openstack service 'network' version '%s'", s.versions["network"],
 			), nil,
 		)
 	}
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+		return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
 	}
 
 	// Volume API
@@ -261,19 +261,19 @@ func New(
 			},
 		)
 	default:
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"]), nil,
 		)
 	}
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+		return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
 	}
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
 		s.ProviderNetworkID, err = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+			return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
 		}
 	}
 

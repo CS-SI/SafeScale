@@ -22,9 +22,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -68,18 +68,18 @@ func (m *Metadata) Written() bool {
 func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 	var err error
 	tracer := debug.NewTracer(task, "", false)
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
-		err = scerr.InvalidInstanceError()
+		err = fail.InvalidInstanceError()
 		return m
 	}
 	if m.item == nil {
-		err = scerr.InvalidParameterError("m.item", "cannot be nil")
+		err = fail.InvalidParameterError("m.item", "cannot be nil")
 		return m
 	}
 	if cluster == nil {
-		err = scerr.InvalidParameterError("cluster", "cannot be nil")
+		err = fail.InvalidParameterError("cluster", "cannot be nil")
 		return m
 	}
 
@@ -91,10 +91,10 @@ func (m *Metadata) Carry(task concurrency.Task, cluster *Controller) *Metadata {
 // Delete removes a cluster metadata
 func (m *Metadata) Delete() error {
 	if m == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return fail.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	err := m.item.Delete(m.name)
@@ -151,10 +151,10 @@ func (m *Metadata) Write() error {
 // It's a good idea to do that just after an Acquire() to be sure to have the latest data
 func (m *Metadata) Reload(task concurrency.Task) error {
 	if m == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return fail.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	// If the metadata object has never been written yet, succeed doing nothing
@@ -168,7 +168,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 			innerErr := m.Read(task, m.name)
 			if innerErr != nil {
 				// If error is ErrNotFound, instructs retry to stop without delay
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
+				if _, ok := innerErr.(fail.ErrNotFound); ok {
 					return retry.AbortedError("not found", innerErr)
 				}
 
@@ -186,10 +186,10 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 		switch realErr := retryErr.(type) {
 		case retry.ErrAborted:
 			return realErr.Cause()
-		case scerr.ErrTimeout:
+		case fail.ErrTimeout:
 			return realErr
 		default:
-			return scerr.Cause(realErr)
+			return fail.Cause(realErr)
 		}
 	}
 	return nil
@@ -198,18 +198,18 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 // Get returns the content of the metadata
 func (m *Metadata) Get() (_ *Controller, err error) {
 	tracer := debug.NewTracer(nil, "", false)
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if m == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return nil, scerr.InvalidParameterError("m.item", "cannot be nil")
+		return nil, fail.InvalidParameterError("m.item", "cannot be nil")
 	}
 	if p, ok := m.item.Get().(*Controller); ok {
 		return p, nil
 	}
-	return nil, scerr.NotFoundError("missing cluster content in metadata")
+	return nil, fail.NotFoundError("missing cluster content in metadata")
 }
 
 // OK ...
@@ -232,10 +232,10 @@ func (m *Metadata) OK() bool {
 // Browse walks through cluster folder and executes a callback for each entry
 func (m *Metadata) Browse(callback func(*Controller) error) error {
 	if m == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if m.item == nil {
-		return scerr.InvalidParameterError("m.item", "cannot be nil")
+		return fail.InvalidParameterError("m.item", "cannot be nil")
 	}
 
 	return m.item.Browse(

@@ -19,7 +19,7 @@ package huaweicloud
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -152,7 +152,7 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, error) {
 	r.Err = err
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to get information for Floating IP id '%s': %s", id, openstack.ProviderErrorToString(err),
 			), err,
@@ -183,7 +183,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 		},
 	)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to browser Floating IPs: %s", openstack.ProviderErrorToString(err),
 			), err,
@@ -202,7 +202,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bi, err := ipOpts.toFloatingIPCreateMap()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err),
 			), err,
@@ -215,7 +215,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bb, err := bandwidthOpts.toBandwidthCreateMap()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to build request to create FloatingIP: %s", openstack.ProviderErrorToString(err),
 			), err,
@@ -235,7 +235,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	_, err = s.Stack.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to request Floating IP creation: %s", openstack.ProviderErrorToString(err),
 			), err,
@@ -243,7 +243,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to create Floating IP: %s", err), err)
+		return nil, fail.Errorf(fmt.Sprintf("failed to create Floating IP: %s", err), err)
 	}
 	return fip, nil
 }
@@ -260,7 +260,7 @@ func (s *Stack) DeleteFloatingIP(id string) error {
 	err := r.ExtractErr()
 
 	if err != nil {
-		return scerr.Wrap(err, "error deleting floating ip")
+		return fail.Wrap(err, "error deleting floating ip")
 	}
 
 	return err
@@ -270,7 +270,7 @@ func (s *Stack) DeleteFloatingIP(id string) error {
 func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf(
 				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
 				openstack.ProviderErrorToString(err),
@@ -288,7 +288,7 @@ func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 	_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf(
 				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
 				openstack.ProviderErrorToString(err),
@@ -302,7 +302,7 @@ func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 func (s *Stack) DissociateFloatingIP(host *resources.Host, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf(
 				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
 				openstack.ProviderErrorToString(err),
@@ -320,7 +320,7 @@ func (s *Stack) DissociateFloatingIP(host *resources.Host, id string) error {
 	_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 	err = r.ExtractErr()
 	if err != nil {
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf(
 				"failed to associate Floating IP id '%s' to host '%s': %s", id, host.Name,
 				openstack.ProviderErrorToString(err),

@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func Test_errorTranslator(t *testing.T) {
-	nerr := scerr.AbortedError("Ouch", nil)
+	nerr := fail.AbortedError("Ouch", nil)
 
 	terr := errorTranslator(nerr)
 	if terr == nil {

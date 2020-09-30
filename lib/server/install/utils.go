@@ -36,8 +36,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -161,13 +161,13 @@ var featureScriptTemplate atomic.Value
 // UploadFile uploads a file to remote host
 func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
 	if localpath == "" {
-		return scerr.InvalidParameterError("localpath", "cannot be empty string")
+		return fail.InvalidParameterError("localpath", "cannot be empty string")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 	if remotepath == "" {
-		return scerr.InvalidParameterError("remotepath", "cannot be empty string")
+		return fail.InvalidParameterError("remotepath", "cannot be empty string")
 	}
 
 	to := fmt.Sprintf("%s:%s", host.Name, remotepath)
@@ -176,7 +176,7 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		nil, fmt.Sprintf("(%s, %s:%s)", localpath, host.Name, remotepath), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	sshClt := client.New().SSH
 	networkError := false
@@ -284,13 +284,13 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 // UploadStringToRemoteFile creates a file 'filename' on remote 'host' with the content 'content'
 func UploadStringToRemoteFile(content string, host *pb.Host, filename string, owner, group, rights string) error {
 	if content == "" {
-		return scerr.InvalidParameterError("content", "cannot be empty string")
+		return fail.InvalidParameterError("content", "cannot be empty string")
 	}
 	if host == nil {
-		return scerr.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 	if filename == "" {
-		return scerr.InvalidParameterError("filename", "cannot be empty string")
+		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {

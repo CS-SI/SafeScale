@@ -31,7 +31,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // SSHHandler exists to ease integration tests
@@ -48,10 +48,10 @@ type SSHListener struct{}
 // Run executes an ssh command on a remote host
 func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshResponse, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
+		return nil, status.Errorf(codes.InvalidArgument, fail.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	host := in.GetHost().GetName()
 	command := in.GetCommand()
@@ -59,7 +59,7 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", host), true).WithStopwatch().GoingIn()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	log.Infof("Listeners: ssh run '%s' -c '%s'", in.Host, in.Command)
 
@@ -91,17 +91,17 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 // Copy copy file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.SshResponse, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return nil, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
+		return nil, status.Errorf(codes.InvalidArgument, fail.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	source := in.Source
 	dest := in.Destination
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", source, dest), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	log.Infof("Listeners: ssh copy %s %s", source, dest)
 

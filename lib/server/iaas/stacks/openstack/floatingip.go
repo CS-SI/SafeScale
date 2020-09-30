@@ -6,8 +6,8 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 )
@@ -69,7 +69,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bi, err := ipOpts.toFloatingIPCreateMap()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to build request to create FloatingIP: %s", ProviderErrorToString(err),
 			), err,
@@ -82,7 +82,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	bb, err := bandwidthOpts.toBandwidthCreateMap()
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to build request to create FloatingIP: %s", ProviderErrorToString(err),
 			), err,
@@ -102,7 +102,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	_, err = s.Driver.Request("POST", url, &opts)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"failed to request Floating IP creation: %s", ProviderErrorToString(err),
 			), err,
@@ -110,7 +110,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 	}
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to create Floating IP: %s", err), err)
+		return nil, fail.Errorf(fmt.Sprintf("failed to create Floating IP: %s", err), err)
 	}
 	return fip, nil
 }
@@ -144,16 +144,16 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
 	)
 	if len(fips) == 0 {
 		if retryErr != nil {
-			return nil, scerr.NotFoundError(
+			return nil, fail.NotFoundError(
 				fmt.Sprintf(
 					"no floating IP found for host '%s': %s", hostID, ProviderErrorToString(retryErr),
 				),
 			)
 		}
-		return nil, scerr.NotFoundError(fmt.Sprintf("no floating IP found for host '%s'", hostID))
+		return nil, fail.NotFoundError(fmt.Sprintf("no floating IP found for host '%s'", hostID))
 	}
 	if len(fips) > 1 {
-		return nil, scerr.InconsistentError(
+		return nil, fail.InconsistentError(
 			fmt.Sprintf(
 				"Configuration error, more than one Floating IP associated to host '%s'", hostID,
 			),

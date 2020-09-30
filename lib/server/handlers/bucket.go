@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_bucketapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers BucketAPI
@@ -57,12 +57,12 @@ func NewBucketHandler(svc iaas.Service) BucketAPI {
 // List retrieves all available buckets
 func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	rv, err = handler.service.ListBuckets(objectstorage.RootPath)
 	return rv, err
@@ -71,15 +71,15 @@ func (handler *BucketHandler) List(ctx context.Context) (rv []string, err error)
 // Create a bucket
 func (handler *BucketHandler) Create(ctx context.Context, name string) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	bucket, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -101,7 +101,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 func (handler *BucketHandler) Destroy(ctx context.Context, name string) (err error) {
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = handler.service.ClearBucket(name, "/", "")
 	if err != nil {
@@ -119,7 +119,7 @@ func (handler *BucketHandler) Destroy(ctx context.Context, name string) (err err
 func (handler *BucketHandler) Delete(ctx context.Context, name string) (err error) {
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = handler.service.DeleteBucket(name)
 	if err != nil {
@@ -132,7 +132,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
@@ -160,7 +160,7 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 		nil, fmt.Sprintf("('%s', '%s', '%s')", bucketName, hostName, path), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check bucket existence
 	_, err = handler.service.GetBucket(bucketName)
@@ -227,12 +227,12 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName string) (err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check bucket existence
 	_, err = handler.Inspect(ctx, bucketName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.ErrNotFound); ok {
 			return err
 		}
 		return err
@@ -242,7 +242,7 @@ func (handler *BucketHandler) Unmount(ctx context.Context, bucketName, hostName 
 	hostHandler := NewHostHandler(handler.service)
 	host, err := hostHandler.Inspect(ctx, hostName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.ErrNotFound); ok {
 			return err
 		}
 		return err

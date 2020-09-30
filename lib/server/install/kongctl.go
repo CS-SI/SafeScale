@@ -34,7 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -61,14 +61,14 @@ type KongController struct {
 // NewKongController ...
 // returns:
 //    *KongController, nil if successful
-//    nil, scerr.ErrNotFound if reverseproxy is not installed
-//    nil, scerr.ErrNotAvailable if cannot check if reverseproxy is installed
+//    nil, fail.ErrNotFound if reverseproxy is not installed
+//    nil, fail.ErrNotAvailable if cannot check if reverseproxy is installed
 func NewKongController(svc iaas.Service, network *resources.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if network == nil {
-		return nil, scerr.InvalidParameterError("network", "cannot be nil")
+		return nil, fail.InvalidParameterError("network", "cannot be nil")
 	}
 
 	// Check if reverseproxy feature is installed on host
@@ -129,7 +129,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 				}
 				results, err := rp.Check(target, Variables{}, Settings{})
 				if err != nil {
-					return false, scerr.NotAvailableError(
+					return false, fail.NotAvailableError(
 						fmt.Sprintf(
 							"failed to check if feature 'edgeproxy4network' is installed on gateway '%s': %s",
 							err.Error(), addressedGateway.Name,
@@ -137,7 +137,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 					)
 				}
 				if !results.Successful() {
-					return false, scerr.NotFoundError(
+					return false, fail.NotFoundError(
 						fmt.Sprintf(
 							"feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.Name,
 						),
@@ -153,7 +153,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		present = true
 	}
 	if !present {
-		return nil, scerr.NotFoundError(
+		return nil, fail.NotFoundError(
 			fmt.Sprintf(
 				"feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.Name,
 			),
@@ -332,7 +332,7 @@ func (k *KongController) addSourceControl(ruleName, url, resourceType, resourceI
 	url += "/plugins"
 	result, _, err := k.get(ruleName, url)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.ErrNotFound); !ok {
 			return err
 		}
 	}
@@ -499,14 +499,14 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 		return response, httpcode, nil
 	case "404":
 		if msg, ok := response["message"]; ok {
-			return nil, httpcode, scerr.NotFoundError(msg.(string))
+			return nil, httpcode, fail.NotFoundError(msg.(string))
 		}
-		return nil, output[1], scerr.NotFoundError("")
+		return nil, output[1], fail.NotFoundError("")
 	case "409":
 		if msg, ok := response["message"]; ok {
-			return nil, httpcode, scerr.DuplicateError(msg.(string))
+			return nil, httpcode, fail.DuplicateError(msg.(string))
 		}
-		return nil, httpcode, scerr.DuplicateError("")
+		return nil, httpcode, fail.DuplicateError("")
 	default:
 		if msg, ok := response["message"]; ok {
 			return response, httpcode, fmt.Errorf("post failed: HTTP error code=%s: %s", httpcode, msg.(string))

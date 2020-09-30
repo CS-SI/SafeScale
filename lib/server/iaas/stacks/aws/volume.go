@@ -19,7 +19,7 @@ package aws
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -226,7 +226,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 			}, nil
 		}
 	}
-	return nil, scerr.Errorf(
+	return nil, fail.Errorf(
 		fmt.Sprintf("volume attachment of volume %s on server %s does not exist", serverID, id), nil,
 	)
 }

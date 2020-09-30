@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
@@ -58,18 +58,18 @@ type SyncedJSONProperty struct {
 // The lock applied on the extension is automatically released on exit.
 func (sp *SyncedJSONProperty) ThenUse(apply func(data.Clonable) error) (err error) {
 	if sp == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if sp.jsonProperty == nil {
-		return scerr.InvalidParameterError("sp.jsonProperty", "cannot be nil")
+		return fail.InvalidParameterError("sp.jsonProperty", "cannot be nil")
 	}
 	if apply == nil {
-		return scerr.InvalidParameterError("apply", "cannot be nil")
+		return fail.InvalidParameterError("apply", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", false).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitTraceError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitTraceError(tracer.TraceMessage(""), &err)()
 	defer sp.unlock()
 
 	if jsonData := sp.jsonProperty.Data; jsonData != nil {

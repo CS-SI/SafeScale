@@ -34,9 +34,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -69,7 +69,7 @@ func NewSSHHandler(svc iaas.Service) *SSHHandler {
 // GetConfig creates SSHConfig to connect to an host
 func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{}) (sshConfig *system.SSHConfig, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostRef string
@@ -94,15 +94,15 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		}
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
@@ -156,15 +156,15 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
 func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interface{}, timeout time.Duration) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if ctx == nil {
-		return scerr.InvalidParameterError("ctx", "cannot be nil")
+		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	sshSvc := NewSSHHandler(handler.service)
@@ -179,22 +179,22 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 // Run tries to execute command 'cmd' on the host
 func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs outputs.Enum) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", scerr.InvalidInstanceError()
+		return -1, "", "", fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	if ctx == nil {
-		return 1, "", "", scerr.InvalidParameterError("ctx", "cannot be nil")
+		return 1, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if hostName == "" {
-		return 1, "", "", scerr.InvalidParameterError("hostName", "cannot be empty")
+		return 1, "", "", fail.InvalidParameterError("hostName", "cannot be empty")
 	}
 	if cmd == "" {
-		return 1, "", "", scerr.InvalidParameterError("cmd", "cannot be empty")
+		return 1, "", "", fail.InvalidParameterError("cmd", "cannot be empty")
 	}
 
 	hostSvc := NewHostHandler(handler.service)
@@ -231,22 +231,22 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 // Run tries to execute command 'cmd' on the host
 func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd string, outs outputs.Enum, timeout time.Duration) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", scerr.InvalidInstanceError()
+		return -1, "", "", fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', <command>)", hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	if ctx == nil {
-		return 1, "", "", scerr.InvalidParameterError("ctx", "cannot be nil")
+		return 1, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if hostName == "" {
-		return 1, "", "", scerr.InvalidParameterError("hostName", "cannot be empty")
+		return 1, "", "", fail.InvalidParameterError("hostName", "cannot be empty")
 	}
 	if cmd == "" {
-		return 1, "", "", scerr.InvalidParameterError("cmd", "cannot be empty")
+		return 1, "", "", fail.InvalidParameterError("cmd", "cannot be empty")
 	}
 
 	hostSvc := NewHostHandler(handler.service)
@@ -327,21 +327,21 @@ func extractPath(in string) (string, error) {
 // Copy copy file/directory
 func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode int, stdOut string, stdErr string, err error) {
 	if handler == nil {
-		return -1, "", "", scerr.InvalidInstanceError()
+		return -1, "", "", fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", from, to), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	if ctx == nil {
-		return 1, "", "", scerr.InvalidParameterError("ctx", "cannot be nil")
+		return 1, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if from == "" {
-		return 1, "", "", scerr.InvalidParameterError("from", "cannot be empty")
+		return 1, "", "", fail.InvalidParameterError("from", "cannot be empty")
 	}
 	if to == "" {
-		return 1, "", "", scerr.InvalidParameterError("to", "cannot be empty")
+		return 1, "", "", fail.InvalidParameterError("to", "cannot be empty")
 	}
 
 	hostName := ""

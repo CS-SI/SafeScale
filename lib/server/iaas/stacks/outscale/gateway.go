@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateGateway creates a public Gateway for a private network
@@ -35,7 +35,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 
 	// Ensure network exists
 	if req.Network == nil {
-		return nil, nil, scerr.InvalidParameterError("req.Network", "cannot be nil")
+		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
 	}
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
@@ -44,7 +44,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 
 	password, err := utils.GeneratePassword(16)
 	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("failed to generate password: %s", err.Error()))
+		return nil, userData, fail.Wrap(err, fmt.Sprintf("failed to generate password: %s", err.Error()))
 	}
 	hostReq := resources.HostRequest{
 		ImageID:      req.ImageID,
@@ -61,10 +61,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	}
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
-		return nil, nil, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
+		return nil, nil, fail.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
 	}
 	if host == nil {
-		return nil, nil, scerr.InconsistentError("host creation returned with an empty host and without reporting an error")
+		return nil, nil, fail.InconsistentError("host creation returned with an empty host and without reporting an error")
 	}
 
 	// Updates Host Property propsv1.HostSizing
@@ -76,7 +76,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 		},
 	)
 	if err != nil {
-		return nil, userData, scerr.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
+		return nil, userData, fail.Wrap(err, fmt.Sprintf("error creating gateway : %v", err))
 	}
 	return host, userData, nil
 }

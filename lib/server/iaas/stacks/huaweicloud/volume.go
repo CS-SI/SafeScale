@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	log "github.com/sirupsen/logrus"
 
@@ -91,7 +91,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
 	volume, err := s.GetVolume(request.Name)
 	if volume != nil && err == nil {
-		return nil, scerr.Errorf(fmt.Sprintf("volume '%s' already exists", request.Name), err)
+		return nil, fail.Errorf(fmt.Sprintf("volume '%s' already exists", request.Name), err)
 	}
 
 	az, err := s.SelectedAvailabilityZone()
@@ -106,7 +106,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("error creating volume : %s", openstack.ProviderErrorToString(err)), err)
+		return nil, fail.Errorf(fmt.Sprintf("error creating volume : %s", openstack.ProviderErrorToString(err)), err)
 	}
 	v := resources.Volume{
 		ID:    vol.ID,
@@ -133,10 +133,10 @@ func (s *Stack) GetVolume(id string) (_ *resources.Volume, err error) {
 					err, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
 						if _, ok := ferr.(gc.ErrDefault404); ok {
 							unwrap = true
-							return scerr.AbortedError("", resources.ResourceNotFoundError("volume", id))
+							return fail.AbortedError("", resources.ResourceNotFoundError("volume", id))
 						}
 
-						return scerr.Wrap(
+						return fail.Wrap(
 							ferr, fmt.Sprintf("error getting volume: %s", openstack.ProviderErrorToString(ferr)),
 						)
 					},
@@ -150,7 +150,7 @@ func (s *Stack) GetVolume(id string) (_ *resources.Volume, err error) {
 
 	if getErr != nil {
 		if unwrap {
-			return nil, scerr.Cause(getErr)
+			return nil, fail.Cause(getErr)
 		}
 		return nil, getErr
 	}
@@ -190,7 +190,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	)
 	if err != nil || len(vs) == 0 {
 		if err != nil {
-			return nil, scerr.Wrap(
+			return nil, fail.Wrap(
 				err, fmt.Sprintf("error listing volume types: %s", openstack.ProviderErrorToString(err)),
 			)
 		}

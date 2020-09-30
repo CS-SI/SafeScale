@@ -37,7 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
@@ -169,7 +169,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 					derr := svc.DeleteVIP(vip)
 					if derr != nil {
 						logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
-						err = scerr.AddConsequence(err, derr)
+						err = fail.AddConsequence(err, derr)
 					}
 				}
 			}()
@@ -182,7 +182,7 @@ func configureCluster(task concurrency.Task, foreman control.Foreman, req contro
 						derr := svc.UnbindHostFromVIP(vip, i)
 						if derr != nil {
 							logrus.Errorf("Cleaning up on failure, failed to delete VirtualIP: %v", derr)
-							err = scerr.AddConsequence(err, derr)
+							err = fail.AddConsequence(err, derr)
 						}
 					}
 				}
@@ -281,7 +281,7 @@ func unconfigureCluster(task concurrency.Task, foreman control.Foreman) error {
 		func(clonable data.Clonable) error {
 			controlPlaneV1, ok := clonable.(*clusterpropsv1.ControlPlane)
 			if !ok {
-				return scerr.InconsistentError("property ControlPlaneV1 doesn't contain valid data")
+				return fail.InconsistentError("property ControlPlaneV1 doesn't contain valid data")
 			}
 			if controlPlaneV1.VirtualIP != nil {
 				inErr := foreman.Cluster().GetService(task).DeleteVIP(controlPlaneV1.VirtualIP)

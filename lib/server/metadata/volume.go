@@ -25,9 +25,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -47,7 +47,7 @@ type Volume struct {
 // NewVolume creates an instance of metadata.Volume
 func NewVolume(svc iaas.Service) (*Volume, error) {
 	if svc == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	aVol, err := metadata.NewItem(svc, volumesFolderName)
@@ -64,13 +64,13 @@ func NewVolume(svc iaas.Service) (*Volume, error) {
 // Carry links a Volume instance to the Metadata instance
 func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 	if mv == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return nil, scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	if volume == nil {
-		return nil, scerr.InvalidParameterError("volume", "cannot be nil!")
+		return nil, fail.InvalidParameterError("volume", "cannot be nil!")
 	}
 	if volume.Properties == nil {
 		volume.Properties = serialize.NewJSONProperties("resources")
@@ -84,24 +84,24 @@ func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 // Get returns the Volume instance linked to metadata
 func (mv *Volume) Get() (*resources.Volume, error) {
 	if mv == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return nil, scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	if volume, ok := mv.item.Get().(*resources.Volume); ok {
 		return volume, nil
 	}
-	return nil, scerr.InconsistentError("invalid content in volume metadata")
+	return nil, fail.InconsistentError("invalid content in volume metadata")
 }
 
 // Write updates the metadata corresponding to the volume in the Object Storage
 func (mv *Volume) Write() error {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil!")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil!")
 	}
 
 	err := mv.item.WriteInto(ByIDFolderName, *mv.id)
@@ -114,15 +114,15 @@ func (mv *Volume) Write() error {
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (mv *Volume) Reload() error {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	err := mv.ReadByID(*mv.id)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return scerr.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return fail.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
 		}
 		return err
 	}
@@ -132,18 +132,18 @@ func (mv *Volume) Reload() error {
 // ReadByReference tries to read with 'ref' as id, then if not found as name
 func (mv *Volume) ReadByReference(ref string) (err error) {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	if ref == "" {
-		return scerr.InvalidParameterError("ref", "cannot be empty string")
+		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "('"+ref+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
+	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
 	var errors []error
 	err1 := mv.mayReadByID(ref) // First read by ID ...
@@ -158,18 +158,18 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 
 	if len(errors) == 2 {
 		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
-			return scerr.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors))
+			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
 		}
 
-		if _, ok := err1.(scerr.ErrNotFound); ok {
-			if _, ok := err2.(scerr.ErrNotFound); ok {
-				return scerr.NotFoundErrorWithCause(
-					fmt.Sprintf("reference %s not found", ref), scerr.ErrListError(errors),
+		if _, ok := err1.(fail.ErrNotFound); ok {
+			if _, ok := err2.(fail.ErrNotFound); ok {
+				return fail.NotFoundErrorWithCause(
+					fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors),
 				)
 			}
 		}
 
-		return scerr.ErrListError(errors)
+		return fail.ErrListError(errors)
 	}
 
 	return nil
@@ -227,18 +227,18 @@ func (mv *Volume) mayReadByName(name string) error {
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
 func (mv *Volume) ReadByID(id string) (err error) {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	if id == "" {
-		return scerr.InvalidParameterError("id", "cannot be empty string")
+		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "("+id+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return mv.mayReadByID(id)
 }
@@ -246,18 +246,18 @@ func (mv *Volume) ReadByID(id string) (err error) {
 // ReadByName reads the metadata of a volume identified by name
 func (mv *Volume) ReadByName(name string) (err error) {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return mv.mayReadByName(name)
 }
@@ -265,15 +265,15 @@ func (mv *Volume) ReadByName(name string) (err error) {
 // Delete delete the metadata corresponding to the volume
 func (mv *Volume) Delete() (err error) {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	err = mv.item.DeleteFrom(ByIDFolderName, *mv.id)
 	if err != nil {
@@ -292,15 +292,15 @@ func (mv *Volume) Delete() (err error) {
 // Browse walks through volume folder and executes a callback for each entries
 func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
 	if mv == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
-		return scerr.InvalidInstanceContentError("mv.item", "cannot be nil")
+		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	return mv.item.BrowseInto(
 		ByIDFolderName, func(buf []byte) error {
@@ -317,15 +317,15 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if volume == nil {
-		return nil, scerr.InvalidParameterError("volume", "cannot be nil")
+		return nil, fail.InvalidParameterError("volume", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "("+volume.Name+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mv, err = NewVolume(svc)
 	if err != nil {
@@ -348,15 +348,15 @@ func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err err
 // RemoveVolume removes the Volume definition from Object Storage
 func RemoveVolume(svc iaas.Service, volumeID string) (err error) {
 	if svc == nil {
-		return scerr.InvalidParameterError("svc", "cannot be nil")
+		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if volumeID == "" {
-		return scerr.InvalidParameterError("volumeID", "cannot be empty string")
+		return fail.InvalidParameterError("volumeID", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "("+volumeID+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	m, err := LoadVolume(svc, volumeID)
 	if err != nil {
@@ -371,15 +371,15 @@ func RemoveVolume(svc iaas.Service, volumeID string) (err error) {
 //        If retry times out, return errNotFound
 func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
-		return nil, scerr.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, "("+ref+")", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	mv, err = NewVolume(svc)
 	if err != nil {
@@ -390,7 +390,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 		func() error {
 			innerErr := mv.ReadByReference(ref)
 			if innerErr != nil {
-				if _, ok := innerErr.(scerr.ErrNotFound); ok {
+				if _, ok := innerErr.(fail.ErrNotFound); ok {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
@@ -408,10 +408,10 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 		switch err := retryErr.(type) {
 		case retry.ErrAborted:
 			return nil, err.Cause()
-		case scerr.ErrTimeout:
+		case fail.ErrTimeout:
 			return nil, err
 		default:
-			return nil, scerr.Cause(err)
+			return nil, fail.Cause(err)
 		}
 	}
 

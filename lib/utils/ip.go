@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var networks = map[string]*net.IPNet{}
@@ -43,11 +43,11 @@ func CIDRToIPv4Range(cidr string) (string, string, error) {
 // CIDRToLongRange converts CIDR to range of long values (representing IPv4 addresses)
 func CIDRToLongRange(cidr string) (uint32, uint32, error) {
 	if cidr == "" {
-		return 0, 0, scerr.InvalidParameterError("cidr", "cannot be empty string")
+		return 0, 0, fail.InvalidParameterError("cidr", "cannot be empty string")
 	}
 	_, _, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return 0, 0, scerr.InvalidParameterError("cidr", "Not a valid CIDR")
+		return 0, 0, fail.InvalidParameterError("cidr", "Not a valid CIDR")
 	}
 
 	var (

@@ -19,7 +19,7 @@ package openstack
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
@@ -153,7 +153,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			}
 		}
 		if !regionIsValidInput {
-			return nil, scerr.InvalidParameterError("region", fmt.Sprintf("invalid Region: '%s'", region))
+			return nil, fail.InvalidParameterError("region", fmt.Sprintf("invalid Region: '%s'", region))
 		}
 	}
 
@@ -176,7 +176,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, scerr.InvalidParameterError(
+			return nil, fail.InvalidParameterError(
 				"zone", fmt.Sprintf("invalid Availability zone: '%s', valid zones are %v", zone, validZones),
 			)
 		}

@@ -38,7 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -466,10 +466,10 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 // taskLaunchStep starts the step
 func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, err error) {
 	if w == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if params == nil {
-		return nil, scerr.InvalidParameterError("params", "can't be nil")
+		return nil, fail.InvalidParameterError("params", "can't be nil")
 	}
 
 	var (
@@ -482,40 +482,40 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	p := params.(data.Map)
 
 	if anon, ok = p["stepName"]; !ok {
-		return nil, scerr.InvalidParameterError("params[stepName]", "is missing")
+		return nil, fail.InvalidParameterError("params[stepName]", "is missing")
 	}
 	if stepName, ok = anon.(string); !ok {
-		return nil, scerr.InvalidParameterError("param[stepName]", "must be a string")
+		return nil, fail.InvalidParameterError("param[stepName]", "must be a string")
 	}
 	if stepName == "" {
-		return nil, scerr.InvalidParameterError("param[stepName]", "cannot be an empty string")
+		return nil, fail.InvalidParameterError("param[stepName]", "cannot be an empty string")
 	}
 	if anon, ok = p["stepKey"]; !ok {
-		return nil, scerr.InvalidParameterError("params[stepKey]", "is missing")
+		return nil, fail.InvalidParameterError("params[stepKey]", "is missing")
 	}
 	if stepKey, ok = anon.(string); !ok {
-		return nil, scerr.InvalidParameterError("param[stepKey]", "must be a string")
+		return nil, fail.InvalidParameterError("param[stepKey]", "must be a string")
 	}
 	if stepKey == "" {
-		return nil, scerr.InvalidParameterError("param[stepKey]", "cannot be an empty string")
+		return nil, fail.InvalidParameterError("param[stepKey]", "cannot be an empty string")
 	}
 	if anon, ok = p["stepMap"]; !ok {
-		return nil, scerr.InvalidParameterError("params[stepMap]", "is missing")
+		return nil, fail.InvalidParameterError("params[stepMap]", "is missing")
 	}
 	if stepMap, ok = anon.(map[string]interface{}); !ok {
-		return nil, scerr.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
+		return nil, fail.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
 	}
 	if anon, ok = p["variables"]; !ok {
-		return nil, scerr.InvalidParameterError("params[variables]", "is missing")
+		return nil, fail.InvalidParameterError("params[variables]", "is missing")
 	}
 	if vars, ok = anon.(Variables); !ok {
-		return nil, scerr.InvalidParameterError("params[variables]", "must be a data.Map")
+		return nil, fail.InvalidParameterError("params[variables]", "must be a data.Map")
 	}
 	if vars == nil {
-		return nil, scerr.InvalidParameterError("params[variables]", "cannot be nil")
+		return nil, fail.InvalidParameterError("params[variables]", "cannot be nil")
 	}
 
-	defer scerr.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)()
+	defer fail.OnExitLogError(fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName), &err)()
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
 		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
@@ -778,7 +778,7 @@ func (w *worker) validateClusterSizing() error {
 // parseClusterSizingRequest returns count, cpu and ram components of request
 func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, error) {
 
-	return 0, 0, 0.0, scerr.NotImplementedError("parseClusterSizingRequest() not yet implemented")
+	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
@@ -789,11 +789,11 @@ func (w *worker) setReverseProxy() (err error) {
 	}
 
 	if w.cluster == nil {
-		return scerr.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
+		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
 	if w.feature.task == nil {
-		return scerr.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
+		return fail.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
 	}
 
 	svc := w.cluster.GetService(w.feature.task)
@@ -813,10 +813,10 @@ func (w *worker) setReverseProxy() (err error) {
 	primaryKongController, err := NewKongController(svc, network, true)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrNotFound:
+		case fail.ErrNotFound:
 			return nil
 		default:
-			return scerr.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
+			return fail.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
 		}
 	}
 	var secondaryKongController *KongController
@@ -824,10 +824,10 @@ func (w *worker) setReverseProxy() (err error) {
 		secondaryKongController, err = NewKongController(svc, network, false)
 		if err != nil {
 			switch err.(type) {
-			case scerr.ErrNotFound:
-				return scerr.InconsistentError("reverseproxy found on primary gateway but not on secondary gateway")
+			case fail.ErrNotFound:
+				return fail.InconsistentError("reverseproxy found on primary gateway but not on secondary gateway")
 			default:
-				return scerr.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
+				return fail.InvalidRequestError(fmt.Sprintf("failed to apply reverse proxy rules: %s", err.Error()))
 			}
 		}
 	}
@@ -864,7 +864,7 @@ func (w *worker) setReverseProxy() (err error) {
 		}
 		hosts, err := w.identifyHosts(targets)
 		if err != nil {
-			return scerr.InvalidRequestError(fmt.Sprintf("failed to apply proxy rules: %s", err.Error()))
+			return fail.InvalidRequestError(fmt.Sprintf("failed to apply proxy rules: %s", err.Error()))
 		}
 
 		for _, h := range hosts {

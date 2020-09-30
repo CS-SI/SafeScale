@@ -34,31 +34,31 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/cidr"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 )
 
 func (s *Stack) CreateVIP(string, string) (*resources.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) BindHostToVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) UnbindHostFromVIP(*resources.VirtualIP, string) error {
-	return scerr.NotImplementedError("UnbindHostToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("UnbindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) DeleteVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Network, err error) {
@@ -97,7 +97,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 			},
 		)
 		if err != nil {
-			return nil, scerr.Wrap(err, "Error creating VPC")
+			return nil, fail.Wrap(err, "Error creating VPC")
 		}
 
 		theVpc = vpcOut.Vpc
@@ -117,7 +117,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				}
 
 				if aws.StringValue(vpcTmp.Vpcs[0].State) != "available" {
-					return scerr.Errorf(fmt.Sprintf("not ready"), nil)
+					return fail.Errorf(fmt.Sprintf("not ready"), nil)
 				}
 
 				return nil
@@ -152,7 +152,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 			if theVpc != nil {
 				derr := s.DeleteNetwork(aws.StringValue(theVpc.VpcId))
 				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
+					err = fail.AddConsequence(err, derr)
 				}
 			}
 		}
@@ -161,7 +161,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	// FIXME: Create private and public subnets here...
 	_, parentNet, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return nil, scerr.Wrap(err, "error parsing requested CIDR")
+		return nil, fail.Wrap(err, "error parsing requested CIDR")
 	}
 
 	var subnets []*net.IPNet
@@ -171,13 +171,13 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		logrus.Warn("We should build subnetworks")
 		publicSubnetCidr, err := cidr.Subnet(parentNet, 1, 0)
 		if err != nil {
-			return nil, scerr.Wrap(err, "error preparing a public subnet")
+			return nil, fail.Wrap(err, "error preparing a public subnet")
 		}
 		subnets = append(subnets, publicSubnetCidr)
 
 		privateSubnetCidr, err := cidr.Subnet(parentNet, 1, 1)
 		if err != nil {
-			return nil, scerr.Wrap(err, "error preparing a private subnet")
+			return nil, fail.Wrap(err, "error preparing a private subnet")
 		}
 		subnets = append(subnets, privateSubnetCidr)
 	} else {
@@ -194,7 +194,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 					},
 				)
 				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
+					err = fail.AddConsequence(err, derr)
 				}
 			}
 		}
@@ -209,14 +209,14 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 			},
 		)
 		if err != nil {
-			return nil, scerr.Wrap(err, "error creating a subnet")
+			return nil, fail.Wrap(err, "error creating a subnet")
 		}
 
 		subnetsResult = append(subnetsResult, sn)
 	}
 
 	if len(subnetsResult) == 0 {
-		return nil, scerr.Errorf(fmt.Sprintf("unable to create any subnet"), nil)
+		return nil, fail.Errorf(fmt.Sprintf("unable to create any subnet"), nil)
 	}
 
 	var subnetIds []*string
@@ -253,7 +253,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 					}
 
 					if aws.StringValue(snTmp.Subnets[0].State) != "available" {
-						return scerr.Errorf(fmt.Sprintf("not ready"), nil)
+						return fail.Errorf(fmt.Sprintf("not ready"), nil)
 					}
 
 					return nil
@@ -270,7 +270,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 
 	gw, err := s.EC2Service.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
 	if err != nil {
-		return nil, scerr.Wrap(err, "error creating internet gateway")
+		return nil, fail.Wrap(err, "error creating internet gateway")
 	}
 	defer func() {
 		if err != nil {
@@ -280,7 +280,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				},
 			)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -292,7 +292,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(err, "error attaching internet gateway")
+		return nil, fail.Wrap(err, "error attaching internet gateway")
 	}
 
 	defer func() {
@@ -304,7 +304,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				},
 			)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -322,7 +322,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		},
 	)
 	if err != nil || len(table.RouteTables) < 1 {
-		return nil, scerr.Wrap(err, "No RouteTables")
+		return nil, fail.Wrap(err, "No RouteTables")
 	}
 
 	_, err = s.EC2Service.CreateRoute(
@@ -333,7 +333,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(err, "CreateRoute")
+		return nil, fail.Wrap(err, "CreateRoute")
 	}
 
 	defer func() {
@@ -345,7 +345,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				},
 			)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -359,7 +359,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(err, "AssociateRouteTable")
+		return nil, fail.Wrap(err, "AssociateRouteTable")
 	}
 
 	defer func() {
@@ -370,7 +370,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				},
 			)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -383,7 +383,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 				},
 			)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -690,7 +690,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	//
 	//    * 80 : stopped
 	if state == nil {
-		return hoststate.ERROR, scerr.Errorf(fmt.Sprintf("unexpected host state"), nil)
+		return hoststate.ERROR, fail.Errorf(fmt.Sprintf("unexpected host state"), nil)
 	}
 	if *state.Code == 0 {
 		return hoststate.STARTING, nil
@@ -710,7 +710,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	if *state.Code == 80 {
 		return hoststate.STOPPED, nil
 	}
-	return hoststate.ERROR, scerr.Errorf(fmt.Sprintf("unexpected host state"), nil)
+	return hoststate.ERROR, fail.Errorf(fmt.Sprintf("unexpected host state"), nil)
 }
 
 func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (_ *resources.Host, _ *userdata.Content, err error) {
@@ -734,10 +734,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case *scerr.ErrInvalidRequest:
+		case *fail.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
+			return nil, userData, fail.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
 		}
 	}
 
@@ -745,7 +745,7 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 		if err != nil {
 			derr := s.DeleteHost(host.ID)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()

@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -128,7 +128,7 @@ func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, error) {
 	case "RESTORING":
 		return volumestate.CREATING, nil
 	default:
-		return -1, scerr.Errorf(fmt.Sprintf("unexpected volume status: [%s]", gcpDriveStatus), nil)
+		return -1, fail.Errorf(fmt.Sprintf("unexpected volume status: [%s]", gcpDriveStatus), nil)
 	}
 }
 
@@ -142,7 +142,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 		if err != nil {
-			return volumes, scerr.Errorf(fmt.Sprintf("cannot list volumes: %v", err), err)
+			return volumes, fail.Errorf(fmt.Sprintf("cannot list volumes: %v", err), err)
 		}
 		for _, instance := range resp.Items {
 			nvolume := resources.NewVolume()

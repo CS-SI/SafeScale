@@ -31,8 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -222,7 +222,7 @@ func handleExecuteScriptReturn(retcode int, stdout string, stderr string, err er
 				collected += errline + ";"
 			}
 		}
-		return scerr.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
+		return fail.Wrap(err, fmt.Sprintf("%s: std error [%s]", msg, collected))
 	}
 	if retcode != 0 {
 		return fmt.Errorf("%s: Errorcode [%d], std error [%s], std output [%s]", msg, retcode, stderr, stdout)

@@ -28,7 +28,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // TemplateHandler exists to ease integration tests
@@ -42,13 +42,13 @@ type TemplateListener struct{}
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest) (tl *pb.TemplateList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 	all := in.GetAll()
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Teplates List"); err == nil {

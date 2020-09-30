@@ -30,7 +30,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // JobManagerHandler ...
@@ -43,10 +43,10 @@ type JobManagerListener struct{}
 func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (empty *googleprotobuf.Empty, err error) {
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return empty, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 	if in == nil {
-		return empty, status.Errorf(codes.InvalidArgument, scerr.InvalidParameterError("in", "cannot be nil").Message())
+		return empty, status.Errorf(codes.InvalidArgument, fail.InvalidParameterError("in", "cannot be nil").Message())
 	}
 	uuid := in.Uuid
 	if in.Uuid == "" {
@@ -55,7 +55,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", uuid), true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	log.Infof("Received stop order for job '%s'...", uuid)
 
@@ -79,12 +79,12 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *pb.JobDefinition) (em
 // List running process
 func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *pb.JobList, err error) {
 	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, scerr.InvalidInstanceError().Message())
+		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

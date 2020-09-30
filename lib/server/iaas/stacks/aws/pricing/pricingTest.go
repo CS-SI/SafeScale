@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -47,7 +47,7 @@ func TryConnection(bucketName, key string) error {
 
 	c := pricing.New(s, &aws.Config{})
 	if c == nil {
-		return scerr.Errorf("Failure creating pricing session", nil)
+		return fail.Errorf("Failure creating pricing session", nil)
 	}
 	prods, err := c.GetProducts(
 		&pricing.GetProductsInput{
@@ -68,7 +68,7 @@ func TryConnection(bucketName, key string) error {
 		},
 	)
 	if err != nil {
-		return scerr.Wrap(err, "unable to fetch products list")
+		return fail.Wrap(err, "unable to fetch products list")
 	}
 
 	hostTemplates := make(map[string]resources.HostTemplate)
