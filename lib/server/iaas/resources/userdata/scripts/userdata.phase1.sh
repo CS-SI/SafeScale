@@ -352,7 +352,17 @@ function compatible_network() {
     # Try installing network-scripts if available
     case $LINUX_KIND in
     redhat | rhel | centos | fedora)
-        sfYum install -q -y network-scripts || true
+        sfRetry 3m 5 "sfYum install -q -y network-scripts" || true
+        ;;
+    *) ;;
+    esac
+}
+
+function silent_compatible_network() {
+    # Try installing network-scripts if available, no need to log this because the gateway is not yet configured
+    case $LINUX_KIND in
+    redhat | rhel | centos | fedora)
+        sfRetry 3m 5 "sfYum install -q -y network-scripts &>/dev/null" || true
         ;;
     *) ;;
     esac
@@ -370,7 +380,7 @@ disable_cloudinit_network_autoconf
 disable_services
 create_user
 
-compatible_network
+silent_compatible_network
 
 ensure_network_connectivity || true
 
