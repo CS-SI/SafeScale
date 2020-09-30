@@ -83,6 +83,25 @@ sfYum() {
 }
 export -f sfYum
 
+sfAvail() {
+    rc=-1
+    case $LINUX_KIND in
+    redhat | rhel | centos | fedora)
+        if [[ -n $(which dnf) ]]; then
+            dnf list available "$@" &>/dev/null && rc=$?
+        else
+            yum list available "$@" &>/dev/null && rc=$?
+        fi
+        ;;
+    debian | ubuntu)
+        DEBIAN_FRONTEND=noninteractive apt search "$@" &>/dev/null && rc=$?
+        ;;
+    esac
+    [ $rc -eq -1 ] && return 1
+    return $rc
+}
+export -f sfAvail
+
 sfWaitLockfile() {
     local ROUNDS=600
     name=$1
