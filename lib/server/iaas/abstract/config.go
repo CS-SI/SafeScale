@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package resources
+package abstract
 
 //go:generate mockgen -destination=../mocks/mock_config.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/providers Config
 

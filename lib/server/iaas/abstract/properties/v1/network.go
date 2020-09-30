@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -112,6 +112,6 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.HostsV1, NewNetworkHosts())
-	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.DescriptionV1, NewNetworkDescription())
+	serialize.PropertyTypeRegistry.Register("abstract.network", networkproperty.HostsV1, NewNetworkHosts())
+	serialize.PropertyTypeRegistry.Register("abstract.network", networkproperty.DescriptionV1, NewNetworkDescription())
 }

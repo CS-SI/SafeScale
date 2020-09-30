@@ -30,7 +30,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -310,7 +310,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if host == nil {
-		return nil, resources.ResourceNotFoundError("share", shareRef)
+		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
 	return srvutils.ToPBShareMountList(host.Name, share, mounts)

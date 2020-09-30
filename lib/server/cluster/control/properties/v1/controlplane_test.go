@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 )
 
 func TestControlPlane_Clone(t *testing.T) {
-	vip := resources.NewVirtualIP()
+	vip := abstract.NewVirtualIP()
 	vip.Hosts = append(vip.Hosts, "Whatever")
 
 	ct := newControlPlane()

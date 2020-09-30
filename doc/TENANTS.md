@@ -17,14 +17,14 @@ Here is an example of a TOML encoded configuration file :
         Password = "<Password>"
         DomainName = "<Domain Name>"
 
-    # This part defines configuration specifically applied to compute resources (AWS EC2, OpenStack Nova, ...)
+    # This part defines configuration specifically applied to compute abstract (AWS EC2, OpenStack Nova, ...)
     [tenants.compute]
         ProjectID = "<Project ID>"
         Region = "<Region>"
         AvailabilityZone = "<Availability Zone>"
         DefaultImage = "<OS Image Name to use as default, ex: Ubuntu 18.04>"
 
-    # This part defines configuration specifically applied to network resources (optional)
+    # This part defines configuration specifically applied to network abstract (optional)
     [tenants.network]
         VPCName = "<VPC Name>"
         VPCCIDR = "<VPC CIDR, ex: 192.168.0.0/16>"

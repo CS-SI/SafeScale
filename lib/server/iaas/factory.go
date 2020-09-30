@@ -26,10 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -256,7 +256,7 @@ func UseService(tenantName string) (newService Service, err error) {
 	if !tenantInCfg {
 		return nil, fail.Errorf(fmt.Sprintf("tenant '%s' not found in configuration", tenantName), nil)
 	}
-	return nil, resources.ResourceNotFoundError("provider builder for", svcProvider)
+	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
 // validatRegexps validates regexp values from tenants file

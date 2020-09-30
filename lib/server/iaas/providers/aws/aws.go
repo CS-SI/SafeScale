@@ -24,11 +24,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 )
@@ -40,19 +40,19 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
-func (p *provider) AddPublicIPToVIP(ip *resources.VirtualIP) error {
+func (p *provider) AddPublicIPToVIP(ip *abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) BindHostToVIP(*resources.VirtualIP, string) error {
+func (p *provider) BindHostToVIP(*abstract.VirtualIP, string) error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) UnbindHostFromVIP(*resources.VirtualIP, string) error {
+func (p *provider) UnbindHostFromVIP(*abstract.VirtualIP, string) error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) DeleteVIP(*resources.VirtualIP) error {
+func (p *provider) DeleteVIP(*abstract.VirtualIP) error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -149,7 +149,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 	}
@@ -242,11 +242,11 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	return p.Stack.ListTemplates()
 }
 

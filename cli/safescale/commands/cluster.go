@@ -387,7 +387,7 @@ var clusterCreateCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "keep-on-failure, k",
-			Usage: "If used, the resources are not deleted on failure (default: not set)",
+			Usage: "If used, the abstract are not deleted on failure (default: not set)",
 		},
 		cli.BoolFlag{
 			Name:  "force, f",

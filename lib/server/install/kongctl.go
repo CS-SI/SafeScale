@@ -27,7 +27,7 @@ import (
 
 	safescale "github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -49,11 +49,11 @@ var kongProxyCheckedCache = utils.NewMapCache()
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
-	network *resources.Network
+	network *abstract.Network
 	// host      *pb.Host
 	safescale safescale.Client
 
-	gateway          *resources.Host
+	gateway          *abstract.Host
 	gatewayPrivateIP string
 	gatewayPublicIP  string
 }
@@ -63,7 +63,7 @@ type KongController struct {
 //    *KongController, nil if successful
 //    nil, fail.ErrNotFound if reverseproxy is not installed
 //    nil, fail.ErrNotAvailable if cannot check if reverseproxy is installed
-func NewKongController(svc iaas.Service, network *resources.Network, addressPrimaryGateway bool) (*KongController, error) {
+func NewKongController(svc iaas.Service, network *abstract.Network, addressPrimaryGateway bool) (*KongController, error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -81,7 +81,7 @@ func NewKongController(svc iaas.Service, network *resources.Network, addressPrim
 		return nil, err
 	}
 	var (
-		addressedGateway *resources.Host
+		addressedGateway *abstract.Host
 	)
 	if addressPrimaryGateway {
 		mh, err := metadata.LoadHost(svc, network.GatewayID)

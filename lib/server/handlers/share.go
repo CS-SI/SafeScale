@@ -28,9 +28,9 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -44,8 +44,8 @@ import (
 // ShareAPI defines API to manipulate Shares
 type ShareAPI interface {
 	Create(context.Context, string, string, string, []string, bool, bool, bool, bool, bool, bool, bool) (*propsv1.HostShare, error)
-	ForceInspect(context.Context, string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
-	Inspect(context.Context, string) (*resources.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+	ForceInspect(context.Context, string) (*abstract.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
+	Inspect(context.Context, string) (*abstract.Host, *propsv1.HostShare, map[string]*propsv1.HostRemoteMount, error)
 	Delete(context.Context, string) error
 	List(context.Context) (map[string]map[string]*propsv1.HostShare, error)
 	Mount(context.Context, string, string, string, bool) (*propsv1.HostRemoteMount, error)
@@ -98,7 +98,7 @@ func (handler *ShareHandler) Create(
 		}
 	}
 	if server != nil {
-		return nil, resources.ResourceDuplicateError("share", shareName)
+		return nil, abstract.ResourceDuplicateError("share", shareName)
 	}
 
 	// Sanitize path
@@ -435,10 +435,10 @@ func (handler *ShareHandler) Mount(
 		return nil, err
 	}
 	if share == nil {
-		return nil, resources.ResourceNotFoundError("share", shareName)
+		return nil, abstract.ResourceNotFoundError("share", shareName)
 	}
 	if server == nil {
-		return nil, resources.ResourceNotFoundError("host", hostName)
+		return nil, abstract.ResourceNotFoundError("host", hostName)
 	}
 
 	// Sanitize path
@@ -447,7 +447,7 @@ func (handler *ShareHandler) Mount(
 		return nil, fmt.Errorf("invalid mount path '%s': '%s'", path, err)
 	}
 
-	var target *resources.Host
+	var target *abstract.Host
 	if server.Name == hostName || server.ID == hostName {
 		target = server
 	} else {
@@ -695,7 +695,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 		return err
 	}
 
-	var target *resources.Host
+	var target *abstract.Host
 	if server.Name == hostName || server.ID == hostName {
 		target = server
 	} else {
@@ -784,7 +784,7 @@ func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName st
 func (handler *ShareHandler) ForceInspect(
 	ctx context.Context,
 	shareName string,
-) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
+) (host *abstract.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
 
 	if handler == nil {
 		return nil, nil, nil, fail.InvalidInstanceError()
@@ -813,7 +813,7 @@ func (handler *ShareHandler) ForceInspect(
 func (handler *ShareHandler) Inspect(
 	ctx context.Context,
 	shareName string,
-) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
+) (host *abstract.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
 
 	if handler == nil {
 		return nil, nil, nil, fail.InvalidInstanceError()
@@ -830,7 +830,7 @@ func (handler *ShareHandler) Inspect(
 	hostName, err := metadata.LoadShare(handler.service, shareName)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, nil, nil, resources.ResourceNotFoundError("share", shareName)
+			return nil, nil, nil, abstract.ResourceNotFoundError("share", shareName)
 		}
 		return nil, nil, nil, err
 	}
@@ -857,7 +857,7 @@ func (handler *ShareHandler) Inspect(
 				_, found = serverSharesV1.ByID[shareID]
 			}
 			if !found {
-				return resources.ResourceNotFoundError("share", fmt.Sprintf("no share named '%s'", shareName))
+				return abstract.ResourceNotFoundError("share", fmt.Sprintf("no share named '%s'", shareName))
 			}
 			share = serverSharesV1.ByID[shareID]
 			return nil

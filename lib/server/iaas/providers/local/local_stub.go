@@ -22,11 +22,11 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	providerapi "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
 var errorStr = "libvirt Driver is not enabled, use the libvirt option while compiling (make libvirt all)"
@@ -64,86 +64,86 @@ func (provider *provider) ListRegions() ([]string, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) ListImages(all bool) ([]resources.Image, error) {
+func (provider *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetImage(id string) (*resources.Image, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-
-func (provider *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-func (provider *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (provider *provider) GetImage(id string) (*abstract.Image, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateKeyPair(name string) (*resources.KeyPair, error) {
+func (provider *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetKeyPair(id string) (*resources.KeyPair, error) {
+func (provider *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListKeyPairs() ([]resources.KeyPair, error) {
+
+func (provider *provider) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+func (provider *provider) GetKeyPair(id string) (*abstract.KeyPair, error) {
+	return nil, fmt.Errorf(errorStr)
+}
+func (provider *provider) ListKeyPairs() ([]abstract.KeyPair, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteKeyPair(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (provider *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetNetwork(id string) (*resources.Network, error) {
+func (provider *provider) GetNetwork(id string) (*abstract.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetNetworkByName(name string) (*resources.Network, error) {
+func (provider *provider) GetNetworkByName(name string) (*abstract.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListNetworks() ([]*resources.Network, error) {
+func (provider *provider) ListNetworks() ([]*abstract.Network, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteNetwork(id string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
+func (provider *provider) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteGateway(string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
+func (provider *provider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) AddPublicIPToVIP(vip *resources.VirtualIP) error {
+func (provider *provider) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+func (provider *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+func (provider *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	return fmt.Errorf(errorStr)
 }
-func (provider *provider) DeleteVIP(vip *resources.VirtualIP) error {
+func (provider *provider) DeleteVIP(vip *abstract.VirtualIP) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateHost(request resources.HostRequest) (*resources.Host, *userdata.Content, error) {
+func (provider *provider) CreateHost(request abstract.HostRequest) (*abstract.Host, *userdata.Content, error) {
 	return nil, nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+func (provider *provider) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) InspectHost(interface{}) (*resources.Host, error) {
+func (provider *provider) InspectHost(interface{}) (*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetHostByName(string) (*resources.Host, error) {
+func (provider *provider) GetHostByName(string) (*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) GetHostState(interface{}) (hoststate.Enum, error) {
 	return hoststate.ERROR, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListHosts() ([]*resources.Host, error) {
+func (provider *provider) ListHosts() ([]*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteHost(id string) error {
@@ -159,26 +159,26 @@ func (provider *provider) RebootHost(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (provider *provider) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) GetVolume(id string) (*resources.Volume, error) {
+func (provider *provider) GetVolume(id string) (*abstract.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListVolumes() ([]resources.Volume, error) {
+func (provider *provider) ListVolumes() ([]abstract.Volume, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteVolume(id string) error {
 	return fmt.Errorf(errorStr)
 }
 
-func (provider *provider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (provider *provider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	return "", fmt.Errorf(errorStr)
 }
-func (provider *provider) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (provider *provider) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	return nil, fmt.Errorf(errorStr)
 }
-func (provider *provider) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (provider *provider) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) DeleteVolumeAttachment(serverID, id string) error {

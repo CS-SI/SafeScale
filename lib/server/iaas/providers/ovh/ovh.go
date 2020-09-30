@@ -26,12 +26,12 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	filters "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	filters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -115,12 +115,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		alternateAPIConsumerKey = val3.(string)
 	}
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			log.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
@@ -270,7 +270,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -278,7 +278,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return tpl, err
 }
 
-func addGPUCfg(tpl *resources.HostTemplate) {
+func addGPUCfg(tpl *abstract.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -286,12 +286,12 @@ func addGPUCfg(tpl *resources.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -327,7 +327,7 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 		}
 	}
 
-	var listAvailableTemplates []resources.HostTemplate
+	var listAvailableTemplates []abstract.HostTemplate
 	for _, template := range allTemplates {
 		if _, ok := flavorMap[template.ID]; ok {
 			listAvailableTemplates = append(listAvailableTemplates, template)
@@ -344,16 +344,16 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return allTemplates, nil
 }
 
-func isWindowsTemplate(t resources.HostTemplate) bool {
+func isWindowsTemplate(t abstract.HostTemplate) bool {
 	return strings.HasPrefix(strings.ToLower(t.Name), "win-")
 }
 
-func isFlexTemplate(t resources.HostTemplate) bool {
+func isFlexTemplate(t abstract.HostTemplate) bool {
 	return strings.HasSuffix(strings.ToLower(t.Name), "flex")
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {
@@ -378,7 +378,7 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 }
 
 // BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p *provider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	if p == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -393,7 +393,7 @@ func (p *provider) BindHostToVIP(vip *resources.VirtualIP, hostID string) error 
 }
 
 // UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p *provider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+func (p *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	if p == nil {
 		return fail.InvalidInstanceError()
 	}

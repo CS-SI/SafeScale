@@ -30,8 +30,8 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -73,12 +73,12 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 	}
 
 	var (
-		sizing    *resources.SizingRequirements
+		sizing    *abstract.SizingRequirements
 		gwImageID string
 		gwName    string
 	)
 	if in.Gateway == nil || in.Gateway.Sizing == nil {
-		sizing = &resources.SizingRequirements{
+		sizing = &abstract.SizingRequirements{
 			MinCores:    int(in.Gateway.Sizing.MinCpuCount),
 			MaxCores:    int(in.Gateway.Sizing.MaxCpuCount),
 			MinRAMSize:  in.Gateway.Sizing.MinRamSize,
@@ -155,7 +155,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
-	// Map resources.Network to pb.Network
+	// Map abstract.Network to pb.Network
 	var pbnetworks []*pb.Network
 	for _, network := range networks {
 		pbn, err := srvutils.ToPBNetwork(network)

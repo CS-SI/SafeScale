@@ -28,12 +28,12 @@ import (
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	converters "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -44,10 +44,10 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []resources.Image, err error) {
+func (s *Stack) ListImages() (images []abstract.Image, err error) {
 	compuService := s.ComputeService
 
-	images = []resources.Image{}
+	images = []abstract.Image{}
 
 	families := []string{
 		"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud",
@@ -65,7 +65,7 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 
 			for _, image := range resp.Items {
 				images = append(
-					images, resources.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10), DiskSize: image.DiskSizeGb},
+					images, abstract.Image{Name: image.Name, URL: image.SelfLink, ID: strconv.FormatUint(image.Id, 10), DiskSize: image.DiskSizeGb},
 				)
 			}
 			token := resp.NextPageToken
@@ -81,7 +81,7 @@ func (s *Stack) ListImages() (images []resources.Image, err error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*resources.Image, error) {
+func (s *Stack) GetImage(id string) (*abstract.Image, error) {
 	images, err := s.ListImages()
 	if err != nil {
 		return nil, err
@@ -99,10 +99,10 @@ func (s *Stack) GetImage(id string) (*resources.Image, error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
+func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err error) {
 	compuService := s.ComputeService
 
-	templates = []resources.HostTemplate{}
+	templates = []abstract.HostTemplate{}
 
 	token := ""
 	for paginate := true; paginate; {
@@ -113,7 +113,7 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 		} else {
 
 			for _, matype := range resp.Items {
-				ht := resources.HostTemplate{
+				ht := abstract.HostTemplate{
 					Cores:    int(matype.GuestCpus),
 					RAMSize:  float32(matype.MemoryMb / 1024),
 					DiskSize: int(matype.ImageSpaceGb),
@@ -135,7 +135,7 @@ func (s *Stack) ListTemplates(all bool) (templates []resources.HostTemplate, err
 }
 
 // GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	templates, err := s.ListTemplates(true)
 	if err != nil {
 		return nil, err
@@ -153,17 +153,17 @@ func (s *Stack) GetTemplate(id string) (*resources.HostTemplate, error) {
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates a key pair (no import)
-func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
-	return resources.NewKeyPair(name)
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+	return abstract.NewKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
 	return nil, fail.NotImplementedError("GetKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
@@ -173,7 +173,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, err error) {
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -200,7 +200,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
 	defaultGateway := request.DefaultGateway
-	isGateway := defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName
+	isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
@@ -287,9 +287,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, err
 	}
 
-	// --- Initializes resources.Host ---
+	// --- Initializes abstract.Host ---
 
-	host = resources.NewHost()
+	host = abstract.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
@@ -393,7 +393,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		return nil, userData, retryErr
 	}
 	if desistError != nil {
-		return nil, userData, resources.ResourceForbiddenError(
+		return nil, userData, abstract.ResourceForbiddenError(
 			request.ResourceName, fmt.Sprintf("error creating host: %s", desistError.Error()),
 		)
 	}
@@ -437,18 +437,18 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 }
 
 // WaitHostReady waits an host achieve ready state
-// hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *resources.Host, err error) {
-	var host *resources.Host
+// hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter.
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.Host, err error) {
+	var host *abstract.Host
 	switch hostParam := hostParam.(type) {
 	case string:
-		host = resources.NewHost()
+		host = abstract.NewHost()
 		host.ID = hostParam
-	case *resources.Host:
+	case *abstract.Host:
 		host = hostParam
 	}
 	if host == nil {
-		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *abstract.Host")
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
@@ -473,7 +473,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return host, resources.TimeoutError(
+			return host, abstract.TimeoutError(
 				fmt.Sprintf(
 					"timeout waiting to get host '%s' information after %v", host.Name, timeout,
 				), timeout,
@@ -498,7 +498,7 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *resources.HostTemplate) (*resources.Host, error) {
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *abstract.HostTemplate) (*abstract.Host, error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageID
@@ -585,29 +585,29 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 		logrus.Warnf("Instance not modified since insert.")
 	}
 
-	host := resources.NewHost()
+	host := abstract.NewHost()
 	host.ID = strconv.FormatUint(inst.Id, 10)
 	host.Name = inst.Name
 
 	return host, nil
 }
 
-// InspectHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
+// InspectHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, err error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
 			return nil, fail.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host = resources.NewHost()
+		host = abstract.NewHost()
 		host.ID = hostParam
-	case *resources.Host:
+	case *abstract.Host:
 		if hostParam == nil {
 			return nil, fail.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 	default:
-		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *abstract.Host")
 	}
 
 	hostRef := host.Name
@@ -616,7 +616,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	}
 
 	if utils.IsEmpty(host) {
-		return nil, resources.ResourceNotFoundError("host", hostRef)
+		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
 	gcpHost, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostRef).Do()
@@ -766,7 +766,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, error) {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstract.Host, error) {
 	hosts, err := s.ListHosts()
 	if err != nil {
 		return nil, err
@@ -778,7 +778,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("host", name)
+	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
 // DeleteHost deletes the host identified by id
@@ -829,15 +829,15 @@ func (s *Stack) DeleteHost(id string) (err error) {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*resources.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, error) {
 	compuService := s.ComputeService
 
-	var hostList []*resources.Host
+	var hostList []*abstract.Host
 
 	token := ""
 	for paginate := true; paginate; {
@@ -846,7 +846,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 			return hostList, fail.Errorf(fmt.Sprintf("cannot list hosts: %v", err), err)
 		}
 		for _, instance := range resp.Items {
-			nhost := resources.NewHost()
+			nhost := abstract.NewHost()
 			nhost.ID = strconv.FormatUint(instance.Id, 10)
 			nhost.Name = instance.Name
 			nhost.LastState, _ = stateConvert(instance.Status)

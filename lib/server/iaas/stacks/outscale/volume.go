@@ -8,19 +8,19 @@ import (
 
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volume, err error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, err error) {
 	v, _ := s.GetVolumeByName(request.Name)
 	if v != nil {
-		return nil, resources.ResourceDuplicateError("volume", request.Name)
+		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 	IOPS := 0
 	if request.Speed == volumespeed.SSD {
@@ -73,7 +73,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (_ *resources.Volu
 	if err != nil {
 		return nil, err
 	}
-	volume := resources.NewVolume()
+	volume := abstract.NewVolume()
 	volume.ID = ov.VolumeId
 	volume.Speed = s.volumeSpeed(ov.VolumeType)
 	volume.Size = int(ov.Size)
@@ -135,7 +135,7 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
@@ -157,7 +157,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	}
 
 	ov := res.Volumes[0]
-	volume := resources.NewVolume()
+	volume := abstract.NewVolume()
 	volume.ID = ov.VolumeId
 	volume.Speed = s.volumeSpeed(ov.VolumeType)
 	volume.Size = int(ov.Size)
@@ -167,7 +167,7 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 }
 
 // GetVolumeByName returns the volume with name name
-func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
+func (s *Stack) GetVolumeByName(name string) (*abstract.Volume, error) {
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -194,7 +194,7 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 		return nil, fail.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
 	}
 	ov := res.Volumes[0]
-	volume := resources.NewVolume()
+	volume := abstract.NewVolume()
 	volume.ID = ov.VolumeId
 	volume.Speed = s.volumeSpeed(ov.VolumeType)
 	volume.Size = int(ov.Size)
@@ -204,7 +204,7 @@ func (s *Stack) GetVolumeByName(name string) (*resources.Volume, error) {
 }
 
 // ListVolumes list available volumes
-func (s *Stack) ListVolumes() ([]resources.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	subregion := s.Options.Compute.Subregion
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
@@ -220,9 +220,9 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		return nil, normalizeError(err)
 	}
 
-	var volumes []resources.Volume
+	var volumes []abstract.Volume
 	for _, ov := range res.Volumes {
-		volume := resources.NewVolume()
+		volume := abstract.NewVolume()
 		volume.ID = ov.VolumeId
 		volume.Speed = s.volumeSpeed(ov.VolumeType)
 		volume.Size = int(ov.Size)
@@ -276,7 +276,7 @@ func (s *Stack) getFirstFreeDeviceName(serverID string) (string, error) {
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	firstDeviceName, err := s.getFirstFreeDeviceName(request.HostID)
 	if err != nil {
 		return "", normalizeError(err)
@@ -301,7 +301,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
@@ -325,7 +325,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 	ov := res.Volumes[0]
 	for _, lv := range ov.LinkedVolumes {
 		if lv.VmId == serverID {
-			return &resources.VolumeAttachment{
+			return &abstract.VolumeAttachment{
 				VolumeID:   id,
 				ServerID:   serverID,
 				Device:     lv.DeviceName,
@@ -341,12 +341,12 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	volumes, err := s.ListVolumes()
 	if err != nil {
 		return nil, err
 	}
-	var atts []resources.VolumeAttachment
+	var atts []abstract.VolumeAttachment
 	for _, v := range volumes {
 		att, _ := s.GetVolumeAttachment(serverID, v.ID)
 		if att != nil {

@@ -33,10 +33,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/identity"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -948,7 +948,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 
 func convertDefaultsV1ToDefaultsV2(defaultsV1 *clusterpropsv1.Defaults, defaultsV2 *clusterpropsv2.Defaults) {
 	defaultsV2.Image = defaultsV1.Image
-	defaultsV2.MasterSizing = resources.SizingRequirements{
+	defaultsV2.MasterSizing = abstract.SizingRequirements{
 		MinCores:    defaultsV1.MasterSizing.Cores,
 		MinFreq:     defaultsV1.MasterSizing.CPUFreq,
 		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
@@ -956,7 +956,7 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *clusterpropsv1.Defaults, defaults
 		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
 		Replaceable: defaultsV1.MasterSizing.Replaceable,
 	}
-	defaultsV2.NodeSizing = resources.SizingRequirements{
+	defaultsV2.NodeSizing = abstract.SizingRequirements{
 		MinCores:    defaultsV1.NodeSizing.Cores,
 		MinFreq:     defaultsV1.NodeSizing.CPUFreq,
 		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
@@ -1086,7 +1086,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 
 					// found, idx := findNodeByID(nodesV1.Masters, hostID)
 					// if !found {
-					//	return resources.ResourceNotFoundError("host", hostID)
+					//	return abstract.ResourceNotFoundError("host", hostID)
 					// }
 					// master = nodesV1.Masters[idx]
 					// if idx < len(nodesV1.Masters)-1 {
@@ -1099,7 +1099,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 					if innerErr != nil {
 						switch innerErr.(type) {
 						case fail.ErrNotFound:
-							return resources.ResourceNotFoundError("host", hostID)
+							return abstract.ResourceNotFoundError("host", hostID)
 						default:
 							return err
 						}
@@ -1422,7 +1422,7 @@ func (c *Controller) Delete(task concurrency.Task) (err error) {
 	return c.foreman.destruct(task)
 }
 
-// Wipe allows to destroy infrastructure of cluster, forcing destruction of resources and ignoring errors
+// Wipe allows to destroy infrastructure of cluster, forcing destruction of abstract and ignoring errors
 func (c *Controller) Wipe(task concurrency.Task) (err error) {
 	if c == nil {
 		return fail.InvalidInstanceError()
@@ -1476,7 +1476,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 		return err
 	}
 
-	// Stops the resources of the cluster
+	// Stops the abstract of the cluster
 
 	var (
 		nodes                         []*clusterpropsv1.Node
@@ -1625,7 +1625,7 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 		return err
 	}
 
-	// Starts the resources of the cluster
+	// Starts the abstract of the cluster
 	var (
 		nodes                         []*clusterpropsv1.Node
 		masters                       []*clusterpropsv1.Node
@@ -1745,8 +1745,8 @@ func (c *Controller) taskStartHost(task concurrency.Task, params concurrency.Tas
 // 		}
 // 		gw := mgw.Get()
 // 		hm := providermetadata.NewHost(svc)
-// 		hosts := []*resources.Host{}
-// 		err = hm.Browse(func(h *resources.Host) error {
+// 		hosts := []*abstract.Host{}
+// 		err = hm.Browse(func(h *abstract.Host) error {
 // 			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
 // 				hosts = append(hosts, h)
 // 			}

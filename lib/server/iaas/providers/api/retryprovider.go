@@ -3,10 +3,10 @@ package api
 import (
 	"net"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -15,7 +15,7 @@ import (
 // RetryProvider ...
 type RetryProvider WrappedProvider
 
-func (w RetryProvider) CreateVIP(first string, second string) (res *resources.VirtualIP, err error) {
+func (w RetryProvider) CreateVIP(first string, second string) (res *abstract.VirtualIP, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.CreateVIP(first, second)
@@ -43,7 +43,7 @@ func (w RetryProvider) CreateVIP(first string, second string) (res *resources.Vi
 	return res, err
 }
 
-func (w RetryProvider) AddPublicIPToVIP(res *resources.VirtualIP) (err error) {
+func (w RetryProvider) AddPublicIPToVIP(res *abstract.VirtualIP) (err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			err = w.InnerProvider.AddPublicIPToVIP(res)
@@ -71,7 +71,7 @@ func (w RetryProvider) AddPublicIPToVIP(res *resources.VirtualIP) (err error) {
 	return err
 }
 
-func (w RetryProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
+func (w RetryProvider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			err = w.InnerProvider.BindHostToVIP(vip, hostID)
@@ -99,7 +99,7 @@ func (w RetryProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (e
 	return err
 }
 
-func (w RetryProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
+func (w RetryProvider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			err = w.InnerProvider.UnbindHostFromVIP(vip, hostID)
@@ -127,7 +127,7 @@ func (w RetryProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string
 	return err
 }
 
-func (w RetryProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
+func (w RetryProvider) DeleteVIP(vip *abstract.VirtualIP) (err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			err = w.InnerProvider.DeleteVIP(vip)
@@ -193,7 +193,7 @@ func (w RetryProvider) Build(something map[string]interface{}) (p Provider, err 
 	return p, err
 }
 
-func (w RetryProvider) ListImages(all bool) (res []resources.Image, err error) {
+func (w RetryProvider) ListImages(all bool) (res []abstract.Image, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListImages(all)
@@ -221,7 +221,7 @@ func (w RetryProvider) ListImages(all bool) (res []resources.Image, err error) {
 	return res, err
 }
 
-func (w RetryProvider) ListTemplates(all bool) (res []resources.HostTemplate, err error) {
+func (w RetryProvider) ListTemplates(all bool) (res []abstract.HostTemplate, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListTemplates(all)
@@ -327,7 +327,7 @@ func (w RetryProvider) ListRegions() (res []string, err error) {
 }
 
 // GetImage ...
-func (w RetryProvider) GetImage(id string) (res *resources.Image, err error) {
+func (w RetryProvider) GetImage(id string) (res *abstract.Image, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetImage(id)
@@ -356,7 +356,7 @@ func (w RetryProvider) GetImage(id string) (res *resources.Image, err error) {
 }
 
 // GetTemplate ...
-func (w RetryProvider) GetTemplate(id string) (res *resources.HostTemplate, err error) {
+func (w RetryProvider) GetTemplate(id string) (res *abstract.HostTemplate, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetTemplate(id)
@@ -385,7 +385,7 @@ func (w RetryProvider) GetTemplate(id string) (res *resources.HostTemplate, err 
 }
 
 // CreateKeyPair ...
-func (w RetryProvider) CreateKeyPair(name string) (kp *resources.KeyPair, err error) {
+func (w RetryProvider) CreateKeyPair(name string) (kp *abstract.KeyPair, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			kp, err = w.InnerProvider.CreateKeyPair(name)
@@ -414,7 +414,7 @@ func (w RetryProvider) CreateKeyPair(name string) (kp *resources.KeyPair, err er
 }
 
 // GetKeyPair ...
-func (w RetryProvider) GetKeyPair(id string) (kp *resources.KeyPair, err error) {
+func (w RetryProvider) GetKeyPair(id string) (kp *abstract.KeyPair, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			kp, err = w.InnerProvider.GetKeyPair(id)
@@ -443,7 +443,7 @@ func (w RetryProvider) GetKeyPair(id string) (kp *resources.KeyPair, err error) 
 }
 
 // ListKeyPairs ...
-func (w RetryProvider) ListKeyPairs() (res []resources.KeyPair, err error) {
+func (w RetryProvider) ListKeyPairs() (res []abstract.KeyPair, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListKeyPairs()
@@ -501,7 +501,7 @@ func (w RetryProvider) DeleteKeyPair(id string) (err error) {
 }
 
 // CreateNetwork ...
-func (w RetryProvider) CreateNetwork(req resources.NetworkRequest) (res *resources.Network, err error) {
+func (w RetryProvider) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.CreateNetwork(req)
@@ -530,7 +530,7 @@ func (w RetryProvider) CreateNetwork(req resources.NetworkRequest) (res *resourc
 }
 
 // GetNetwork ...
-func (w RetryProvider) GetNetwork(id string) (res *resources.Network, err error) {
+func (w RetryProvider) GetNetwork(id string) (res *abstract.Network, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetNetwork(id)
@@ -559,7 +559,7 @@ func (w RetryProvider) GetNetwork(id string) (res *resources.Network, err error)
 }
 
 // GetNetworkByName ...
-func (w RetryProvider) GetNetworkByName(name string) (res *resources.Network, err error) {
+func (w RetryProvider) GetNetworkByName(name string) (res *abstract.Network, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetNetworkByName(name)
@@ -588,7 +588,7 @@ func (w RetryProvider) GetNetworkByName(name string) (res *resources.Network, er
 }
 
 // ListNetworks ...
-func (w RetryProvider) ListNetworks() (res []*resources.Network, err error) {
+func (w RetryProvider) ListNetworks() (res []*abstract.Network, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListNetworks()
@@ -646,7 +646,7 @@ func (w RetryProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w RetryProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (res *resources.Host, data *userdata.Content, err error) {
+func (w RetryProvider) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (res *abstract.Host, data *userdata.Content, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, data, err = w.InnerProvider.CreateGateway(req, sizing)
@@ -704,7 +704,7 @@ func (w RetryProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateHost ...
-func (w RetryProvider) CreateHost(request resources.HostRequest) (res *resources.Host, data *userdata.Content, err error) {
+func (w RetryProvider) CreateHost(request abstract.HostRequest) (res *abstract.Host, data *userdata.Content, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, data, err = w.InnerProvider.CreateHost(request)
@@ -733,7 +733,7 @@ func (w RetryProvider) CreateHost(request resources.HostRequest) (res *resources
 }
 
 // InspectHost ...
-func (w RetryProvider) InspectHost(something interface{}) (res *resources.Host, err error) {
+func (w RetryProvider) InspectHost(something interface{}) (res *abstract.Host, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.InspectHost(something)
@@ -762,7 +762,7 @@ func (w RetryProvider) InspectHost(something interface{}) (res *resources.Host, 
 }
 
 // GetHostByName ...
-func (w RetryProvider) GetHostByName(name string) (res *resources.Host, err error) {
+func (w RetryProvider) GetHostByName(name string) (res *abstract.Host, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetHostByName(name)
@@ -820,7 +820,7 @@ func (w RetryProvider) GetHostState(something interface{}) (res hoststate.Enum, 
 }
 
 // ListHosts ...
-func (w RetryProvider) ListHosts() (res []*resources.Host, err error) {
+func (w RetryProvider) ListHosts() (res []*abstract.Host, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListHosts()
@@ -965,7 +965,7 @@ func (w RetryProvider) RebootHost(id string) (err error) {
 }
 
 // ResizeHost ...
-func (w RetryProvider) ResizeHost(id string, request resources.SizingRequirements) (res *resources.Host, err error) {
+func (w RetryProvider) ResizeHost(id string, request abstract.SizingRequirements) (res *abstract.Host, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ResizeHost(id, request)
@@ -994,7 +994,7 @@ func (w RetryProvider) ResizeHost(id string, request resources.SizingRequirement
 }
 
 // CreateVolume ...
-func (w RetryProvider) CreateVolume(request resources.VolumeRequest) (res *resources.Volume, err error) {
+func (w RetryProvider) CreateVolume(request abstract.VolumeRequest) (res *abstract.Volume, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.CreateVolume(request)
@@ -1023,7 +1023,7 @@ func (w RetryProvider) CreateVolume(request resources.VolumeRequest) (res *resou
 }
 
 // GetVolume ...
-func (w RetryProvider) GetVolume(id string) (res *resources.Volume, err error) {
+func (w RetryProvider) GetVolume(id string) (res *abstract.Volume, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetVolume(id)
@@ -1052,7 +1052,7 @@ func (w RetryProvider) GetVolume(id string) (res *resources.Volume, err error) {
 }
 
 // ListVolumes ...
-func (w RetryProvider) ListVolumes() (res []resources.Volume, err error) {
+func (w RetryProvider) ListVolumes() (res []abstract.Volume, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListVolumes()
@@ -1110,7 +1110,7 @@ func (w RetryProvider) DeleteVolume(id string) (err error) {
 }
 
 // CreateVolumeAttachment ...
-func (w RetryProvider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (res string, err error) {
+func (w RetryProvider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (res string, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.CreateVolumeAttachment(request)
@@ -1139,7 +1139,7 @@ func (w RetryProvider) CreateVolumeAttachment(request resources.VolumeAttachment
 }
 
 // GetVolumeAttachment ...
-func (w RetryProvider) GetVolumeAttachment(serverID, id string) (res *resources.VolumeAttachment, err error) {
+func (w RetryProvider) GetVolumeAttachment(serverID, id string) (res *abstract.VolumeAttachment, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.GetVolumeAttachment(serverID, id)
@@ -1168,7 +1168,7 @@ func (w RetryProvider) GetVolumeAttachment(serverID, id string) (res *resources.
 }
 
 // ListVolumeAttachments ...
-func (w RetryProvider) ListVolumeAttachments(serverID string) (res []resources.VolumeAttachment, err error) {
+func (w RetryProvider) ListVolumeAttachments(serverID string) (res []abstract.VolumeAttachment, err error) {
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			res, err = w.InnerProvider.ListVolumeAttachments(serverID)

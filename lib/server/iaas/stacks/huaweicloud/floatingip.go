@@ -25,7 +25,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 )
 
@@ -192,7 +192,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 	if found {
 		return &fip, nil
 	}
-	return nil, resources.ResourceNotFoundError("Floating IP", ipAddress)
+	return nil, abstract.ResourceNotFoundError("Floating IP", ipAddress)
 }
 
 // CreateFloatingIP creates a floating IP
@@ -267,7 +267,7 @@ func (s *Stack) DeleteFloatingIP(id string) error {
 }
 
 // AssociateFloatingIP to host
-func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
+func (s *Stack) AssociateFloatingIP(host *abstract.Host, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
 		return fail.Errorf(
@@ -299,7 +299,7 @@ func (s *Stack) AssociateFloatingIP(host *resources.Host, id string) error {
 }
 
 // DissociateFloatingIP from host
-func (s *Stack) DissociateFloatingIP(host *resources.Host, id string) error {
+func (s *Stack) DissociateFloatingIP(host *abstract.Host, id string) error {
 	fip, err := s.GetFloatingIP(id)
 	if err != nil {
 		return fail.Errorf(

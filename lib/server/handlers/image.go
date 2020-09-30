@@ -23,7 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -33,9 +33,9 @@ import (
 
 // ImageAPI defines API to manipulate images
 type ImageAPI interface {
-	List(ctx context.Context, all bool) ([]resources.Image, error)
-	Select(ctx context.Context, osfilter string) (*resources.Image, error)
-	Filter(ctx context.Context, osfilter string) ([]resources.Image, error)
+	List(ctx context.Context, all bool) ([]abstract.Image, error)
+	Select(ctx context.Context, osfilter string) (*abstract.Image, error)
+	Filter(ctx context.Context, osfilter string) ([]abstract.Image, error)
 }
 
 // ImageHandler image service
@@ -51,7 +51,7 @@ func NewImageHandler(svc iaas.Service) ImageAPI {
 }
 
 // List returns the image list
-func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resources.Image, err error) {
+func (handler *ImageHandler) List(ctx context.Context, all bool) (images []abstract.Image, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -60,11 +60,11 @@ func (handler *ImageHandler) List(ctx context.Context, all bool) (images []resou
 }
 
 // Select selects the image that best fits osname
-func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *resources.Image, err error) {
+func (handler *ImageHandler) Select(ctx context.Context, osname string) (image *abstract.Image, err error) {
 	return nil, nil
 }
 
 // Filter filters the images that do not fit osname
-func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []resources.Image, err error) {
+func (handler *ImageHandler) Filter(ctx context.Context, osname string) (image []abstract.Image, err error) {
 	return nil, nil
 }

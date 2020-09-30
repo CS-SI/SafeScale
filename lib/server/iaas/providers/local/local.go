@@ -24,10 +24,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	libStack "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 )
@@ -106,12 +106,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	compute, _ := params["compute"].(map[string]interface{})
 
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 	config.OperatorUsername = operatorUsername
@@ -157,14 +157,14 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 // GetAuthOpts returns authentification options as a Config
 func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
-	cfg := resources.ConfigMap{}
+	cfg := abstract.ConfigMap{}
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
 func (p *provider) GetConfigurationOptions() (providers.Config, error) {
-	config := resources.ConfigMap{}
+	config := abstract.ConfigMap{}
 
 	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
 	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
@@ -181,12 +181,12 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	return p.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	return p.Stack.ListTemplates()
 }
 

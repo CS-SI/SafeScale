@@ -24,12 +24,12 @@ import (
 
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(subnetID string, name string) (_ *resources.VirtualIP, err error) {
+func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, err error) {
 	subnet, err := s.getSubnet(subnetID)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *resources.VirtualIP,
 		return nil, err
 	}
 	// primary := deviceNumber == 0
-	return &resources.VirtualIP{
+	return &abstract.VirtualIP{
 		ID:         nic.NicId,
 		PrivateIP:  nic.PrivateIps[0].PrivateIp,
 		NetworkID:  netID,
@@ -97,7 +97,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *resources.VirtualIP,
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
+func (s *Stack) AddPublicIPToVIP(*abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -138,7 +138,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	// deviceNumber, err := s.getFirstFreeDeviceNumber(hostID)
 	// if err != nil {
 	// 	return err
@@ -171,7 +171,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	// res, err := s.client.POST_ReadNics(osc.ReadNicsRequest{
 	// 	Filters: osc.FiltersNic{
 	// 		NicIds: []string{vip.ID},
@@ -195,7 +195,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VirtualIP) (err error) {
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) (err error) {
 	if vip.PublicIP != "" && vip.PublicIPID != "" {
 		deletePublicIpRequest := osc.DeletePublicIpRequest{
 			PublicIp:   vip.PublicIP,

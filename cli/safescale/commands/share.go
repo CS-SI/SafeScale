@@ -27,7 +27,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -58,7 +58,7 @@ var shareCreate = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultShareExportedPath,
+			Value: abstract.DefaultShareExportedPath,
 			Usage: "Path to be exported",
 		},
 		cli.BoolFlag{
@@ -205,7 +205,7 @@ var shareMount = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "path",
-			Value: resources.DefaultShareMountPath,
+			Value: abstract.DefaultShareMountPath,
 			Usage: "Path to be mounted",
 		},
 		cli.BoolFlag{

@@ -47,9 +47,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/nodetype"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	providermetadata "github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -373,9 +373,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Saving Cluster parameters, with status 'Creating'
 	var (
-		kp                               *resources.KeyPair
+		kp                               *abstract.KeyPair
 		kpName                           string
-		primaryGateway, secondaryGateway *resources.Host
+		primaryGateway, secondaryGateway *abstract.Host
 	)
 
 	// Loads primary gateway metadata
@@ -420,7 +420,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
-	kp, err = resources.NewKeyPair(kpName)
+	kp, err = abstract.NewKeyPair(kpName)
 	if err != nil {
 		return err
 	}
@@ -1376,15 +1376,15 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	var (
 		p                                data.Map
 		ok                               bool
-		primaryGateway, secondaryGateway *resources.Host
+		primaryGateway, secondaryGateway *abstract.Host
 	)
 	if p, ok = params.(data.Map); !ok {
 		return fail.InvalidParameterError("params", "must be a data.Map")
 	}
-	if primaryGateway, ok = p["PrimaryGateway"].(*resources.Host); !ok || primaryGateway == nil {
-		return fail.InvalidParameterError("params[primaryGateway]", "must be a not-nil '*resources.Host'")
+	if primaryGateway, ok = p["PrimaryGateway"].(*abstract.Host); !ok || primaryGateway == nil {
+		return fail.InvalidParameterError("params[primaryGateway]", "must be a not-nil '*abstract.Host'")
 	}
-	secondaryGateway, ok = p["SecondaryGateway"].(*resources.Host)
+	secondaryGateway, ok = p["SecondaryGateway"].(*abstract.Host)
 	if !ok || secondaryGateway == nil {
 		logrus.Debugf("secondary gateway not configured")
 	}

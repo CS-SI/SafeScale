@@ -26,16 +26,16 @@ import (
 
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	keypair, err := resources.NewKeyPair(name)
+	keypair, err := abstract.NewKeyPair(name)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 }
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
-func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
+func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) error {
 	if keypair == nil {
 		return fail.InvalidParameterError("keyair", "cannot be nil")
 	}
@@ -61,7 +61,7 @@ func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
 	readKeypairsRequest := osc.ReadKeypairsRequest{
 		Filters: osc.FiltersKeypair{
 			KeypairNames: []string{id},
@@ -82,22 +82,22 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		return nil, fail.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
 	}
 	kp := resp.Keypairs[0]
-	return &resources.KeyPair{
+	return &abstract.KeyPair{
 		ID:   kp.KeypairName,
 		Name: kp.KeypairName,
 	}, nil
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
 	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
 	if err != nil {
 		return nil, normalizeError(err)
 	}
-	var kps []resources.KeyPair
+	var kps []abstract.KeyPair
 	for _, kp := range resp.Keypairs {
 		kps = append(
-			kps, resources.KeyPair{
+			kps, abstract.KeyPair{
 				ID:   kp.KeypairName,
 				Name: kp.KeypairName,
 			},

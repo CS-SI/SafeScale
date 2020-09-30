@@ -19,7 +19,7 @@ package stacks
 import (
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
 )
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names

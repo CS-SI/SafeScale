@@ -1,12 +1,12 @@
 package properties
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 )
 
 // ModelHostTemplateToPropertyHostSize ...
-func ModelHostTemplateToPropertyHostSize(ht *resources.HostTemplate) *propsv1.HostSize {
+func ModelHostTemplateToPropertyHostSize(ht *abstract.HostTemplate) *propsv1.HostSize {
 	hs := propsv1.NewHostSize()
 	hs.Cores = ht.Cores
 	hs.RAMSize = ht.RAMSize
@@ -17,7 +17,7 @@ func ModelHostTemplateToPropertyHostSize(ht *resources.HostTemplate) *propsv1.Ho
 }
 
 // ModelHostDefinitionToPropertyHostSize ...
-func ModelHostDefinitionToPropertyHostSize(hd *resources.HostDefinition) *propsv1.HostSize {
+func ModelHostDefinitionToPropertyHostSize(hd *abstract.HostDefinition) *propsv1.HostSize {
 	hs := propsv1.NewHostSize()
 	hs.Cores = hd.Cores
 	hs.RAMSize = hd.RAMSize

@@ -32,9 +32,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
@@ -88,7 +88,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources.Volume, err error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, err error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", request.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	volume, err = s.GetVolume(request.Name)
@@ -98,15 +98,15 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 		}
 	}
 	if volume != nil {
-		return nil, resources.ResourceDuplicateError("volume", request.Name)
+		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
 	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
-		return nil, resources.ResourceDuplicateError("volume", request.Name)
+		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
-	var v resources.Volume
+	var v abstract.Volume
 	switch s.versions["volume"] {
 	case "v1":
 		var vol *volumesv1.Volume
@@ -127,7 +127,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			)
 			break
 		}
-		v = resources.Volume{
+		v = abstract.Volume{
 			ID:    vol.ID,
 			Name:  vol.Name,
 			Size:  vol.Size,
@@ -153,7 +153,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 			)
 			break
 		}
-		v = resources.Volume{
+		v = abstract.Volume{
 			ID:    vol.ID,
 			Name:  vol.Name,
 			Size:  vol.Size,
@@ -171,7 +171,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (volume *resources
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
+func (s *Stack) GetVolume(id string) (volume *abstract.Volume, err error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vol *volumesv2.Volume
@@ -185,7 +185,7 @@ func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 					err, nil, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
 						if _, ok := ferr.(gc.ErrDefault404); ok {
 							unwrap = true
-							return fail.AbortedError("", resources.ResourceNotFoundError("volume", id))
+							return fail.AbortedError("", abstract.ResourceNotFoundError("volume", id))
 						}
 
 						return fail.Wrap(ferr, fmt.Sprintf("error getting volume: %s", ProviderErrorToString(ferr)))
@@ -204,7 +204,7 @@ func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 		return nil, getErr
 	}
 
-	av := resources.Volume{
+	av := abstract.Volume{
 		ID:    vol.ID,
 		Name:  vol.Name,
 		Size:  vol.Size,
@@ -215,10 +215,10 @@ func (s *Stack) GetVolume(id string) (volume *resources.Volume, err error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s *Stack) ListVolumes() ([]resources.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	var vs []resources.Volume
+	var vs []abstract.Volume
 	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(
 		func(page pagination.Page) (bool, error) {
 			list, err := volumesv2.ExtractVolumes(page)
@@ -227,7 +227,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 				return false, err
 			}
 			for _, vol := range list {
-				av := resources.Volume{
+				av := abstract.Volume{
 					ID:    vol.ID,
 					Name:  vol.Name,
 					Size:  vol.Size,
@@ -285,7 +285,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	defer debug.NewTracer(nil, "("+request.Name+")", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Creates the attachment
@@ -308,7 +308,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	defer debug.NewTracer(nil, "('"+serverID+"', '"+id+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
@@ -317,7 +317,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 			err, fmt.Sprintf("error getting volume attachment %s: %s", id, ProviderErrorToString(err)),
 		)
 	}
-	return &resources.VolumeAttachment{
+	return &abstract.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
 		VolumeID: va.VolumeID,
@@ -326,10 +326,10 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	defer debug.NewTracer(nil, "('"+serverID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	var vs []resources.VolumeAttachment
+	var vs []abstract.VolumeAttachment
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(
 		func(page pagination.Page) (bool, error) {
 			list, err := volumeattach.ExtractVolumeAttachments(page)
@@ -337,7 +337,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 				return false, fail.Wrap(err, "Error listing volume attachment: extracting attachments")
 			}
 			for _, va := range list {
-				ava := resources.VolumeAttachment{
+				ava := abstract.VolumeAttachment{
 					ID:       va.ID,
 					ServerID: va.ServerID,
 					VolumeID: va.VolumeID,

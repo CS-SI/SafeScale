@@ -5,10 +5,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 )
 
 // ErrorTraceProvider ...
@@ -27,7 +27,7 @@ func (w ErrorTraceProvider) Build(something map[string]interface{}) (p Provider,
 }
 
 // ListImages ...
-func (w ErrorTraceProvider) ListImages(all bool) (images []resources.Image, err error) {
+func (w ErrorTraceProvider) ListImages(all bool) (images []abstract.Image, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -37,7 +37,7 @@ func (w ErrorTraceProvider) ListImages(all bool) (images []resources.Image, err 
 }
 
 // ListTemplates ...
-func (w ErrorTraceProvider) ListTemplates(all bool) (templates []resources.HostTemplate, err error) {
+func (w ErrorTraceProvider) ListTemplates(all bool) (templates []abstract.HostTemplate, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -105,7 +105,7 @@ func (w ErrorTraceProvider) ListRegions() (regions []string, err error) {
 }
 
 // GetImage ...
-func (w ErrorTraceProvider) GetImage(id string) (images *resources.Image, err error) {
+func (w ErrorTraceProvider) GetImage(id string) (images *abstract.Image, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -115,7 +115,7 @@ func (w ErrorTraceProvider) GetImage(id string) (images *resources.Image, err er
 }
 
 // GetTemplate ...
-func (w ErrorTraceProvider) GetTemplate(id string) (templates *resources.HostTemplate, err error) {
+func (w ErrorTraceProvider) GetTemplate(id string) (templates *abstract.HostTemplate, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -125,7 +125,7 @@ func (w ErrorTraceProvider) GetTemplate(id string) (templates *resources.HostTem
 }
 
 // CreateKeyPair ...
-func (w ErrorTraceProvider) CreateKeyPair(name string) (pairs *resources.KeyPair, err error) {
+func (w ErrorTraceProvider) CreateKeyPair(name string) (pairs *abstract.KeyPair, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -135,7 +135,7 @@ func (w ErrorTraceProvider) CreateKeyPair(name string) (pairs *resources.KeyPair
 }
 
 // GetKeyPair ...
-func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *resources.KeyPair, err error) {
+func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *abstract.KeyPair, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -145,7 +145,7 @@ func (w ErrorTraceProvider) GetKeyPair(id string) (pairs *resources.KeyPair, err
 }
 
 // ListKeyPairs ...
-func (w ErrorTraceProvider) ListKeyPairs() (pairs []resources.KeyPair, err error) {
+func (w ErrorTraceProvider) ListKeyPairs() (pairs []abstract.KeyPair, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -165,7 +165,7 @@ func (w ErrorTraceProvider) DeleteKeyPair(id string) (err error) {
 }
 
 // CreateNetwork ...
-func (w ErrorTraceProvider) CreateNetwork(req resources.NetworkRequest) (net *resources.Network, err error) {
+func (w ErrorTraceProvider) CreateNetwork(req abstract.NetworkRequest) (net *abstract.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -175,7 +175,7 @@ func (w ErrorTraceProvider) CreateNetwork(req resources.NetworkRequest) (net *re
 }
 
 // GetNetwork ...
-func (w ErrorTraceProvider) GetNetwork(id string) (net *resources.Network, err error) {
+func (w ErrorTraceProvider) GetNetwork(id string) (net *abstract.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -185,7 +185,7 @@ func (w ErrorTraceProvider) GetNetwork(id string) (net *resources.Network, err e
 }
 
 // GetNetworkByName ...
-func (w ErrorTraceProvider) GetNetworkByName(name string) (net *resources.Network, err error) {
+func (w ErrorTraceProvider) GetNetworkByName(name string) (net *abstract.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -195,7 +195,7 @@ func (w ErrorTraceProvider) GetNetworkByName(name string) (net *resources.Networ
 }
 
 // ListNetworks ...
-func (w ErrorTraceProvider) ListNetworks() (net []*resources.Network, err error) {
+func (w ErrorTraceProvider) ListNetworks() (net []*abstract.Network, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -215,7 +215,7 @@ func (w ErrorTraceProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w ErrorTraceProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, content *userdata.Content, err error) {
+func (w ErrorTraceProvider) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -235,7 +235,7 @@ func (w ErrorTraceProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateVIP ...
-func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *resources.VirtualIP, err error) {
+func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *abstract.VirtualIP, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -245,7 +245,7 @@ func (w ErrorTraceProvider) CreateVIP(networkID string, description string) (_ *
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err error) {
+func (w ErrorTraceProvider) AddPublicIPToVIP(vip *abstract.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -255,7 +255,7 @@ func (w ErrorTraceProvider) AddPublicIPToVIP(vip *resources.VirtualIP) (err erro
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
+func (w ErrorTraceProvider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -265,7 +265,7 @@ func (w ErrorTraceProvider) BindHostToVIP(vip *resources.VirtualIP, hostID strin
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
+func (w ErrorTraceProvider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -275,7 +275,7 @@ func (w ErrorTraceProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID s
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (w ErrorTraceProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
+func (w ErrorTraceProvider) DeleteVIP(vip *abstract.VirtualIP) (err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -285,7 +285,7 @@ func (w ErrorTraceProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
 }
 
 // CreateHost ...
-func (w ErrorTraceProvider) CreateHost(request resources.HostRequest) (_ *resources.Host, _ *userdata.Content, err error) {
+func (w ErrorTraceProvider) CreateHost(request abstract.HostRequest) (_ *abstract.Host, _ *userdata.Content, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -295,7 +295,7 @@ func (w ErrorTraceProvider) CreateHost(request resources.HostRequest) (_ *resour
 }
 
 // InspectHost ...
-func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *resources.Host, err error) {
+func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *abstract.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -305,7 +305,7 @@ func (w ErrorTraceProvider) InspectHost(something interface{}) (_ *resources.Hos
 }
 
 // GetHostByName ...
-func (w ErrorTraceProvider) GetHostByName(name string) (_ *resources.Host, err error) {
+func (w ErrorTraceProvider) GetHostByName(name string) (_ *abstract.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -325,7 +325,7 @@ func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enu
 }
 
 // ListHosts ...
-func (w ErrorTraceProvider) ListHosts() (_ []*resources.Host, err error) {
+func (w ErrorTraceProvider) ListHosts() (_ []*abstract.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -375,7 +375,7 @@ func (w ErrorTraceProvider) RebootHost(id string) (err error) {
 }
 
 // ResizeHost ...
-func (w ErrorTraceProvider) ResizeHost(id string, request resources.SizingRequirements) (_ *resources.Host, err error) {
+func (w ErrorTraceProvider) ResizeHost(id string, request abstract.SizingRequirements) (_ *abstract.Host, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -385,7 +385,7 @@ func (w ErrorTraceProvider) ResizeHost(id string, request resources.SizingRequir
 }
 
 // CreateVolume ...
-func (w ErrorTraceProvider) CreateVolume(request resources.VolumeRequest) (_ *resources.Volume, err error) {
+func (w ErrorTraceProvider) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -395,7 +395,7 @@ func (w ErrorTraceProvider) CreateVolume(request resources.VolumeRequest) (_ *re
 }
 
 // GetVolume ...
-func (w ErrorTraceProvider) GetVolume(id string) (_ *resources.Volume, err error) {
+func (w ErrorTraceProvider) GetVolume(id string) (_ *abstract.Volume, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -405,7 +405,7 @@ func (w ErrorTraceProvider) GetVolume(id string) (_ *resources.Volume, err error
 }
 
 // ListVolumes ...
-func (w ErrorTraceProvider) ListVolumes() (_ []resources.Volume, err error) {
+func (w ErrorTraceProvider) ListVolumes() (_ []abstract.Volume, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -425,7 +425,7 @@ func (w ErrorTraceProvider) DeleteVolume(id string) (err error) {
 }
 
 // CreateVolumeAttachment ...
-func (w ErrorTraceProvider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (_ string, err error) {
+func (w ErrorTraceProvider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -435,7 +435,7 @@ func (w ErrorTraceProvider) CreateVolumeAttachment(request resources.VolumeAttac
 }
 
 // GetVolumeAttachment ...
-func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *resources.VolumeAttachment, err error) {
+func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)
@@ -445,7 +445,7 @@ func (w ErrorTraceProvider) GetVolumeAttachment(serverID, id string) (_ *resourc
 }
 
 // ListVolumeAttachments ...
-func (w ErrorTraceProvider) ListVolumeAttachments(serverID string) (_ []resources.VolumeAttachment, err error) {
+func (w ErrorTraceProvider) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, err error) {
 	defer func(prefix string) {
 		if err != nil {
 			logrus.Debugf("%s : Intercepted error: %v", prefix, err)

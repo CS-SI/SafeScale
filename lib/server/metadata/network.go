@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/networkproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
@@ -97,7 +97,7 @@ func (m *Network) OK() (bool, error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Network) Carry(network *resources.Network) (*Network, error) {
+func (m *Network) Carry(network *abstract.Network) (*Network, error) {
 	if m == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -109,7 +109,7 @@ func (m *Network) Carry(network *resources.Network) (*Network, error) {
 	}
 
 	if network.Properties == nil {
-		network.Properties = serialize.NewJSONProperties("resources")
+		network.Properties = serialize.NewJSONProperties("abstract")
 	}
 
 	m.item.Carry(network)
@@ -119,15 +119,15 @@ func (m *Network) Carry(network *resources.Network) (*Network, error) {
 	return m, nil
 }
 
-// Get returns the resources.Network instance linked to metadata
-func (m *Network) Get() (*resources.Network, error) {
+// Get returns the abstract.Network instance linked to metadata
+func (m *Network) Get() (*abstract.Network, error) {
 	if m == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if m.item == nil {
 		return nil, fail.InvalidInstanceContentError("m.item", "cannot be nil")
 	}
-	return m.item.Get().(*resources.Network), nil
+	return m.item.Get().(*abstract.Network), nil
 }
 
 // Write updates the metadata corresponding to the network in the Object Storage
@@ -223,7 +223,7 @@ func (m *Network) ReadByReference(ref string) (err error) {
 // mayReadByID reads the metadata of a network identified by ID from Object Storage
 // Doesn't log error or validate parameter by design; caller does that
 func (m *Network) mayReadByID(id string) (err error) {
-	network := resources.NewNetwork()
+	network := abstract.NewNetwork()
 	err = m.item.ReadFrom(
 		ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 			ierr := network.Deserialize(buf)
@@ -246,7 +246,7 @@ func (m *Network) mayReadByID(id string) (err error) {
 // mayReadByName reads the metadata of a network identified by name
 // Doesn't log error or validate parameter by design; caller does that
 func (m *Network) mayReadByName(name string) (err error) {
-	network := resources.NewNetwork()
+	network := abstract.NewNetwork()
 	err = m.item.ReadFrom(
 		ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 			ierr := network.Deserialize(buf)
@@ -332,7 +332,7 @@ func (m *Network) Delete() (err error) {
 }
 
 // Browse walks through all the metadata objects in network
-func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
+func (m *Network) Browse(callback func(*abstract.Network) error) (err error) {
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -349,7 +349,7 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 
 	return m.item.BrowseInto(
 		ByIDFolderName, func(buf []byte) error {
-			network := resources.Network{}
+			network := abstract.Network{}
 			err := (&network).Deserialize(buf)
 			if err != nil {
 				return err
@@ -360,7 +360,7 @@ func (m *Network) Browse(callback func(*resources.Network) error) (err error) {
 }
 
 // AttachHost links host ID to the network
-func (m *Network) AttachHost(host *resources.Host) (err error) {
+func (m *Network) AttachHost(host *abstract.Host) (err error) {
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -426,8 +426,8 @@ func (m *Network) DetachHost(hostID string) (err error) {
 	return nil
 }
 
-// ListHosts returns the list of resources.Host attached to the network (excluding gateway)
-func (m *Network) ListHosts() (list []*resources.Host, err error) {
+// ListHosts returns the list of abstract.Host attached to the network (excluding gateway)
+func (m *Network) ListHosts() (list []*abstract.Host, err error) {
 	if m == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -481,7 +481,7 @@ func (m *Network) Release() {
 }
 
 // SaveNetwork saves the Network definition in Object Storage
-func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err error) {
+func SaveNetwork(svc iaas.Service, net *abstract.Network) (mn *Network, err error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -507,7 +507,7 @@ func SaveNetwork(svc iaas.Service, net *resources.Network) (mn *Network, err err
 }
 
 // RemoveNetwork removes the Network definition from Object Storage
-func RemoveNetwork(svc iaas.Service, net *resources.Network) (err error) {
+func RemoveNetwork(svc iaas.Service, net *abstract.Network) (err error) {
 	if svc == nil {
 		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -632,7 +632,7 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (mg *Gateway) Carry(host *resources.Host) (gw *Gateway, err error) {
+func (mg *Gateway) Carry(host *abstract.Host) (gw *Gateway, err error) {
 	if mg.host == nil {
 		mg.host, err = NewHost(mg.network.GetService())
 		if err != nil {
@@ -648,8 +648,8 @@ func (mg *Gateway) Carry(host *resources.Host) (gw *Gateway, err error) {
 	return mg, nil
 }
 
-// Get returns the *resources.Host linked to the metadata
-func (mg *Gateway) Get() (*resources.Host, error) {
+// Get returns the *abstract.Host linked to the metadata
+func (mg *Gateway) Get() (*abstract.Host, error) {
 	if mg == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -825,7 +825,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 }
 
 // SaveGateway saves the metadata of a gateway
-func SaveGateway(svc iaas.Service, host *resources.Host, networkID string) (mg *Gateway, err error) {
+func SaveGateway(svc iaas.Service, host *abstract.Host, networkID string) (mg *Gateway, err error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}

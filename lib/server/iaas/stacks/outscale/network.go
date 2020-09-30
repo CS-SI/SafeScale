@@ -23,13 +23,13 @@ import (
 	"github.com/outscale-dev/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
+func (s *Stack) createSubnet(req abstract.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
 	// Create a subnet with the same CIDR than the network
 	createSubnetRequest := osc.CreateSubnetRequest{
 		IpRange:       req.CIDR,
@@ -91,7 +91,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, err := s.getVpc(s.Options.Network.VPCID)
 	if err != nil {
@@ -138,7 +138,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 
-	net := resources.NewNetwork()
+	net := abstract.NewNetwork()
 	net.ID = subnet.SubnetId
 	net.CIDR = subnet.IpRange
 	net.IPVersion = ipversion.IPv4
@@ -171,8 +171,8 @@ func (s *Stack) getSubnet(id string) (*osc.Subnet, error) {
 
 }
 
-func toNetwork(subnet *osc.Subnet) *resources.Network {
-	net := resources.NewNetwork()
+func toNetwork(subnet *osc.Subnet) *abstract.Network {
+	net := abstract.NewNetwork()
 	net.ID = subnet.SubnetId
 	net.CIDR = subnet.IpRange
 	net.IPVersion = ipversion.IPv4
@@ -184,7 +184,7 @@ func toNetwork(subnet *osc.Subnet) *resources.Network {
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 	onet, err := s.getSubnet(id)
 	if err != nil {
 		return nil, err
@@ -197,7 +197,7 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by name)
-func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
@@ -231,7 +231,7 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 }
 
 // ListNetworks lists all networks
-func (s *Stack) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
@@ -245,7 +245,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	if err != nil {
 		return nil, fail.Wrap(normalizeError(err), "failed to list networks")
 	}
-	var nets []*resources.Network
+	var nets []*abstract.Network
 	for _, onet := range res.Subnets {
 		nets = append(nets, toNetwork(&onet))
 	}
@@ -254,7 +254,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 }
 
 // ListNetworks lists all networks
-func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []osc.Nic, error) {
+func (s *Stack) listNetworksByHost(hostID string) ([]*abstract.Network, []osc.Nic, error) {
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},
@@ -269,7 +269,7 @@ func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []osc.N
 		return nil, nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to list networks of host '%s'", hostID))
 	}
 
-	var subnets []*resources.Network
+	var subnets []*abstract.Network
 	for _, nic := range res.Nics {
 		subnet, err := s.getSubnet(nic.SubnetId)
 		if err != nil {

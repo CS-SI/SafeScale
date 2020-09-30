@@ -349,7 +349,7 @@ func (sc *SSHCommand) closeTunneling() error {
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait releases any resources associated with the cmd.
+// Wait releases any abstract associated with the cmd.
 func (sc *SSHCommand) Wait() (err error) {
 	defer func() {
 		nerr := sc.cleanup()
@@ -367,7 +367,7 @@ func (sc *SSHCommand) Wait() (err error) {
 	return err
 }
 
-// Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
+// Kill kills SSHCommand process and releases any abstract associated with the SSHCommand.
 func (sc *SSHCommand) Kill() error {
 	return sc.cmd.Process.Kill()
 }
@@ -446,7 +446,7 @@ func (sc *SSHCommand) CombinedOutput() (_ []byte, err error) {
 
 // Start starts the specified command but does not wait for it to complete.
 //
-// The Wait method will return the exit code and release associated resources
+// The Wait method will return the exit code and release associated abstract
 // once the command exits.
 func (sc *SSHCommand) Start() error {
 	return sc.cmd.Start()

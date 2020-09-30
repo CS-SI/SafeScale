@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package resources
+package abstract
 
 import (
 	"fmt"
 
 	uuid "github.com/satori/go.uuid"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -43,7 +43,7 @@ func (kp *KeyPair) IsNull() bool {
 	return kp == nil || kp.Name == "" || kp.PublicKey == "" || kp.PrivateKey == ""
 }
 
-// NewKeyPair creates a *resources.KeyPair
+// NewKeyPair creates a *abstract.KeyPair
 func NewKeyPair(prefix string) (*KeyPair, error) {
 	id, err := uuid.NewV4()
 	if err != nil {
@@ -185,7 +185,7 @@ type Host struct {
 // NewHost ...
 func NewHost() *Host {
 	return &Host{
-		Properties: serialize.NewJSONProperties("resources.host"),
+		Properties: serialize.NewJSONProperties("abstract.host"),
 	}
 }
 
@@ -309,7 +309,7 @@ func (h *Host) Serialize() ([]byte, error) {
 // Deserialize reads json code and reinstantiates an Host
 func (h *Host) Deserialize(buf []byte) error {
 	if h.Properties == nil {
-		h.Properties = serialize.NewJSONProperties("resources.host")
+		h.Properties = serialize.NewJSONProperties("abstract.host")
 	}
 	err := serialize.FromJSON(buf, h)
 	if err != nil {

@@ -26,8 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -39,7 +39,7 @@ type BucketAPI interface {
 	Create(context.Context, string) error
 	Delete(context.Context, string) error
 	Destroy(context.Context, string) error
-	Inspect(context.Context, string) (*resources.Bucket, error)
+	Inspect(context.Context, string) (*abstract.Bucket, error)
 	Mount(context.Context, string, string, string) error
 	Unmount(context.Context, string, string) error
 }
@@ -88,7 +88,7 @@ func (handler *BucketHandler) Create(ctx context.Context, name string) (err erro
 		}
 	}
 	if bucket != nil {
-		return resources.ResourceDuplicateError("bucket", name)
+		return abstract.ResourceDuplicateError("bucket", name)
 	}
 	_, err = handler.service.CreateBucket(name)
 	if err != nil {
@@ -129,7 +129,7 @@ func (handler *BucketHandler) Delete(ctx context.Context, name string) (err erro
 }
 
 // Inspect a bucket
-func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *resources.Bucket, err error) {
+func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *abstract.Bucket, err error) {
 	tracer := debug.NewTracer(nil, "('"+name+"')", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -137,7 +137,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 	b, err := handler.service.GetBucket(name)
 	if err != nil {
 		if err == stow.ErrNotFound { // FIXME: Remove stow dependency
-			return nil, resources.ResourceNotFoundError("bucket", name)
+			return nil, abstract.ResourceNotFoundError("bucket", name)
 		}
 
 		return nil, err
@@ -148,7 +148,7 @@ func (handler *BucketHandler) Inspect(ctx context.Context, name string) (mb *res
 		return nil, err
 	}
 
-	mb = &resources.Bucket{
+	mb = &abstract.Bucket{
 		Name: bucketName,
 	}
 	return mb, nil
@@ -177,8 +177,8 @@ func (handler *BucketHandler) Mount(ctx context.Context, bucketName, hostName, p
 
 	// Create mount point
 	mountPoint := path
-	if path == resources.DefaultBucketMountPoint {
-		mountPoint = resources.DefaultBucketMountPoint + bucketName
+	if path == abstract.DefaultBucketMountPoint {
+		mountPoint = abstract.DefaultBucketMountPoint + bucketName
 	}
 
 	authOpts, _ := handler.service.GetAuthenticationOptions()

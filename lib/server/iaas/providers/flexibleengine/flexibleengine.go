@@ -25,12 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/filters/images"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	imagefilters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/filters/images"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 )
@@ -92,12 +92,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	vpcCIDR, _ := network["VPCCIDR"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	operatorUsername := resources.DefaultUser
+	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
 		if operatorUsername == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = resources.DefaultUser
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 
@@ -218,7 +218,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	return prov, nil
 }
 
-func addGPUCfg(tpl *resources.HostTemplate) {
+func addGPUCfg(tpl *abstract.HostTemplate) {
 	if cfg, ok := gpuMap[tpl.Name]; ok {
 		tpl.GPUNumber = cfg.GPUNumber
 		tpl.GPUType = cfg.GPUType
@@ -226,7 +226,7 @@ func addGPUCfg(tpl *resources.HostTemplate) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -234,16 +234,16 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 	return tpl, err
 }
 
-// func isBlacklistedTemplate(tpl resources.HostTemplate) bool {
+// func isBlacklistedTemplate(tpl abstract.HostTemplate) bool {
 // 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "t2.")
 // }
 
-// func isS3Template(tpl resources.HostTemplate) bool {
+// func isS3Template(tpl abstract.HostTemplate) bool {
 // 	return strings.HasPrefix(strings.ToUpper(tpl.Name), "S3.")
 // }
 
 // func templateFromWhite(regr string) templatefilters.Predicate {
-// 	return func(tpl resources.HostTemplate) bool {
+// 	return func(tpl abstract.HostTemplate) bool {
 // 		re, err := regexp.Compile(regr)
 // 		if err != nil || len(regr) == 0 {
 // 			return true
@@ -253,7 +253,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // }
 
 // func templateFromBlack(regr string) templatefilters.Predicate {
-// 	return func(tpl resources.HostTemplate) bool {
+// 	return func(tpl abstract.HostTemplate) bool {
 // 		re, err := regexp.Compile(regr)
 // 		if err != nil || len(regr) == 0 {
 // 			return false
@@ -263,7 +263,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // }
 
 // func imageFromWhite(regr string) imagefilters.Predicate {
-// 	return func(image resources.Image) bool {
+// 	return func(image abstract.Image) bool {
 // 		re, err := regexp.Compile(regr)
 // 		if err != nil || len(regr) == 0 {
 // 			return true
@@ -273,7 +273,7 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 // }
 
 // func imageFromBlack(regr string) imagefilters.Predicate {
-// 	return func(image resources.Image) bool {
+// 	return func(image abstract.Image) bool {
 // 		re, err := regexp.Compile(regr)
 // 		if err != nil || len(regr) == 0 {
 // 			return false
@@ -284,13 +284,13 @@ func (p *provider) GetTemplate(id string) (*resources.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
 	}
 
-	var tpls []resources.HostTemplate
+	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
@@ -299,17 +299,17 @@ func (p *provider) ListTemplates(all bool) ([]resources.HostTemplate, error) {
 	return tpls, nil
 }
 
-func isWindowsImage(image resources.Image) bool {
+func isWindowsImage(image abstract.Image) bool {
 	return strings.Contains(strings.ToLower(image.Name), "windows")
 }
 
-func isBMSImage(image resources.Image) bool {
+func isBMSImage(image abstract.Image) bool {
 	return strings.HasPrefix(strings.ToUpper(image.Name), "OBS-BMS") ||
 		strings.HasPrefix(strings.ToUpper(image.Name), "OBS_BMS")
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]resources.Image, error) {
+func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 	images, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err

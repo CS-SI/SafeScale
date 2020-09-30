@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/types/v56"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -36,7 +36,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (s *StackEbrc) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: &types.Disk{
 			Name:       request.Name,
@@ -86,7 +86,7 @@ func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Vo
 		return nil, fail.Errorf(fmt.Sprintf("unable to find disk by reference: %s", err), err)
 	}
 
-	revol := &resources.Volume{
+	revol := &abstract.Volume{
 		ID:   disk.Disk.Id,
 		Name: disk.Disk.Name,
 		Size: disk.Disk.Size,
@@ -96,11 +96,11 @@ func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Vo
 }
 
 // GetVolume returns the volume identified by id
-func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
+func (s *StackEbrc) GetVolume(ref string) (*abstract.Volume, error) {
 	logrus.Debug("ebrc.Client.GetVolume() called")
 	defer logrus.Debug("ebrc.Client.GetVolume() done")
 
-	var volume resources.Volume
+	var volume abstract.Volume
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
@@ -112,7 +112,7 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 	if err == nil {
 		thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
 		if err == nil {
-			volume = resources.Volume{
+			volume = abstract.Volume{
 				Name: thed.Disk.Name,
 				Size: thed.Disk.Size,
 				ID:   thed.Disk.Id,
@@ -128,11 +128,11 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
+func (s *StackEbrc) ListVolumes() ([]abstract.Volume, error) {
 	logrus.Debug("ebrc.Client.ListVolumes() called")
 	defer logrus.Debug("ebrc.Client.ListVolumes() done")
 
-	var volumes []resources.Volume
+	var volumes []abstract.Volume
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
@@ -150,7 +150,7 @@ func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 		if err == nil {
 			thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)
 			if err == nil {
-				volumes = append(volumes, resources.Volume{Name: ref.Name, ID: ref.ID, Size: thed.Disk.Size})
+				volumes = append(volumes, abstract.Volume{Name: ref.Name, ID: ref.ID, Size: thed.Disk.Size})
 			}
 		}
 	}
@@ -190,7 +190,7 @@ func getAttachmentID(volume string, domain string) string {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *StackEbrc) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	logrus.Debugf(">>> stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 	defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 
@@ -218,7 +218,7 @@ func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentReq
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	logrus.Debugf(">>> stacks.ebrc::GetVolumeAttachment(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
 
@@ -268,18 +268,18 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 }
 
 // ListVolumeAttachments lists available volume attachments
-func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	vms, err := s.findVmNames()
 	if err != nil {
-		return []resources.VolumeAttachment{}, err
+		return []abstract.VolumeAttachment{}, err
 	}
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return []resources.VolumeAttachment{}, fail.Wrap(err, fmt.Sprintf("Error deleting volume"))
+		return []abstract.VolumeAttachment{}, fail.Wrap(err, fmt.Sprintf("Error deleting volume"))
 	}
 
-	var attachments []resources.VolumeAttachment
+	var attachments []abstract.VolumeAttachment
 
 	for _, vmname := range vms {
 		vm, err := s.findVMByName(vmname)
@@ -296,7 +296,7 @@ func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]resources.VolumeAt
 						continue
 					}
 
-					reid := resources.VolumeAttachment{
+					reid := abstract.VolumeAttachment{
 						ID:       serverID + ":" + thedi.Disk.Id,
 						VolumeID: thedi.Disk.Id,
 						ServerID: serverID,

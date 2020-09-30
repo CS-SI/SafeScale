@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -711,11 +711,11 @@ func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.DescriptionV1, NewHostDescription())
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.NetworkV1, NewHostNetwork())
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV1, NewHostSizing())
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SharesV1, NewHostShares())
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.VolumesV1, NewHostVolumes())
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.MountsV1, NewHostMounts())
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.FeaturesV1, NewHostFeatures())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.DescriptionV1, NewHostDescription())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.NetworkV1, NewHostNetwork())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.SizingV1, NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.SharesV1, NewHostShares())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.VolumesV1, NewHostVolumes())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.MountsV1, NewHostMounts())
+	serialize.PropertyTypeRegistry.Register("abstract.host", hostproperty.FeaturesV1, NewHostFeatures())
 }

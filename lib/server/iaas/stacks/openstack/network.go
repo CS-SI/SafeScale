@@ -35,11 +35,11 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
@@ -72,7 +72,7 @@ type Subnet struct {
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, err error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Checks if CIDR is valid...
@@ -127,7 +127,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 		}
 	}()
 
-	newNet = resources.NewNetwork()
+	newNet = abstract.NewNetwork()
 	newNet.ID = network.ID
 	newNet.Name = network.Name
 	newNet.CIDR = subnet.Mask
@@ -136,7 +136,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (newNet *resources.N
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -171,11 +171,11 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		id := entry["id"].(string)
 		return s.GetNetwork(id)
 	}
-	return nil, resources.ResourceNotFoundError("network", name)
+	return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (_ *resources.Network, err error) {
+func (s *Stack) GetNetwork(id string) (_ *abstract.Network, err error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// If not found, we look for any network from provider
@@ -215,7 +215,7 @@ func (s *Stack) GetNetwork(id string) (_ *resources.Network, err error) {
 		}
 		sn := sns[0]
 
-		newNet := resources.NewNetwork()
+		newNet := abstract.NewNetwork()
 		newNet.ID = network.ID
 		newNet.Name = network.Name
 		newNet.CIDR = sn.Mask
@@ -225,17 +225,17 @@ func (s *Stack) GetNetwork(id string) (_ *resources.Network, err error) {
 	}
 
 	// At this point, no network has been found with given reference
-	errNotFound := resources.ResourceNotFoundError("network(GetNetwork)", id)
+	errNotFound := abstract.ResourceNotFoundError("network(GetNetwork)", id)
 	log.Debug(errNotFound)
 	return nil, errNotFound
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
-	var netList []*resources.Network
+	var netList []*abstract.Network
 	pager := networks.List(s.NetworkClient, networks.ListOpts{})
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
@@ -259,7 +259,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 				}
 				sn := sns[0]
 
-				newNet := resources.NewNetwork()
+				newNet := abstract.NewNetwork()
 				newNet.ID = n.ID
 				newNet.Name = n.Name
 				newNet.CIDR = sn.Mask
@@ -326,7 +326,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, userData *userdata.Content, err error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	userData = userdata.NewContent()
@@ -344,13 +344,13 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	if err != nil {
 		return nil, userData, fail.Errorf(fmt.Sprintf("failed to generate password: %s", err.Error()), err)
 	}
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 		Password:     password,
 	}
@@ -630,7 +630,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				case "SubnetInUse":
 					msg := "hosts or services are still attached"
 					log.Warnf(utils.Capitalize(msg))
-					return resources.ResourceNotAvailableError("subnet", id)
+					return abstract.ResourceNotAvailableError("subnet", id)
 				default:
 					log.Debugf("NeutronError: type = %s", neutronError["type"])
 				}
@@ -650,7 +650,7 @@ func (s *Stack) deleteSubnet(id string) error {
 				if _, ok := err.(fail.ErrNotAvailable); ok {
 					return err
 				}
-				return resources.TimeoutError(
+				return abstract.TimeoutError(
 					fmt.Sprintf(
 						"failed to delete subnet after %v: %v", temporal.GetContextTimeout(), err,
 					), temporal.GetContextTimeout(),
@@ -779,7 +779,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -792,7 +792,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, 
 	if err != nil {
 		return nil, fail.Wrap(err, "error crating VIP")
 	}
-	vip := resources.VirtualIP{
+	vip := abstract.VirtualIP{
 		ID:        port.ID,
 		PrivateIP: port.FixedIPs[0].IPAddress,
 	}
@@ -800,12 +800,12 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, 
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
 		return err
@@ -836,7 +836,7 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	vipPort, err := ports.Get(s.NetworkClient, vip.ID).Extract()
 	if err != nil {
 		return err
@@ -868,7 +868,7 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
 	for _, h := range vip.Hosts {
 		err := s.UnbindHostFromVIP(vip, h)
 		if err != nil {

@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 )
 
 func TestIdentity_Clone(t *testing.T) {
 	ct := NewIdentity()
-	ct.Keypair = &resources.KeyPair{
+	ct.Keypair = &abstract.KeyPair{
 		ID:   "None",
 		Name: "salvation",
 	}

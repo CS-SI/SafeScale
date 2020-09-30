@@ -6,13 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 )
 
 func TestDefaults_Clone(t *testing.T) {
 	ct := newDefaults()
 	ct.Image = "something"
-	ct.GatewaySizing = resources.HostDefinition{
+	ct.GatewaySizing = abstract.HostDefinition{
 		RAMSize: 3,
 		GPUType: "NVidia",
 	}

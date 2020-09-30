@@ -29,7 +29,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -82,7 +82,7 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
-	// Map resources.Volume to pb.Volume
+	// Map abstract.Volume to pb.Volume
 	var pbvolumes []*pb.Volume
 	for _, volume := range volumes {
 		pbv, err := srvutils.ToPBVolume(&volume)

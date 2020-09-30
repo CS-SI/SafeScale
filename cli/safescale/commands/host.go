@@ -268,7 +268,7 @@ var hostCreate = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "keep-on-failure, k",
-			Usage: "If set, the resources are not deleted on failure (default: not set)",
+			Usage: "If set, the abstract are not deleted on failure (default: not set)",
 		},
 		cli.StringFlag{
 			Name: "S, sizing",

@@ -29,11 +29,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumeproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumeproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -50,9 +50,9 @@ import (
 // VolumeAPI defines API to manipulate hosts
 type VolumeAPI interface {
 	Delete(ctx context.Context, ref string) error
-	List(ctx context.Context, all bool) ([]resources.Volume, error)
-	Inspect(ctx context.Context, ref string) (*resources.Volume, map[string]*propsv1.HostLocalMount, error)
-	Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (*resources.Volume, error)
+	List(ctx context.Context, all bool) ([]abstract.Volume, error)
+	Inspect(ctx context.Context, ref string) (*abstract.Volume, map[string]*propsv1.HostLocalMount, error)
+	Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (*abstract.Volume, error)
 	Attach(ctx context.Context, volume string, host string, path string, format string, doNotFormat bool) (string, error)
 	Detach(ctx context.Context, volume string, host string) error
 	Expand(ctx context.Context, volume string, host string, increment uint32, incrementType string) error
@@ -72,7 +72,7 @@ func NewVolumeHandler(svc iaas.Service) VolumeAPI {
 }
 
 // List returns the network list
-func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []resources.Volume, err error) {
+func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []abstract.Volume, err error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -92,7 +92,7 @@ func (handler *VolumeHandler) List(ctx context.Context, all bool) (volumes []res
 		return nil, err
 	}
 	err = mv.Browse(
-		func(volume *resources.Volume) error {
+		func(volume *abstract.Volume) error {
 			volumes = append(volumes, *volume)
 			return nil
 		},
@@ -120,7 +120,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 	if err != nil {
 		switch err.(type) {
 		case fail.ErrNotFound:
-			return resources.ResourceNotFoundError("volume", ref)
+			return abstract.ResourceNotFoundError("volume", ref)
 		default:
 			logrus.Debugf("failed to delete volume: %+v", err)
 			return err
@@ -189,7 +189,7 @@ func (handler *VolumeHandler) Delete(ctx context.Context, ref string) (err error
 func (handler *VolumeHandler) Inspect(
 	ctx context.Context,
 	ref string,
-) (volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount, err error) {
+) (volume *abstract.Volume, mounts map[string]*propsv1.HostLocalMount, err error) {
 
 	if handler == nil {
 		return nil, nil, fail.InvalidInstanceError()
@@ -203,7 +203,7 @@ func (handler *VolumeHandler) Inspect(
 	mv, err := metadata.LoadVolume(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, nil, resources.ResourceNotFoundError("volume", ref)
+			return nil, nil, abstract.ResourceNotFoundError("volume", ref)
 		}
 		return nil, nil, err
 	}
@@ -261,7 +261,7 @@ func (handler *VolumeHandler) Inspect(
 }
 
 // Create a volume
-func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (volume *resources.Volume, err error) {
+func (handler *VolumeHandler) Create(ctx context.Context, name string, size int, speed volumespeed.Enum) (volume *abstract.Volume, err error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -283,7 +283,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	}
 
 	volume, err = handler.service.CreateVolume(
-		resources.VolumeRequest{
+		abstract.VolumeRequest{
 			Name:  name,
 			Size:  size,
 			Speed: speed,
@@ -345,7 +345,7 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	return volume, nil
 }
 
-func (handler *VolumeHandler) isAlreadyMounted(ctx context.Context, hostName string, volume *resources.Volume) (err error) {
+func (handler *VolumeHandler) isAlreadyMounted(ctx context.Context, hostName string, volume *abstract.Volume) (err error) {
 	// Get Host data
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -436,15 +436,15 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 			volumeAttachedV1 := clonable.(*propsv1.VolumeAttachments)
 
 			mountPoint = path
-			if path == resources.DefaultVolumeMountPoint {
-				mountPoint = resources.DefaultVolumeMountPoint + volume.Name
+			if path == abstract.DefaultVolumeMountPoint {
+				mountPoint = abstract.DefaultVolumeMountPoint + volume.Name
 			}
 
 			// For now, allows only one attachment...
 			if len(volumeAttachedV1.Hosts) > 0 {
 				for id := range volumeAttachedV1.Hosts {
 					if id != host.ID {
-						return resources.ResourceNotAvailableError("volume", volumeName)
+						return abstract.ResourceNotAvailableError("volume", volumeName)
 					}
 					break
 				}
@@ -500,7 +500,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 								return err
 							}
 							vaID, err := handler.service.CreateVolumeAttachment(
-								resources.VolumeAttachmentRequest{
+								abstract.VolumeAttachmentRequest{
 									Name:     fmt.Sprintf("%s-%s", volume.Name, host.Name),
 									HostID:   host.ID,
 									VolumeID: volume.ID,
@@ -740,7 +740,7 @@ func (handler *VolumeHandler) Attach(ctx context.Context, volumeName, hostName, 
 	return deviceName, nil
 }
 
-func getHost(ctx context.Context, svc *VolumeHandler, hostName string) (*resources.Host, error) {
+func getHost(ctx context.Context, svc *VolumeHandler, hostName string) (*abstract.Host, error) {
 	// Load host data
 	hostSvc := NewHostHandler(svc.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
@@ -859,8 +859,8 @@ func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostNam
 		lvmId := newIds[len(newIds)-1]
 
 		mountPoint := path
-		if path == resources.DefaultVolumeMountPoint {
-			mountPoint = resources.DefaultVolumeMountPoint + volume.Name
+		if path == abstract.DefaultVolumeMountPoint {
+			mountPoint = abstract.DefaultVolumeMountPoint + volume.Name
 		}
 
 		// Updates volume properties
@@ -1050,8 +1050,8 @@ func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostNam
 		// FIXME: use functions to handle structs
 
 		mountPoint := path
-		if path == resources.DefaultVolumeMountPoint {
-			mountPoint = resources.DefaultVolumeMountPoint + volume.Name
+		if path == abstract.DefaultVolumeMountPoint {
+			mountPoint = abstract.DefaultVolumeMountPoint + volume.Name
 		}
 
 		err = host.Properties.LockForWrite(hostproperty.MountsV1).ThenUse(
@@ -1110,7 +1110,7 @@ func (handler *VolumeHandler) attachLVM(ctx context.Context, volumeName, hostNam
 	return nil
 }
 
-func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *resources.Host) (set mapset.Set, err error) {
+func (handler *VolumeHandler) listAttachedDevices(ctx context.Context, host *abstract.Host) (set mapset.Set, err error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1226,7 +1226,7 @@ func getHostLocalMount(ctx context.Context, handler *VolumeHandler, volumeName, 
 		if _, ok := err.(fail.ErrNotFound); !ok {
 			return nil, err
 		}
-		return nil, resources.ResourceNotFoundError("volume", volumeName)
+		return nil, abstract.ResourceNotFoundError("volume", volumeName)
 	}
 
 	var attachment *propsv1.HostVolume
@@ -1281,15 +1281,15 @@ func (handler *VolumeHandler) Expand(ctx context.Context, volumeName, hostName s
 		if _, ok := err.(fail.ErrNotFound); !ok {
 			return err
 		}
-		return resources.ResourceNotFoundError("volume", volumeName)
+		return abstract.ResourceNotFoundError("volume", volumeName)
 	}
 
 	if !volume.ManagedByLVM {
-		return resources.ResourceInvalidRequestError("volume", "Standard volumes cannot be expandad")
+		return abstract.ResourceInvalidRequestError("volume", "Standard volumes cannot be expandad")
 	}
 
 	if len(volume.PVM) == 0 {
-		return resources.ResourceInvalidRequestError(
+		return abstract.ResourceInvalidRequestError(
 			"volume", "Physical volumes cannot be expanded, only the volume group can be expanded",
 		)
 	}
@@ -1305,7 +1305,7 @@ func (handler *VolumeHandler) Expand(ctx context.Context, volumeName, hostName s
 
 	// that should never happen, consider panicking instead
 	if !validChange {
-		return resources.ResourceInvalidRequestError("volume", "Unknown size parameter")
+		return abstract.ResourceInvalidRequestError("volume", "Unknown size parameter")
 	}
 
 	nun := uint32(0)
@@ -1335,7 +1335,7 @@ func (handler *VolumeHandler) Expand(ctx context.Context, volumeName, hostName s
 	logrus.Debugf("Volume path [%s], filesystem [%s]", mountInfo.Path, mountInfo.FileSystem)
 
 	var deviceNames []string
-	var createdVolumes []*resources.Volume
+	var createdVolumes []*abstract.Volume
 
 	defer func() {
 		if err != nil {
@@ -1361,7 +1361,7 @@ func (handler *VolumeHandler) Expand(ctx context.Context, volumeName, hostName s
 	for tba := 0; tba < int(nun); tba++ {
 
 		newVolume, err := handler.service.CreateVolume(
-			resources.VolumeRequest{
+			abstract.VolumeRequest{
 				Name:   volume.Name + "_lvm_" + strconv.Itoa(len(volume.PVM)+tba),
 				Size:   vuSize,
 				Speed:  volume.Speed,
@@ -1434,7 +1434,7 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 		if _, ok := err.(fail.ErrNotFound); !ok {
 			return err
 		}
-		return resources.ResourceNotFoundError("volume", volumeName)
+		return abstract.ResourceNotFoundError("volume", volumeName)
 	}
 
 	if !volume.ManagedByLVM {
@@ -1569,7 +1569,7 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 
 			if !failed {
 				// update volume PVMs
-				var na []*resources.Volume
+				var na []*abstract.Volume
 				for _, v := range volume.PVM {
 					if v.ID == vod {
 						continue
@@ -1609,7 +1609,7 @@ func (handler *VolumeHandler) Detach(ctx context.Context, volumeName, hostName s
 		if _, ok := err.(fail.ErrNotFound); !ok {
 			return err
 		}
-		return resources.ResourceNotFoundError("volume", volumeName)
+		return abstract.ResourceNotFoundError("volume", volumeName)
 	}
 	mountPath := ""
 

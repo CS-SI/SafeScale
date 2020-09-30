@@ -25,10 +25,10 @@ import (
 	"github.com/vmware/go-vcloud-director/govcd"
 	"github.com/vmware/go-vcloud-director/types/v56"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -405,7 +405,7 @@ func getLinks(org govcd.Org, typed string) ([]types.Link, error) {
 }
 
 // CreateNetwork creates a network named name
-func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resources.Network, err error) {
+func (s *StackEbrc) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
 	logrus.Debug("ebrc.Client.CreateNetwork() called")
 	defer logrus.Debug("ebrc.Client.CreateNetwork() done")
 
@@ -593,7 +593,7 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 		}
 	}()
 
-	network = resources.NewNetwork()
+	network = abstract.NewNetwork()
 
 	// FIXME: Remove this, get info from recently created network
 	network.ID = createdNetwork.OrgVDCNetwork.ID
@@ -604,7 +604,7 @@ func (s *StackEbrc) CreateNetwork(req resources.NetworkRequest) (network *resour
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
+func (s *StackEbrc) GetNetwork(ref string) (*abstract.Network, error) {
 	logrus.Debug("ebrc.Client.GetNetwork() called")
 	defer logrus.Debug("ebrc.Client.GetNetwork() done")
 
@@ -625,7 +625,7 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 	if res.Results != nil {
 		for _, li := range res.Results.Link {
 			if li.Name == ref {
-				newnet := &resources.Network{
+				newnet := &abstract.Network{
 					ID:         li.ID,
 					Name:       li.Name,
 					CIDR:       "",
@@ -638,11 +638,11 @@ func (s *StackEbrc) GetNetwork(ref string) (*resources.Network, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("network", ref)
+	return nil, abstract.ResourceNotFoundError("network", ref)
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
+func (s *StackEbrc) GetNetworkByName(ref string) (*abstract.Network, error) {
 	logrus.Debug("ebrc.Client.GetNetworkByName() called")
 	defer logrus.Debug("ebrc.Client.GetNetworkByName() done")
 
@@ -654,13 +654,13 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
 	onet, err := vdc.FindVDCNetwork(ref)
 	if err != nil {
 		if strings.Contains(err.Error(), "can't find") {
-			return nil, resources.ResourceNotFoundError("network", ref)
+			return nil, abstract.ResourceNotFoundError("network", ref)
 		} else {
 			return nil, err
 		}
 	}
 
-	newnet := &resources.Network{
+	newnet := &abstract.Network{
 		ID:   onet.OrgVDCNetwork.ID,
 		Name: onet.OrgVDCNetwork.Name,
 	}
@@ -669,7 +669,7 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*resources.Network, error) {
 }
 
 // ListNetworks lists available networks
-func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
+func (s *StackEbrc) ListNetworks() ([]*abstract.Network, error) {
 	logrus.Debug("ebrc.Client.ListNetworks() called")
 	defer logrus.Debug("ebrc.Client.ListNetworks() done")
 
@@ -683,9 +683,9 @@ func (s *StackEbrc) ListNetworks() ([]*resources.Network, error) {
 		return nil, fail.Wrap(err, fmt.Sprintf("Error listing networks"))
 	}
 
-	var nets []*resources.Network
+	var nets []*abstract.Network
 	for _, ref := range refs {
-		newnet := &resources.Network{
+		newnet := &abstract.Network{
 			ID:         ref.ID,
 			Name:       ref.Name,
 			CIDR:       "",
@@ -727,7 +727,7 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (host *resources.Host, content *userdata.Content, err error) {
+func (s *StackEbrc) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, err error) {
 	logrus.Debug("ebrc.Client.CreateGateway() called")
 	defer logrus.Debug("ebrc.Client.CreateGateway() done")
 
@@ -736,13 +736,13 @@ func (s *StackEbrc) CreateGateway(req resources.GatewayRequest, sizing *resource
 		gwname = "gw-" + req.Network.Name
 	}
 
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 	}
 	if sizing != nil && sizing.MinDiskSize > 0 {

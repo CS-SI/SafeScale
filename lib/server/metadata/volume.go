@@ -23,7 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
@@ -62,7 +62,7 @@ func NewVolume(svc iaas.Service) (*Volume, error) {
 }
 
 // Carry links a Volume instance to the Metadata instance
-func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
+func (mv *Volume) Carry(volume *abstract.Volume) (*Volume, error) {
 	if mv == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -73,7 +73,7 @@ func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 		return nil, fail.InvalidParameterError("volume", "cannot be nil!")
 	}
 	if volume.Properties == nil {
-		volume.Properties = serialize.NewJSONProperties("resources")
+		volume.Properties = serialize.NewJSONProperties("abstract")
 	}
 	mv.item.Carry(volume)
 	mv.name = &volume.Name
@@ -82,14 +82,14 @@ func (mv *Volume) Carry(volume *resources.Volume) (*Volume, error) {
 }
 
 // Get returns the Volume instance linked to metadata
-func (mv *Volume) Get() (*resources.Volume, error) {
+func (mv *Volume) Get() (*abstract.Volume, error) {
 	if mv == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
 		return nil, fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
-	if volume, ok := mv.item.Get().(*resources.Volume); ok {
+	if volume, ok := mv.item.Get().(*abstract.Volume); ok {
 		return volume, nil
 	}
 	return nil, fail.InconsistentError("invalid content in volume metadata")
@@ -178,7 +178,7 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 // mayReadByID reads the metadata of a volume identified by ID from Object Storage
 // Doesn't log error or validate parameters by design; caller does that
 func (mv *Volume) mayReadByID(id string) error {
-	volume := resources.NewVolume()
+	volume := abstract.NewVolume()
 	err := mv.item.ReadFrom(
 		ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 			err := volume.Deserialize(buf)
@@ -203,7 +203,7 @@ func (mv *Volume) mayReadByID(id string) error {
 // mayReadByName reads the metadata of a volume identified by name
 // Doesn't log error or validate parameters by design; caller does that
 func (mv *Volume) mayReadByName(name string) error {
-	volume := resources.NewVolume()
+	volume := abstract.NewVolume()
 	err := mv.item.ReadFrom(
 		ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 			err := volume.Deserialize(buf)
@@ -290,7 +290,7 @@ func (mv *Volume) Delete() (err error) {
 }
 
 // Browse walks through volume folder and executes a callback for each entries
-func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
+func (mv *Volume) Browse(callback func(*abstract.Volume) error) (err error) {
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -304,7 +304,7 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
 
 	return mv.item.BrowseInto(
 		ByIDFolderName, func(buf []byte) error {
-			volume := resources.NewVolume()
+			volume := abstract.NewVolume()
 			err := volume.Deserialize(buf)
 			if err != nil {
 				return err
@@ -315,7 +315,7 @@ func (mv *Volume) Browse(callback func(*resources.Volume) error) (err error) {
 }
 
 // SaveVolume saves the Volume definition in Object Storage
-func SaveVolume(svc iaas.Service, volume *resources.Volume) (mv *Volume, err error) {
+func SaveVolume(svc iaas.Service, volume *abstract.Volume) (mv *Volume, err error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
