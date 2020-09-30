@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
 
 	"github.com/stretchr/testify/require"
 
@@ -176,7 +176,7 @@ func Test_NetworksWithDelete(t *testing.T) {
 	}
 	require.Nil(t, err)
 	net, err := tt.Service.CreateNetwork(
-		resources.NetworkRequest{
+		abstract.NetworkRequest{
 			Name:       "my-net",
 			IPVersion:  ipversion.IPv4,
 			CIDR:       "192.168.23.0/24",
@@ -199,7 +199,7 @@ func TestVMWithGPU(t *testing.T) {
 	img, err := tt.Service.SearchImage("Ubuntu 18.04")
 	assert.NoError(t, err)
 	tpls, err := tt.Service.SelectTemplatesBySize(
-		resources.SizingRequirements{
+		abstract.SizingRequirements{
 			MinCores:    1,
 			MaxCores:    1,
 			MinRAMSize:  1,
@@ -212,7 +212,7 @@ func TestVMWithGPU(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tpls)
-	tpl := func() *resources.HostTemplate {
+	tpl := func() *abstract.HostTemplate {
 		for _, tpl := range tpls {
 			if tpl.GPUType == "nvidia-k2" {
 				return tpl
@@ -222,7 +222,7 @@ func TestVMWithGPU(t *testing.T) {
 	}()
 	assert.NotNil(t, tpl)
 	net, err := tt.Service.CreateNetwork(
-		resources.NetworkRequest{
+		abstract.NetworkRequest{
 			Name:       "public-net",
 			IPVersion:  ipversion.IPv4,
 			CIDR:       "192.168.23.0/24",
@@ -235,10 +235,10 @@ func TestVMWithGPU(t *testing.T) {
 		_ = tt.Service.DeleteNetwork(net.ID)
 	}()
 	h, _, err := tt.Service.CreateHost(
-		resources.HostRequest{
+		abstract.HostRequest{
 			ResourceName:   "hostWithGPU",
 			HostName:       "host",
-			Networks:       []*resources.Network{net},
+			Networks:       []*abstract.Network{net},
 			DefaultRouteIP: "",
 			DefaultGateway: nil,
 			PublicIP:       true,

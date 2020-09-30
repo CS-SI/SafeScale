@@ -33,9 +33,9 @@ import (
 	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 )
 
 func infoFromCidr(cidr string) (string, string, string, string, error) {
@@ -63,7 +63,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 			re := regexp.MustCompile("[0-9]+")
 			errCode, _ := strconv.Atoi(re.FindString(err.Error()))
 			if errCode == 43 {
-				return nil, resources.ResourceNotFoundError("network", ref)
+				return nil, abstract.ResourceNotFoundError("network", ref)
 			}
 			return nil, fail.Errorf(
 				fmt.Sprintf(fmt.Sprintf("failed to fetch network from ref : %s", err.Error())), err,
@@ -74,7 +74,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 	return libvirtNetwork, nil
 }
 
-func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.Network, error) {
+func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
 		return nil, fail.Errorf(
@@ -124,7 +124,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 		cidr = networkDescription.IPv6
 	}
 
-	network := resources.NewNetwork()
+	network := abstract.NewNetwork()
 	network.ID = networkDescription.UUID
 	network.Name = networkDescription.Name
 	network.CIDR = cidr
@@ -136,7 +136,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*resources.N
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	name := req.Name
@@ -214,7 +214,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
@@ -243,16 +243,16 @@ func (s *Stack) GetNetwork(ref string) (*resources.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 	return s.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
-	var networks []*resources.Network
+	var networks []*abstract.Network
 
 	libvirtNetworks, err := s.LibvirtService.ListAllNetworks(3)
 	if err != nil {
@@ -305,7 +305,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	network := req.Network
@@ -326,13 +326,13 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 		gwName = "gw-" + name
 	}
 
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      imageID,
 		KeyPair:      keyPair,
 		HostName:     req.Name,
 		ResourceName: gwName,
 		TemplateID:   templateID,
-		Networks:     []*resources.Network{network},
+		Networks:     []*abstract.Network{network},
 		PublicIP:     true,
 	}
 	if sizing != nil && sizing.MinDiskSize > 0 {
@@ -355,26 +355,26 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
+func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
+func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
+func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
+func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

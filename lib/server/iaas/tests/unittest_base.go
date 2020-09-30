@@ -34,14 +34,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
@@ -180,7 +180,7 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 	assert.Nil(t, err)
 	assert.EqualValues(t, nbKP+2, len(lst))
 	for _, kpe := range lst {
-		var kpr resources.KeyPair
+		var kpr abstract.KeyPair
 		switch kpe.ID {
 		case kp.ID:
 			kpr = *kp
@@ -197,10 +197,10 @@ func (tester *ServiceTester) ListKeyPairs(t *testing.T) {
 }
 
 // CreateNetwork creates a test network
-func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*resources.Network, *resources.Host) {
+func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW bool, cidr string) (*abstract.Network, *abstract.Host) {
 
 	network, err := tester.Service.CreateNetwork(
-		resources.NetworkRequest{
+		abstract.NetworkRequest{
 			Name:      name,
 			IPVersion: ipversion.IPv4,
 			CIDR:      cidr,
@@ -209,7 +209,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 	require.NoError(t, err)
 
 	tpls, err := tester.Service.SelectTemplatesBySize(
-		resources.SizingRequirements{
+		abstract.SizingRequirements{
 			MinCores:    1,
 			MinRAMSize:  1,
 			MinDiskSize: 0,
@@ -224,14 +224,14 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 	}()
 	require.Nil(t, err)
 
-	gwRequest := resources.GatewayRequest{
+	gwRequest := abstract.GatewayRequest{
 		ImageID:    img.ID,
 		Network:    network,
 		KeyPair:    keypair,
 		TemplateID: tpls[0].ID,
 	}
 
-	var gateway *resources.Host
+	var gateway *abstract.Host
 
 	if withGW {
 		gateway, _, err = tester.Service.CreateGateway(gwRequest, nil)
@@ -243,9 +243,9 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, withGW boo
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *resources.Network, public bool) (*resources.Host, *userdata.Content, error) {
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *abstract.Network, public bool) (*abstract.Host, *userdata.Content, error) {
 	tpls, err := tester.Service.SelectTemplatesBySize(
-		resources.SizingRequirements{
+		abstract.SizingRequirements{
 			MinCores:    1,
 			MinRAMSize:  1,
 			MinDiskSize: 10,
@@ -255,11 +255,11 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *reso
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
 	gw, _ := tester.Service.InspectHost(network.GatewayID)
-	hostRequest := resources.HostRequest{
+	hostRequest := abstract.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
 		TemplateID:     tpls[0].ID,
-		Networks:       []*resources.Network{network},
+		Networks:       []*abstract.Network{network},
 		DefaultGateway: gw,
 		PublicIP:       public,
 	}
@@ -267,9 +267,9 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, network *reso
 }
 
 // CreateGW creates a test GW
-func (tester *ServiceTester) CreateGW(t *testing.T, network *resources.Network) error {
+func (tester *ServiceTester) CreateGW(t *testing.T, network *abstract.Network) error {
 	tpls, err := tester.Service.SelectTemplatesBySize(
-		resources.SizingRequirements{
+		abstract.SizingRequirements{
 			MinCores:    1,
 			MinRAMSize:  1,
 			MinDiskSize: 10,
@@ -278,7 +278,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, network *resources.Network) 
 	assert.Nil(t, err)
 	img, err := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, err)
-	gwRequest := resources.GatewayRequest{
+	gwRequest := abstract.GatewayRequest{
 		ImageID:    img.ID,
 		TemplateID: tpls[0].ID,
 		Network:    network,
@@ -425,7 +425,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	// out, err := cmd.Output()
 	// assert.Nil(t, err)
 	// content := strings.Trim(string(out), "\n")
-	// assert.Equal(t, resources.DefaultUser, content)
+	// assert.Equal(t, abstract.DefaultUser, content)
 
 	// cmd, err = ssh.Command("ping -c1 8.8.8.8")
 	// fmt.Println(ssh.PrivateKey)
@@ -519,7 +519,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	nbVolumes := len(lst)
 
 	v1, err := tester.Service.CreateVolume(
-		resources.VolumeRequest{
+		abstract.VolumeRequest{
 			Name:  "test_volume1",
 			Size:  25,
 			Speed: volumespeed.HDD,
@@ -538,7 +538,7 @@ func (tester *ServiceTester) Volume(t *testing.T) {
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(
-		resources.VolumeRequest{
+		abstract.VolumeRequest{
 			Name:  "test_volume2",
 			Size:  35,
 			Speed: volumespeed.HDD,
@@ -597,7 +597,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	attachmentNumber := len(lst)
 
 	v1, err := tester.Service.CreateVolume(
-		resources.VolumeRequest{
+		abstract.VolumeRequest{
 			Name:  "test_volume1",
 			Size:  25,
 			Speed: volumespeed.HDD,
@@ -614,7 +614,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(
-		resources.VolumeRequest{
+		abstract.VolumeRequest{
 			Name:  "test_volume2",
 			Size:  35,
 			Speed: volumespeed.HDD,
@@ -632,7 +632,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(
-		resources.VolumeAttachmentRequest{
+		abstract.VolumeAttachmentRequest{
 			Name:     "Attachment1",
 			HostID:   host.ID,
 			VolumeID: v1.ID,
@@ -648,7 +648,7 @@ func (tester *ServiceTester) VolumeAttachment(t *testing.T) {
 	}()
 
 	va2ID, err := tester.Service.CreateVolumeAttachment(
-		resources.VolumeAttachmentRequest{
+		abstract.VolumeAttachmentRequest{
 			Name:     "Attachment2",
 			HostID:   host.ID,
 			VolumeID: v2.ID,
@@ -733,9 +733,9 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 // 	assert.Empty(t, o.Content)
 // 	assert.Equal(t, 1, len(o.Metadata))
 // 	assert.Equal(t, "B", o.Metadata["A"])
-// 	o, err = tester.Service.GetObject("testC", "object1", []resources.Range{
-// 		resources.NewRange(0, 2),
-// 		resources.NewRange(4, 7),
+// 	o, err = tester.Service.GetObject("testC", "object1", []abstract.Range{
+// 		abstract.NewRange(0, 2),
+// 		abstract.NewRange(4, 7),
 // 	})
 // 	assert.Nil(t, err)
 // 	if err == nil {

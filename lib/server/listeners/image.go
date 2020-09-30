@@ -66,7 +66,7 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
-	// Map resources.Image to pb.Image
+	// Map abstract.Image to pb.Image
 	var pbImages []*pb.Image
 	for _, image := range images {
 		pbi, err := srvutils.ToPBImage(&image)

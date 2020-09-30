@@ -30,9 +30,9 @@ import (
 	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -133,11 +133,11 @@ func (s *Stack) getLibvirtVolume(ref string) (*libvirt.StorageVol, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("volume", ref)
+	return nil, abstract.ResourceNotFoundError("volume", ref)
 }
 
-func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*resources.Volume, error) {
-	volume := resources.NewVolume()
+func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*abstract.Volume, error) {
+	volume := abstract.NewVolume()
 
 	volumeXML, err := libvirtVolume.GetXMLDesc(0)
 	if err != nil {
@@ -162,8 +162,8 @@ func getVolumeFromLibvirtVolume(libvirtVolume *libvirt.StorageVol) (*resources.V
 	return volume, nil
 }
 
-func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvirt.Domain) (*resources.VolumeAttachment, error) {
-	attachment := &resources.VolumeAttachment{}
+func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvirt.Domain) (*abstract.VolumeAttachment, error) {
+	attachment := &abstract.VolumeAttachment{}
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
@@ -234,7 +234,7 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).GoingIn().OnExitTrace()()
 
 	// volume speed is ignored
@@ -293,7 +293,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	if err != nil {
 		return nil, fail.Errorf(
 			fmt.Sprintf(
-				"failed to get resources.Volume form libvirt.Volume %s on pool %s : %s", request.Name,
+				"failed to get abstract.Volume form libvirt.Volume %s on pool %s : %s", request.Name,
 				storagePoolDescription.Name, err.Error(),
 			), err,
 		)
@@ -303,7 +303,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).GoingIn().OnExitTrace()()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
@@ -314,7 +314,7 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 	volume, err := getVolumeFromLibvirtVolume(libvirtVolume)
 	if err != nil {
 		return nil, fail.Errorf(
-			fmt.Sprintf("failed to get resources.volume from libvirt.Volume : %s", err.Error()), err,
+			fmt.Sprintf("failed to get abstract.volume from libvirt.Volume : %s", err.Error()), err,
 		)
 	}
 
@@ -322,7 +322,7 @@ func (s *Stack) GetVolume(ref string) (*resources.Volume, error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *Stack) ListVolumes() ([]resources.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
@@ -330,7 +330,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		return nil, fail.Errorf(fmt.Sprintf("failed to get storage pool from path : %s", err.Error()), err)
 	}
 
-	var volumes []resources.Volume
+	var volumes []abstract.Volume
 	libvirtVolumes, err := storagePool.ListAllStorageVolumes(0)
 	if err != nil {
 		return nil, fail.Errorf(fmt.Sprintf("failed to list all storages volumes : %s", err.Error()), err)
@@ -340,7 +340,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 		if err != nil {
 			return nil, fail.Errorf(
 				fmt.Sprintf(
-					"failed to get resources.Valume from libvirt.Volume : %s", err.Error(),
+					"failed to get abstract.Valume from libvirt.Volume : %s", err.Error(),
 				), err,
 			)
 		}
@@ -371,7 +371,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	defer debug.NewTracer(
 		nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true,
 	).GoingIn().OnExitTrace()()
@@ -433,7 +433,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).GoingIn().OnExitTrace()()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
@@ -503,11 +503,11 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).GoingIn().OnExitTrace()()
 
 	var volumes []*libvirt.StorageVol
-	var volumeAttachments []resources.VolumeAttachment
+	var volumeAttachments []abstract.VolumeAttachment
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
 	if err != nil {

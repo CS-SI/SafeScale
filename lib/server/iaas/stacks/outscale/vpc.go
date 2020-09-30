@@ -24,7 +24,7 @@ import (
 	"github.com/outscale-dev/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -146,7 +146,7 @@ func (s *Stack) updateRouteTable(onet *osc.Net, is *osc.InternetService) error {
 	return normalizeError(err)
 }
 
-func (s *Stack) createInternetService(req resources.NetworkRequest, onet *osc.Net) error {
+func (s *Stack) createInternetService(req abstract.NetworkRequest, onet *osc.Net) error {
 	// Create internet service to allow internet access from VMs attached to the network
 	isResp, _, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
 	if err != nil {
@@ -332,7 +332,7 @@ func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
 		return nil, err
 	}
 
-	req := resources.NetworkRequest{
+	req := abstract.NetworkRequest{
 		CIDR:       cidr,
 		DNSServers: s.configurationOptions.DNSList,
 		Name:       name,
@@ -426,7 +426,7 @@ func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, error) {
 	return res.DhcpOptionsSets[0].NtpServers, err
 }
 
-func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) (err error) {
+func (s *Stack) createDHCPOptionSet(req abstract.NetworkRequest, net *osc.Net) (err error) {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}

@@ -30,26 +30,26 @@ import (
 	"github.com/vmware/go-vcloud-director/govcd"
 	"github.com/vmware/go-vcloud-director/types/v56"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
+func (s *StackEbrc) ListImages(all bool) ([]abstract.Image, error) {
 	logrus.Debug(">>> stacks.ebrc::ListImages()")
 	defer logrus.Debug("<<< stacks.ebrc::ListImages()")
 
-	var empty []resources.Image
+	var empty []abstract.Image
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 			}
 			for _, item := range cat.Catalog.CatalogItems {
 				for _, deepItem := range item.CatalogItem {
-					empty = append(empty, resources.Image{ID: deepItem.ID, Name: deepItem.Name})
+					empty = append(empty, abstract.Image{ID: deepItem.ID, Name: deepItem.Name})
 				}
 			}
 		}
@@ -85,7 +85,7 @@ func (s *StackEbrc) ListImages(all bool) ([]resources.Image, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *StackEbrc) GetImage(id string) (*resources.Image, error) {
+func (s *StackEbrc) GetImage(id string) (*abstract.Image, error) {
 	images, err := s.ListImages(true)
 	if err != nil {
 		return nil, err
@@ -102,22 +102,22 @@ func (s *StackEbrc) GetImage(id string) (*resources.Image, error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *StackEbrc) ListTemplates(all bool) ([]resources.HostTemplate, error) {
+func (s *StackEbrc) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
 
-	var empty []resources.HostTemplate
-	empty = append(empty, resources.HostTemplate{Name: "Default", Cores: 1, DiskSize: 20, ID: "None...", RAMSize: 2})
+	var empty []abstract.HostTemplate
+	empty = append(empty, abstract.HostTemplate{Name: "Default", Cores: 1, DiskSize: 20, ID: "None...", RAMSize: 2})
 
 	return empty, nil
 }
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, error) {
+func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, error) {
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
 
-	var empty []resources.HostTemplate
+	var empty []abstract.HostTemplate
 
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
@@ -163,7 +163,7 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 						continue
 					}
 
-					ht := resources.HostTemplate{
+					ht := abstract.HostTemplate{
 						Cores:    1,
 						RAMSize:  float32(ms),
 						DiskSize: ds,
@@ -180,7 +180,7 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]resources.HostTemplate, er
 }
 
 // GetTemplate overload OpenStackEbrc GetTemplate method to add GPU configuration
-func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
+func (s *StackEbrc) GetTemplate(id string) (*abstract.HostTemplate, error) {
 	logrus.Debugf(">>> stacks.ebrc::GetTemplate(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetTemplate(%s)", id)
 
@@ -190,7 +190,7 @@ func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 		cores, _ := strconv.Atoi(strings.Split(items[0], ":")[1])
 		disk, _ := strconv.Atoi(strings.Split(items[1], ":")[1])
 		memory, _ := strconv.Atoi(strings.Split(items[2], ":")[1])
-		hot := &resources.HostTemplate{
+		hot := &abstract.HostTemplate{
 			Cores:    cores,
 			DiskSize: disk,
 			RAMSize:  float32(memory),
@@ -205,20 +205,20 @@ func (s *StackEbrc) GetTemplate(id string) (*resources.HostTemplate, error) {
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *StackEbrc) CreateKeyPair(name string) (*resources.KeyPair, error) {
+func (s *StackEbrc) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	return resources.NewKeyPair(name)
+	return abstract.NewKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *StackEbrc) GetKeyPair(id string) (*resources.KeyPair, error) {
+func (s *StackEbrc) GetKeyPair(id string) (*abstract.KeyPair, error) {
 	return nil, fail.NotImplementedError("")
 }
 
 // ListKeyPairs lists available key pairs
-func (s *StackEbrc) ListKeyPairs() ([]resources.KeyPair, error) {
+func (s *StackEbrc) ListKeyPairs() ([]abstract.KeyPair, error) {
 	return nil, fail.NotImplementedError("")
 }
 
@@ -228,7 +228,7 @@ func (s *StackEbrc) DeleteKeyPair(id string) error {
 }
 
 // CreateHost creates an host satisfying request
-func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.Host, content *userdata.Content, err error) {
+func (s *StackEbrc) CreateHost(request abstract.HostRequest) (host *abstract.Host, content *userdata.Content, err error) {
 	logrus.Debug("ebrc.Client.CreateHost() called")
 	defer logrus.Debug("ebrc.Client.CreateHost() done")
 
@@ -510,7 +510,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	}
 
 	// FIXME: Populate this
-	host = resources.NewHost()
+	host = abstract.NewHost()
 	host.ID = vapp.VApp.ID
 	host.Name = vapp.VApp.Name
 	host.PrivateKey = keyPair.PrivateKey
@@ -530,7 +530,7 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 			hostNetworkV1.DefaultNetworkID = defaultNetwork.ID
 
-			hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != resources.SingleHostNetworkName
+			hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
 			if request.DefaultGateway != nil {
 				hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
 
@@ -606,8 +606,8 @@ func (s *StackEbrc) CreateHost(request resources.HostRequest) (host *resources.H
 	return host, userData, nil
 }
 
-// GetHost returns the host identified by ref (name or id) or by a *resources.Host containing an id
-func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) {
+// GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
+func (s *StackEbrc) InspectHost(hostParam interface{}) (*abstract.Host, error) {
 	logrus.Debug("ebrc.Client.InspectHost() called")
 	defer logrus.Debug("ebrc.Client.InspectHost() done")
 
@@ -616,15 +616,15 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 		return nil, fail.Wrap(err, fmt.Sprintf("error inspecting host"))
 	}
 
-	var host *resources.Host
+	var host *abstract.Host
 	switch hostParam.(type) {
 	case string:
-		host := resources.NewHost()
+		host := abstract.NewHost()
 		host.ID = hostParam.(string)
-	case *resources.Host:
-		host = hostParam.(*resources.Host)
+	case *abstract.Host:
+		host = hostParam.(*abstract.Host)
 	default:
-		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *abstract.Host")
 	}
 
 	if host == nil {
@@ -654,11 +654,11 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 
 	err = vapp.Refresh()
 	if err != nil {
-		return nil, resources.ResourceNotFoundError("host", host.Name)
+		return nil, abstract.ResourceNotFoundError("host", host.Name)
 	}
 
 	// FIXME: Populate this
-	newHost := &resources.Host{
+	newHost := &abstract.Host{
 		ID:         vapp.VApp.ID,
 		Name:       vapp.VApp.Name,
 		LastState:  stateConvert(vapp.VApp.Status),
@@ -672,7 +672,7 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*resources.Host, error) 
 	return host, nil
 }
 
-func (s *StackEbrc) complementHost(host *resources.Host, newHost *resources.Host) error {
+func (s *StackEbrc) complementHost(host *abstract.Host, newHost *abstract.Host) error {
 	if host == nil || newHost == nil {
 		return fail.Errorf(fmt.Sprintf("host and newHost have to been set"), nil)
 	}
@@ -730,7 +730,7 @@ func stateConvert(stateVcd int) hoststate.Enum {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
+func (s *StackEbrc) GetHostByName(name string) (*abstract.Host, error) {
 	logrus.Debug("ebrc.Client.GetHostByName() called")
 	defer logrus.Debug("ebrc.Client.GetHostByName() done")
 
@@ -741,16 +741,16 @@ func (s *StackEbrc) GetHostByName(name string) (*resources.Host, error) {
 
 	vapp, err := vdc.FindVAppByName(name)
 	if err != nil {
-		return nil, resources.ResourceNotFoundError("host", name)
+		return nil, abstract.ResourceNotFoundError("host", name)
 	}
 
 	err = vapp.Refresh()
 	if err != nil {
-		return nil, resources.ResourceNotFoundError("host", name)
+		return nil, abstract.ResourceNotFoundError("host", name)
 	}
 
 	// FIXME: Populate this
-	hr := &resources.Host{
+	hr := &abstract.Host{
 		ID:         vapp.VApp.ID,
 		Name:       vapp.VApp.Name,
 		LastState:  stateConvert(vapp.VApp.Status),
@@ -800,12 +800,12 @@ func (s *StackEbrc) DeleteHost(id string) error {
 }
 
 // ResizeHost change the template used by an host
-func (s *StackEbrc) ResizeHost(id string, request resources.SizingRequirements) (*resources.Host, error) {
+func (s *StackEbrc) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
 	return nil, fail.Errorf(fmt.Sprintf("Not implemented yet"), nil)
 }
 
 // ListHosts lists available hosts
-func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
+func (s *StackEbrc) ListHosts() ([]*abstract.Host, error) {
 	logrus.Debug("ebrc.Client.ListHosts() called")
 	defer logrus.Debug("ebrc.Client.ListHosts() done")
 
@@ -819,9 +819,9 @@ func (s *StackEbrc) ListHosts() ([]*resources.Host, error) {
 		return nil, fail.Wrap(err, fmt.Sprintf("Error listing hosts"))
 	}
 
-	var nets []*resources.Host
+	var nets []*abstract.Host
 	for _, ref := range refs {
-		nets = append(nets, &resources.Host{Name: ref.Name})
+		nets = append(nets, &abstract.Host{Name: ref.Name})
 	}
 
 	return nets, nil
@@ -925,22 +925,22 @@ func (s *StackEbrc) ListRegions() ([]string, error) {
 	return nil, fail.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *StackEbrc) CreateVIP(s1 string, s2 string) (*resources.VirtualIP, error) {
+func (s *StackEbrc) CreateVIP(s1 string, s2 string) (*abstract.VirtualIP, error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *StackEbrc) AddPublicIPToVIP(ip *resources.VirtualIP) error {
+func (s *StackEbrc) AddPublicIPToVIP(ip *abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *StackEbrc) BindHostToVIP(ip *resources.VirtualIP, s2 string) error {
+func (s *StackEbrc) BindHostToVIP(ip *abstract.VirtualIP, s2 string) error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *StackEbrc) UnbindHostFromVIP(ip *resources.VirtualIP, s2 string) error {
+func (s *StackEbrc) UnbindHostFromVIP(ip *abstract.VirtualIP, s2 string) error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *StackEbrc) DeleteVIP(ip *resources.VirtualIP) error {
+func (s *StackEbrc) DeleteVIP(ip *abstract.VirtualIP) error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

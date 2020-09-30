@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package resources
+package abstract
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -56,7 +56,7 @@ func NewVolume() *Volume {
 	return &Volume{
 		LVM:        []*Volume{},
 		PVM:        []*Volume{},
-		Properties: serialize.NewJSONProperties("resources.volume"),
+		Properties: serialize.NewJSONProperties("abstract.volume"),
 	}
 }
 
@@ -78,9 +78,9 @@ func (v *Volume) Serialize() ([]byte, error) {
 // Deserialize reads json code and restores an Host
 func (v *Volume) Deserialize(buf []byte) error {
 	if v.Properties == nil {
-		v.Properties = serialize.NewJSONProperties("resources.volume")
+		v.Properties = serialize.NewJSONProperties("abstract.volume")
 	} else {
-		v.Properties.SetModule("resources.volume")
+		v.Properties.SetModule("abstract.volume")
 	}
 	err := serialize.FromJSON(buf, v)
 	if err != nil {

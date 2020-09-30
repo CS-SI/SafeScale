@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package resources
+package abstract
 
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -82,7 +82,7 @@ type Network struct {
 // NewNetwork ...
 func NewNetwork() *Network {
 	return &Network{
-		Properties: serialize.NewJSONProperties("resources.network"),
+		Properties: serialize.NewJSONProperties("abstract.network"),
 	}
 }
 
@@ -122,9 +122,9 @@ func (n *Network) Serialize() ([]byte, error) {
 // Deserialize reads json code and reinstantiates an Host
 func (n *Network) Deserialize(buf []byte) error {
 	if n.Properties == nil {
-		n.Properties = serialize.NewJSONProperties("resources.network")
+		n.Properties = serialize.NewJSONProperties("abstract.network")
 	} else {
-		n.Properties.SetModule("resources.network")
+		n.Properties.SetModule("abstract.network")
 	}
 	err := serialize.FromJSON(buf, n)
 	if err != nil {

@@ -43,13 +43,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	converters "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	converters "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
@@ -254,8 +254,8 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 }
 
 // CreateHost creates a new host
-// On success returns an instance of resources.Host, and a string containing the script to execute to finalize host installation
-func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host, userData *userdata.Content, err error) {
+// On success returns an instance of abstract.Host, and a string containing the script to execute to finalize host installation
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", request.ResourceName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -266,7 +266,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if request.DefaultGateway == nil && !request.PublicIP {
-		return nil, userData, resources.ResourceInvalidRequestError(
+		return nil, userData, abstract.ResourceInvalidRequestError(
 			"host creation", "cannot create a host without network and without public access (would be unreachable)",
 		)
 	}
@@ -285,7 +285,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	defaultNetwork := request.Networks[0]
 	defaultNetworkID := defaultNetwork.ID
 	defaultGateway := request.DefaultGateway
-	isGateway := defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName
+	isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
 	defaultGatewayID := ""
 	defaultGatewayPrivateIP := ""
 	if defaultGateway != nil {
@@ -406,9 +406,9 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		)
 	}
 
-	// --- Initializes resources.Host ---
+	// --- Initializes abstract.Host ---
 
-	host = resources.NewHost()
+	host = abstract.NewHost()
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Password = request.Password
 
@@ -586,7 +586,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			return nil, userData, err
 		}
 
-		if defaultGateway == nil && defaultNetwork.Name != resources.SingleHostNetworkName {
+		if defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName {
 			err = s.enableHostRouterMode(host)
 			if err != nil {
 				return nil, userData, fail.Errorf(
@@ -604,7 +604,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 }
 
 // validatehostName validates the name of an host based on known FlexibleEngine requirements
-func validatehostName(req resources.HostRequest) (bool, error) {
+func validatehostName(req abstract.HostRequest) (bool, error) {
 	s := check.Struct{
 		"ResourceName": check.Composite{
 			check.NonEmpty{},
@@ -627,21 +627,21 @@ func validatehostName(req resources.HostRequest) (bool, error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, err error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
 			return nil, fail.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
-		host = resources.NewHost()
+		host = abstract.NewHost()
 		host.ID = hostParam
-	case *resources.Host:
+	case *abstract.Host:
 		if hostParam == nil {
 			return nil, fail.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 	default:
-		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *abstract.Host")
 	}
 
 	serverState, err := s.GetHostState(host.ID)
@@ -674,7 +674,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(host *resources.Host, server *servers.Server) error {
+func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) error {
 	networks, addresses, ipv4, ipv6, err := s.collectAddresses(host)
 	if err != nil {
 		return err
@@ -789,7 +789,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 // collectAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
+func (s *Stack) collectAddresses(host *abstract.Host) ([]string, map[ipversion.Enum]map[string]string, string, string, error) {
 	var (
 		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
@@ -840,9 +840,9 @@ func (s *Stack) collectAddresses(host *resources.Host) ([]string, map[ipversion.
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*resources.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, error) {
 	pager := servers.List(s.Stack.ComputeClient, servers.ListOpts{})
-	var hosts []*resources.Host
+	var hosts []*abstract.Host
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
 			list, err := servers.ExtractServers(page)
@@ -851,7 +851,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 			}
 
 			for _, srv := range list {
-				h := resources.NewHost()
+				h := abstract.NewHost()
 				h.ID = srv.ID
 				err := s.complementHost(h, &srv)
 				if err != nil {
@@ -948,7 +948,7 @@ func (s *Stack) DeleteHost(id string) error {
 			if innerRetryErr != nil {
 				if _, ok := innerRetryErr.(retry.ErrTimeout); ok {
 					// retry deletion...
-					return resources.TimeoutError(
+					return abstract.TimeoutError(
 						fmt.Sprintf(
 							"host '%s' not deleted after %v", id, temporal.GetContextTimeout(),
 						), temporal.GetContextTimeout(),
@@ -1012,7 +1012,7 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, err
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to an host
-func (s *Stack) attachFloatingIP(host *resources.Host) (*FloatingIP, error) {
+func (s *Stack) attachFloatingIP(host *abstract.Host) (*FloatingIP, error) {
 	fip, err := s.CreateFloatingIP()
 	if err != nil {
 		return nil, fail.Errorf(
@@ -1036,7 +1036,7 @@ func (s *Stack) attachFloatingIP(host *resources.Host) (*FloatingIP, error) {
 }
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
-func (s *Stack) enableHostRouterMode(host *resources.Host) error {
+func (s *Stack) enableHostRouterMode(host *abstract.Host) error {
 	var (
 		portID *string
 		err    error
@@ -1078,7 +1078,7 @@ func (s *Stack) enableHostRouterMode(host *resources.Host) error {
 }
 
 // DisableHostRouterMode disables the host to act as a router/gateway.
-func (s *Stack) disableHostRouterMode(host *resources.Host) error {
+func (s *Stack) disableHostRouterMode(host *abstract.Host) error {
 	portID, err := s.getOpenstackPortID(host)
 	if err != nil {
 		return fail.Errorf(
@@ -1119,7 +1119,7 @@ func (s *Stack) listInterfaces(hostID string) pagination.Pager {
 
 // getOpenstackPortID returns the port ID corresponding to the first private IP address of the host
 // returns nil,nil if not found
-func (s *Stack) getOpenstackPortID(host *resources.Host) (*string, error) {
+func (s *Stack) getOpenstackPortID(host *abstract.Host) (*string, error) {
 	ip := host.GetPrivateIP()
 	found := false
 	nic := nics.Interface{}
@@ -1152,10 +1152,10 @@ func (s *Stack) getOpenstackPortID(host *resources.Host) (*string, error) {
 	if found {
 		return &nic.PortID, nil
 	}
-	return nil, resources.ResourceNotFoundError("Port ID corresponding to host", host.Name)
+	return nil, abstract.ResourceNotFoundError("Port ID corresponding to host", host.Name)
 }
 
-// toHostSize converts flavor attributes returned by OpenStack driver into resources.hostproperty.v1.HostSize
+// toHostSize converts flavor attributes returned by OpenStack driver into abstract.hostproperty.v1.HostSize
 func (s *Stack) toHostSize(flavor map[string]interface{}) *propsv1.HostSize {
 	if i, ok := flavor["id"]; ok {
 		fid := i.(string)
@@ -1188,19 +1188,19 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // waitHostState waits an host achieve ready state
-// hostParam can be an ID of host, or an instance of *resources.Host; any other type will return an utils.ErrInvalidParameter
+// hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
-	var host *resources.Host
+	var host *abstract.Host
 
 	switch hostParam := hostParam.(type) {
 	case string:
-		host = resources.NewHost()
+		host = abstract.NewHost()
 		host.ID = hostParam
-	case *resources.Host:
+	case *abstract.Host:
 		host = hostParam
 	}
 	if host == nil {
-		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
+		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *abstract.Host!")
 	}
 
 	hostRef := host.Name
@@ -1236,7 +1236,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 			// logrus.Warnf("Target state: %s, current state: %s", states, lastState)
 
 			if lastState == hoststate.ERROR {
-				return fail.AbortedError("", resources.ResourceNotAvailableError("host", host.ID))
+				return fail.AbortedError("", abstract.ResourceNotAvailableError("host", host.ID))
 			}
 
 			if !((lastState == hoststate.STARTING) || (lastState == hoststate.STOPPING)) {
@@ -1255,7 +1255,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 	)
 	if retryErr != nil {
 		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return nil, resources.TimeoutError(
+			return nil, abstract.TimeoutError(
 				fmt.Sprintf(
 					"timeout waiting to get host '%s' information after %v", host.Name, timeout,
 				), timeout,

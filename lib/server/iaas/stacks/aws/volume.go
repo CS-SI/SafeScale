@@ -24,12 +24,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 )
 
-func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume, error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
 	v, err := s.EC2Service.CreateVolume(
 		&ec2.CreateVolumeInput{
 			Size:             aws.Int64(int64(request.Size)),
@@ -59,7 +59,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 		return nil, err
 	}
 
-	volume := resources.Volume{
+	volume := abstract.Volume{
 		ID:    aws.StringValue(v.VolumeId),
 		Name:  request.Name,
 		Size:  int(aws.Int64Value(v.Size)),
@@ -69,7 +69,7 @@ func (s *Stack) CreateVolume(request resources.VolumeRequest) (*resources.Volume
 	return &volume, nil
 }
 
-func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			VolumeIds: []*string{aws.String(id)},
@@ -80,11 +80,11 @@ func (s *Stack) GetVolume(id string) (*resources.Volume, error) {
 	}
 
 	if len(out.Volumes) == 0 {
-		return nil, resources.ResourceNotFoundError("Volume", id)
+		return nil, abstract.ResourceNotFoundError("Volume", id)
 	}
 
 	v := out.Volumes[0]
-	volume := resources.Volume{
+	volume := abstract.Volume{
 		ID:    aws.StringValue(v.VolumeId),
 		Name:  aws.StringValue(v.VolumeId), // FIXME: Append name as Tags
 		Size:  int(aws.Int64Value(v.Size)),
@@ -153,12 +153,12 @@ func toVolumeState(s *string) volumestate.Enum {
 	return volumestate.OTHER
 }
 
-func (s *Stack) ListVolumes() ([]resources.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 	out, err := s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
 	if err != nil {
 		return nil, err
 	}
-	volumes := []resources.Volume{}
+	volumes := []abstract.Volume{}
 	for _, v := range out.Volumes {
 		volumeName := aws.StringValue(v.VolumeId)
 		if len(v.Tags) > 0 {
@@ -171,7 +171,7 @@ func (s *Stack) ListVolumes() ([]resources.Volume, error) {
 			}
 		}
 
-		volume := resources.Volume{
+		volume := abstract.Volume{
 			ID:    aws.StringValue(v.VolumeId),
 			Name:  volumeName,
 			Size:  int(aws.Int64Value(v.Size)),
@@ -193,7 +193,7 @@ func (s *Stack) DeleteVolume(id string) error {
 	return err
 }
 
-func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
 	va, err := s.EC2Service.AttachVolume(
 		&ec2.AttachVolumeInput{
 			Device:     aws.String(request.Name),
@@ -207,7 +207,7 @@ func (s *Stack) CreateVolumeAttachment(request resources.VolumeAttachmentRequest
 	return aws.StringValue(va.Device) + aws.StringValue(va.VolumeId), nil
 }
 
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			VolumeIds: []*string{aws.String(id)},
@@ -219,7 +219,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 	v := out.Volumes[0]
 	for _, va := range v.Attachments {
 		if *va.InstanceId == serverID {
-			return &resources.VolumeAttachment{
+			return &abstract.VolumeAttachment{
 				Device:   aws.StringValue(va.Device),
 				ServerID: aws.StringValue(va.InstanceId),
 				VolumeID: aws.StringValue(va.VolumeId),
@@ -231,7 +231,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*resources.VolumeAttac
 	)
 }
 
-func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
@@ -245,11 +245,11 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]resources.VolumeAttach
 	if err != nil {
 		return nil, err
 	}
-	vas := []resources.VolumeAttachment{}
+	vas := []abstract.VolumeAttachment{}
 	for _, v := range out.Volumes {
 		for _, va := range v.Attachments {
 			vas = append(
-				vas, resources.VolumeAttachment{
+				vas, abstract.VolumeAttachment{
 					Device:   aws.StringValue(va.Device),
 					ServerID: aws.StringValue(va.InstanceId),
 					VolumeID: aws.StringValue(va.VolumeId),

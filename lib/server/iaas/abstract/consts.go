@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package resources
+package abstract
 
 const (
 	// DefaultUser Default Host user

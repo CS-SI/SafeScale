@@ -3,29 +3,29 @@ package api
 import (
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // ValidatedProvider ...
 type ValidatedProvider WrappedProvider
 
-func (w ValidatedProvider) CreateVIP(first string, second string) (_ *resources.VirtualIP, err error) {
+func (w ValidatedProvider) CreateVIP(first string, second string) (_ *abstract.VirtualIP, err error) {
 	defer fail.OnPanic(&err)()
 
 	return w.InnerProvider.CreateVIP(first, second)
 }
 
-func (w ValidatedProvider) AddPublicIPToVIP(res *resources.VirtualIP) (err error) {
+func (w ValidatedProvider) AddPublicIPToVIP(res *abstract.VirtualIP) (err error) {
 	defer fail.OnPanic(&err)()
 
 	return w.InnerProvider.AddPublicIPToVIP(res)
 }
 
-func (w ValidatedProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (err error) {
+func (w ValidatedProvider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (err error) {
 	defer fail.OnPanic(&err)()
 
 	if vip == nil {
@@ -38,7 +38,7 @@ func (w ValidatedProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string
 	return w.InnerProvider.BindHostToVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) (err error) {
+func (w ValidatedProvider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (err error) {
 	defer fail.OnPanic(&err)()
 
 	if vip == nil {
@@ -51,7 +51,7 @@ func (w ValidatedProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID st
 	return w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 }
 
-func (w ValidatedProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
+func (w ValidatedProvider) DeleteVIP(vip *abstract.VirtualIP) (err error) {
 	defer fail.OnPanic(&err)()
 
 	if vip == nil {
@@ -77,7 +77,7 @@ func (w ValidatedProvider) Build(something map[string]interface{}) (p Provider, 
 	return w.InnerProvider.Build(something)
 }
 
-func (w ValidatedProvider) ListImages(all bool) (res []resources.Image, err error) {
+func (w ValidatedProvider) ListImages(all bool) (res []abstract.Image, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.ListImages(all)
@@ -91,7 +91,7 @@ func (w ValidatedProvider) ListImages(all bool) (res []resources.Image, err erro
 	return res, err
 }
 
-func (w ValidatedProvider) ListTemplates(all bool) (res []resources.HostTemplate, err error) {
+func (w ValidatedProvider) ListTemplates(all bool) (res []abstract.HostTemplate, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.ListTemplates(all)
@@ -143,7 +143,7 @@ func (w ValidatedProvider) ListRegions() (_ []string, err error) {
 }
 
 // GetImage ...
-func (w ValidatedProvider) GetImage(id string) (res *resources.Image, err error) {
+func (w ValidatedProvider) GetImage(id string) (res *abstract.Image, err error) {
 	defer fail.OnPanic(&err)()
 
 	if id == "" {
@@ -163,7 +163,7 @@ func (w ValidatedProvider) GetImage(id string) (res *resources.Image, err error)
 }
 
 // GetTemplate ...
-func (w ValidatedProvider) GetTemplate(id string) (res *resources.HostTemplate, err error) {
+func (w ValidatedProvider) GetTemplate(id string) (res *abstract.HostTemplate, err error) {
 	defer fail.OnPanic(&err)()
 
 	if id == "" {
@@ -182,7 +182,7 @@ func (w ValidatedProvider) GetTemplate(id string) (res *resources.HostTemplate, 
 }
 
 // CreateKeyPair ...
-func (w ValidatedProvider) CreateKeyPair(name string) (kp *resources.KeyPair, err error) {
+func (w ValidatedProvider) CreateKeyPair(name string) (kp *abstract.KeyPair, err error) {
 	defer fail.OnPanic(&err)()
 
 	if name == "" {
@@ -199,7 +199,7 @@ func (w ValidatedProvider) CreateKeyPair(name string) (kp *resources.KeyPair, er
 }
 
 // GetKeyPair ...
-func (w ValidatedProvider) GetKeyPair(id string) (kp *resources.KeyPair, err error) {
+func (w ValidatedProvider) GetKeyPair(id string) (kp *abstract.KeyPair, err error) {
 	defer fail.OnPanic(&err)()
 
 	if id == "" {
@@ -216,7 +216,7 @@ func (w ValidatedProvider) GetKeyPair(id string) (kp *resources.KeyPair, err err
 }
 
 // ListKeyPairs ...
-func (w ValidatedProvider) ListKeyPairs() (res []resources.KeyPair, err error) {
+func (w ValidatedProvider) ListKeyPairs() (res []abstract.KeyPair, err error) {
 	defer fail.OnPanic(&err)()
 
 	return w.InnerProvider.ListKeyPairs()
@@ -234,7 +234,7 @@ func (w ValidatedProvider) DeleteKeyPair(id string) (err error) {
 }
 
 // CreateNetwork ...
-func (w ValidatedProvider) CreateNetwork(req resources.NetworkRequest) (res *resources.Network, err error) {
+func (w ValidatedProvider) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.CreateNetwork(req)
@@ -249,7 +249,7 @@ func (w ValidatedProvider) CreateNetwork(req resources.NetworkRequest) (res *res
 }
 
 // GetNetwork ...
-func (w ValidatedProvider) GetNetwork(id string) (res *resources.Network, err error) {
+func (w ValidatedProvider) GetNetwork(id string) (res *abstract.Network, err error) {
 	defer fail.OnPanic(&err)()
 
 	if id == "" {
@@ -268,7 +268,7 @@ func (w ValidatedProvider) GetNetwork(id string) (res *resources.Network, err er
 }
 
 // GetNetworkByName ...
-func (w ValidatedProvider) GetNetworkByName(name string) (res *resources.Network, err error) {
+func (w ValidatedProvider) GetNetworkByName(name string) (res *abstract.Network, err error) {
 	defer fail.OnPanic(&err)()
 
 	if name == "" {
@@ -287,7 +287,7 @@ func (w ValidatedProvider) GetNetworkByName(name string) (res *resources.Network
 }
 
 // ListNetworks ...
-func (w ValidatedProvider) ListNetworks() (res []*resources.Network, err error) {
+func (w ValidatedProvider) ListNetworks() (res []*abstract.Network, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.ListNetworks()
@@ -311,7 +311,7 @@ func (w ValidatedProvider) DeleteNetwork(id string) (err error) {
 }
 
 // CreateGateway ...
-func (w ValidatedProvider) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (res *resources.Host, data *userdata.Content, err error) {
+func (w ValidatedProvider) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (res *abstract.Host, data *userdata.Content, err error) {
 	defer fail.OnPanic(&err)()
 
 	if req.KeyPair == nil {
@@ -350,7 +350,7 @@ func (w ValidatedProvider) DeleteGateway(networkID string) (err error) {
 }
 
 // CreateHost ...
-func (w ValidatedProvider) CreateHost(request resources.HostRequest) (res *resources.Host, data *userdata.Content, err error) {
+func (w ValidatedProvider) CreateHost(request abstract.HostRequest) (res *abstract.Host, data *userdata.Content, err error) {
 	defer fail.OnPanic(&err)()
 
 	if request.KeyPair == nil {
@@ -374,7 +374,7 @@ func (w ValidatedProvider) CreateHost(request resources.HostRequest) (res *resou
 }
 
 // InspectHost ...
-func (w ValidatedProvider) InspectHost(something interface{}) (res *resources.Host, err error) {
+func (w ValidatedProvider) InspectHost(something interface{}) (res *abstract.Host, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.InspectHost(something)
@@ -389,7 +389,7 @@ func (w ValidatedProvider) InspectHost(something interface{}) (res *resources.Ho
 }
 
 // GetHostByName ...
-func (w ValidatedProvider) GetHostByName(name string) (res *resources.Host, err error) {
+func (w ValidatedProvider) GetHostByName(name string) (res *abstract.Host, err error) {
 	defer fail.OnPanic(&err)()
 
 	if name == "" {
@@ -415,7 +415,7 @@ func (w ValidatedProvider) GetHostState(something interface{}) (res hoststate.En
 }
 
 // ListHosts ...
-func (w ValidatedProvider) ListHosts() (res []*resources.Host, err error) {
+func (w ValidatedProvider) ListHosts() (res []*abstract.Host, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.ListHosts()
@@ -476,7 +476,7 @@ func (w ValidatedProvider) RebootHost(id string) (err error) {
 }
 
 // ResizeHost ...
-func (w ValidatedProvider) ResizeHost(id string, request resources.SizingRequirements) (res *resources.Host, err error) {
+func (w ValidatedProvider) ResizeHost(id string, request abstract.SizingRequirements) (res *abstract.Host, err error) {
 	defer fail.OnPanic(&err)()
 
 	if id == "" {
@@ -495,7 +495,7 @@ func (w ValidatedProvider) ResizeHost(id string, request resources.SizingRequire
 }
 
 // CreateVolume ...
-func (w ValidatedProvider) CreateVolume(request resources.VolumeRequest) (res *resources.Volume, err error) {
+func (w ValidatedProvider) CreateVolume(request abstract.VolumeRequest) (res *abstract.Volume, err error) {
 	defer fail.OnPanic(&err)()
 
 	if request.Name == "" {
@@ -514,7 +514,7 @@ func (w ValidatedProvider) CreateVolume(request resources.VolumeRequest) (res *r
 }
 
 // GetVolume ...
-func (w ValidatedProvider) GetVolume(id string) (res *resources.Volume, err error) {
+func (w ValidatedProvider) GetVolume(id string) (res *abstract.Volume, err error) {
 	defer fail.OnPanic(&err)()
 
 	if id == "" {
@@ -533,7 +533,7 @@ func (w ValidatedProvider) GetVolume(id string) (res *resources.Volume, err erro
 }
 
 // ListVolumes ...
-func (w ValidatedProvider) ListVolumes() (res []resources.Volume, err error) {
+func (w ValidatedProvider) ListVolumes() (res []abstract.Volume, err error) {
 	defer fail.OnPanic(&err)()
 
 	res, err = w.InnerProvider.ListVolumes()
@@ -559,7 +559,7 @@ func (w ValidatedProvider) DeleteVolume(id string) (err error) {
 }
 
 // CreateVolumeAttachment ...
-func (w ValidatedProvider) CreateVolumeAttachment(request resources.VolumeAttachmentRequest) (id string, err error) {
+func (w ValidatedProvider) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (id string, err error) {
 	defer fail.OnPanic(&err)()
 
 	if request.Name == "" {
@@ -576,7 +576,7 @@ func (w ValidatedProvider) CreateVolumeAttachment(request resources.VolumeAttach
 }
 
 // GetVolumeAttachment ...
-func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *resources.VolumeAttachment, err error) {
+func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *abstract.VolumeAttachment, err error) {
 	defer fail.OnPanic(&err)()
 
 	if serverID == "" {
@@ -598,7 +598,7 @@ func (w ValidatedProvider) GetVolumeAttachment(serverID, id string) (res *resour
 }
 
 // ListVolumeAttachments ...
-func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []resources.VolumeAttachment, err error) {
+func (w ValidatedProvider) ListVolumeAttachments(serverID string) (res []abstract.VolumeAttachment, err error) {
 	defer fail.OnPanic(&err)()
 
 	if serverID == "" {

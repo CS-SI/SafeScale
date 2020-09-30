@@ -17,8 +17,8 @@
 package api
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	stacks "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 )
 
@@ -32,11 +32,11 @@ type Provider interface {
 	stacks.Stack
 
 	// ListImages lists available OS images
-	ListImages(all bool) ([]resources.Image, error)
+	ListImages(all bool) ([]abstract.Image, error)
 
 	// ListTemplates lists available host templates
 	// Host templates are sorted using Dominant Resource Fairness Algorithm
-	ListTemplates(all bool) ([]resources.HostTemplate, error)
+	ListTemplates(all bool) ([]abstract.HostTemplate, error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
 	GetAuthenticationOptions() (providers.Config, error)

@@ -20,17 +20,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
 	userData := userdata.NewContent()
 
 	// Ensure network exists
@@ -46,13 +46,13 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	if err != nil {
 		return nil, userData, fail.Wrap(err, fmt.Sprintf("failed to generate password: %s", err.Error()))
 	}
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 		Password:     password,
 	}

@@ -19,16 +19,16 @@ package identity
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // Identity contains the bare minimum information about a cluster
 type Identity struct {
-	Name       string             `json:"name"`       // Name is the name of the cluster
-	Flavor     flavor.Enum        `json:"flavor"`     // Flavor tells what kind of cluster it is
-	Complexity complexity.Enum    `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
-	Keypair    *resources.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
+	Name       string            `json:"name"`       // Name is the name of the cluster
+	Flavor     flavor.Enum       `json:"flavor"`     // Flavor tells what kind of cluster it is
+	Complexity complexity.Enum   `json:"complexity"` // Mode is the mode of cluster; can be Simple, HighAvailability, HighVolume
+	Keypair    *abstract.KeyPair `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
 
 	// AdminPassword contains the password of cladm account. This password
 	// is used to connect via Guacamole, but cannot be used with SSH
@@ -60,7 +60,7 @@ func (i *Identity) Clone() data.Clonable {
 func (i *Identity) Replace(p data.Clonable) data.Clonable {
 	src := p.(*Identity)
 	*i = *src
-	i.Keypair = &resources.KeyPair{}
+	i.Keypair = &abstract.KeyPair{}
 	*i.Keypair = *src.Keypair
 	return i
 }

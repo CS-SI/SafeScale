@@ -26,8 +26,8 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/listeners"
 )
 
@@ -36,10 +36,10 @@ type MyMockedVolService struct {
 	err error
 }
 
-func (m *MyMockedVolService) Create(name string, size int, speed volumespeed.Enum) (*resources.Volume, error) {
+func (m *MyMockedVolService) Create(name string, size int, speed volumespeed.Enum) (*abstract.Volume, error) {
 	m.Called(name, size, speed)
 
-	return &resources.Volume{
+	return &abstract.Volume{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
@@ -48,7 +48,7 @@ func (m *MyMockedVolService) Create(name string, size int, speed volumespeed.Enu
 func (m *MyMockedVolService) Delete(name string) error {
 	return nil
 }
-func (m *MyMockedVolService) List() ([]resources.Volume, error) {
+func (m *MyMockedVolService) List() ([]abstract.Volume, error) {
 	return nil, nil
 }
 func (m *MyMockedVolService) Attach(volume string, host string, path string, format string) error {
@@ -57,8 +57,8 @@ func (m *MyMockedVolService) Attach(volume string, host string, path string, for
 func (m *MyMockedVolService) Detach(volume string, host string) error {
 	return nil
 }
-func (m *MyMockedVolService) Get(ref string) (*resources.Volume, error) {
-	return &resources.Volume{}, nil
+func (m *MyMockedVolService) Get(ref string) (*abstract.Volume, error) {
+	return &abstract.Volume{}, nil
 }
 
 func TestCreate(t *testing.T) {

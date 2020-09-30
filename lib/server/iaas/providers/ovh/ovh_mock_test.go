@@ -29,7 +29,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/mocks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/tests"
 )
 
@@ -83,8 +83,8 @@ func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockProvider
 }
 
 // Helper function to test mock objects
-func GetHostTemplate(core int, ram int, disk int) resources.HostTemplate {
-	return resources.HostTemplate{
+func GetHostTemplate(core int, ram int, disk int) abstract.HostTemplate {
+	return abstract.HostTemplate{
 		Cores:    core,
 		RAMSize:  float32(ram) / 1000.0,
 		DiskSize: disk,
@@ -99,7 +99,7 @@ func TestMock_GetTemplates_Mock(t *testing.T) {
 
 	// It runs with the Mock object
 	if amok != nil {
-		amok.EXPECT().ListTemplates(false).Times(1).Return([]resources.HostTemplate{GetHostTemplate(3, 3, 1), GetHostTemplate(4, 4, 2)}, nil)
+		amok.EXPECT().ListTemplates(false).Times(1).Return([]abstract.HostTemplate{GetHostTemplate(3, 3, 1), GetHostTemplate(4, 4, 2)}, nil)
 	}
 
 	require.Nil(t, err)

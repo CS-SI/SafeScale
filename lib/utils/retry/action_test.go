@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -93,11 +93,11 @@ func JustThrowBasicError() (err error) {
 }
 
 func JustThrowError() (err error) {
-	return resources.ResourceDuplicateError("host", "boo")
+	return abstract.ResourceDuplicateError("host", "boo")
 }
 
 func JustThrowComplexError() (err error) {
-	err = resources.ResourceDuplicateError("host", "booboo")
+	err = abstract.ResourceDuplicateError("host", "booboo")
 	err = fail.AddConsequence(err, fmt.Errorf("cleanup error"))
 	return err
 }
@@ -399,7 +399,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 }
 
 func genErr() error {
-	return resources.ResourceNotFoundError("host", "whatever")
+	return abstract.ResourceNotFoundError("host", "whatever")
 }
 
 func genTimeout() error {

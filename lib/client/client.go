@@ -34,7 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// Session units the different resources proposed by safescaled as safescale client
+// Session units the different abstract proposed by safescaled as safescale client
 type Session struct {
 	Bucket *bucket
 	// Data       *data

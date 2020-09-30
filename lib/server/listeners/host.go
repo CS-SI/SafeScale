@@ -31,7 +31,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -211,7 +211,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
-	// Map resources.Host to pb.Host
+	// Map abstract.Host to pb.Host
 	var pbhost []*pb.Host
 	for _, host := range hosts {
 		pbHost, err := srvutils.ToPBHost(host)
@@ -252,9 +252,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		return nil, status.Errorf(codes.FailedPrecondition, "cannot create host: no tenant set")
 	}
 
-	var sizing *resources.SizingRequirements
+	var sizing *abstract.SizingRequirements
 	if in.Sizing == nil {
-		sizing = &resources.SizingRequirements{
+		sizing = &abstract.SizingRequirements{
 			MinCores:    int(in.GetCpuCount()),
 			MaxCores:    int(in.GetCpuCount()),
 			MinRAMSize:  in.GetRam(),

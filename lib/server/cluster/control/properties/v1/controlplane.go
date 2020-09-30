@@ -18,7 +18,7 @@ package propertiesv1
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -28,7 +28,7 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type ControlPlane struct {
-	VirtualIP *resources.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
+	VirtualIP *abstract.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
 }
 
 func newControlPlane() *ControlPlane {
@@ -53,7 +53,7 @@ func (cp *ControlPlane) Replace(p data.Clonable) data.Clonable {
 	src := p.(*ControlPlane)
 	*cp = *src
 	if src.VirtualIP != nil {
-		cp.VirtualIP = src.VirtualIP.Clone().(*resources.VirtualIP)
+		cp.VirtualIP = src.VirtualIP.Clone().(*abstract.VirtualIP)
 	}
 	return cp
 }

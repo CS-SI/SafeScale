@@ -29,7 +29,7 @@ type InstanceType struct {
 	MaxPods      int64
 }
 
-// InstanceTypes is a map of EC2 resources.
+// InstanceTypes is a map of EC2 abstract.
 var InstanceTypes = map[string]*InstanceType{
 	"a1": {
 		InstanceType: "a1",

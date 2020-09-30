@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -76,12 +76,12 @@ func (mh *Host) OK() (bool, error) {
 }
 
 // Carry links an host instance to the Metadata instance
-func (mh *Host) Carry(host *resources.Host) (*Host, error) {
+func (mh *Host) Carry(host *abstract.Host) (*Host, error) {
 	if host == nil {
 		return nil, fail.InvalidParameterError("host", "cannot be nil!")
 	}
 	if host.Properties == nil {
-		host.Properties = serialize.NewJSONProperties("resources")
+		host.Properties = serialize.NewJSONProperties("abstract")
 	}
 	mh.item.Carry(host)
 	mh.name = &host.Name
@@ -90,7 +90,7 @@ func (mh *Host) Carry(host *resources.Host) (*Host, error) {
 }
 
 // Get returns the Network instance linked to metadata
-func (mh *Host) Get() (*resources.Host, error) {
+func (mh *Host) Get() (*abstract.Host, error) {
 	if mh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -98,7 +98,7 @@ func (mh *Host) Get() (*resources.Host, error) {
 		return nil, fail.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
-	gh := mh.item.Get().(*resources.Host)
+	gh := mh.item.Get().(*abstract.Host)
 	return gh, nil
 }
 
@@ -171,7 +171,7 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 // mayReadByID reads the metadata of a network identified by ID from Object Storage
 // Doesn't log error or validate parameter by design; caller does that
 func (mh *Host) mayReadByID(id string) (err error) {
-	host := resources.NewHost()
+	host := abstract.NewHost()
 	err = mh.item.ReadFrom(
 		ByIDFolderName, id, func(buf []byte) (serialize.Serializable, error) {
 			err := host.Deserialize(buf)
@@ -193,7 +193,7 @@ func (mh *Host) mayReadByID(id string) (err error) {
 // mayReadByName reads the metadata of a host identified by name
 // Doesn't log error or validate parameter by design; caller does that
 func (mh *Host) mayReadByName(name string) (err error) {
-	host := resources.NewHost()
+	host := abstract.NewHost()
 	err = mh.item.ReadFrom(
 		ByNameFolderName, name, func(buf []byte) (serialize.Serializable, error) {
 			err := host.Deserialize(buf)
@@ -274,7 +274,7 @@ func (mh *Host) Delete() (err error) {
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
+func (mh *Host) Browse(callback func(*abstract.Host) error) (err error) {
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -288,7 +288,7 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 
 	return mh.item.BrowseInto(
 		ByIDFolderName, func(buf []byte) error {
-			host := resources.NewHost()
+			host := abstract.NewHost()
 			err := host.Deserialize(buf)
 			if err != nil {
 				return err
@@ -299,7 +299,7 @@ func (mh *Host) Browse(callback func(*resources.Host) error) (err error) {
 }
 
 // SaveHost saves the Host definition in Object Storage
-func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
+func SaveHost(svc iaas.Service, host *abstract.Host) (mh *Host, err error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -347,7 +347,7 @@ func SaveHost(svc iaas.Service, host *resources.Host) (mh *Host, err error) {
 }
 
 // RemoveHost removes the host definition from Object Storage
-func RemoveHost(svc iaas.Service, host *resources.Host) (err error) {
+func RemoveHost(svc iaas.Service, host *abstract.Host) (err error) {
 	if svc == nil {
 		return fail.InvalidParameterError("svc", "cannot be nil")
 	}

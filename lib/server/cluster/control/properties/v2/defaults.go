@@ -18,7 +18,7 @@ package propertiesv2
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/property"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -30,11 +30,11 @@ import (
 //       Create a new version instead with updated/additional fields
 type Defaults struct {
 	// GatewaySizing keeps the default node sizing
-	GatewaySizing resources.SizingRequirements `json:"gateway_sizing"`
+	GatewaySizing abstract.SizingRequirements `json:"gateway_sizing"`
 	// MasterSizing keeps the default node sizing
-	MasterSizing resources.SizingRequirements `json:"master_sizing"`
+	MasterSizing abstract.SizingRequirements `json:"master_sizing"`
 	// NodeSizing keeps the default node sizing
-	NodeSizing resources.SizingRequirements `json:"node_sizing"`
+	NodeSizing abstract.SizingRequirements `json:"node_sizing"`
 	// Image keeps the default Linux image to use
 	Image string `json:"image"`
 }

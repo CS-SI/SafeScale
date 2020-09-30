@@ -34,9 +34,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -213,7 +213,7 @@ func (s *Stack) DeleteVPC(id string) error {
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -278,7 +278,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 		}
 	}()
 
-	network = resources.NewNetwork()
+	network = abstract.NewNetwork()
 	network.ID = subnet.ID
 	network.Name = subnet.Name
 	network.CIDR = subnet.CIDR
@@ -288,7 +288,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (network *resources.
 }
 
 // validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
-func validateNetworkName(req resources.NetworkRequest) (bool, error) {
+func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
 	s := check.Struct{
 		"Name": check.Composite{
 			check.NonEmpty{},
@@ -311,7 +311,7 @@ func validateNetworkName(req resources.NetworkRequest) (bool, error) {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
 	getErr := retry.WhileSuccessfulDelay1Second(
@@ -349,11 +349,11 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		}
 		return s.GetNetwork(id)
 	}
-	return nil, resources.ResourceNotFoundError("network", name)
+	return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 	subnet, err := s.getSubnet(id)
 	if err != nil {
 		if !strings.Contains(err.Error(), id) {
@@ -365,10 +365,10 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		}
 	}
 	if subnet == nil || subnet.ID == "" {
-		return nil, resources.ResourceNotFoundError("subnet", id)
+		return nil, abstract.ResourceNotFoundError("subnet", id)
 	}
 
-	newNet := resources.NewNetwork()
+	newNet := abstract.NewNetwork()
 	newNet.ID = subnet.ID
 	newNet.Name = subnet.Name
 	newNet.CIDR = subnet.CIDR
@@ -377,16 +377,16 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 }
 
 // ListNetworks lists networks
-func (s *Stack) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
 		return nil, fail.Errorf(
 			fmt.Sprintf("failed to get networks list: %s", openstack.ProviderErrorToString(err)), err,
 		)
 	}
-	var networkList []*resources.Network
+	var networkList []*abstract.Network
 	for _, subnet := range *subnetList {
-		newNet := resources.NewNetwork()
+		newNet := abstract.NewNetwork()
 		newNet.ID = subnet.ID
 		newNet.Name = subnet.Name
 		newNet.CIDR = subnet.CIDR
@@ -713,7 +713,7 @@ func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
 		}
 	}
 	if !found {
-		return nil, resources.ResourceNotFoundError("subnet", name)
+		return nil, abstract.ResourceNotFoundError("subnet", name)
 	}
 	return &subnet, nil
 }
@@ -731,7 +731,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (*resources.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
@@ -740,13 +740,13 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", gwname), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 	}
 	if sizing != nil && sizing.MinDiskSize > 0 {
@@ -775,7 +775,7 @@ func (s *Stack) DeleteGateway(id string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
@@ -788,7 +788,7 @@ func (s *Stack) CreateVIP(networkID string, name string) (*resources.VirtualIP, 
 	if err != nil {
 		return nil, err
 	}
-	vip := resources.VirtualIP{
+	vip := abstract.VirtualIP{
 		ID:        port.ID,
 		Name:      name,
 		NetworkID: networkID,

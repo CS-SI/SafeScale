@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package images
+package templates
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 )
 
 // Filter ...
@@ -26,7 +26,7 @@ type Filter struct {
 }
 
 // Predicate ...
-type Predicate func(img resources.Image) bool
+type Predicate func(abstract.HostTemplate) bool
 
 // NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
@@ -36,7 +36,7 @@ func NewFilter(predicate Predicate) *Filter {
 // Not ...
 func (f *Filter) Not() *Filter {
 	oldFilter := f.filter
-	f.filter = func(in resources.Image) bool {
+	f.filter = func(in abstract.HostTemplate) bool {
 		return !oldFilter(in)
 	}
 	return f
@@ -45,7 +45,7 @@ func (f *Filter) Not() *Filter {
 // And ...
 func (f *Filter) And(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in resources.Image) bool {
+	f.filter = func(in abstract.HostTemplate) bool {
 		return oldFilter(in) && other.filter(in)
 	}
 	return f
@@ -54,7 +54,7 @@ func (f *Filter) And(other *Filter) *Filter {
 // Or ...
 func (f *Filter) Or(other *Filter) *Filter {
 	oldFilter := f.filter
-	f.filter = func(in resources.Image) bool {
+	f.filter = func(in abstract.HostTemplate) bool {
 		return oldFilter(in) || other.filter(in)
 	}
 	return f
@@ -62,14 +62,14 @@ func (f *Filter) Or(other *Filter) *Filter {
 
 // Not ...
 func Not(f Predicate) Predicate {
-	return func(in resources.Image) bool {
+	return func(in abstract.HostTemplate) bool {
 		return !f(in)
 	}
 }
 
 // OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-	return func(in resources.Image) bool {
+	return func(in abstract.HostTemplate) bool {
 		for _, f := range filters {
 			if f(in) {
 				return true
@@ -81,7 +81,7 @@ func OrFilter(filters ...Predicate) Predicate {
 
 // AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-	return func(in resources.Image) bool {
+	return func(in abstract.HostTemplate) bool {
 		for _, f := range filters {
 			if !f(in) {
 				return false
@@ -91,13 +91,13 @@ func AndFilter(filters ...Predicate) Predicate {
 	}
 }
 
-// FilterImages ...
-func FilterImages(images []resources.Image, f *Filter) []resources.Image {
-	res := make([]resources.Image, 0)
-	for _, img := range images {
+// FilterTemplates ...
+func FilterTemplates(templates []abstract.HostTemplate, f *Filter) []abstract.HostTemplate {
+	res := make([]abstract.HostTemplate, 0)
+	for _, template := range templates {
 
-		if f.filter(img) {
-			res = append(res, img)
+		if f.filter(template) {
+			res = append(res, template)
 		}
 	}
 	return res

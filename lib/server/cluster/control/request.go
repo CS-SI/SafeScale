@@ -38,7 +38,7 @@ type Request struct {
 	NetworkID string
 	// Tenant contains the name of the tenant
 	Tenant string
-	// KeepOnFailure is set to True to keep resources on cluster creation failure
+	// KeepOnFailure is set to True to keep abstract on cluster creation failure
 	KeepOnFailure bool
 	// Force is set to True in order to ignore sizing recommendations
 	Force bool

@@ -23,7 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -33,7 +33,7 @@ import (
 
 // TemplateAPI defines API to manipulate hosts
 type TemplateAPI interface {
-	List(ctx context.Context, all bool) ([]resources.HostTemplate, error)
+	List(ctx context.Context, all bool) ([]abstract.HostTemplate, error)
 }
 
 // TemplateHandler template service
@@ -49,7 +49,7 @@ func NewTemplateHandler(svc iaas.Service) TemplateAPI {
 }
 
 // List returns the template list
-func (handler *TemplateHandler) List(ctx context.Context, all bool) (tlist []resources.HostTemplate, err error) {
+func (handler *TemplateHandler) List(ctx context.Context, all bool) (tlist []abstract.HostTemplate, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()

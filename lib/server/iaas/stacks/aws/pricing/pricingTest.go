@@ -29,7 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/pricing"
 	"github.com/davecgh/go-spew/spew"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 
 	ouraws "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 )
@@ -71,7 +71,7 @@ func TryConnection(bucketName, key string) error {
 		return fail.Wrap(err, "unable to fetch products list")
 	}
 
-	hostTemplates := make(map[string]resources.HostTemplate)
+	hostTemplates := make(map[string]abstract.HostTemplate)
 
 	for _, price := range prods.PriceList {
 		jsonPrice, err := json.Marshal(price)
@@ -84,7 +84,7 @@ func TryConnection(bucketName, key string) error {
 			continue
 		}
 
-		tpl := resources.HostTemplate{
+		tpl := abstract.HostTemplate{
 			ID:        price.Product.Attributes.InstanceType,
 			Name:      price.Product.Attributes.InstanceType,
 			Cores:     ouraws.ParseNumber(price.Product.Attributes.Vcpu, 1),

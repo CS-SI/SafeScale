@@ -27,9 +27,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -73,7 +73,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	}
 
 	var hostRef string
-	host := resources.NewHost()
+	host := abstract.NewHost()
 	switch hostParam := hostParam.(type) {
 	case string:
 		hostRef = hostParam
@@ -85,7 +85,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		if err != nil {
 			return nil, err
 		}
-	case *resources.Host:
+	case *abstract.Host:
 		host = hostParam
 		if host.Name != "" {
 			hostRef = host.Name
@@ -94,7 +94,7 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 		}
 	}
 	if host == nil {
-		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *abstract.Host")
 	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
@@ -108,12 +108,12 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	if err != nil {
 		return nil, err
 	}
-	user := resources.DefaultUser
+	user := abstract.DefaultUser
 	if userIf, ok := cfg.Get("OperatorUsername"); ok {
 		user = userIf.(string)
 		if user == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			user = resources.DefaultUser
+			user = abstract.DefaultUser
 		}
 	}
 

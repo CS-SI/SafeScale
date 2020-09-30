@@ -67,7 +67,7 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
-	// Map resources.Host to pb.Host
+	// Map abstract.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
 	for _, template := range templates {
 		pbt, err := srvutils.ToPBHostTemplate(&template)

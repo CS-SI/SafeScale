@@ -36,8 +36,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -330,7 +330,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	// Prepare network
 
 	there := true
-	var network *resources.Network
+	var network *abstract.Network
 
 	netName := "net-safescale" // FIXME: Hardcoded string
 	if network, err = serviceProvider.GetNetwork(netName); network != nil && err == nil {
@@ -341,7 +341,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 
 	if !there {
 		network, err = serviceProvider.CreateNetwork(
-			resources.NetworkRequest{
+			abstract.NetworkRequest{
 				CIDR:      "192.168.0.0/24",
 				IPVersion: ipversion.IPv4,
 				Name:      netName,
@@ -378,7 +378,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	concurrency := math.Min(4, float64(len(templates)/2))
 	sem := make(chan bool, int(concurrency))
 
-	hostAnalysis := func(template resources.HostTemplate) error {
+	hostAnalysis := func(template abstract.HostTemplate) error {
 		defer wg.Done()
 		if network != nil {
 
@@ -488,7 +488,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	for _, target := range templates {
 		sem <- true
 		localTarget := target
-		go func(inner resources.HostTemplate) {
+		go func(inner abstract.HostTemplate) {
 			defer func() { <-sem }()
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
@@ -513,7 +513,7 @@ func dumpTemplates(service iaas.Service, tenant string) (err error) {
 	}
 
 	type TemplateList struct {
-		Templates []resources.HostTemplate `json:"templates,omitempty"`
+		Templates []abstract.HostTemplate `json:"templates,omitempty"`
 	}
 
 	templates, err := service.ListTemplates(false)
@@ -548,7 +548,7 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 	}
 
 	type ImageList struct {
-		Images []resources.Image `json:"images,omitempty"`
+		Images []abstract.Image `json:"images,omitempty"`
 	}
 
 	images, err := service.ListImages(false)

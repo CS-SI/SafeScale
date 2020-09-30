@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
 
 	"github.com/sirupsen/logrus"
 
@@ -31,7 +31,7 @@ import (
 	clusterapi "github.com/CS-SI/SafeScale/lib/server/cluster/api"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/complexity"
 	"github.com/CS-SI/SafeScale/lib/server/cluster/enums/flavor"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/action"
 	"github.com/CS-SI/SafeScale/lib/server/install/enums/method"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
@@ -144,7 +144,7 @@ func (w *worker) CanProceed(s Settings) error {
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 	if w.cluster == nil {
-		return nil, resources.ResourceNotAvailableError("cluster", "")
+		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
 		hostID, err := w.cluster.FindAvailableMaster(w.feature.task)
@@ -162,7 +162,7 @@ func (w *worker) identifyAvailableMaster() (*pb.Host, error) {
 // identifyAvailableNode finds a node available and will use this one during all the install session
 func (w *worker) identifyAvailableNode() (*pb.Host, error) {
 	if w.cluster == nil {
-		return nil, resources.ResourceNotAvailableError("cluster", "")
+		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
 		hostID, err := w.cluster.FindAvailableNode(w.feature.task)

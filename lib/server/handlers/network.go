@@ -25,20 +25,20 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
 
-	// "github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/NetworkState"
+	// "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/NetworkState"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/networkproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
@@ -58,9 +58,9 @@ import (
 
 // NetworkAPI defines API to manage networks
 type NetworkAPI interface {
-	Create(context.Context, string, string, ipversion.Enum, resources.SizingRequirements, string, string, bool, string, bool) (*resources.Network, error)
-	List(context.Context, bool) ([]*resources.Network, error)
-	Inspect(context.Context, string) (*resources.Network, error)
+	Create(context.Context, string, string, ipversion.Enum, abstract.SizingRequirements, string, string, bool, string, bool) (*abstract.Network, error)
+	List(context.Context, bool) ([]*abstract.Network, error)
+	Inspect(context.Context, string) (*abstract.Network, error)
 	Delete(context.Context, string) error
 	Destroy(context.Context, string) error
 }
@@ -82,9 +82,9 @@ func NewNetworkHandler(svc iaas.Service) NetworkAPI {
 func (handler *NetworkHandler) Create(
 	ctx context.Context,
 	name string, cidr string, ipVersion ipversion.Enum,
-	sizing resources.SizingRequirements, theos string, gwname string,
+	sizing abstract.SizingRequirements, theos string, gwname string,
 	failover bool, domain string, keeponfailure bool,
-) (network *resources.Network, err error) {
+) (network *abstract.Network, err error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -144,7 +144,7 @@ func (handler *NetworkHandler) Create(
 	// Create the network
 	logrus.Debugf("Creating network '%s' ...", name)
 	network, err = handler.service.CreateNetwork(
-		resources.NetworkRequest{
+		abstract.NetworkRequest{
 			Name:      name,
 			IPVersion: ipVersion,
 			CIDR:      cidr,
@@ -252,7 +252,7 @@ func (handler *NetworkHandler) Create(
 		}
 	}()
 
-	var template *resources.HostTemplate
+	var template *abstract.HostTemplate
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
 		logrus.Warn("error creating network: error reading machine templates")
@@ -308,7 +308,7 @@ func (handler *NetworkHandler) Create(
 		domain = "." + domain
 	}
 
-	gwRequest := resources.GatewayRequest{
+	gwRequest := abstract.GatewayRequest{
 		ImageID: img.ID,
 		Network: network,
 		// KeyPair:    keypair,
@@ -318,7 +318,7 @@ func (handler *NetworkHandler) Create(
 	}
 
 	var (
-		primaryGateway, secondaryGateway   *resources.Host
+		primaryGateway, secondaryGateway   *abstract.Host
 		primaryUserdata, secondaryUserdata *userdata.Content
 		secondaryTask                      concurrency.Task
 		primaryMetadata, secondaryMetadata *metadata.Gateway
@@ -329,7 +329,7 @@ func (handler *NetworkHandler) Create(
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.Name = primaryGatewayName + domain
-	primaryRequest.KeyPair, err = resources.NewKeyPair(primaryRequest.Name)
+	primaryRequest.KeyPair, err = abstract.NewKeyPair(primaryRequest.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +353,7 @@ func (handler *NetworkHandler) Create(
 	if failover {
 		secondaryRequest := gwRequest
 		secondaryRequest.Name = secondaryGatewayName + domain
-		secondaryRequest.KeyPair, err = resources.NewKeyPair(secondaryRequest.Name)
+		secondaryRequest.KeyPair, err = abstract.NewKeyPair(secondaryRequest.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -376,7 +376,7 @@ func (handler *NetworkHandler) Create(
 
 	primaryResult, primaryErr := primaryTask.Wait()
 	if primaryErr == nil {
-		primaryGateway = primaryResult.(data.Map)["host"].(*resources.Host)
+		primaryGateway = primaryResult.(data.Map)["host"].(*abstract.Host)
 		primaryUserdata = primaryResult.(data.Map)["userdata"].(*userdata.Content)
 		if domain != "" {
 			primaryUserdata.HostName = primaryGatewayName + domain
@@ -419,7 +419,7 @@ func (handler *NetworkHandler) Create(
 	if failover && secondaryTask != nil {
 		secondaryResult, secondaryErr = secondaryTask.Wait()
 		if secondaryErr == nil {
-			secondaryGateway = secondaryResult.(data.Map)["host"].(*resources.Host)
+			secondaryGateway = secondaryResult.(data.Map)["host"].(*abstract.Host)
 			secondaryUserdata = secondaryResult.(data.Map)["userdata"].(*userdata.Content)
 			if domain != "" {
 				secondaryUserdata.HostName = secondaryGatewayName + domain
@@ -663,8 +663,8 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params", "must be a data.Map")
 	}
 	// name := inputs["name"].(string)
-	request := inputs["request"].(resources.GatewayRequest)
-	sizing := inputs["sizing"].(resources.SizingRequirements)
+	request := inputs["request"].(abstract.GatewayRequest)
+	sizing := inputs["sizing"].(abstract.SizingRequirements)
 	primary := inputs["primary"].(bool)
 	nokeep := inputs["nokeep"].(bool)
 
@@ -695,7 +695,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 	} else {
 		// gw in state 'TERMINATED' doesn't really exist, other states mean the gw exists
 		if gw.LastState != hoststate.TERMINATED {
-			return nil, resources.ResourceDuplicateError("host", request.Name)
+			return nil, abstract.ResourceDuplicateError("host", request.Name)
 		}
 	}
 
@@ -806,7 +806,7 @@ func (handler *NetworkHandler) createGateway(t concurrency.Task, params concurre
 func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	task concurrency.Task, params concurrency.TaskParameters,
 ) (result concurrency.TaskResult, err error) {
-	gw := params.(*resources.Host)
+	gw := params.(*abstract.Host)
 
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
@@ -852,11 +852,11 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 
 func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
-		gw       *resources.Host
+		gw       *abstract.Host
 		userData *userdata.Content
 		ok       bool
 	)
-	if gw, ok = params.(data.Map)["host"].(*resources.Host); !ok {
+	if gw, ok = params.(data.Map)["host"].(*abstract.Host); !ok {
 		return nil, fail.InvalidParameterError("params", "missing field 'host'")
 	}
 	if userData, ok = params.(data.Map)["userdata"].(*userdata.Content); !ok {
@@ -944,7 +944,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	return nil, nil
 }
 
-func (handler *NetworkHandler) deleteGateway(gw *resources.Host) (err error) {
+func (handler *NetworkHandler) deleteGateway(gw *abstract.Host) (err error) {
 	logrus.Warnf("Cleaning up on failure, deleting gateway '%s'...", gw.Name)
 	err = handler.service.DeleteHost(gw.ID)
 	if err != nil {
@@ -975,7 +975,7 @@ func (handler *NetworkHandler) deleteGatewayMetadata(m *metadata.Gateway) (err e
 	return derr
 }
 
-func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VirtualIP, host *resources.Host) (err error) {
+func (handler *NetworkHandler) unbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.Host) (err error) {
 	err = handler.service.UnbindHostFromVIP(vip, host.ID)
 	if err != nil {
 		switch err.(type) {
@@ -991,7 +991,7 @@ func (handler *NetworkHandler) unbindHostFromVIP(vip *resources.VirtualIP, host 
 }
 
 // List returns the network list
-func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*resources.Network, err error) {
+func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*abstract.Network, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1005,7 +1005,7 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 		return nil, err
 	}
 	err = mn.Browse(
-		func(network *resources.Network) error {
+		func(network *abstract.Network) error {
 			netList = append(netList, network)
 			return nil
 		},
@@ -1019,7 +1019,7 @@ func (handler *NetworkHandler) List(ctx context.Context, all bool) (netList []*r
 }
 
 // Inspect returns the network identified by ref, ref can be the name or the id
-func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *resources.Network, err error) {
+func (handler *NetworkHandler) Inspect(ctx context.Context, ref string) (network *abstract.Network, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1090,7 +1090,7 @@ func (handler *NetworkHandler) Delete(ctx context.Context, ref string) (err erro
 					"cannot delete network '%s': %d host%s %s still attached to it: %s",
 					network.Name, hostsLen, utils.Plural(hostsLen), verb, strings.Join(list, ", "),
 				)
-				return resources.ResourceNotAvailableError("network", network.Name)
+				return abstract.ResourceNotAvailableError("network", network.Name)
 			}
 			return nil
 		},

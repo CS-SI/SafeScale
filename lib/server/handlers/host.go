@@ -33,13 +33,13 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/networkproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/networkproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/install"
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -59,14 +59,14 @@ import (
 
 // HostAPI defines API to manipulate hosts
 type HostAPI interface {
-	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (*resources.Host, error)
-	List(ctx context.Context, all bool) ([]*resources.Host, error)
-	ForceInspect(ctx context.Context, ref string) (*resources.Host, error)
-	Inspect(ctx context.Context, ref string) (*resources.Host, error)
+	Create(ctx context.Context, name string, net string, os string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (*abstract.Host, error)
+	List(ctx context.Context, all bool) ([]*abstract.Host, error)
+	ForceInspect(ctx context.Context, ref string) (*abstract.Host, error)
+	Inspect(ctx context.Context, ref string) (*abstract.Host, error)
 	Delete(ctx context.Context, ref string) error
 	SSH(ctx context.Context, ref string) (*system.SSHConfig, error)
 	Reboot(ctx context.Context, ref string) error
-	Resize(ctx context.Context, name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*resources.Host, error)
+	Resize(ctx context.Context, name string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (*abstract.Host, error)
 	Start(ctx context.Context, ref string) error
 	Stop(ctx context.Context, ref string) error
 }
@@ -94,7 +94,7 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 		return err
 	}
 	if mh == nil {
-		return resources.ResourceNotFoundError("host", ref)
+		return abstract.ResourceNotFoundError("host", ref)
 	}
 
 	mhm, err := mh.Get()
@@ -132,7 +132,7 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 		return err
 	}
 	if mh == nil {
-		return resources.ResourceNotFoundError("host", ref)
+		return abstract.ResourceNotFoundError("host", ref)
 	}
 
 	mhm, err := mh.Get()
@@ -212,7 +212,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 }
 
 // Resize ...
-func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *resources.Host, err error) {
+func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram float32, disk int, gpuNumber int, freq float32) (newHost *abstract.Host, err error) {
 	tracer := debug.NewTracer(
 		nil, fmt.Sprintf("('%s', %d, %.02f, %d, %d, %.02f)", ref, cpu, ram, disk, gpuNumber, freq), true,
 	).WithStopwatch().GoingIn()
@@ -224,7 +224,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 		return nil, err
 	}
 	if mh == nil {
-		return nil, resources.ResourceNotFoundError("host", ref)
+		return nil, abstract.ResourceNotFoundError("host", ref)
 	}
 
 	mhm, err := mh.Get()
@@ -233,7 +233,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	}
 
 	id := mhm.ID
-	hostSizeRequest := resources.SizingRequirements{
+	hostSizeRequest := abstract.SizingRequirements{
 		MinDiskSize: disk,
 		MinRAMSize:  ram,
 		MinCores:    cpu,
@@ -273,7 +273,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 			return nil, err
 		}
 		if descent {
-			logrus.Warn("Asking for less resources..., ain't gonna happen :(")
+			logrus.Warn("Asking for less abstract..., ain't gonna happen :(")
 		}
 	}
 
@@ -300,7 +300,7 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 // 	force bool,
 func (handler *HostHandler) Create(
 	ctx context.Context,
-	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (newHost *resources.Host, err error) {
+	name string, net string, los string, public bool, sizingParam interface{}, force bool, domain string, keeponfailure bool) (newHost *abstract.Host, err error) {
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -325,16 +325,16 @@ func (handler *HostHandler) Create(
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var (
-		sizing       *resources.SizingRequirements
+		sizing       *abstract.SizingRequirements
 		templateName string
 	)
 	switch sizingParam := sizingParam.(type) {
-	case *resources.SizingRequirements:
+	case *abstract.SizingRequirements:
 		sizing = sizingParam
 	case string:
 		templateName = sizingParam
 	default:
-		return nil, fail.InvalidParameterError("sizing", "must be *resources.SizingRequirements or string")
+		return nil, fail.InvalidParameterError("sizing", "must be *abstract.SizingRequirements or string")
 	}
 
 	// Check if host already exist in SafeScale scope
@@ -366,17 +366,17 @@ func (handler *HostHandler) Create(
 		if hsErr == nil {
 			logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
 			if hostThere != hoststate.TERMINATED {
-				return nil, resources.ResourceDuplicateError("host", name)
+				return nil, abstract.ResourceDuplicateError("host", name)
 			}
 		}
-		return nil, resources.ResourceDuplicateError("host", name)
+		return nil, abstract.ResourceDuplicateError("host", name)
 	}
 
 	var (
-		networks       []*resources.Network
-		defaultNetwork *resources.Network
-		primaryGateway *resources.Host
-		// secondaryGateway *resources.Host
+		networks       []*abstract.Network
+		defaultNetwork *abstract.Network
+		primaryGateway *abstract.Host
+		// secondaryGateway *abstract.Host
 		defaultRouteIP string
 	)
 	if net != "" && net != "net-safescale" {
@@ -417,7 +417,7 @@ func (handler *HostHandler) Create(
 		networks = append(networks, net)
 	}
 
-	var template *resources.HostTemplate
+	var template *abstract.HostTemplate
 	if sizing != nil {
 		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 		if err != nil {
@@ -446,7 +446,7 @@ func (handler *HostHandler) Create(
 			msg += ")"
 			logrus.Infof(msg)
 		} else {
-			return nil, fail.Errorf(fmt.Sprintf("failed to find template corresponding to requested resources"), nil)
+			return nil, fail.Errorf(fmt.Sprintf("failed to find template corresponding to requested abstract"), nil)
 		}
 	} else {
 		template, err = handler.service.SelectTemplateByName(templateName)
@@ -460,7 +460,7 @@ func (handler *HostHandler) Create(
 		}
 	}
 
-	var img *resources.Image
+	var img *abstract.Image
 	retryErr := retryOnCommunicationFailure(
 		func() error {
 			var innerErr error
@@ -486,11 +486,11 @@ func (handler *HostHandler) Create(
 		domain = "." + domain
 	}
 
-	keypair, err := resources.NewKeyPair(name)
+	keypair, err := abstract.NewKeyPair(name)
 	if err != nil {
 		return nil, err
 	}
-	hostRequest := resources.HostRequest{
+	hostRequest := abstract.HostRequest{
 		ImageID:        img.ID,
 		ResourceName:   name,
 		HostName:       name + domain,
@@ -898,7 +898,7 @@ func (handler *HostHandler) Create(
 	return host, nil
 }
 
-func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) ([]string, []string) {
+func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host *abstract.Host) ([]string, []string) {
 	if sshHandler == nil || host == nil {
 		return []string{}, []string{}
 	}
@@ -924,7 +924,7 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 	return warnings, errs
 }
 
-func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *resources.Host) {
+func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *abstract.Host) {
 	if sshHandler == nil || host == nil {
 		return
 	}
@@ -974,13 +974,13 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *re
 	}
 }
 
-// getOrCreateDefaultNetwork gets network resources.SingleHostNetworkName or create it if necessary
+// getOrCreateDefaultNetwork gets network abstract.SingleHostNetworkName or create it if necessary
 // We don't want metadata on this network, so we use directly provider api instead of services
-func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Network, err error) {
+func (handler *HostHandler) getOrCreateDefaultNetwork() (network *abstract.Network, err error) {
 	retryErr := retryOnCommunicationFailure(
 		func() error {
 			var innerErr error
-			network, innerErr = handler.service.GetNetworkByName(resources.SingleHostNetworkName)
+			network, innerErr = handler.service.GetNetworkByName(abstract.SingleHostNetworkName)
 			return innerErr
 		},
 		0,
@@ -997,8 +997,8 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 		return network, nil
 	}
 
-	request := resources.NetworkRequest{
-		Name:      resources.SingleHostNetworkName,
+	request := abstract.NetworkRequest{
+		Name:      abstract.SingleHostNetworkName,
 		IPVersion: ipversion.IPv4,
 		CIDR:      "10.0.0.0/8",
 	}
@@ -1028,7 +1028,7 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *resources.Netw
 }
 
 // List returns the host list
-func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resources.Host, err error) {
+func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*abstract.Host, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%v)", all), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1042,7 +1042,7 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 		return nil, err
 	}
 	err = m.Browse(
-		func(host *resources.Host) error {
+		func(host *abstract.Host) error {
 			hosts = append(hosts, host)
 			return nil
 		},
@@ -1055,7 +1055,7 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*resour
 
 // Force 	 ...
 // If not found, return (nil, err)
-func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *resources.Host, err error) {
+func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host *abstract.Host, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1071,7 +1071,7 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, *fail.ErrNotFound)
 // On any other error, returns (host, error)
-func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *resources.Host, err error) {
+func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *abstract.Host, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
@@ -1079,7 +1079,7 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *reso
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, resources.ResourceNotFoundError("host", ref)
+			return nil, abstract.ResourceNotFoundError("host", ref)
 		}
 		return nil, err
 	}
@@ -1171,7 +1171,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
-			return resources.ResourceNotFoundError("host", ref)
+			return abstract.ResourceNotFoundError("host", ref)
 		}
 		return err
 	}
@@ -1248,7 +1248,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 					return err
 				}
 				if share == nil {
-					return resources.ResourceNotFoundError("share", i.ShareID)
+					return abstract.ResourceNotFoundError("share", i.ShareID)
 				}
 				mounts = append(mounts, share)
 			}
@@ -1365,7 +1365,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	select {
 	case <-ctx.Done():
 		logrus.Warnf("Host delete cancelled by safescale")
-		var hostBis *resources.Host
+		var hostBis *abstract.Host
 		err2 := host.Properties.LockForRead(hostproperty.SizingV1).ThenUse(
 			func(clonable data.Clonable) error {
 				hostSizingV1 := clonable.(*propsv1.HostSizing)
@@ -1377,7 +1377,7 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 								hostNetworkV1 := clonable.(*propsv1.HostNetwork)
 								// FIXME: host's os name is not stored in metadata so we used ubuntu 18.04 by default
 								var err3 error
-								sizing := resources.SizingRequirements{
+								sizing := abstract.SizingRequirements{
 									MinCores:    hostSizingV1.AllocatedSize.Cores,
 									MaxCores:    hostSizingV1.AllocatedSize.Cores,
 									MinFreq:     hostSizingV1.AllocatedSize.CPUFreq,

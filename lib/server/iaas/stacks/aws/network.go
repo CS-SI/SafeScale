@@ -27,41 +27,41 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/cidr"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 )
 
-func (s *Stack) CreateVIP(string, string) (*resources.VirtualIP, error) {
+func (s *Stack) CreateVIP(string, string) (*abstract.VirtualIP, error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
+func (s *Stack) AddPublicIPToVIP(*abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) BindHostToVIP(*resources.VirtualIP, string) error {
+func (s *Stack) BindHostToVIP(*abstract.VirtualIP, string) error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) UnbindHostFromVIP(*resources.VirtualIP, string) error {
+func (s *Stack) UnbindHostFromVIP(*abstract.VirtualIP, string) error {
 	return fail.NotImplementedError("UnbindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) DeleteVIP(*resources.VirtualIP) error {
+func (s *Stack) DeleteVIP(*abstract.VirtualIP) error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, err error) {
 	logrus.Warnf("CreateNetwork invocation")
 
 	var theVpc *ec2.Vpc
@@ -73,7 +73,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	}
 
 	for _, vpc := range out.Vpcs {
-		vpcnet := resources.Network{}
+		vpcnet := abstract.Network{}
 		vpcnet.CIDR = aws.StringValue(vpc.CidrBlock)
 		vpcnet.ID = aws.StringValue(vpc.VpcId)
 		for _, tag := range vpc.Tags {
@@ -389,7 +389,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	}()
 
 	// FIXME: Add properties and GatewayID
-	subnet := resources.NewNetwork()
+	subnet := abstract.NewNetwork()
 	subnet.ID = aws.StringValue(sn.Subnet.SubnetId)
 	subnet.Name = req.Name
 	subnet.CIDR = req.CIDR // FIXME: AWS Storing parent CIDR
@@ -397,7 +397,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 
 	for _, sn := range subnetsResult {
 		subnet.Subnetworks = append(
-			subnet.Subnetworks, resources.SubNetwork{
+			subnet.Subnetworks, abstract.SubNetwork{
 				CIDR: aws.StringValue(sn.Subnet.CidrBlock),
 				ID:   aws.StringValue(sn.Subnet.SubnetId),
 			},
@@ -410,7 +410,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (res *resources.Netw
 	return subnet, nil
 }
 
-func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -422,10 +422,10 @@ func (s *Stack) GetNetwork(id string) (*resources.Network, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("Network", id)
+	return nil, abstract.ResourceNotFoundError("Network", id)
 }
 
-func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -437,17 +437,17 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		}
 	}
 
-	return nil, resources.ResourceNotFoundError("Network", name)
+	return nil, abstract.ResourceNotFoundError("Network", name)
 }
 
-func (s *Stack) ListNetworks() ([]*resources.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 	out, err := s.EC2Service.DescribeVpcs(&ec2.DescribeVpcsInput{})
 	if err != nil {
 		return nil, err
 	}
-	var nets []*resources.Network
+	var nets []*abstract.Network
 	for _, vpc := range out.Vpcs {
-		vpcnet := resources.Network{}
+		vpcnet := abstract.Network{}
 		vpcnet.ID = aws.StringValue(vpc.VpcId)
 		vpcnet.CIDR = aws.StringValue(vpc.CidrBlock)
 		for _, tag := range vpc.Tags {
@@ -466,7 +466,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	}
 
 	for _, subn := range subns.Subnets {
-		vpcnet := resources.Network{}
+		vpcnet := abstract.Network{}
 		vpcnet.ID = aws.StringValue(subn.SubnetId)
 		vpcnet.CIDR = aws.StringValue(subn.CidrBlock)
 		vpcnet.Subnet = true
@@ -713,19 +713,19 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	return hoststate.ERROR, fail.Errorf(fmt.Sprintf("unexpected host state"), nil)
 }
 
-func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.SizingRequirements) (_ *resources.Host, _ *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (_ *abstract.Host, _ *userdata.Content, err error) {
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
 	}
 
-	hostReq := resources.HostRequest{
+	hostReq := abstract.HostRequest{
 		ImageID:      req.ImageID,
 		KeyPair:      req.KeyPair,
 		HostName:     req.Name,
 		ResourceName: gwname,
 		TemplateID:   req.TemplateID,
-		Networks:     []*resources.Network{req.Network},
+		Networks:     []*abstract.Network{req.Network},
 		PublicIP:     true,
 	}
 	if sizing != nil && sizing.MinDiskSize > 0 {

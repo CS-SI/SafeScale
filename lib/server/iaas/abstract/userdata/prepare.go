@@ -36,7 +36,7 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -138,7 +138,7 @@ func (ud Content) OK() bool {
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func (ud *Content) Prepare(
-	options stacks.ConfigurationOptions, request resources.HostRequest, cidr string, defaultNetworkCIDR string,
+	options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
 ) error {
 
 	// Generate password for user safescale
@@ -192,7 +192,7 @@ func (ud *Content) Prepare(
 	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.DefaultRouteIP == "" && len(request.Networks) != 0 && request.Networks[0].Name != resources.SingleHostNetworkName && !useLayer3Networking
+	ud.IsGateway = request.DefaultRouteIP == "" && len(request.Networks) != 0 && request.Networks[0].Name != abstract.SingleHostNetworkName && !useLayer3Networking
 	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr

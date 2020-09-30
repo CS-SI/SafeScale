@@ -22,9 +22,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	pb "github.com/CS-SI/SafeScale/lib"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hostproperty"
-	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
+	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -76,7 +76,7 @@ func ToSystemSSHConfig(from *pb.SshConfig) (gw *system.SSHConfig, err error) {
 }
 
 // ToPBVolume converts an api.Volume to a *Volume
-func ToPBVolume(in *resources.Volume) (*pb.Volume, error) {
+func ToPBVolume(in *abstract.Volume) (*pb.Volume, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -89,7 +89,7 @@ func ToPBVolume(in *resources.Volume) (*pb.Volume, error) {
 }
 
 // ToPBVolumeAttachment converts an api.Volume to a *Volume
-func ToPBVolumeAttachment(in *resources.VolumeAttachment) (*pb.VolumeAttachment, error) {
+func ToPBVolumeAttachment(in *abstract.VolumeAttachment) (*pb.VolumeAttachment, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -102,7 +102,7 @@ func ToPBVolumeAttachment(in *resources.VolumeAttachment) (*pb.VolumeAttachment,
 }
 
 // ToPBVolumeInfo converts an api.Volume to a *VolumeInfo
-func ToPBVolumeInfo(volume *resources.Volume, mounts map[string]*propsv1.HostLocalMount) (*pb.VolumeInfo, error) {
+func ToPBVolumeInfo(volume *abstract.Volume, mounts map[string]*propsv1.HostLocalMount) (*pb.VolumeInfo, error) {
 	if volume == nil {
 		return nil, fail.InvalidParameterError("volume", "cannot be nil")
 	}
@@ -138,7 +138,7 @@ func ToPBBucketList(in []string) (*pb.BucketList, error) {
 }
 
 // ToPBBucketMountPoint convert a Bucket into a BucketMountingPoint
-func ToPBBucketMountPoint(in *resources.Bucket) (*pb.BucketMountingPoint, error) {
+func ToPBBucketMountPoint(in *abstract.Bucket) (*pb.BucketMountingPoint, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -207,7 +207,7 @@ func ToPBShareMountList(hostName string, share *propsv1.HostShare, mounts map[st
 }
 
 // ToPBHost convert an host from api to protocolbuffer format
-func ToPBHost(in *resources.Host) (*pb.Host, error) {
+func ToPBHost(in *abstract.Host) (*pb.Host, error) {
 	var (
 		hostNetworkV1 *propsv1.HostNetwork
 		hostSizingV1  *propsv1.HostSizing
@@ -258,7 +258,7 @@ func ToPBHost(in *resources.Host) (*pb.Host, error) {
 }
 
 // ToPBHostDefinition ...
-func ToPBHostDefinition(in *resources.HostDefinition) (*pb.HostDefinition, error) {
+func ToPBHostDefinition(in *abstract.HostDefinition) (*pb.HostDefinition, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -277,8 +277,8 @@ func ToPBHostDefinition(in *resources.HostDefinition) (*pb.HostDefinition, error
 	}, nil
 }
 
-// ToPBGatewayDefinition converts a resources.HostDefinition tp .GatewayDefinition
-func ToPBGatewayDefinition(in *resources.HostDefinition) (*pb.GatewayDefinition, error) {
+// ToPBGatewayDefinition converts a abstract.HostDefinition tp .GatewayDefinition
+func ToPBGatewayDefinition(in *abstract.HostDefinition) (*pb.GatewayDefinition, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -318,7 +318,7 @@ func FromPBHostDefinitionToPBGatewayDefinition(in *pb.HostDefinition) *pb.Gatewa
 }
 
 // ToHostStatus ...
-func ToHostStatus(in *resources.Host) (*pb.HostStatus, error) {
+func ToHostStatus(in *abstract.Host) (*pb.HostStatus, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -329,7 +329,7 @@ func ToHostStatus(in *resources.Host) (*pb.HostStatus, error) {
 }
 
 // ToPBHostTemplate convert an template from api to protocolbuffer format
-func ToPBHostTemplate(in *resources.HostTemplate) (*pb.HostTemplate, error) {
+func ToPBHostTemplate(in *abstract.HostTemplate) (*pb.HostTemplate, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -345,7 +345,7 @@ func ToPBHostTemplate(in *resources.HostTemplate) (*pb.HostTemplate, error) {
 }
 
 // ToPBImage convert an image from api to protocolbuffer format
-func ToPBImage(in *resources.Image) (*pb.Image, error) {
+func ToPBImage(in *abstract.Image) (*pb.Image, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -356,7 +356,7 @@ func ToPBImage(in *resources.Image) (*pb.Image, error) {
 }
 
 // ToPBNetwork convert a network from api to protocolbuffer format
-func ToPBNetwork(in *resources.Network) (*pb.Network, error) {
+func ToPBNetwork(in *abstract.Network) (*pb.Network, error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -393,8 +393,8 @@ func ToPBFileList(fileNames []string, uploadDates []string, fileSizes []int64, f
 	return &pb.FileList{Files: files}
 }
 
-// ToPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
-func ToPBHostSizing(src resources.SizingRequirements) *pb.HostSizing {
+// ToPBHostSizing converts a protobuf HostSizing message to abstract.SizingRequirements
+func ToPBHostSizing(src abstract.SizingRequirements) *pb.HostSizing {
 	return &pb.HostSizing{
 		MinCpuCount: int32(src.MinCores),
 		MaxCpuCount: int32(src.MaxCores),
@@ -406,12 +406,12 @@ func ToPBHostSizing(src resources.SizingRequirements) *pb.HostSizing {
 	}
 }
 
-// FromPBHostSizing converts a protobuf HostSizing message to resources.SizingRequirements
-func FromPBHostSizing(src *pb.HostSizing) (resources.SizingRequirements, error) {
+// FromPBHostSizing converts a protobuf HostSizing message to abstract.SizingRequirements
+func FromPBHostSizing(src *pb.HostSizing) (abstract.SizingRequirements, error) {
 	if src == nil {
-		return resources.SizingRequirements{}, fail.InvalidParameterError("src", "cannot be nil")
+		return abstract.SizingRequirements{}, fail.InvalidParameterError("src", "cannot be nil")
 	}
-	return resources.SizingRequirements{
+	return abstract.SizingRequirements{
 		MinCores:    int(src.MinCpuCount),
 		MaxCores:    int(src.MaxCpuCount),
 		MinFreq:     src.MinCpuFreq,
@@ -422,8 +422,8 @@ func FromPBHostSizing(src *pb.HostSizing) (resources.SizingRequirements, error) 
 	}, nil
 }
 
-// ToPBVirtualIP converts a resources.VirtualIP to a pb.VirtualIp
-func ToPBVirtualIP(src resources.VirtualIP) *pb.VirtualIp {
+// ToPBVirtualIP converts a abstract.VirtualIP to a pb.VirtualIp
+func ToPBVirtualIP(src abstract.VirtualIP) *pb.VirtualIp {
 	dest := &pb.VirtualIp{
 		Id:        src.ID,
 		NetworkId: src.NetworkID,

@@ -100,7 +100,7 @@ Test Results - client_test_go\.html
 # versions
 lib/security/gateway/client/safe-security
 
-lib/server/iaas/resources/userdata/version.go
+lib/server/iaas/abstract/userdata/version.go
 lib/system/version.go
 
 # ci and binaries
