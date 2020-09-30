@@ -27,7 +27,7 @@ import (
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateKeyPair creates and import a key pair
@@ -45,7 +45,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 // ImportKeyPair is used to import an existing KeyPair in Outscale
 func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
 	if keypair == nil {
-		return scerr.InvalidParameterError("keyair", "cannot be nil")
+		return fail.InvalidParameterError("keyair", "cannot be nil")
 	}
 
 	createKeypairRequest := osc.CreateKeypairRequest{
@@ -76,10 +76,10 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 		return nil, normalizeError(err)
 	}
 	if len(resp.Keypairs) > 1 {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
+		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 	if len(resp.Keypairs) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
+		return nil, fail.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
 	}
 	kp := resp.Keypairs[0]
 	return &resources.KeyPair{

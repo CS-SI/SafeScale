@@ -18,7 +18,7 @@ package concurrency
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Shielded allows to store data with controlled access to it
@@ -44,13 +44,13 @@ func (d *Shielded) Clone() *Shielded {
 // // Returns a Protector, on which can be applied method 'Shield()'
 // func (d *Shielded) LockShared(task Task) (Protector, error) {
 // 	if d == nil {
-// 		return nil, scerr.InvalidInstanceError()
+// 		return nil, fail.InvalidInstanceError()
 // 	}
 // 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+// 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 // 	}
 // 	if d.witness == nil {
-// 		return nil, scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
+// 		return nil, fail.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
 // 	}
 // 	d.lock.RLock(task)
 // 	return &protector{shielded: d, readLock: true}, nil
@@ -59,16 +59,16 @@ func (d *Shielded) Clone() *Shielded {
 // Inspect is used to lock a clonable for read
 func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) error) error {
 	if d == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if inspector == nil {
-		return scerr.InvalidParameterError("inspector", "cannot be nil")
+		return fail.InvalidParameterError("inspector", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
+		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewShielded() to instanciate")
 	}
 	d.lock.RLock(task)
 	defer d.lock.RUnlock(task)
@@ -80,13 +80,13 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 // // Returns a Protector, on which can be applied methods 'ShieldXXX()'
 // func (d *Shielded) LockExclusive(task Task) (Protector, error) {
 // 	if d == nil {
-// 		return nil, scerr.InvalidInstanceError()
+// 		return nil, fail.InvalidInstanceError()
 // 	}
 // 	if task == nil {
-// 		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+// 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 // 	}
 // 	if d.witness == nil {
-// 		return nil, scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
+// 		return nil, fail.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
 // 	}
 
 // 	d.lock.Lock(task)
@@ -96,16 +96,16 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) err
 // Alter allows to update a clonable using a write lock
 func (d *Shielded) Alter(task Task, alterer func(data.Clonable) error) error {
 	if d == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return scerr.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if alterer == nil {
-		return scerr.InvalidParameterError("alterer", "cannot be nil")
+		return fail.InvalidParameterError("alterer", "cannot be nil")
 	}
 	if d.witness == nil {
-		return scerr.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
+		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurency.NewData() to instanciate")
 	}
 
 	d.lock.Lock(task)

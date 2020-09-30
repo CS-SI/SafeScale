@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -269,7 +269,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 	tracer := debug.NewTracer(is.Worker.feature.task, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 	nHosts := len(hosts)
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, utils.Plural(nHosts)),
@@ -418,7 +418,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	)
 	if params != nil {
 		if p, ok = params.(data.Map); !ok {
-			return nil, scerr.InvalidParameterError("params", "must be a data.Map")
+			return nil, fail.InvalidParameterError("params", "must be a data.Map")
 		}
 	}
 

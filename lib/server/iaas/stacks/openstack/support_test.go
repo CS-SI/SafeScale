@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/gophercloud/gophercloud"
 )
@@ -43,7 +43,7 @@ func TestEmptyGophercloudErrorCodes(t *testing.T) {
 }
 
 func TestNotGophercloudErrorCodes(t *testing.T) {
-	srcErr := scerr.Errorf(fmt.Sprintf("something else"), nil)
+	srcErr := fail.Errorf(fmt.Sprintf("something else"), nil)
 	code, err := GetUnexpectedGophercloudErrorCode(srcErr)
 	if err == nil {
 		t.FailNow()

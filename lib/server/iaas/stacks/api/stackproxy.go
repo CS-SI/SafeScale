@@ -4,7 +4,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 type StackProxy WrappedStack
@@ -14,11 +14,11 @@ func errorTranslator(inErr error) (outErr error) {
 		return inErr
 	}
 
-	if scerr.ImplementsCauser(inErr) || scerr.ImplementsConsequencer(inErr) {
+	if fail.ImplementsCauser(inErr) || fail.ImplementsConsequencer(inErr) {
 		return inErr
 	}
 
-	return scerr.Wrap(inErr, "wrapped error")
+	return fail.Wrap(inErr, "wrapped error")
 }
 
 func (sp StackProxy) ListAvailabilityZones() (map[string]bool, error) {

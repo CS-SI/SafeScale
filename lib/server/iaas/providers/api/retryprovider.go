@@ -7,8 +7,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -21,11 +21,11 @@ func (w RetryProvider) CreateVIP(first string, second string) (res *resources.Vi
 			res, err = w.InnerProvider.CreateVIP(first, second)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -49,11 +49,11 @@ func (w RetryProvider) AddPublicIPToVIP(res *resources.VirtualIP) (err error) {
 			err = w.InnerProvider.AddPublicIPToVIP(res)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -77,11 +77,11 @@ func (w RetryProvider) BindHostToVIP(vip *resources.VirtualIP, hostID string) (e
 			err = w.InnerProvider.BindHostToVIP(vip, hostID)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -105,11 +105,11 @@ func (w RetryProvider) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string
 			err = w.InnerProvider.UnbindHostFromVIP(vip, hostID)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -133,11 +133,11 @@ func (w RetryProvider) DeleteVIP(vip *resources.VirtualIP) (err error) {
 			err = w.InnerProvider.DeleteVIP(vip)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -171,11 +171,11 @@ func (w RetryProvider) Build(something map[string]interface{}) (p Provider, err 
 			p, err = w.InnerProvider.Build(something)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -199,11 +199,11 @@ func (w RetryProvider) ListImages(all bool) (res []resources.Image, err error) {
 			res, err = w.InnerProvider.ListImages(all)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -227,11 +227,11 @@ func (w RetryProvider) ListTemplates(all bool) (res []resources.HostTemplate, er
 			res, err = w.InnerProvider.ListTemplates(all)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -275,11 +275,11 @@ func (w RetryProvider) ListAvailabilityZones() (res map[string]bool, err error) 
 			res, err = w.InnerProvider.ListAvailabilityZones()
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -304,11 +304,11 @@ func (w RetryProvider) ListRegions() (res []string, err error) {
 			res, err = w.InnerProvider.ListRegions()
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -333,11 +333,11 @@ func (w RetryProvider) GetImage(id string) (res *resources.Image, err error) {
 			res, err = w.InnerProvider.GetImage(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -362,11 +362,11 @@ func (w RetryProvider) GetTemplate(id string) (res *resources.HostTemplate, err 
 			res, err = w.InnerProvider.GetTemplate(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -391,11 +391,11 @@ func (w RetryProvider) CreateKeyPair(name string) (kp *resources.KeyPair, err er
 			kp, err = w.InnerProvider.CreateKeyPair(name)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -420,11 +420,11 @@ func (w RetryProvider) GetKeyPair(id string) (kp *resources.KeyPair, err error) 
 			kp, err = w.InnerProvider.GetKeyPair(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -449,11 +449,11 @@ func (w RetryProvider) ListKeyPairs() (res []resources.KeyPair, err error) {
 			res, err = w.InnerProvider.ListKeyPairs()
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -478,11 +478,11 @@ func (w RetryProvider) DeleteKeyPair(id string) (err error) {
 			err = w.InnerProvider.DeleteKeyPair(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -507,11 +507,11 @@ func (w RetryProvider) CreateNetwork(req resources.NetworkRequest) (res *resourc
 			res, err = w.InnerProvider.CreateNetwork(req)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -536,11 +536,11 @@ func (w RetryProvider) GetNetwork(id string) (res *resources.Network, err error)
 			res, err = w.InnerProvider.GetNetwork(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -565,11 +565,11 @@ func (w RetryProvider) GetNetworkByName(name string) (res *resources.Network, er
 			res, err = w.InnerProvider.GetNetworkByName(name)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -594,11 +594,11 @@ func (w RetryProvider) ListNetworks() (res []*resources.Network, err error) {
 			res, err = w.InnerProvider.ListNetworks()
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -623,11 +623,11 @@ func (w RetryProvider) DeleteNetwork(id string) (err error) {
 			err = w.InnerProvider.DeleteNetwork(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -652,11 +652,11 @@ func (w RetryProvider) CreateGateway(req resources.GatewayRequest, sizing *resou
 			res, data, err = w.InnerProvider.CreateGateway(req, sizing)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -681,11 +681,11 @@ func (w RetryProvider) DeleteGateway(networkID string) (err error) {
 			err = w.InnerProvider.DeleteGateway(networkID)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -710,11 +710,11 @@ func (w RetryProvider) CreateHost(request resources.HostRequest) (res *resources
 			res, data, err = w.InnerProvider.CreateHost(request)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -739,11 +739,11 @@ func (w RetryProvider) InspectHost(something interface{}) (res *resources.Host, 
 			res, err = w.InnerProvider.InspectHost(something)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -768,11 +768,11 @@ func (w RetryProvider) GetHostByName(name string) (res *resources.Host, err erro
 			res, err = w.InnerProvider.GetHostByName(name)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -797,11 +797,11 @@ func (w RetryProvider) GetHostState(something interface{}) (res hoststate.Enum, 
 			res, err = w.InnerProvider.GetHostState(something)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -826,11 +826,11 @@ func (w RetryProvider) ListHosts() (res []*resources.Host, err error) {
 			res, err = w.InnerProvider.ListHosts()
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -855,11 +855,11 @@ func (w RetryProvider) DeleteHost(id string) (err error) {
 			err = w.InnerProvider.DeleteHost(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -884,11 +884,11 @@ func (w RetryProvider) StopHost(id string) (err error) {
 			err = w.InnerProvider.StopHost(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -913,11 +913,11 @@ func (w RetryProvider) StartHost(id string) (err error) {
 			err = w.InnerProvider.StartHost(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -942,11 +942,11 @@ func (w RetryProvider) RebootHost(id string) (err error) {
 			err = w.InnerProvider.RebootHost(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -971,11 +971,11 @@ func (w RetryProvider) ResizeHost(id string, request resources.SizingRequirement
 			res, err = w.InnerProvider.ResizeHost(id, request)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1000,11 +1000,11 @@ func (w RetryProvider) CreateVolume(request resources.VolumeRequest) (res *resou
 			res, err = w.InnerProvider.CreateVolume(request)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1029,11 +1029,11 @@ func (w RetryProvider) GetVolume(id string) (res *resources.Volume, err error) {
 			res, err = w.InnerProvider.GetVolume(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1058,11 +1058,11 @@ func (w RetryProvider) ListVolumes() (res []resources.Volume, err error) {
 			res, err = w.InnerProvider.ListVolumes()
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1087,11 +1087,11 @@ func (w RetryProvider) DeleteVolume(id string) (err error) {
 			err = w.InnerProvider.DeleteVolume(id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1116,11 +1116,11 @@ func (w RetryProvider) CreateVolumeAttachment(request resources.VolumeAttachment
 			res, err = w.InnerProvider.CreateVolumeAttachment(request)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1145,11 +1145,11 @@ func (w RetryProvider) GetVolumeAttachment(serverID, id string) (res *resources.
 			res, err = w.InnerProvider.GetVolumeAttachment(serverID, id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1174,11 +1174,11 @@ func (w RetryProvider) ListVolumeAttachments(serverID string) (res []resources.V
 			res, err = w.InnerProvider.ListVolumeAttachments(serverID)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil
@@ -1203,11 +1203,11 @@ func (w RetryProvider) DeleteVolumeAttachment(serverID, id string) (err error) {
 			err = w.InnerProvider.DeleteVolumeAttachment(serverID, id)
 			if err != nil {
 				switch err.(type) {
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					return err
 				case *net.DNSError:
 					return err
-				case scerr.ErrInvalidRequest:
+				case fail.ErrInvalidRequest:
 					return err
 				default:
 					return nil

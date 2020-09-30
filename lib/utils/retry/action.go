@@ -25,8 +25,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 )
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.
@@ -58,13 +58,13 @@ func Action(run func() error, arbiter Arbiter, officer *Officer,
 	first func() error, last func() error, notify Notify) error {
 
 	if run == nil {
-		return scerr.InvalidParameterError("run", "cannot be nil!")
+		return fail.InvalidParameterError("run", "cannot be nil!")
 	}
 	if arbiter == nil {
-		return scerr.InvalidParameterError("arbiter", "cannot be nil!")
+		return fail.InvalidParameterError("arbiter", "cannot be nil!")
 	}
 	if officer == nil {
-		return scerr.InvalidParameterError("officer", "cannot be nil!")
+		return fail.InvalidParameterError("officer", "cannot be nil!")
 	}
 
 	return action{
@@ -177,7 +177,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	}
 
 	if notify == nil {
-		return scerr.InvalidParameterError("notify", "cannot be nil!")
+		return fail.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -208,7 +208,7 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 	}
 
 	if notify == nil {
-		return scerr.InvalidParameterError("notify", "cannot be nil!")
+		return fail.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -300,7 +300,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 	}
 
 	if notify == nil {
-		return scerr.InvalidParameterError("notify", "cannot be nil!")
+		return fail.InvalidParameterError("notify", "cannot be nil!")
 	}
 
 	if delay <= 0 {
@@ -379,7 +379,7 @@ func (a action) loop() error {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return scerr.ErrListError([]error{errLast, retryErr})
+					return fail.ErrListError([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -389,7 +389,7 @@ func (a action) loop() error {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return scerr.ErrListError([]error{errLast, retryErr})
+					return fail.ErrListError([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -434,9 +434,9 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 			err = response
 		case <-time.After(timeout):
 			// call timed out
-			err = scerr.TimeoutError("operation timeout", timeout, nil)
+			err = fail.TimeoutError("operation timeout", timeout, nil)
 		case <-desist:
-			err = scerr.TimeoutError("desist timeout", timeout, nil)
+			err = fail.TimeoutError("desist timeout", timeout, nil)
 		}
 
 		// Collects the result of the try
@@ -459,7 +459,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return scerr.ErrListError([]error{errLast, retryErr})
+					return fail.ErrListError([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -469,7 +469,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 			if a.Last != nil {
 				errLast = a.Last()
 				if errLast != nil {
-					return scerr.ErrListError([]error{errLast, retryErr})
+					return fail.ErrListError([]error{errLast, retryErr})
 				}
 			}
 			return retryErr
@@ -486,7 +486,7 @@ func (a action) loopWithTimeout(timeout time.Duration) error {
 					err = response
 					_ = err
 				case <-desist:
-					err = scerr.TimeoutError("desist timeout", timeout, nil)
+					err = fail.TimeoutError("desist timeout", timeout, nil)
 					_ = err
 				}
 			}

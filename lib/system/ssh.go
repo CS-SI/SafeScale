@@ -42,8 +42,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -575,21 +575,21 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, t
 	if result, ok := r.(data.Map); ok {
 		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
 	}
-	return -1, "", "", scerr.InconsistentError("'result' should have been of type 'data.Map'")
+	return -1, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
 // taskExecute executes the command on remote host by SSH inside a task
 func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, error) {
 	if sc == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, scerr.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	params, ok := p.(data.Map)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p", "must be of type data.Map")
+		return nil, fail.InvalidParameterError("p", "must be of type data.Map")
 	}
 	var (
 		stdoutPipe, stderrPipe io.ReadCloser
@@ -597,20 +597,20 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	)
 	stdoutPipe, ok = params["stdout"].(io.ReadCloser)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p['stdout']", "is missing or is not of type io.ReadCloser")
+		return nil, fail.InvalidParameterError("p['stdout']", "is missing or is not of type io.ReadCloser")
 	}
 	if stdoutPipe == nil {
-		return nil, scerr.InvalidParameterError("p['stdout']", "cannot be nil")
+		return nil, fail.InvalidParameterError("p['stdout']", "cannot be nil")
 	}
 	stderrPipe, ok = params["stderr"].(io.ReadCloser)
 	if !ok {
-		return nil, scerr.InvalidParameterError("p['stderr']", "is missing or is not of type io.ReadCloser")
+		return nil, fail.InvalidParameterError("p['stderr']", "is missing or is not of type io.ReadCloser")
 	}
 	if stderrPipe == nil {
-		return nil, scerr.InvalidParameterError("p['stderr']", "cannot be nil")
+		return nil, fail.InvalidParameterError("p['stderr']", "cannot be nil")
 	}
 	if collectOutputs, ok = params["collect_outputs"].(bool); !ok {
-		return nil, scerr.InvalidParameterError("p['collect_outputs']", "is missing or is not of type bool")
+		return nil, fail.InvalidParameterError("p['collect_outputs']", "is missing or is not of type bool")
 	}
 
 	var (
@@ -687,7 +687,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 			if !collectOutputs {
 				derr := pipeBridgeCtrl.Stop()
 				if derr != nil {
-					err = scerr.AddConsequence(err, derr)
+					err = fail.AddConsequence(err, derr)
 				}
 			}
 			return result, err
@@ -855,20 +855,20 @@ func (ssh *SSHConfig) command(cmdString string, withTty, withSudo bool) (*SSHCom
 // the 'timeout' parameter is in minutes
 func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out string, err error) {
 	if ssh == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 	if phase == "" {
-		return "", scerr.InvalidParameterError("phase", "cannot be empty string")
+		return "", fail.InvalidParameterError("phase", "cannot be empty string")
 	}
 	if ssh.Host == "" {
-		return "", scerr.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
+		return "", fail.InvalidInstanceContentError("ssh.Host", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
 		nil, fmt.Sprintf("('%s',%s)", phase, temporal.FormatDuration(timeout)), false,
 	).GoingIn().OnExitTrace()()
 
-	defer scerr.OnExitTraceError(
+	defer fail.OnExitTraceError(
 		fmt.Sprintf(
 			"timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, ssh.Host,
 			temporal.FormatDuration(timeout),
@@ -905,7 +905,7 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				if retcode == 1 { // File doesn't exist yet
 					return fmt.Errorf("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
 				}
-				return scerr.AbortedError(
+				return fail.AbortedError(
 					"",
 					fmt.Errorf("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr),
 				)
@@ -916,9 +916,9 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 					logrus.Warn(stdout)
 					if strings.Contains(stdout, ",") {
 						splitted := strings.Split(stdout, ",")
-						return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
+						return fail.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
 					}
-					return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", "Unknown"), nil)
+					return fail.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", "Unknown"), nil)
 				}
 			}
 
@@ -927,9 +927,9 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 					logrus.Warn(stderr)
 					if strings.Contains(stderr, ",") {
 						splitted := strings.Split(stderr, ",")
-						return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
+						return fail.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", splitted[0]), nil)
 					}
-					return scerr.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", "Unknown"), nil)
+					return fail.AbortedError(fmt.Sprintf("PROVISIONING ERROR: %s", "Unknown"), nil)
 				}
 			}
 

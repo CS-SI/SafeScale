@@ -25,7 +25,7 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // var sshCfgCache = cache.NewMapCache()
@@ -120,7 +120,7 @@ func (h *host) Stop(name string, timeout time.Duration) error {
 // Create ...
 func (h *host) Create(def *pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
 	if def == nil {
-		return nil, scerr.InvalidParameterError("def", "cannot be nil")
+		return nil, fail.InvalidParameterError("def", "cannot be nil")
 	}
 
 	h.session.Connect()
@@ -200,7 +200,7 @@ func (h *host) SSHConfig(name string) (*system.SSHConfig, error) {
 
 func (h *host) Resize(def *pb.HostDefinition, duration time.Duration) (*pb.Host, error) {
 	if def == nil {
-		return nil, scerr.InvalidParameterError("def", "cannot be nil")
+		return nil, fail.InvalidParameterError("def", "cannot be nil")
 	}
 
 	h.session.Connect()

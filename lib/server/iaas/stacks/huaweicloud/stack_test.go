@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/stretchr/testify/require"
 
@@ -58,7 +58,7 @@ func getClient() (iaas.Service, error) {
 		var err error
 		service, err = iaas.UseService(tenantName)
 		if err != nil || service == nil {
-			return nil, scerr.Errorf(
+			return nil, fail.Errorf(
 				fmt.Sprintf(
 					"you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files",
 					tenantName,

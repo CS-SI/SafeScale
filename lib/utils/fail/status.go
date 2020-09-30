@@ -1,4 +1,4 @@
-package scerr
+package fail
 
 import "fmt"
 

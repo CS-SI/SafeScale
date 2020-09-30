@@ -23,7 +23,7 @@ import (
 
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func normalizeErrorWithReason(reason string, err error) error {
@@ -37,23 +37,23 @@ func normalizeErrorWithReason(reason string, err error) error {
 		case osc.ErrorResponse:
 			switch model.Errors[0].Code {
 			case "1":
-				return scerr.UnauthorizedError("user is not authenticated")
+				return fail.UnauthorizedError("user is not authenticated")
 			case "4045":
-				return scerr.InvalidRequestError("invalid CIDR")
+				return fail.InvalidRequestError("invalid CIDR")
 			case "5057":
-				return scerr.NotFoundError("network not found")
+				return fail.NotFoundError("network not found")
 			case "5071":
-				return scerr.NotFoundError("keypair not found")
+				return fail.NotFoundError("keypair not found")
 			case "9011":
-				return scerr.DuplicateError("keypair already exists")
+				return fail.DuplicateError("keypair already exists")
 			case "9044":
-				return scerr.InvalidRequestError("not included in VPC CIDR")
+				return fail.InvalidRequestError("not included in VPC CIDR")
 			case "9058":
-				return scerr.DuplicateError("network already exist")
+				return fail.DuplicateError("network already exist")
 			default:
 				merr := model.Errors[0]
 				reqId := model.ResponseContext.RequestId
-				return scerr.UnknownError(
+				return fail.UnknownError(
 					fmt.Sprintf(
 						"%s: from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", reason, merr.Code,
 						merr.Type, merr.Details, reqId,
@@ -61,7 +61,7 @@ func normalizeErrorWithReason(reason string, err error) error {
 				)
 			}
 		default:
-			return scerr.UnknownError(
+			return fail.UnknownError(
 				fmt.Sprintf(
 					"%s: from outscale driver, model='%s', error='%s'", reason, reflect.TypeOf(realErr.Model()), realErr.Error(),
 				),
@@ -83,23 +83,23 @@ func normalizeError(err error) error {
 		case osc.ErrorResponse:
 			switch model.Errors[0].Code {
 			case "1":
-				return scerr.UnauthorizedError("user is not authenticated")
+				return fail.UnauthorizedError("user is not authenticated")
 			case "4045":
-				return scerr.InvalidRequestError("invalid CIDR")
+				return fail.InvalidRequestError("invalid CIDR")
 			case "5057":
-				return scerr.NotFoundError("network not found")
+				return fail.NotFoundError("network not found")
 			case "5071":
-				return scerr.NotFoundError("keypair not found")
+				return fail.NotFoundError("keypair not found")
 			case "9011":
-				return scerr.DuplicateError("keypair already exists")
+				return fail.DuplicateError("keypair already exists")
 			case "9044":
-				return scerr.InvalidRequestError("not included in VPC CIDR")
+				return fail.InvalidRequestError("not included in VPC CIDR")
 			case "9058":
-				return scerr.DuplicateError("network already exist")
+				return fail.DuplicateError("network already exist")
 			default:
 				merr := model.Errors[0]
 				reqId := model.ResponseContext.RequestId
-				return scerr.UnknownError(
+				return fail.UnknownError(
 					fmt.Sprintf(
 						"from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code,
 						merr.Type, merr.Details, reqId,
@@ -107,7 +107,7 @@ func normalizeError(err error) error {
 				)
 			}
 		default:
-			return scerr.UnknownError(
+			return fail.UnknownError(
 				fmt.Sprintf(
 					"from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr.Model()), realErr.Error(),
 				),

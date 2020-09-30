@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var settings map[string]map[string]struct{} = nil
@@ -29,14 +29,14 @@ var settings map[string]map[string]struct{} = nil
 // RegisterTraceSettings keeps track of what has to be traced
 func RegisterTraceSettings(jsonSettings string) error {
 	if settings != nil {
-		return scerr.DuplicateError("trace settings are already defined")
+		return fail.DuplicateError("trace settings are already defined")
 	}
 
 	newSettings := map[string]map[string]struct{}{}
 	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
 	if err != nil {
-		return scerr.Wrap(
-			scerr.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings",
+		return fail.Wrap(
+			fail.SyntaxError(err.Error()), "no trace are enabled, an error occured loading trace settings",
 		)
 	}
 

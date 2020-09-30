@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -99,7 +99,7 @@ func (i *Item) Get() interface{} {
 // DeleteFrom removes a metadata from a folder
 func (i *Item) DeleteFrom(path string, name string) error {
 	if name == "" {
-		return scerr.InvalidParameterError("name", "cannot be emtpy!")
+		return fail.InvalidParameterError("name", "cannot be emtpy!")
 	}
 	if path == "" {
 		path = "."
@@ -107,7 +107,7 @@ func (i *Item) DeleteFrom(path string, name string) error {
 
 	err := i.folder.Search(path, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.ErrNotFound); ok {
 			// If entry not found, consider a success
 			return nil
 		}
@@ -158,10 +158,10 @@ func (i *Item) Read(name string, callback ItemDecoderCallback) error {
 // WriteInto saves the content of Item in a subfolder to the Object Storage
 func (i *Item) WriteInto(path string, name string) error {
 	if i == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if i.payload == nil {
-		return scerr.InvalidInstanceContentError("i.payload", "cannot be nil")
+		return fail.InvalidInstanceContentError("i.payload", "cannot be nil")
 	}
 	data, err := i.payload.Serialize()
 	if err != nil {
@@ -183,7 +183,7 @@ func (i *Item) Write(name string) error {
 // BrowseInto walks through a subfolder and item folder and executes a callback for each entry
 func (i *Item) BrowseInto(path string, callback func([]byte) error) error {
 	if callback == nil {
-		return scerr.InvalidParameterError("callback", "cannot be nil!")
+		return fail.InvalidParameterError("callback", "cannot be nil!")
 	}
 
 	if path == "" {

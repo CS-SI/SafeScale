@@ -17,7 +17,7 @@
 
 package safescale
 
-import "github.com/CS-SI/SafeScale/lib/utils/scerr"
+import "github.com/CS-SI/SafeScale/lib/utils/fail"
 
 // Clone makes a copy of HostSizing
 func (x *HostSizing) Clone() *HostSizing {
@@ -37,11 +37,11 @@ func (x *HostSizing) Clone() *HostSizing {
 
 func (x *HostSizing) GreaterThan(y *HostSizing) (bool, error) {
 	if x == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 
 	if y == nil {
-		return false, scerr.InvalidParameterError("y", "cannot be nil")
+		return false, fail.InvalidParameterError("y", "cannot be nil")
 	}
 
 	if x.MinCpuCount < y.MinCpuCount {
@@ -69,11 +69,11 @@ func (x *HostSizing) GreaterThan(y *HostSizing) (bool, error) {
 
 func (x *HostDefinition) LowerThan(y *HostDefinition) (bool, error) {
 	if x == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 
 	if y == nil {
-		return false, scerr.InvalidParameterError("y", "cannot be nil")
+		return false, fail.InvalidParameterError("y", "cannot be nil")
 	}
 
 	less := true
@@ -105,11 +105,11 @@ func (x *HostDefinition) LowerThan(y *HostDefinition) (bool, error) {
 
 func (x *HostDefinition) LowerOrEqualThan(y *HostDefinition) (bool, error) {
 	if x == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 
 	if y == nil {
-		return false, scerr.InvalidParameterError("y", "cannot be nil")
+		return false, fail.InvalidParameterError("y", "cannot be nil")
 	}
 
 	less := true
@@ -141,7 +141,7 @@ func (x *HostDefinition) LowerOrEqualThan(y *HostDefinition) (bool, error) {
 
 func (x *HostSizing) LowerOrEqualThan(y *HostSizing) (bool, error) {
 	if x == nil {
-		return false, scerr.InvalidInstanceError()
+		return false, fail.InvalidInstanceError()
 	}
 
 	gr, err := x.GreaterThan(y)

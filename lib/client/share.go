@@ -21,7 +21,7 @@ import (
 
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -34,7 +34,7 @@ type share struct {
 // Create ...
 func (n *share) Create(def *pb.ShareDefinition, timeout time.Duration) error {
 	if def == nil {
-		return scerr.InvalidParameterError("def", "cannot be nil")
+		return fail.InvalidParameterError("def", "cannot be nil")
 	}
 	n.session.Connect()
 	defer n.session.Disconnect()
@@ -88,7 +88,7 @@ func (n *share) List(timeout time.Duration) (*pb.ShareList, error) {
 // Mount ...
 func (n *share) Mount(def *pb.ShareMountDefinition, timeout time.Duration) error {
 	if def == nil {
-		return scerr.InvalidParameterError("def", "cannot be nil")
+		return fail.InvalidParameterError("def", "cannot be nil")
 	}
 
 	n.session.Connect()
@@ -109,7 +109,7 @@ func (n *share) Mount(def *pb.ShareMountDefinition, timeout time.Duration) error
 // Unmount ...
 func (n *share) Unmount(def *pb.ShareMountDefinition, timeout time.Duration) error {
 	if def == nil {
-		return scerr.InvalidParameterError("def", "cannot be nil")
+		return fail.InvalidParameterError("def", "cannot be nil")
 	}
 
 	n.session.Connect()

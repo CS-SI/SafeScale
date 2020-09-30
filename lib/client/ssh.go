@@ -30,9 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -84,7 +84,7 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 
 			// If an error occurred and is not a timeout one, stop the loop and propagates this error
 			if breakErr != nil {
-				if _, ok := breakErr.(*scerr.ErrTimeout); ok {
+				if _, ok := breakErr.(*fail.ErrTimeout); ok {
 					return breakErr
 				}
 				retcode = -1

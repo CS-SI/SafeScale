@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // TaskGroupResult is a map of the TaskResult of each task
@@ -130,7 +130,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, erro
 
 	taskStatus := tg.task.GetStatus()
 	if taskStatus != READY && taskStatus != RUNNING {
-		return nil, scerr.InvalidRequestError(
+		return nil, fail.InvalidRequestError(
 			fmt.Sprintf(
 				"cannot start new task in group '%s': neither ready nor running", tid,
 			),
@@ -170,7 +170,7 @@ func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
 		return tg.result, tg.task.err
 	}
 	if taskStatus == ABORTED {
-		return nil, scerr.AbortedError("", nil)
+		return nil, fail.AbortedError("", nil)
 	}
 	if taskStatus != RUNNING {
 		return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
@@ -244,7 +244,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(
+			return false, nil, fail.TimeoutError(
 				fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil,
 			)
 		default:

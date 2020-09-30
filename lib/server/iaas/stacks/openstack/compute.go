@@ -48,8 +48,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -83,7 +83,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	opts := images.ListOpts{}
 
@@ -137,7 +137,7 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 	)
 	if (len(imgList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing images: %s", ProviderErrorToString(err)))
+			return nil, fail.Wrap(err, fmt.Sprintf("error listing images: %s", ProviderErrorToString(err)))
 		}
 		logrus.Debugf("Image list empty !")
 	}
@@ -148,7 +148,7 @@ func (s *Stack) ListImages() (imgList []resources.Image, err error) {
 func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	var img *images.Image
 
@@ -166,7 +166,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("error getting image: %s", ProviderErrorToString(err)))
+		return nil, fail.Wrap(err, fmt.Sprintf("error getting image: %s", ProviderErrorToString(err)))
 	}
 
 	return &resources.Image{ID: img.ID, Name: img.Name, DiskSize: int64(img.MinDiskGigabytes)}, nil
@@ -176,7 +176,7 @@ func (s *Stack) GetImage(id string) (image *resources.Image, err error) {
 func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -189,7 +189,7 @@ func (s *Stack) GetTemplate(id string) (template *resources.HostTemplate, err er
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		return nil, scerr.Wrap(retryErr, fmt.Sprintf("error getting template: %s", ProviderErrorToString(retryErr)))
+		return nil, fail.Wrap(retryErr, fmt.Sprintf("error getting template: %s", ProviderErrorToString(retryErr)))
 	}
 	return &resources.HostTemplate{
 		Cores:    flv.VCPUs,
@@ -243,10 +243,10 @@ func (s *Stack) ListTemplates() ([]resources.HostTemplate, error) {
 	)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrTimeout:
+		case fail.ErrTimeout:
 			return nil, err
 		default:
-			return nil, scerr.Wrap(err, "error listing templates")
+			return nil, fail.Wrap(err, "error listing templates")
 		}
 	}
 	if len(flvList) == 0 {
@@ -266,7 +266,7 @@ func (s *Stack) CreateKeyPair(name string) (*resources.KeyPair, error) {
 
 // ImportKeyPair imports a keypair in OpenStack
 func (s *Stack) ImportKeyPair(keypair *resources.KeyPair) error {
-	return scerr.NotImplementedError("ImportKeyPair is not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("ImportKeyPair is not implemented yet") // FIXME: Technical debt
 }
 
 // GetKeyPair returns the key pair identified by id
@@ -275,7 +275,7 @@ func (s *Stack) GetKeyPair(id string) (*resources.KeyPair, error) {
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
 	if err != nil {
-		return nil, scerr.Wrap(err, "error getting keypair")
+		return nil, fail.Wrap(err, "error getting keypair")
 	}
 	return &resources.KeyPair{
 		ID:         kp.Name,
@@ -318,7 +318,7 @@ func (s *Stack) ListKeyPairs() ([]resources.KeyPair, error) {
 	)
 	if (len(kpList) == 0) || (err != nil) {
 		if err != nil {
-			return nil, scerr.Wrap(err, "error listing keypairs")
+			return nil, fail.Wrap(err, "error listing keypairs")
 		}
 	}
 	return kpList, nil
@@ -330,7 +330,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("error deleting key pair: %s", ProviderErrorToString(err)))
+		return fail.Wrap(err, fmt.Sprintf("error deleting key pair: %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -375,17 +375,17 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *resources.Host, err er
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+			return nil, fail.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
 		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
 		if hostParam == nil {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+			return nil, fail.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 	hostRef := host.Name
 	if hostRef == "" {
@@ -583,7 +583,7 @@ func (s *Stack) complementHost(host *resources.Host, server *servers.Server) err
 					net, err := s.GetNetwork(netid)
 					if err != nil {
 						switch err.(type) {
-						case scerr.ErrNotFound:
+						case fail.ErrNotFound:
 							logrus.Errorf(err.Error()) // FIXME: complementHost should be a failure
 						default:
 							logrus.Errorf(
@@ -617,7 +617,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		},
 	)
 	if r.Err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to get data of host '%s': %v", name, r.Err), r.Err)
+		return nil, fail.Errorf(fmt.Sprintf("failed to get data of host '%s': %v", name, r.Err), r.Err)
 	}
 	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	if found && len(serverList) > 0 {
@@ -685,7 +685,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
 			msg := fmt.Sprintf("failed to generate password: %s", err.Error())
-			return nil, userData, scerr.Errorf(msg, err)
+			return nil, userData, fail.Errorf(msg, err)
 		}
 		request.Password = password
 	}
@@ -696,14 +696,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if err != nil {
 		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		return nil, userData, scerr.Errorf(msg, err)
+		return nil, userData, fail.Errorf(msg, err)
 	}
 
 	// Determine system disk size based on vcpus count
 	template, err := s.GetTemplate(request.TemplateID)
 	if err != nil {
 		msg := fmt.Sprintf("failed to get image: %s", ProviderErrorToString(err))
-		return nil, userData, scerr.Errorf(msg, err)
+		return nil, userData, fail.Errorf(msg, err)
 	}
 
 	// Select usable availability zone, the first one in the list
@@ -813,7 +813,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					servers.Delete(s.ComputeClient, server.ID)
 				}
 				msg := ProviderErrorToString(ierr)
-				return scerr.Errorf(msg, ierr)
+				return fail.Errorf(msg, ierr)
 			}
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
@@ -832,7 +832,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			}
 
 			if server == nil {
-				return scerr.Errorf("failed to create server", nil)
+				return fail.Errorf("failed to create server", nil)
 			}
 			host.ID = server.ID
 
@@ -848,12 +848,12 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			srv, ierr = s.waitHostState(host, []hoststate.Enum{hoststate.STARTED}, temporal.GetHostTimeout())
 			if ierr != nil {
 				logrus.Debugf("failure waiting for host state")
-				return scerr.Errorf(ProviderErrorToString(ierr), ierr)
+				return fail.Errorf(ProviderErrorToString(ierr), ierr)
 			}
 
 			if ierr = s.complementHost(host, srv); ierr != nil {
 				logrus.Debugf("failure complementing host data")
-				return scerr.Errorf(ProviderErrorToString(ierr), ierr)
+				return fail.Errorf(ProviderErrorToString(ierr), ierr)
 			}
 
 			ierr = nil
@@ -862,10 +862,10 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, scerr.Wrap(retryErr, "error creating host")
+		return nil, userData, fail.Wrap(retryErr, "error creating host")
 	}
 	if host == nil {
-		return nil, userData, scerr.Errorf(fmt.Sprintf("unexpected problem creating host"), nil)
+		return nil, userData, fail.Errorf(fmt.Sprintf("unexpected problem creating host"), nil)
 	}
 	logrus.Debugf("host resource created.")
 
@@ -877,14 +877,14 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			derr := s.DeleteHost(newHost.ID)
 			if derr != nil {
 				switch derr.(type) {
-				case scerr.ErrNotFound:
+				case fail.ErrNotFound:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-				case scerr.ErrTimeout:
+				case fail.ErrTimeout:
 					logrus.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 				}
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -907,7 +907,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 			},
 		).Extract()
 		if ierr != nil {
-			return nil, userData, scerr.Wrap(ierr, fmt.Sprintf(msgFail, ProviderErrorToString(ierr)))
+			return nil, userData, fail.Wrap(ierr, fmt.Sprintf(msgFail, ProviderErrorToString(ierr)))
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -918,7 +918,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 					derr := floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 					if derr != nil {
 						logrus.Errorf("error deleting floating IP: %v", derr)
-						err = scerr.AddConsequence(err, derr)
+						err = fail.AddConsequence(err, derr)
 					}
 				}
 			}
@@ -934,7 +934,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (host *resources.Host,
 		).ExtractErr()
 		if err != nil {
 			msg := fmt.Sprintf(msgFail, ProviderErrorToString(err))
-			return nil, userData, scerr.Wrap(err, msg)
+			return nil, userData, fail.Wrap(err, msg)
 		}
 
 		logrus.Trace("Editing metadata")
@@ -969,11 +969,11 @@ func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
 	var allServers []ServerWithAZ
 	allPages, err := servers.List(s.ComputeClient, nil).AllPages()
 	if err != nil {
-		return "", scerr.Errorf(fmt.Sprintf("unable to retrieve servers: %s", err), err)
+		return "", fail.Errorf(fmt.Sprintf("unable to retrieve servers: %s", err), err)
 	}
 	err = servers.ExtractServersInto(allPages, &allServers)
 	if err != nil {
-		return "", scerr.Errorf(fmt.Sprintf("unable to extract servers: %s", err), err)
+		return "", fail.Errorf(fmt.Sprintf("unable to extract servers: %s", err), err)
 	}
 	for _, server := range allServers {
 		if server.ID == serverID {
@@ -981,7 +981,7 @@ func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
 		}
 	}
 
-	return "", scerr.Errorf(fmt.Sprintf("unable to find availability zone information for server [%s]", serverID), nil)
+	return "", fail.Errorf(fmt.Sprintf("unable to find availability zone information for server [%s]", serverID), nil)
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
@@ -1017,7 +1017,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 		host = hostParam
 	}
 	if host == nil {
-		return nil, scerr.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
+		return nil, fail.InvalidParameterError("hostParam", "must be a not-empty string or a *resources.Host!")
 	}
 
 	hostRef := host.Name
@@ -1034,13 +1034,13 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 			if err != nil {
 				return ReinterpretGophercloudErrorCode(
 					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
-						return scerr.AbortedError("", ferr)
+						return fail.AbortedError("", ferr)
 					},
 				)
 			}
 
 			if server == nil {
-				return scerr.Errorf("error getting host, nil response from gophercloud", nil)
+				return fail.Errorf("error getting host, nil response from gophercloud", nil)
 			}
 
 			lastState := toHostState(server.Status)
@@ -1063,11 +1063,11 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 			}
 
 			if lastState == hoststate.ERROR {
-				return scerr.AbortedError("", resources.ResourceNotAvailableError("host", host.ID))
+				return fail.AbortedError("", resources.ResourceNotAvailableError("host", host.ID))
 			}
 
 			if !((lastState == hoststate.STARTING) || (lastState == hoststate.STOPPING)) {
-				return scerr.Errorf(
+				return fail.Errorf(
 					fmt.Sprintf(
 						"host status of '%s' is in state '%s', and that's not a transition state", host.ID,
 						server.Status,
@@ -1075,7 +1075,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 				)
 			}
 
-			return scerr.Errorf("server not ready yet", nil)
+			return fail.Errorf("server not ready yet", nil)
 		},
 		temporal.GetMinDelay(),
 		timeout,
@@ -1112,7 +1112,7 @@ func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ ho
 		host = hostParam
 	}
 	if host == nil {
-		return hoststate.ERROR, scerr.InvalidParameterError(
+		return hoststate.ERROR, fail.InvalidParameterError(
 			"hostParam", "must be a not-empty string or a *resources.Host!",
 		)
 	}
@@ -1131,13 +1131,13 @@ func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ ho
 			if err != nil {
 				return ReinterpretGophercloudErrorCode(
 					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
-						return scerr.AbortedError("", ferr)
+						return fail.AbortedError("", ferr)
 					},
 				)
 			}
 
 			if server == nil {
-				return scerr.Errorf("error getting host, nil response from gophercloud", nil)
+				return fail.Errorf("error getting host, nil response from gophercloud", nil)
 			}
 
 			lastState = toHostState(server.Status)
@@ -1167,7 +1167,7 @@ func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ ho
 }
 
 // GetHostState returns the current state of host identified by id
-// hostParam can be a string or an instance of *resources.Host; any other type will return an scerr.InvalidParameterError
+// hostParam can be a string or an instance of *resources.Host; any other type will return an fail.InvalidParameterError
 func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	defer debug.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
@@ -1202,7 +1202,7 @@ func (s *Stack) ListHosts() ([]*resources.Host, error) {
 	)
 	if len(hosts) == 0 || err != nil {
 		if err != nil {
-			return nil, scerr.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
+			return nil, fail.Wrap(err, fmt.Sprintf("error listing hosts : %s", ProviderErrorToString(err)))
 		}
 		logrus.Warnf("Hosts lists empty !")
 	}
@@ -1218,21 +1218,21 @@ func (s *Stack) DeleteHost(id string) error {
 		fip, err := s.getFloatingIP(id)
 		if err != nil {
 			switch err.(type) {
-			case scerr.ErrNotFound:
+			case fail.ErrNotFound:
 				// Continue
 			default:
-				return scerr.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
+				return fail.Wrap(err, fmt.Sprintf("error retrieving floating ip for '%s'", id))
 			}
 		} else if fip != nil {
 			err = floatingips.DisassociateInstance(
 				s.ComputeClient, id, floatingips.DisassociateOpts{FloatingIP: fip.IP},
 			).ExtractErr()
 			if err != nil {
-				return scerr.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+				return fail.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 			}
 			err = floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
 			if err != nil {
-				return scerr.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
+				return fail.Wrap(err, fmt.Sprintf("error deleting host '%s' : %s", id, ProviderErrorToString(err)))
 			}
 		}
 	}
@@ -1246,7 +1246,7 @@ func (s *Stack) DeleteHost(id string) error {
 			if err != nil {
 				return ReinterpretGophercloudErrorCode(
 					err, []int64{404}, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
-						return scerr.Errorf(
+						return fail.Errorf(
 							fmt.Sprintf(
 								"failed to submit host '%s' deletion: %s", id, ProviderErrorToString(ferr),
 							), ferr,
@@ -1265,12 +1265,12 @@ func (s *Stack) DeleteHost(id string) error {
 						if toHostState(host.Status) == hoststate.ERROR {
 							return nil
 						}
-						return scerr.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), err)
+						return fail.Errorf(fmt.Sprintf("host '%s' state is '%s'", host.Name, host.Status), err)
 					}
 
 					rei := ReinterpretGophercloudErrorCode(
 						err, []int64{404}, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
-							return scerr.Errorf(
+							return fail.Errorf(
 								fmt.Sprintf(
 									"failed to submit host '%s' deletion: %s", id, ProviderErrorToString(ferr),
 								), ferr,
@@ -1300,13 +1300,13 @@ func (s *Stack) DeleteHost(id string) error {
 				logrus.Debugf("Host '%s' not found, deletion considered successful after a few retries", id)
 				return nil
 			}
-			return scerr.Errorf(fmt.Sprintf("host '%s' in state 'ERROR', retrying to delete", id), err)
+			return fail.Errorf(fmt.Sprintf("host '%s' in state 'ERROR', retrying to delete", id), err)
 		},
 		0,
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		return scerr.Wrap(outerRetryErr, "error deleting host: retry error")
+		return fail.Wrap(outerRetryErr, "error deleting host: retry error")
 	}
 	return nil
 }
@@ -1317,7 +1317,7 @@ func (s *Stack) StopHost(id string) error {
 
 	err := startstop.Stop(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
+		return fail.Wrap(err, fmt.Sprintf("error stopping host : %s", ProviderErrorToString(err)))
 	}
 	return nil
 }
@@ -1333,7 +1333,7 @@ func (s *Stack) RebootHost(id string) error {
 	}
 	if err != nil {
 		ftErr := fmt.Sprintf("error rebooting host [%s]: %s", id, ProviderErrorToString(err))
-		return scerr.Wrap(err, ftErr)
+		return fail.Wrap(err, ftErr)
 	}
 	return nil
 }
@@ -1344,7 +1344,7 @@ func (s *Stack) StartHost(id string) error {
 
 	err := startstop.Start(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("error starting host : %s", ProviderErrorToString(err)))
+		return fail.Wrap(err, fmt.Sprintf("error starting host : %s", ProviderErrorToString(err)))
 	}
 
 	return nil
@@ -1360,5 +1360,5 @@ func (s *Stack) ResizeHost(id string, request resources.SizingRequirements) (*re
 	// TODO: RESIZE Call this
 	// servers.Resize()
 
-	return nil, scerr.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }

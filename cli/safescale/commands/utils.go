@@ -26,7 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -47,10 +47,10 @@ type RemoteFileItem struct {
 // Upload transfers the local file to the hostname
 func (rfc RemoteFileItem) Upload(hostname string) error {
 	if rfc.Local == "" {
-		return scerr.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
 	}
 	if rfc.Remote == "" {
-		return scerr.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
 	SSHClient := client.New().SSH
@@ -63,7 +63,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 		return err
 	}
 	if retcode != 0 {
-		return scerr.Errorf(fmt.Sprintf("failed to copy file '%s'", rfc.Local), nil)
+		return fail.Errorf(fmt.Sprintf("failed to copy file '%s'", rfc.Local), nil)
 	}
 
 	// Updates owner and access rights if asked for
@@ -84,7 +84,7 @@ func (rfc RemoteFileItem) Upload(hostname string) error {
 		return err
 	}
 	if retcode != 0 {
-		return scerr.Errorf(fmt.Sprintf("failed to update owner and/or access rights of the remote file"), nil)
+		return fail.Errorf(fmt.Sprintf("failed to update owner and/or access rights of the remote file"), nil)
 	}
 
 	return nil
@@ -98,7 +98,7 @@ func (rfc RemoteFileItem) RemoveRemote(hostname string) error {
 		hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
 	)
 	if err != nil || retcode != 0 {
-		return scerr.Errorf(fmt.Sprintf("failed to remove file '%s:%s'", hostname, rfc.Remote), nil)
+		return fail.Errorf(fmt.Sprintf("failed to remove file '%s:%s'", hostname, rfc.Remote), nil)
 	}
 	return nil
 }

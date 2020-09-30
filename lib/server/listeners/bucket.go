@@ -30,7 +30,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // BucketHandler ...
@@ -50,7 +50,7 @@ type BucketListener struct{}
 func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *pb.BucketList, err error) {
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -67,7 +67,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	handler := BucketHandler(tenant.Service)
 	buckets, err := handler.List(ctx)
 	if err != nil {
-		tbr := scerr.Wrap(err, "Can't list buckets"+adaptedUserMessage(err))
+		tbr := fail.Wrap(err, "Can't list buckets"+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -79,7 +79,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	bucketName := in.GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Create : "+bucketName); err != nil {
@@ -97,7 +97,7 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	handler := BucketHandler(tenant.Service)
 	err = handler.Create(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot create bucket"+adaptedUserMessage(err))
+		tbr := fail.Wrap(err, "cannot create bucket"+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -109,7 +109,7 @@ func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *goo
 	bucketName := in.GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -128,7 +128,7 @@ func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *goo
 	handler := BucketHandler(tenant.Service)
 	err = handler.Destroy(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot destroy bucket"+adaptedUserMessage(err))
+		tbr := fail.Wrap(err, "cannot destroy bucket"+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -140,7 +140,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	bucketName := in.GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 
@@ -159,7 +159,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	handler := BucketHandler(tenant.Service)
 	err = handler.Delete(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot delete bucket"+adaptedUserMessage(err))
+		tbr := fail.Wrap(err, "cannot delete bucket"+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -171,7 +171,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	bucketName := in.GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
@@ -189,7 +189,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	handler := BucketHandler(tenant.Service)
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
-		tbr := scerr.Wrap(err, "cannot inspect bucket"+adaptedUserMessage(err))
+		tbr := fail.Wrap(err, "cannot inspect bucket"+adaptedUserMessage(err))
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 	if resp == nil {
@@ -204,7 +204,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *pb.BucketMountingPoint) 
 	hostName := in.GetHost().GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Mount : "+bucketName+" on "+hostName); err != nil {
@@ -233,7 +233,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *pb.BucketMountingPoint
 	hostName := in.GetHost().GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", bucketName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 

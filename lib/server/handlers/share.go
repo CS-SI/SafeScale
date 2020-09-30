@@ -34,7 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/metadata"
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ShareAPI
@@ -79,21 +79,21 @@ func (handler *ShareHandler) Create(
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,
 ) (share *propsv1.HostShare, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); !ok {
+		if _, ok := err.(fail.ErrNotFound); !ok {
 			return nil, err
 		}
 	}
@@ -171,7 +171,7 @@ func (handler *ShareHandler) Create(
 			err2 := nfsServer.RemoveShare(sharePath)
 			if err2 != nil {
 				log.Warn("failed to RemoveShare")
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -185,7 +185,7 @@ func (handler *ShareHandler) Create(
 			share.Name = shareName
 			shareID, err := uuid.NewV4()
 			if err != nil {
-				return scerr.Wrap(err, "Error creating UUID for share")
+				return fail.Wrap(err, "Error creating UUID for share")
 			}
 			share.ID = shareID.String()
 			share.Path = sharePath
@@ -218,12 +218,12 @@ func (handler *ShareHandler) Create(
 			)
 			if err2 != nil {
 				log.Warnf("failed to set shares metadata of host %s", hostName)
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("failed to save metadata of host %s", hostName)
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -236,7 +236,7 @@ func (handler *ShareHandler) Create(
 			derr := ms.Delete()
 			if derr != nil {
 				log.Warnf("failed to delete metadata of share '%s'", newShare.Name)
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -255,16 +255,16 @@ func (handler *ShareHandler) Create(
 // Delete a share from host
 func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return scerr.InvalidParameterError("ctx", "cannot be nil")
+		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Retrieve info about the share
 	server, share, _, err := handler.ForceInspect(ctx, name)
@@ -345,15 +345,15 @@ func (handler *ShareHandler) Delete(ctx context.Context, name string) (err error
 // List return the list of all shares from all servers
 func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[string]*propsv1.HostShare, err error) {
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	shares := map[string]map[string]*propsv1.HostShare{}
 
@@ -402,8 +402,8 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 	}
 
 	if len(shares) == 0 && len(warnings) != 0 {
-		return shares, scerr.Errorf(
-			"there have been problems iterating the list of shares", scerr.ErrListError(warnings),
+		return shares, fail.Errorf(
+			"there have been problems iterating the list of shares", fail.ErrListError(warnings),
 		)
 	}
 
@@ -418,16 +418,16 @@ func (handler *ShareHandler) Mount(
 ) (mount *propsv1.HostRemoteMount, err error) {
 
 	if handler == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Retrieve info about the share
 	server, share, _, err := handler.Inspect(ctx, shareName)
@@ -548,22 +548,22 @@ func (handler *ShareHandler) Mount(
 			sshHandler := NewSSHHandler(handler.service)
 			sshConfig, derr := sshHandler.GetConfig(ctx, target)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 
 			nfsClient, derr := nfs.NewNFSClient(sshConfig)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 
 			derr = nfsClient.Install()
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 
 			derr = nfsClient.Unmount(export)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -606,12 +606,12 @@ func (handler *ShareHandler) Mount(
 			)
 			if err2 != nil {
 				log.Warnf("failed to remove mounted share %s from host %s metadatas", shareName, server.Name)
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 			err2 = mh.Write()
 			if err2 != nil {
 				log.Warnf("failed to save host %s metadatas : %s", server.Name, err2.Error())
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -637,12 +637,12 @@ func (handler *ShareHandler) Mount(
 			)
 			if err2 != nil {
 				log.Warnf("failed to remove mounted share '%s' from host '%s' metadata", shareName, hostName)
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 			_, err2 = metadata.SaveHost(handler.service, target)
 			if err2 != nil {
 				log.Warnf("failed to save host '%s' metadata : %s", hostName, err2.Error())
-				err = scerr.AddConsequence(err, err2)
+				err = fail.AddConsequence(err, err2)
 			}
 		}
 	}()
@@ -661,16 +661,16 @@ func (handler *ShareHandler) Mount(
 // Unmount a share from local directory of an host
 func (handler *ShareHandler) Unmount(ctx context.Context, shareName, hostName string) (err error) {
 	if handler == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return scerr.InvalidParameterError("ctx", "cannot be nil")
+		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", shareName, hostName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	server, share, _, err := handler.ForceInspect(ctx, shareName)
 	if err != nil {
@@ -787,16 +787,16 @@ func (handler *ShareHandler) ForceInspect(
 ) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
 
 	if handler == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, nil, nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, nil, nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	host, share, mounts, err := handler.Inspect(ctx, shareName)
 	if err != nil {
@@ -816,20 +816,20 @@ func (handler *ShareHandler) Inspect(
 ) (host *resources.Host, share *propsv1.HostShare, props map[string]*propsv1.HostRemoteMount, err error) {
 
 	if handler == nil {
-		return nil, nil, nil, scerr.InvalidInstanceError()
+		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, nil, nil, scerr.InvalidParameterError("ctx", "cannot be nil")
+		return nil, nil, nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", shareName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostName, err := metadata.LoadShare(handler.service, shareName)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.ErrNotFound); ok {
 			return nil, nil, nil, resources.ResourceNotFoundError("share", shareName)
 		}
 		return nil, nil, nil, err

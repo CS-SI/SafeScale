@@ -8,7 +8,7 @@ import (
 	"github.com/libvirt/libvirt-go"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 type Stack struct {
@@ -28,14 +28,14 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, 
 
 	libvirtConnection, err := libvirt.NewConnect(stack.LibvirtConfig.URI)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("failed to connect to libvirt : %s", err.Error()), err)
+		return nil, fail.Errorf(fmt.Sprintf("failed to connect to libvirt : %s", err.Error()), err)
 	}
 	stack.LibvirtService = libvirtConnection
 
 	if stack.LibvirtConfig.LibvirtStorage != "" {
 		err := stack.CreatePoolIfUnexistant(stack.LibvirtConfig.LibvirtStorage)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("unable to create StoragePool : %s", err.Error()), err)
+			return nil, fail.Errorf(fmt.Sprintf("unable to create StoragePool : %s", err.Error()), err)
 		}
 	}
 

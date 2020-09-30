@@ -27,7 +27,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // -------------Volumes Management---------------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Vo
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error creating volume"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error creating volume"))
 	}
 
 	storageProfileValue := ""
@@ -62,28 +62,28 @@ func (s *StackEbrc) CreateVolume(request resources.VolumeRequest) (*resources.Vo
 	if storageProfileValue != "" {
 		storageReference, err = vdc.FindStorageProfileReference(storageProfileValue)
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("error finding storage profile %s", storageProfileValue), err)
+			return nil, fail.Errorf(fmt.Sprintf("error finding storage profile %s", storageProfileValue), err)
 		}
 		diskCreateParams.Disk.StorageProfile = &types.Reference{HREF: storageReference.HREF}
 	}
 
 	task, err := vdc.CreateDisk(diskCreateParams)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
+		return nil, fail.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
 	}
 
 	err = task.WaitTaskCompletion()
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("error waiting to finish creation of independent disk: %s", err), err)
+		return nil, fail.Errorf(fmt.Sprintf("error waiting to finish creation of independent disk: %s", err), err)
 	}
 
 	drec, err := vdc.QueryDisk(request.Name)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
+		return nil, fail.Errorf(fmt.Sprintf("error creating independent disk: %s", err), err)
 	}
 	disk, err := vdc.FindDiskByHREF(drec.Disk.HREF)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("unable to find disk by reference: %s", err), err)
+		return nil, fail.Errorf(fmt.Sprintf("unable to find disk by reference: %s", err), err)
 	}
 
 	revol := &resources.Volume{
@@ -104,7 +104,7 @@ func (s *StackEbrc) GetVolume(ref string) (*resources.Volume, error) {
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error listing volumes"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error listing volumes"))
 	}
 
 	// FIXME: Add data
@@ -136,13 +136,13 @@ func (s *StackEbrc) ListVolumes() ([]resources.Volume, error) {
 
 	org, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return volumes, scerr.Wrap(err, fmt.Sprintf("Error listing volumes"))
+		return volumes, fail.Wrap(err, fmt.Sprintf("Error listing volumes"))
 	}
 
 	// Check if network is already there
 	refs, err := getLinks(org, "vnd.vmware.vcloud.disk+xml")
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error recovering network information"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error recovering network information"))
 	}
 	for _, ref := range refs {
 		// FIXME: Add data
@@ -196,22 +196,22 @@ func (s *StackEbrc) CreateVolumeAttachment(request resources.VolumeAttachmentReq
 
 	vm, err := s.findVMByID(request.HostID)
 	if err != nil || utils.IsEmpty(vm) {
-		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
+		return "", fail.Wrap(err, fmt.Sprintf("Error creating attachment, vm empty"))
 	}
 
 	disk, err := s.findDiskByID(request.VolumeID)
 	if err != nil || utils.IsEmpty(disk) {
-		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment, disk empty"))
+		return "", fail.Wrap(err, fmt.Sprintf("Error creating attachment, disk empty"))
 	}
 
 	attask, err := vm.AttachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
 	if err != nil {
-		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment"))
+		return "", fail.Wrap(err, fmt.Sprintf("Error creating attachment"))
 	}
 
 	err = attask.WaitTaskCompletion()
 	if err != nil {
-		return "", scerr.Wrap(err, fmt.Sprintf("Error creating attachment"))
+		return "", fail.Wrap(err, fmt.Sprintf("Error creating attachment"))
 	}
 
 	return getAttachmentID(request.HostID, request.VolumeID), nil
@@ -224,7 +224,7 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 
 	vats, err := s.ListVolumeAttachments(serverID)
 	if err != nil {
-		return nil, scerr.Wrap(err, fmt.Sprintf("Error getting attachment"))
+		return nil, fail.Wrap(err, fmt.Sprintf("Error getting attachment"))
 	}
 
 	for _, vat := range vats {
@@ -233,7 +233,7 @@ func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*resources.VolumeA
 		}
 	}
 
-	return nil, scerr.Errorf(fmt.Sprintf("Attachment [%s] to [%s] not found", id, serverID), nil)
+	return nil, fail.Errorf(fmt.Sprintf("Attachment [%s] to [%s] not found", id, serverID), nil)
 }
 
 // DeleteVolumeAttachment ...
@@ -243,7 +243,7 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 
 	vm, err := s.findVMByID(serverID)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting attachment"))
 	}
 
 	splitted := strings.Split(id, ":")
@@ -251,17 +251,17 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 	diskId := strings.Join(splitted[len(splitted)/2:], ":")
 	disk, err := s.findDiskByID(diskId)
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting attachment"))
 	}
 
 	attask, err := vm.DetachDisk(&types.DiskAttachOrDetachParams{Disk: &types.Reference{HREF: disk.Disk.HREF}})
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error deleting attachment"))
+		return fail.Wrap(err, fmt.Sprintf("Error deleting attachment"))
 	}
 
 	err = attask.WaitTaskCompletion()
 	if err != nil {
-		return scerr.Wrap(err, fmt.Sprintf("Error creating attachment"))
+		return fail.Wrap(err, fmt.Sprintf("Error creating attachment"))
 	}
 
 	return nil
@@ -276,7 +276,7 @@ func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]resources.VolumeAt
 
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
-		return []resources.VolumeAttachment{}, scerr.Wrap(err, fmt.Sprintf("Error deleting volume"))
+		return []resources.VolumeAttachment{}, fail.Wrap(err, fmt.Sprintf("Error deleting volume"))
 	}
 
 	var attachments []resources.VolumeAttachment

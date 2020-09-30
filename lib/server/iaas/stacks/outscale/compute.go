@@ -37,8 +37,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -66,7 +66,7 @@ func normalizeImageName(name string) string {
 func (s *Stack) ListImages(bool) ([]resources.Image, error) {
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), "failed to list images")
+		return nil, fail.Wrap(normalizeError(err), "failed to list images")
 	}
 	var images []resources.Image
 	for _, omi := range res.Images {
@@ -116,7 +116,7 @@ func parseSizing(s string) (cpus, ram, perf int, err error) {
 	)
 
 	if len(tokens) < 2 {
-		return 0, 0, 0, scerr.InconsistentError("error parsing sizing string")
+		return 0, 0, 0, fail.InconsistentError("error parsing sizing string")
 	}
 
 	cpus, err = strconv.Atoi(tokens[0])
@@ -146,7 +146,7 @@ func parseGPU(s string) (gpus int, gpuType string, err error) {
 		},
 	)
 	if len(tokens) < 2 {
-		err = scerr.InvalidParameterError("id", "malformed id")
+		err = fail.InvalidParameterError("id", "malformed id")
 		return
 	}
 	gpus, err = strconv.Atoi(tokens[0])
@@ -160,19 +160,19 @@ func parseGPU(s string) (gpus int, gpuType string, err error) {
 func (s *Stack) parseTemplateID(id string) (*resources.HostTemplate, error) {
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 || !strings.HasPrefix(id, "tina") {
-		return nil, scerr.InvalidParameterError("id", "invalid template id")
+		return nil, fail.InvalidParameterError("id", "invalid template id")
 	}
 
 	cpus, ram, perf, err := parseSizing(tokens[1])
 	if err != nil {
-		return nil, scerr.InvalidParameterError("id", "invalid template id")
+		return nil, fail.InvalidParameterError("id", "invalid template id")
 	}
 	gpus := 0
 	gpuType := ""
 	if len(tokens) > 2 {
 		gpus, gpuType, err = parseGPU(tokens[2])
 		if err != nil {
-			return nil, scerr.InvalidParameterError("id", "invalid template id")
+			return nil, fail.InvalidParameterError("id", "invalid template id")
 		}
 	}
 	return &resources.HostTemplate{
@@ -317,7 +317,7 @@ func (s *Stack) ListTemplates(bool) ([]resources.HostTemplate, error) {
 func (s *Stack) GetImage(id string) (_ *resources.Image, err error) {
 	defer func() {
 		if err != nil {
-			err = scerr.Wrap(err, fmt.Sprintf("failed to get image '%s'", id))
+			err = fail.Wrap(err, fmt.Sprintf("failed to get image '%s'", id))
 		}
 	}()
 
@@ -334,10 +334,10 @@ func (s *Stack) GetImage(id string) (_ *resources.Image, err error) {
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get image '%s'", id))
+		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to get image '%s'", id))
 	}
 	if len(res.Images) != 1 {
-		return nil, scerr.InconsistentError("more than one image with the same id")
+		return nil, fail.InconsistentError("more than one image with the same id")
 	}
 	img := res.Images[0]
 	return &resources.Image{
@@ -481,7 +481,7 @@ func (s *Stack) hostState(id string) (hoststate.Enum, error) {
 		return hoststate.ERROR, err
 	}
 	if vm == nil {
-		return hoststate.TERMINATED, scerr.AbortedError("", fmt.Errorf("vm %s does not exist", id))
+		return hoststate.TERMINATED, fail.AbortedError("", fmt.Errorf("vm %s does not exist", id))
 	}
 	return hostState(vm.State), nil
 }
@@ -492,13 +492,13 @@ func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 		func() error {
 			hostState, err := s.hostState(hostID)
 			if err != nil {
-				return scerr.Errorf("", err)
+				return fail.Errorf("", err)
 			}
 			if state != hostState {
-				return scerr.Errorf("wrong state", nil)
+				return fail.Errorf("wrong state", nil)
 			}
 			if state == hoststate.ERROR {
-				return scerr.AbortedError("host in error state", err)
+				return fail.AbortedError("host in error state", err)
 			}
 			return nil
 		}, temporal.GetHostCreationTimeout(),
@@ -509,7 +509,7 @@ func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 func outscaleTemplateID(id string) (string, error) {
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 {
-		return "", scerr.InvalidParameterError("id", "malformed template id")
+		return "", fail.InvalidParameterError("id", "malformed template id")
 	}
 	if len(tokens) == 2 {
 		return id, nil
@@ -550,7 +550,7 @@ func (s *Stack) addGPUs(request *resources.HostRequest, vmID string) error {
 		return err
 	}
 	if tpl == nil {
-		return scerr.InvalidParameterError("request.TemplateID", "Template does not exists")
+		return fail.InvalidParameterError("request.TemplateID", "Template does not exists")
 	}
 	if tpl.GPUNumber <= 0 {
 		return nil
@@ -624,12 +624,12 @@ func (s *Stack) addVolume(request *resources.HostRequest, vmID string) (err erro
 	}
 	defer func() {
 		if err != nil {
-			if !scerr.ImplementsCauser(err) {
-				err = scerr.Wrap(err, "")
+			if !fail.ImplementsCauser(err) {
+				err = fail.Wrap(err, "")
 			}
 			derr := s.DeleteVolume(v.ID)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -794,7 +794,7 @@ func (s *Stack) initHostProperties(request *resources.HostRequest, host *resourc
 		return err
 	}
 	if template == nil {
-		return scerr.InvalidParameterError("request.TemplateID", "Invalid template ID")
+		return fail.InvalidParameterError("request.TemplateID", "Invalid template ID")
 	}
 
 	host.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
@@ -931,7 +931,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 			return nil, nil, err
 		}
 		if tpl == nil {
-			return nil, nil, scerr.InvalidParameterError("request.TemplateID", "Template does not exist")
+			return nil, nil, fail.InvalidParameterError("request.TemplateID", "Template does not exist")
 		}
 
 		var diskSize int
@@ -965,24 +965,24 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 		},
 	)
 	if err != nil {
-		return nil, userData, scerr.Wrap(
+		return nil, userData, fail.Wrap(
 			normalizeError(err), fmt.Sprintf("failed to create host '%s'", request.ResourceName),
 		)
 	}
 
 	if len(resVM.Vms) == 0 {
-		return nil, userData, scerr.InconsistentError("virtual machine list empty")
+		return nil, userData, fail.InconsistentError("virtual machine list empty")
 	}
 
 	vm := resVM.Vms[0]
 	defer func() {
 		if err != nil {
-			if !scerr.ImplementsCauser(err) {
-				err = scerr.Wrap(err, "")
+			if !fail.ImplementsCauser(err) {
+				err = fail.Wrap(err, "")
 			}
 			derr := s.DeleteHost(vm.VmId)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -997,7 +997,7 @@ func (s *Stack) CreateHost(request resources.HostRequest) (_ *resources.Host, _ 
 		return nil, userData, err
 	}
 	if len(nics) == 0 {
-		return nil, userData, scerr.InconsistentError("No network interface associated to vm")
+		return nil, userData, fail.InconsistentError("No network interface associated to vm")
 	}
 	defaultNic := nics[0]
 
@@ -1165,18 +1165,18 @@ func (s *Stack) InspectHost(hostParam interface{}) (*resources.Host, error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+			return nil, fail.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
 		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
 		if hostParam == nil {
-			return nil, scerr.InvalidParameterError("hostParam", "cannot be nil")
+			return nil, fail.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 		hostName = host.Name
 	default:
-		return nil, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return nil, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	vm, err := s.getVM(host.ID)
@@ -1222,7 +1222,7 @@ func (s *Stack) GetHostByName(name string) (*resources.Host, error) {
 		return nil, normalizeError(err)
 	}
 	if len(res.Vms) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("No host named %s", name))
+		return nil, fail.NotFoundError(fmt.Sprintf("No host named %s", name))
 	}
 	return s.InspectHost(res.Vms[0].VmId)
 }
@@ -1233,17 +1233,17 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
-			return hoststate.UNKNOWN, scerr.InvalidParameterError("hostParam", "cannot be an empty string")
+			return hoststate.UNKNOWN, fail.InvalidParameterError("hostParam", "cannot be an empty string")
 		}
 		host = resources.NewHost()
 		host.ID = hostParam
 	case *resources.Host:
 		if hostParam == nil {
-			return hoststate.UNKNOWN, scerr.InvalidParameterError("hostParam", "cannot be nil")
+			return hoststate.UNKNOWN, fail.InvalidParameterError("hostParam", "cannot be nil")
 		}
 		host = hostParam
 	default:
-		return hoststate.UNKNOWN, scerr.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
+		return hoststate.UNKNOWN, fail.InvalidParameterError("hostParam", "must be a string or a *resources.Host")
 	}
 
 	return s.hostState(host.ID)

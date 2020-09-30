@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func caseInsensitiveContains(haystack, needle string) bool {
@@ -29,7 +29,7 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
 	xValue := reflect.ValueOf(err)
 
 	if xValue.Kind() != reflect.Struct {
-		return 0, scerr.Errorf(fmt.Sprintf("not a gophercloud.ErrUnexpectedResponseCode"), nil)
+		return 0, fail.Errorf(fmt.Sprintf("not a gophercloud.ErrUnexpectedResponseCode"), nil)
 	}
 
 	_, there := xType.FieldByName("ErrUnexpectedResponseCode")
@@ -43,7 +43,7 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
 		}
 	}
 
-	return 0, scerr.Errorf(fmt.Sprintf("not a gophercloud.ErrUnexpectedResponseCode"), nil)
+	return 0, fail.Errorf(fmt.Sprintf("not a gophercloud.ErrUnexpectedResponseCode"), nil)
 }
 
 func ReinterpretGophercloudErrorCode(gopherErr error, success []int64, transparent []int64, abort []int64, defaultHandler func(error) error) error {
@@ -60,7 +60,7 @@ func ReinterpretGophercloudErrorCode(gopherErr error, success []int64, transpare
 
 		for _, tcode := range abort {
 			if tcode == code {
-				return scerr.AbortedError("", gopherErr)
+				return fail.AbortedError("", gopherErr)
 			}
 		}
 
@@ -87,7 +87,7 @@ func defaultErrorInterpreter(inErr error) error {
 				return ferr
 			}
 
-			return scerr.AbortedError("", ferr)
+			return fail.AbortedError("", ferr)
 		},
 	)
 }

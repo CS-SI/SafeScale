@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/graymeta/stow"
 )
@@ -70,7 +70,7 @@ func (b *bucket) GetObject(objectName string) (Object, error) {
 // ListObjects list objects of a Bucket
 func (b *bucket) List(path, prefix string) ([]string, error) {
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -103,7 +103,7 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 // Browse walks through the objects in the Bucket and executes callback on each Object found
 func (b *bucket) Browse(path, prefix string, callback func(Object) error) error {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -131,11 +131,11 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 // Clear empties a bucket
 func (b *bucket) Clear(path, prefix string) error {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	if b.container == nil {
-		return scerr.InvalidInstanceContentError("b.container", "cannot be nil")
+		return fail.InvalidInstanceContentError("b.container", "cannot be nil")
 	}
 
 	defer debug.NewTracer(
@@ -166,10 +166,10 @@ func (b *bucket) Clear(path, prefix string) error {
 // DeleteObject deletes an object from a bucket
 func (b *bucket) DeleteObject(objectName string) error {
 	if b == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if objectName == "" {
-		return scerr.InvalidParameterError("objectName", "cannot be empty string")
+		return fail.InvalidParameterError("objectName", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(
@@ -186,7 +186,7 @@ func (b *bucket) DeleteObject(objectName string) error {
 // ReadObject ...
 func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, error) {
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -207,7 +207,7 @@ func (b *bucket) ReadObject(objectName string, target io.Writer, from int64, to 
 // WriteObject ...
 func (b *bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata ObjectMetadata) (Object, error) {
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -238,7 +238,7 @@ func (b *bucket) WriteMultiPartObject(
 ) (Object, error) {
 
 	if b == nil {
-		return nil, scerr.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -264,7 +264,7 @@ func (b *bucket) WriteMultiPartObject(
 // GetName returns the name of the Bucket
 func (b *bucket) GetName() (string, error) {
 	if b == nil {
-		return "", scerr.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 
 	return b.Name, nil
@@ -274,7 +274,7 @@ func (b *bucket) GetName() (string, error) {
 // 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
 func (b *bucket) GetCount(path, prefix string) (int64, error) {
 	if b == nil {
-		return 0, scerr.InvalidInstanceError()
+		return 0, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(
@@ -305,7 +305,7 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 // GetSize returns the total size of the Objects inside the Bucket
 func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 	if b == nil {
-		return 0, "", scerr.InvalidInstanceError()
+		return 0, "", fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(

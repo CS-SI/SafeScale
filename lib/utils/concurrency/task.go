@@ -25,7 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -148,7 +148,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, error) {
 	)
 
 	if ctx == nil {
-		return nil, scerr.InvalidParameterError("ctx", "cannot be nil, use context.TODO() instead")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil, use context.TODO() instead")
 	}
 
 	if parentTask == nil {
@@ -214,10 +214,10 @@ func (t *task) GetContext() context.Context {
 // becomes the responsability of the developer...
 func (t *task) ForceID(id string) (Task, error) {
 	if id == "" {
-		return nil, scerr.InvalidParameterError("id", "cannot be empty!")
+		return nil, fail.InvalidParameterError("id", "cannot be empty!")
 	}
 	if id == "0" {
-		return nil, scerr.InvalidParameterError("id", "cannot be '0', reserved for root task")
+		return nil, fail.InvalidParameterError("id", "cannot be '0', reserved for root task")
 	}
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -289,7 +289,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.abortCh = nil
 				if t.status != TIMEOUT {
 					t.status = ABORTED
-					t.err = scerr.AbortedError("", nil)
+					t.err = fail.AbortedError("", nil)
 				}
 				t.lock.Unlock()
 				finish = true
@@ -297,7 +297,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Lock()
 				st := t.status
 				t.status = TIMEOUT
-				t.err = scerr.TimeoutError(
+				t.err = fail.TimeoutError(
 					fmt.Sprintf(
 						"task is out of time ( %s > %s)", temporal.FormatDuration(time.Since(begin)),
 						temporal.FormatDuration(timeout),
@@ -333,7 +333,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.abortCh = nil
 				if t.status != TIMEOUT {
 					t.status = ABORTED
-					t.err = scerr.AbortedError("", nil)
+					t.err = fail.AbortedError("", nil)
 				}
 				t.lock.Unlock()
 				finish = true
@@ -417,8 +417,8 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 // WaitFor waits for the task to end, for 'duration' duration.
 // Note: if timeout occured, the task is not aborted. You have to abort it yourself if needed.
 // If task done, returns (true, <error from the task>)
-// If task aborted, returns (true, scerr.ErrAborted)
-// If duration elapsed (meaning the task is still running after duration), returns (false, scerr.ErrTimeout)
+// If task aborted, returns (true, fail.ErrAborted)
+// If duration elapsed (meaning the task is still running after duration), returns (false, fail.ErrTimeout)
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	tid, _ := t.GetID() // FIXME: Later
 
@@ -436,7 +436,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	for {
 		select {
 		case <-time.After(duration):
-			return false, nil, scerr.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
+			return false, nil, fail.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
 		default:
 			ok, result, err := t.TryWait()
 			if ok {
@@ -484,7 +484,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 // Abort aborts the task execution
 func (t *task) Abort() error {
 	if t == nil {
-		return scerr.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 
 	status := t.GetStatus()

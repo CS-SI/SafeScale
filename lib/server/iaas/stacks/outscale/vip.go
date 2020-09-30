@@ -25,7 +25,7 @@ import (
 	"github.com/outscale-dev/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateVIP ...
@@ -61,20 +61,20 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *resources.VirtualIP,
 				}
 				_, _, cerr := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{DeleteNicRequest: optional.NewInterface(dnr)})
 				if cerr != nil {
-					err = scerr.AddConsequence(err, cerr)
+					err = fail.AddConsequence(err, cerr)
 				}
 			}
 		}()
 	*/
 
 	if len(res.Nic.PrivateIps) < 1 {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
+		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 	nic := res.Nic
 	// ip, err := s.addPublicIP(&nic)
 	// VPL: twice ?
 	// if len(res.Nic.PrivateIps) < 1 {
-	//	return nil, scerr.InconsistentError("Inconsistent provider response")
+	//	return nil, fail.InconsistentError("Inconsistent provider response")
 	// }
 
 	err = s.setResourceTags(
@@ -98,7 +98,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *resources.VirtualIP,
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(*resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
@@ -117,7 +117,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	}
 	// No nics linked to the VM
 	if len(res.Nics) == 0 {
-		return -1, scerr.Errorf("no nics linked to the VM", nil)
+		return -1, fail.Errorf("no nics linked to the VM", nil)
 	}
 	var numbers sort.IntSlice
 	for _, nic := range res.Nics {
@@ -125,7 +125,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 	}
 
 	if numbers == nil {
-		return 0, scerr.Errorf("no nics linked to the VM", nil)
+		return 0, fail.Errorf("no nics linked to the VM", nil)
 	}
 
 	sort.Sort(numbers)
@@ -134,7 +134,7 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
 			return int64(i), nil
 		}
 	}
-	return 0, scerr.InvalidRequestError(fmt.Sprintf("No more free device on host %s", hostID))
+	return 0, fail.InvalidRequestError(fmt.Sprintf("No more free device on host %s", hostID))
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
@@ -152,10 +152,10 @@ func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
 	// 	return err
 	// }
 	// if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
-	// 	return scerr.InconsistentError("Inconsistent provider response")
+	// 	return fail.InconsistentError("Inconsistent provider response")
 	// }
 	// if res.OK == nil || len(res.OK.Nics) == 0 {
-	// 	return scerr.InvalidParameterError("vip", "VIP does not exixt")
+	// 	return fail.InvalidParameterError("vip", "VIP does not exixt")
 	// }
 	// _, err = s.client.POST_LinkNic(osc.LinkNicRequest{
 	// 	NicId:        res.OK.Nics[0].NicId,
@@ -181,10 +181,10 @@ func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error
 	// 	return err
 	// }
 	// if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
-	// 	return scerr.InconsistentError("Inconsistent provider response")
+	// 	return fail.InconsistentError("Inconsistent provider response")
 	// }
 	// if res.OK == nil || len(res.OK.Nics) == 0 {
-	// 	return scerr.InvalidParameterError("vip", "VIP does not exixt")
+	// 	return fail.InvalidParameterError("vip", "VIP does not exixt")
 	// }
 	// nic := res.OK.Nics[0]
 	// _, err = s.client.POST_UnlinkNic(osc.UnlinkNicRequest{

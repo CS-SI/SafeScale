@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -89,11 +89,11 @@ func Unsuccessful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -116,11 +116,11 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -145,11 +145,11 @@ func Successful() Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -171,11 +171,11 @@ func Timeout(limit time.Duration) Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
@@ -200,11 +200,11 @@ func Max(limit uint) Arbiter {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 
-			if _, ok := t.Err.(*scerr.ErrRuntimePanic); ok {
+			if _, ok := t.Err.(*fail.ErrRuntimePanic); ok {
 				return verdict.Done, t.Err
 			}
 

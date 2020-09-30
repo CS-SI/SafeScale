@@ -33,7 +33,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/userdata"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -275,7 +275,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
 		if err != nil {
-			return networks, scerr.Errorf(fmt.Sprintf("cannot list networks ...: %s", err), err)
+			return networks, fail.Errorf(fmt.Sprintf("cannot list networks ...: %s", err), err)
 		}
 
 		for _, nett := range resp.Items {
@@ -294,7 +294,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 	for paginate := true; paginate; {
 		resp, err := compuService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).PageToken(token).Do()
 		if err != nil {
-			return networks, scerr.Errorf(fmt.Sprintf("cannot list subnetworks ...: %s", err), err)
+			return networks, fail.Errorf(fmt.Sprintf("cannot list subnetworks ...: %s", err), err)
 		}
 
 		for _, nett := range resp.Items {
@@ -326,7 +326,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	}
 
 	if theNetwork == nil {
-		return scerr.Errorf(
+		return fail.Errorf(
 			fmt.Sprintf("delete network failed: unexpected nil network when looking for [%s]", ref), err,
 		)
 	}
@@ -356,7 +356,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrTimeout:
+		case fail.ErrTimeout:
 			logrus.Warnf("Timeout waiting for subnetwork deletion")
 			return err
 		default:
@@ -440,10 +440,10 @@ func (s *Stack) CreateGateway(req resources.GatewayRequest, sizing *resources.Si
 	host, userData, err := s.CreateHost(hostReq)
 	if err != nil {
 		switch err.(type) {
-		case scerr.ErrInvalidRequest:
+		case fail.ErrInvalidRequest:
 			return nil, userData, err
 		default:
-			return nil, userData, scerr.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
+			return nil, userData, fail.Errorf(fmt.Sprintf("error creating gateway : %s", err), err)
 		}
 	}
 
@@ -470,25 +470,25 @@ func (s *Stack) DeleteGateway(ref string) error {
 // CreateVIP creates a private virtual IP
 // If public is set to true,
 func (s *Stack) CreateVIP(networkID string, description string) (*resources.VirtualIP, error) {
-	return nil, scerr.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
+	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
 func (s *Stack) AddPublicIPToVIP(vip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
 func (s *Stack) BindHostToVIP(vip *resources.VirtualIP, hostID string) error {
-	return scerr.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
 func (s *Stack) UnbindHostFromVIP(vip *resources.VirtualIP, hostID string) error {
-	return scerr.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
 func (s *Stack) DeleteVIP(vip *resources.VirtualIP) error {
-	return scerr.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

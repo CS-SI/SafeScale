@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	logr "github.com/sirupsen/logrus"
 
@@ -137,11 +137,11 @@ func DecorateError(err error, action string, maySucceed bool) error {
 
 // IsTimeoutError tells if the err is a timeout kind
 func IsTimeoutError(err error) bool {
-	if _, ok := err.(scerr.ErrTimeout); ok {
+	if _, ok := err.(fail.ErrTimeout); ok {
 		return true
 	}
 
-	if _, ok := err.(*scerr.ErrTimeout); ok {
+	if _, ok := err.(*fail.ErrTimeout); ok {
 		return true
 	}
 

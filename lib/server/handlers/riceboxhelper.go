@@ -23,7 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	rice "github.com/GeertJohan/go.rice"
 
@@ -34,7 +34,7 @@ import (
 
 // Return the script (embeded in a rice-box) with placeholders replaced by the values given in data
 func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
-	defer scerr.OnExitLogError(debug.NewTracer(nil, "", true).TraceMessage(""), &err)()
+	defer fail.OnExitLogError(debug.NewTracer(nil, "", true).TraceMessage(""), &err)()
 
 	box, err := rice.FindBox("../handlers/scripts")
 	if err != nil {

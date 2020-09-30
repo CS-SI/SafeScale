@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Folder describes a metadata folder
@@ -45,7 +45,7 @@ type FolderDecoderCallback func([]byte) error
 // NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
 func NewFolder(svc iaas.Service, path string) (*Folder, error) {
 	if svc == nil {
-		return nil, scerr.InvalidParameterError("svc", "cannot be nil!")
+		return nil, fail.InvalidParameterError("svc", "cannot be nil!")
 	}
 	cryptKey := svc.GetMetadataKey()
 	crypto := cryptKey != nil && len(cryptKey) > 0
@@ -105,7 +105,7 @@ func (f *Folder) Search(path string, name string) error {
 			return nil
 		}
 	}
-	return scerr.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
+	return fail.NotFoundError(fmt.Sprintf("failed to find '%s'", fullPath))
 }
 
 // Delete removes metadata passed as parameter
@@ -125,7 +125,7 @@ func (f *Folder) Delete(path string, name string) error {
 func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) error {
 	err := f.Search(path, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.ErrNotFound); ok {
 			return err
 		}
 
@@ -135,8 +135,8 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	var buffer bytes.Buffer
 	_, err = f.service.GetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return scerr.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return fail.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
 		}
 		return err
 	}
@@ -144,16 +144,16 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	if f.crypt {
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		if err != nil {
-			if _, ok := err.(scerr.ErrNotFound); ok {
-				return scerr.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
+			if _, ok := err.(fail.ErrNotFound); ok {
+				return fail.NotFoundError(fmt.Sprintf("failed to decrypt metadata '%s/%s': %v", path, name, err))
 			}
 			return err
 		}
 	}
 	err = callback(data)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
-			return scerr.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return fail.NotFoundError(fmt.Sprintf("failed to decode metadata '%s/%s': %v", path, name, err))
 		}
 		return err
 	}
@@ -211,7 +211,7 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		err = callback(data)
 		if err != nil {
 			if _, ok := err.(*json.SyntaxError); ok && strings.Contains(err.Error(), "invalid character") {
-				err = scerr.SyntaxError(
+				err = fail.SyntaxError(
 					fmt.Sprintf(
 						"seems metadata '%s' is encrypted but not encryption key provided", i,
 					),

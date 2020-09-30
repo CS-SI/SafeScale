@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, error) {
@@ -123,7 +123,7 @@ func (s *Stack) getDefaultRouteTable(onet *osc.Net) (*osc.RouteTable, error) {
 		return nil, normalizeError(err)
 	}
 	if len(res.RouteTables) != 1 {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
+		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 	return &res.RouteTables[0], nil
 }
@@ -291,7 +291,7 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, error
 		}
 	}
 	// should never go there, in case this means that the network do not have a default security group
-	return nil, scerr.InconsistentError("invalid provider response")
+	return nil, fail.InconsistentError("invalid provider response")
 }
 
 func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
@@ -312,13 +312,13 @@ func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
 
 	defer func() {
 		if err != nil {
-			if !scerr.ImplementsCauser(err) {
-				err = scerr.Wrap(err, "")
+			if !fail.ImplementsCauser(err) {
+				err = fail.Wrap(err, "")
 			}
 
 			derr := s.DeleteNetwork(onet.NetId)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
@@ -343,7 +343,7 @@ func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
 		return nil, err
 	}
 	if securityGroup == nil {
-		return nil, scerr.InconsistentError("no default security group")
+		return nil, fail.InconsistentError("no default security group")
 	}
 
 	err = s.updateDefaultSecurityRules(securityGroup)
@@ -421,7 +421,7 @@ func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, error) {
 		return nil, normalizeError(err)
 	}
 	if len(res.DhcpOptionsSets) != 1 {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
+		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 	return res.DhcpOptionsSets[0].NtpServers, err
 }
@@ -449,13 +449,13 @@ func (s *Stack) createDHCPOptionSet(req resources.NetworkRequest, net *osc.Net) 
 
 	defer func() {
 		if err != nil {
-			if !scerr.ImplementsCauser(err) {
-				err = scerr.Wrap(err, "")
+			if !fail.ImplementsCauser(err) {
+				err = fail.Wrap(err, "")
 			}
 
 			derr := s.deleteDhcpOptions(net, false)
 			if derr != nil {
-				err = scerr.AddConsequence(err, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()

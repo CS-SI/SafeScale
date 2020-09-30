@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
@@ -42,13 +42,13 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to create network with CIDR '%s'", req.CIDR))
+		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to create network with CIDR '%s'", req.CIDR))
 	}
 
 	defer func() {
 		if err != nil {
-			if !scerr.ImplementsCauser(err) {
-				err = scerr.Wrap(err, "")
+			if !fail.ImplementsCauser(err) {
+				err = fail.Wrap(err, "")
 			}
 
 			deleteSubnetRequest := osc.DeleteSubnetRequest{
@@ -61,7 +61,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 				},
 			)
 			if derr != nil {
-				err = scerr.AddConsequence(err, normalizeError(derr))
+				err = fail.AddConsequence(err, normalizeError(derr))
 			}
 		}
 	}()
@@ -85,7 +85,7 @@ func (s *Stack) createSubnet(req resources.NetworkRequest, vpcID string) (_ *osc
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to create subnet '%s'", req.CIDR))
+		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to create subnet '%s'", req.CIDR))
 	}
 	return &resSubnet.Subnet, nil
 }
@@ -95,25 +95,25 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, err := s.getVpc(s.Options.Network.VPCID)
 	if err != nil {
-		return nil, scerr.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s'", req.CIDR), err)
+		return nil, fail.Errorf(fmt.Sprintf("cannot create subnet with CIDR '%s'", req.CIDR), err)
 	}
 	ok, err := utils.DoCIDRsIntersect(vpc.IpRange, req.CIDR)
 	if err != nil {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, vpc.IpRange,
 			), nil,
 		)
 	}
 	if !ok {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"cannot create subnet with CIDR '%s': not inside VPC CIDR '%s'", req.CIDR, vpc.IpRange,
 			), nil,
 		)
 	}
 	if vpc.IpRange == req.CIDR {
-		return nil, scerr.Errorf(
+		return nil, fail.Errorf(
 			fmt.Sprintf(
 				"cannot create subnet with CIDR '%s': identical to VPC CIDR, choose a subnet of '%s'", req.CIDR,
 				vpc.IpRange,
@@ -135,7 +135,7 @@ func (s *Stack) CreateNetwork(req resources.NetworkRequest) (*resources.Network,
 		return nil, err
 	}
 	if subnet == nil {
-		return nil, scerr.InconsistentError("Inconsistent provider response")
+		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 
 	net := resources.NewNetwork()
@@ -159,10 +159,10 @@ func (s *Stack) getSubnet(id string) (*osc.Subnet, error) {
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", id))
+		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", id))
 	}
 	if len(res.Subnets) > 1 {
-		return nil, scerr.InconsistentError("Inconstent provider response")
+		return nil, fail.InconsistentError("Inconstent provider response")
 	}
 	if len(res.Subnets) == 0 {
 		return nil, nil
@@ -209,10 +209,10 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", name))
+		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", name))
 	}
 	if len(res.Subnets) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("No network named %s", name))
+		return nil, fail.NotFoundError(fmt.Sprintf("No network named %s", name))
 	}
 	var subnets []osc.Subnet
 	for _, subnet := range res.Subnets {
@@ -221,10 +221,10 @@ func (s *Stack) GetNetworkByName(name string) (*resources.Network, error) {
 		}
 	}
 	if len(subnets) > 1 {
-		return nil, scerr.InconsistentError(fmt.Sprintf("More than one subnet with name %s", name))
+		return nil, fail.InconsistentError(fmt.Sprintf("More than one subnet with name %s", name))
 	}
 	if len(subnets) == 0 {
-		return nil, scerr.NotFoundError(fmt.Sprintf("No subnet with name %s", name))
+		return nil, fail.NotFoundError(fmt.Sprintf("No subnet with name %s", name))
 	}
 
 	return toNetwork(&res.Subnets[0]), nil
@@ -243,7 +243,7 @@ func (s *Stack) ListNetworks() ([]*resources.Network, error) {
 		},
 	)
 	if err != nil {
-		return nil, scerr.Wrap(normalizeError(err), "failed to list networks")
+		return nil, fail.Wrap(normalizeError(err), "failed to list networks")
 	}
 	var nets []*resources.Network
 	for _, onet := range res.Subnets {
@@ -266,14 +266,14 @@ func (s *Stack) listNetworksByHost(hostID string) ([]*resources.Network, []osc.N
 		},
 	)
 	if err != nil {
-		return nil, nil, scerr.Wrap(normalizeError(err), fmt.Sprintf("failed to list networks of host '%s'", hostID))
+		return nil, nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to list networks of host '%s'", hostID))
 	}
 
 	var subnets []*resources.Network
 	for _, nic := range res.Nics {
 		subnet, err := s.getSubnet(nic.SubnetId)
 		if err != nil {
-			return nil, nil, scerr.Wrap(err, fmt.Sprintf("failed to list networks of host '%s'", hostID))
+			return nil, nil, fail.Wrap(err, fmt.Sprintf("failed to list networks of host '%s'", hostID))
 		}
 		subnets = append(subnets, toNetwork(subnet))
 	}

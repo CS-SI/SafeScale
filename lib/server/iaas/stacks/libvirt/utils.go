@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // VMInfo represents the useful informations package send from each new local vm
@@ -66,7 +66,7 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 	iw.mutex.Unlock()
 
 	if !found {
-		return scerr.Errorf(fmt.Sprintf("nothing registered with the name %s", name), nil)
+		return fail.Errorf(fmt.Sprintf("nothing registered with the name %s", name), nil)
 	}
 	fmt.Println("Deregistered : ", name)
 	return nil
@@ -77,7 +77,7 @@ func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
-			return nil, scerr.Errorf(fmt.Sprintf("failed to open a tcp connection : %s", err.Error()), err)
+			return nil, fail.Errorf(fmt.Sprintf("failed to open a tcp connection : %s", err.Error()), err)
 		}
 		vmInfoWaiter.port = listener.Addr().(*net.TCPAddr).Port
 		vmInfoWaiter.listner = &listener

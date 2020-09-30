@@ -33,7 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/cluster/flavors/swarm"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/scerr"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -54,7 +54,7 @@ func Load(task concurrency.Task, name string) (api.Cluster, error) {
 	}
 	err = m.Read(task, name)
 	if err != nil {
-		if _, ok := err.(scerr.ErrNotFound); ok {
+		if _, ok := err.(fail.ErrNotFound); ok {
 			return nil, err
 		}
 		return nil, fmt.Errorf("failed to get information about Cluster '%s': %s", name, err.Error())
@@ -84,7 +84,7 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 	case flavor.SWARM:
 		return controller.Restore(task, control.NewForeman(controller, swarm.Makers))
 	default:
-		return scerr.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", f.String()))
+		return fail.NotImplementedError(fmt.Sprintf("cluster Flavor '%s' not yet implemented", f.String()))
 	}
 }
 
@@ -92,14 +92,14 @@ func setForeman(task concurrency.Task, controller *control.Controller) error {
 func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err error) {
 	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer scerr.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	// Validates parameters
 	if req.Name == "" {
-		return nil, scerr.InvalidParameterError("req.Name", "cannot be empty!")
+		return nil, fail.InvalidParameterError("req.Name", "cannot be empty!")
 	}
 	if req.CIDR == "" {
-		return nil, scerr.InvalidParameterError("req.CIDR", "cannot be empty!")
+		return nil, fail.InvalidParameterError("req.CIDR", "cannot be empty!")
 	}
 
 	log.Infof("Creating infrastructure for cluster '%s'", req.Name)
@@ -145,7 +145,7 @@ func Create(task concurrency.Task, req control.Request) (_ api.Cluster, err erro
 			return nil, err
 		}
 	default:
-		return nil, scerr.NotImplementedError(
+		return nil, fail.NotImplementedError(
 			fmt.Sprintf(
 				"cluster Flavor '%s' not yet implemented", req.Flavor.String(),
 			),
