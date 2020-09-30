@@ -42,15 +42,68 @@ exec 1<>/opt/safescale/var/log/user_data.phase1.log
 exec 2>&1
 set -x
 
+sfApt() {
+    rc=-1
+    DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+    return $rc
+}
+export -f sfApt
+
+# try using dnf instead of yum if available
+sfYum() {
+    rc=-1
+    if [[ -n $(which dnf) ]]; then
+        dnf "$@" && rc=$?
+    else
+        yum "$@" && rc=$?
+    fi
+    return $rc
+}
+export -f sfYum
+
+# sfRetry <timeout> <delay> command
+# retries command until success, with sleep of <delay> seconds
+sfRetry() {
+    local timeout=$1
+    local delay=$2
+    shift 2
+    local result
+
+    { code=$(</dev/stdin); } <<-EOF
+        fn() {
+            local r
+            local rc
+            while true; do
+                r=\$($*)
+                rc=\$?
+                [ \$rc -eq 0 ] && echo \$r && break
+                sleep $delay
+            done
+            return \$rc
+        }
+        export -f fn
+EOF
+    eval "$code"
+    result=$(timeout $timeout bash -c -x fn)
+    rc=$?
+    unset fn
+    [ $rc -eq 0 ] && echo $result && return 0
+    echo "sfRetry: timeout!"
+    return $rc
+}
+export -f sfRetry
+
 LINUX_KIND=
 VERSION_ID=
 FULL_VERSION_ID=
+FULL_HOSTNAME=
 
 sfDetectFacts() {
     [[ -f /etc/os-release ]] && {
         . /etc/os-release
         LINUX_KIND=$ID
         FULL_HOSTNAME=$VERSION_ID
+        FULL_VERSION_ID=$VERSION_ID
     } || {
         which lsb_release &>/dev/null && {
             LINUX_KIND=$(lsb_release -is)
@@ -145,6 +198,8 @@ put_hostname_in_hosts() {
     FULL_HOSTNAME="{{ .HostName }}"
     SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
+    echo "" >>/etc/hosts
+    echo "127.0.0.1 ${SHORT_HOSTNAME}" >>/etc/hosts
     echo "${SHORT_HOSTNAME}" >/etc/hostname
     hostname "${SHORT_HOSTNAME}"
 }
@@ -170,22 +225,61 @@ disable_services() {
     esac
 }
 
-is_network_reachable() {
-    NETROUNDS=24
+function check_dns_configuration() {
+    if [[ -r /etc/resolv.conf ]]; then
+        echo "Getting DNS using resolv.conf..."
+        THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2) || true
+
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
+    fi
+
+    if which systemd-resolve; then
+        echo "Getting DNS using systemd-resolve"
+        THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}') || true
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
+    fi
+
+    if which resolvectl; then
+        echo "Getting DNS using resolvectl"
+        THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}') || true
+        if [[ -n ${THE_DNS} ]]; then
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+        fi
+    fi
+
+    timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
+    return 1
+}
+
+function is_network_reachable() {
+    NETROUNDS=4
     REACHED=0
+    TRIED=0
 
     for i in $(seq ${NETROUNDS}); do
         if which curl; then
-            curl -I www.google.com -m 5 | grep "200 OK" && REACHED=1 && break
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
         fi
 
         if which wget; then
-            wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-        else
-            ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
         fi
 
-        sleep 1
+        if [[ ${TRIED} -eq 1 ]]; then
+            break
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
     done
 
     if [[ ${REACHED} -eq 0 ]]; then
@@ -283,6 +377,30 @@ function fail_fast_unsupported_distros() {
         fail 199
         ;;
     esac
+}
+
+function compatible_network() {
+    # Try installing network-scripts if available
+    case $LINUX_KIND in
+    redhat | rhel | centos | fedora)
+        sfRetry 3m 5 "sfYum install -q -y network-scripts" || true
+        ;;
+    *) ;;
+    esac
+}
+
+function silent_compatible_network() {
+    # If network works, try to install network-scripts; if install fails, no need to log this because the gateway is not yet configured
+    op=-1
+    is_network_reachable && op=$? || true
+    if [[ ${op} -eq 0 ]]; then
+        case $LINUX_KIND in
+        redhat | rhel | centos | fedora)
+            sfRetry 3m 5 "sfYum install -q -y network-scripts &>/dev/null" || true
+            ;;
+        *) ;;
+        esac
+    fi
 }
 
 # ---- Main

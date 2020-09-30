@@ -255,6 +255,7 @@ func (handler *NetworkHandler) Create(
 	var template *resources.HostTemplate
 	tpls, err := handler.service.SelectTemplatesBySize(sizing, false)
 	if err != nil {
+		logrus.Warn("error creating network: error reading machine templates")
 		switch err.(type) {
 		case scerr.ErrNotFound, scerr.ErrTimeout:
 			return nil, err

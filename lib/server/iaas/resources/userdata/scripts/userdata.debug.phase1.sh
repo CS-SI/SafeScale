@@ -61,15 +61,50 @@ sfYum() {
 }
 export -f sfYum
 
+# sfRetry <timeout> <delay> command
+# retries command until success, with sleep of <delay> seconds
+sfRetry() {
+    local timeout=$1
+    local delay=$2
+    shift 2
+    local result
+
+    { code=$(</dev/stdin); } <<-EOF
+        fn() {
+            local r
+            local rc
+            while true; do
+                r=\$($*)
+                rc=\$?
+                [ \$rc -eq 0 ] && echo \$r && break
+                sleep $delay
+            done
+            return \$rc
+        }
+        export -f fn
+EOF
+    eval "$code"
+    result=$(timeout $timeout bash -c -x fn)
+    rc=$?
+    unset fn
+    [ $rc -eq 0 ] && echo $result && return 0
+    echo "sfRetry: timeout!"
+    return $rc
+}
+export -f sfRetry
+
 LINUX_KIND=
 VERSION_ID=
 FULL_VERSION_ID=
+FULL_HOSTNAME=
+
 
 sfDetectFacts() {
     [[ -f /etc/os-release ]] && {
         . /etc/os-release
         LINUX_KIND=$ID
         FULL_HOSTNAME=$VERSION_ID
+        FULL_VERSION_ID=$VERSION_ID
     } || {
         which lsb_release &>/dev/null && {
             LINUX_KIND=$(lsb_release -is)
@@ -164,6 +199,8 @@ put_hostname_in_hosts() {
     FULL_HOSTNAME="{{ .HostName }}"
     SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
+    echo "" >>/etc/hosts
+    echo "127.0.0.1 ${SHORT_HOSTNAME}" >>/etc/hosts
     echo "${SHORT_HOSTNAME}" >/etc/hostname
     hostname "${SHORT_HOSTNAME}"
 }
@@ -288,10 +325,10 @@ ensure_network_connectivity() {
     if [[ ${op} -eq 0 ]]; then
         echo "ensure_network_connectivity finished WITH network AFTER putting custom DNS..."
         return 0
+    else
+        echo "ensure_network_connectivity finished WITHOUT network, not even custom DNS was enough..."
+        return 1
     fi
-
-    echo "ensure_network_connectivity finished WITHOUT network, not even custom DNS was enough..."
-    return 1
 }
 
 function fail_fast_unsupported_distros() {
