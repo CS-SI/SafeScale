@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,9 +74,9 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 	return nil, xerr
 }
 
-// taskUnbindFromHostsAttachedToNetwork unbinds security group from hosts attached to a network
+// taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a network
 // 'params" expects to be a '*network'
-func (sg *securityGroup) taskUnbindFromHostsAttachedToNetwork(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	networkID, ok := params.(string)
 	if !ok || networkID == "" {
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
@@ -90,13 +90,13 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToNetwork(task concurrency.T
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// network does not exist anymore ? consider as a success and continue
+			// subnet does not exist anymore ? consider as a success and continue
 		default:
 			return nil, xerr
 		}
 	}
 
-	// Unbinds security group from hosts attached to network
+	// Unbinds security group from hosts attached to subnet
 	xerr = rn.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.NetworkHosts)
@@ -105,7 +105,7 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToNetwork(task concurrency.T
 			}
 			tg, innerXErr := concurrency.NewTaskGroup(task)
 			if innerXErr != nil {
-				return fail.Prepend(innerXErr, "failed to start new task group to remove security group '%s' from hosts attached to the network '%s'", sg.GetName(), rn.GetName())
+				return fail.Wrap(innerXErr, "failed to start new task group to remove security group '%s' from hosts attached to the subnet '%s'", sg.GetName(), rn.GetName())
 			}
 			for _, v := range nsgV1.ByName {
 				_, innerXErr = tg.Start(sg.taskUnbindFromHost, v)
@@ -121,12 +121,12 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToNetwork(task concurrency.T
 		return nil, xerr
 	}
 
-	// Alter network security groups property, deleting current security group
+	// Alter subnet security groups property, deleting current security group
 	xerr = rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			sgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+			sgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			delete(sgV1.ByID, sgID)
 			delete(sgV1.ByName, sgName)

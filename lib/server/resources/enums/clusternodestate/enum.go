@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ package clusternodestate
 type Enum int
 
 const (
-    // Started the node is started and available
-    Started Enum = iota
-    // Disabled the node is started but not available to take load
-    Disabled
-    // Stopped the node is stopped
-    Stopped
+	// Started the node is started and available
+	Started Enum = iota
+	// Disabled the node is started but not available to take load
+	Disabled
+	// Stopped the node is stopped
+	Stopped
 
-    // Unknown ...
-    Unknown
+	// Unknown ...
+	Unknown
 )

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-const (
-	DefaultSecurityGroupName        string = "safescale-default-sg"
-	DefaultSecurityGroupDescription string = "Default Security Group for SafeScale resources"
-)
+//const (
+//	DefaultSecurityGroupName        string = "safescale-default-sg"
+//	DefaultSecurityGroupDescription string = "Default Security Group for SafeScale resources"
+//)
 
 // SecurityGroupParameter can represent a Security Group by a string as ID or an *abstract.SecurityGroup
 type SecurityGroupParameter interface{}
@@ -56,43 +56,43 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 func DefaultTCPRules() []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Ingress: allow SSH only
-		abstract.SecurityGroupRule{
+		{
 			Description: "INGRESS: TCP4: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			PortFrom:    22,
 			//PortTo:      22,
 			EtherType: ipversion.IPv4,
 			Protocol:  "tcp",
-			CIDR:      "0.0.0.0/0",
+			IPRanges:  []string{"0.0.0.0/0"},
 		},
-		abstract.SecurityGroupRule{
+		{
 			Description: "INGRESS: TCP6: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			PortFrom:    22,
 			//PortTo:      22,
 			EtherType: ipversion.IPv6,
 			Protocol:  "tcp",
-			CIDR:      "::/0",
+			IPRanges:  []string{"::/0"},
 		},
 
 		// Egress: allow everything
-		abstract.SecurityGroupRule{
+		{
 			Description: "EGRESS: TCP4: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
-			CIDR:        "0.0.0.0/0",
+			IPRanges:    []string{"0.0.0.0/0"},
 		},
-		abstract.SecurityGroupRule{
+		{
 			Description: "EGRESS: TCP6: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
-			CIDR:        "::/0",
+			IPRanges:    []string{"::/0"},
 		},
 	}
 }
@@ -102,23 +102,23 @@ func DefaultTCPRules() []abstract.SecurityGroupRule {
 func DefaultUDPRules() []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Outbound = egress == going to Outside
-		abstract.SecurityGroupRule{
+		{
 			Description: "EGRESS: UDP4: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "udp",
-			CIDR:        "0.0.0.0/0",
+			IPRanges:    []string{"0.0.0.0/0"},
 		},
-		abstract.SecurityGroupRule{
+		{
 			Description: "EGRESS: UDP4: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "udp",
-			CIDR:        "::/0",
+			IPRanges:    []string{"::/0"},
 		},
 	}
 }
@@ -128,34 +128,34 @@ func DefaultUDPRules() []abstract.SecurityGroupRule {
 func DefaultICMPRules() []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Inbound == ingress == coming from Outside
-		abstract.SecurityGroupRule{
+		{
 			Description: "INGRESS: ICMP4: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
-			CIDR:        "0.0.0.0/0",
+			IPRanges:    []string{"0.0.0.0/0"},
 		},
-		abstract.SecurityGroupRule{
+		{
 			Description: "INGRESS: ICMP6: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			CIDR:        "::/0",
+			IPRanges:    []string{"::/0"},
 		},
 		// Outbound = egress == going to Outside
-		abstract.SecurityGroupRule{
+		{
 			Description: "EGRESS: ICMP4: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
-			CIDR:        "0.0.0.0/0",
+			IPRanges:    []string{"0.0.0.0/0"},
 		},
-		abstract.SecurityGroupRule{
+		{
 			Description: "EGRESS: ICMP6: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			CIDR:        "::/0",
+			IPRanges:    []string{"::/0"},
 		},
 	}
 }

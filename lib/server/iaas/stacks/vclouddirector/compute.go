@@ -1,6 +1,6 @@
 // +build ignore
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -560,7 +560,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	hostIsAGateway := false
 
-	// TODO: adapt in abstract.HostFull.HostNetwork
+	// TODO: adapt in abstract.HostFull.HostSubnet
 	hostFull.Network.DefaultNetworkID = defaultNetwork.ID
 	hostFull.Network.IsGateway = request.IsGateway
 	if hostFull.Network.IsGateway {
@@ -569,8 +569,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 		hostFull.Network.PublicIPv4 = capturedIP
 	}
 	// retryErr = hostFull.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-	//	hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-	//	hostNetworkV1.DefaultNetworkID = defaultNetwork.ID
+	//	hostNetworkV1 := clonable.(*propsv1.HostSubnet)
+	//	hostNetworkV1.DefaultSubnetID = defaultNetwork.ID
 	//
 	//	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
 	//	if request.DefaultGateway != nil {
@@ -704,14 +704,14 @@ func (s *Stack) complementHost(host *abstract.HostFull, newHost *abstract.HostFu
 	}
 	host.Core.LastState = newHost.Core.LastState
 
-	// TODO: adapt to abstract.HostFull.HostNetwork
+	// TODO: adapt to abstract.HostFull.HostSubnet
 	// err := host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-	//	newHostNetworkV1 := propsv1.NewHostNetwork()
-	//	hostNetworkV1 := clonable.(*propsv1.HostNetwork)
+	//	newHostNetworkV1 := propsv1.NewHostSubnet()
+	//	hostNetworkV1 := clonable.(*propsv1.HostSubnet)
 	//	hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
 	//	hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
-	//	hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
-	//	hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
+	//	hostNetworkV1.SubnetsByID = newHostNetworkV1.SubnetsByID
+	//	hostNetworkV1.SubnetsByName = newHostNetworkV1.SubnetsByName
 	//	return nil
 	// })
 	// if err != nil {

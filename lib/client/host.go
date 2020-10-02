@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -317,10 +317,17 @@ func (h host) BindSecurityGroup(hostRef, sgRef string, enable bool, duration tim
 		return xerr
 	}
 
-	req := &protocol.SecurityGroupBindRequest{
-		Group:  &protocol.Reference{Name: sgRef},
-		Target: &protocol.Reference{Name: hostRef},
-		Enable: enable,
+	var state protocol.SecurityGroupState
+	switch enable {
+	case true:
+		state = protocol.SecurityGroupState_SGS_ENABLED
+	case false:
+		state = protocol.SecurityGroupState_SGS_DISABLED
+	}
+	req := &protocol.SecurityGroupHostBindRequest{
+		Group: &protocol.Reference{Name: sgRef},
+		Host:  &protocol.Reference{Name: hostRef},
+		State: state,
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.BindSecurityGroup(ctx, req)
@@ -337,9 +344,9 @@ func (h host) UnbindSecurityGroup(hostRef, sgRef string, duration time.Duration)
 		return xerr
 	}
 
-	req := &protocol.SecurityGroupBindRequest{
-		Group:  &protocol.Reference{Name: sgRef},
-		Target: &protocol.Reference{Name: hostRef},
+	req := &protocol.SecurityGroupHostBindRequest{
+		Group: &protocol.Reference{Name: sgRef},
+		Host:  &protocol.Reference{Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.UnbindSecurityGroup(ctx, req)
@@ -356,9 +363,9 @@ func (h host) EnableSecurityGroup(hostRef, sgRef string, duration time.Duration)
 		return xerr
 	}
 
-	req := &protocol.SecurityGroupBindRequest{
-		Group:  &protocol.Reference{Name: sgRef},
-		Target: &protocol.Reference{Name: hostRef},
+	req := &protocol.SecurityGroupHostBindRequest{
+		Group: &protocol.Reference{Name: sgRef},
+		Host:  &protocol.Reference{Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.EnableSecurityGroup(ctx, req)
@@ -375,17 +382,17 @@ func (h host) DisableSecurityGroup(hostRef, sgRef string, duration time.Duration
 		return xerr
 	}
 
-	req := &protocol.SecurityGroupBindRequest{
-		Group:  &protocol.Reference{Name: sgRef},
-		Target: &protocol.Reference{Name: hostRef},
+	req := &protocol.SecurityGroupHostBindRequest{
+		Group: &protocol.Reference{Name: sgRef},
+		Host:  &protocol.Reference{Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.DisableSecurityGroup(ctx, req)
 	return err
 }
 
-// ListSecurityGroups calls the gRPC server to list bound security groups of a network
-func (h host) ListSecurityGroups(hostRef, kind string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
+// ListSecurityGroups calls the gRPC server to list bound security groups of a host
+func (h host) ListSecurityGroups(hostRef, state string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -396,9 +403,18 @@ func (h host) ListSecurityGroups(hostRef, kind string, duration time.Duration) (
 
 	service := protocol.NewHostServiceClient(h.session.connection)
 
-	req := &protocol.SecurityGroupBondsRequest{
-		Target: &protocol.Reference{Name: hostRef},
-		Kind:   strings.ToLower(kind),
+	req := &protocol.SecurityGroupHostBindRequest{
+		Host: &protocol.Reference{Name: hostRef},
+	}
+	switch strings.ToLower(strings.TrimSpace(state)) {
+	case "all":
+		req.State = protocol.SecurityGroupState_SGS_ALL
+	case "enable", "enabled":
+		req.State = protocol.SecurityGroupState_SGS_ENABLED
+	case "disable", "disabled":
+		req.State = protocol.SecurityGroupState_SGS_DISABLED
+	default:
+		return nil, fail.SyntaxError("invalid value '%s' for 'state' field", state)
 	}
 	return service.ListSecurityGroups(ctx, req)
 }

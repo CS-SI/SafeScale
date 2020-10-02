@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,85 +17,85 @@
 package gcp
 
 import (
-    "fmt"
-    "net/url"
-    "strings"
-    "time"
+	"fmt"
+	"net/url"
+	"strings"
+	"time"
 
-    "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 // OpContext ...
 type OpContext struct {
-    Operation    *compute.Operation
-    ProjectID    string
-    Service      *compute.Service
-    DesiredState string
+	Operation    *compute.Operation
+	ProjectID    string
+	Service      *compute.Service
+	DesiredState string
 }
 
 // Result ...
 type Result struct {
-    State string
-    Error error
-    Done  bool
+	State string
+	Error error
+	Done  bool
 }
 
 // RefreshResult ...
 func RefreshResult(oco OpContext) (res Result, xerr fail.Error) {
-    var err error
-    res = Result{}
-    if oco.Operation != nil {
-        if oco.Operation.Zone != "" { // nolint
-            zoneURL, ierr := url.Parse(oco.Operation.Zone)
-            if ierr != nil {
-                return res, fail.ToError(ierr)
-            }
-            zone := getResourceNameFromSelfLink(*zoneURL)
-            oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
-        } else if oco.Operation.Region != "" {
-            regionURL, ierr := url.Parse(oco.Operation.Region)
-            if ierr != nil {
-                return res, fail.ToError(ierr)
-            }
-            region := getResourceNameFromSelfLink(*regionURL)
-            oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
-        } else {
-            oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
-        }
+	var err error
+	res = Result{}
+	if oco.Operation != nil {
+		if oco.Operation.Zone != "" { // nolint
+			zoneURL, ierr := url.Parse(oco.Operation.Zone)
+			if ierr != nil {
+				return res, fail.ToError(ierr)
+			}
+			zone := getResourceNameFromSelfLink(*zoneURL)
+			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
+		} else if oco.Operation.Region != "" {
+			regionURL, ierr := url.Parse(oco.Operation.Region)
+			if ierr != nil {
+				return res, fail.ToError(ierr)
+			}
+			region := getResourceNameFromSelfLink(*regionURL)
+			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
+		} else {
+			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
+		}
 
-        if oco.Operation == nil {
-            if err == nil {
-                return res, fail.NewError("no operation")
-            }
-            return res, fail.ToError(err)
-        }
+		if oco.Operation == nil {
+			if err == nil {
+				return res, fail.NewError("no operation")
+			}
+			return res, fail.ToError(err)
+		}
 
-        res.State = oco.Operation.Status
-        res.Error = err
-        res.Done = res.State == oco.DesiredState
+		res.State = oco.Operation.Status
+		res.Error = err
+		res.Done = res.State == oco.DesiredState
 
-        return res, fail.ToError(err)
-    }
+		return res, fail.ToError(err)
+	}
 
-    return res, fail.NewError("no operation")
+	return res, fail.NewError("no operation")
 }
 
 func waitUntilOperationIsSuccessfulOrTimeout(oco OpContext, poll time.Duration, duration time.Duration) (xerr fail.Error) {
-    retryErr := retry.WhileUnsuccessful(func() error {
-        r, anerr := RefreshResult(oco)
-        if anerr != nil {
-            return anerr
-        }
-        if !r.Done {
-            return fmt.Errorf("not finished yet")
-        }
-        return nil
-    }, poll, duration)
+	retryErr := retry.WhileUnsuccessful(func() error {
+		r, anerr := RefreshResult(oco)
+		if anerr != nil {
+			return anerr
+		}
+		if !r.Done {
+			return fmt.Errorf("not finished yet")
+		}
+		return nil
+	}, poll, duration)
 
-    return fail.ToError(retryErr)
+	return fail.ToError(retryErr)
 }
 
 // SelfLink ...
@@ -103,49 +103,49 @@ type SelfLink = url.URL
 
 // IPInSubnet ...
 type IPInSubnet struct {
-    Subnet   SelfLink
-    Name     string
-    ID       string
-    IP       string
-    PublicIP string
+	Subnet   SelfLink
+	Name     string
+	ID       string
+	IP       string
+	PublicIP string
 }
 
 func genURL(urlCand string) SelfLink {
-    theURL, err := url.Parse(urlCand)
-    if err != nil {
-        return url.URL{}
-    }
-    return *theURL
+	theURL, err := url.Parse(urlCand)
+	if err != nil {
+		return url.URL{}
+	}
+	return *theURL
 }
 
 func getResourceNameFromSelfLink(link SelfLink) string {
-    stringRepr := link.String()
-    parts := strings.Split(stringRepr, "/")
-    return parts[len(parts)-1]
+	stringRepr := link.String()
+	parts := strings.Split(stringRepr, "/")
+	return parts[len(parts)-1]
 }
 
 func indexOf(element string, data []string) int {
-    for k, v := range data {
-        if element == v {
-            return k
-        }
-    }
-    return -1 // not found.
+	for k, v := range data {
+		if element == v {
+			return k
+		}
+	}
+	return -1 // not found.
 }
 
 func getRegionFromSelfLink(link SelfLink) (string, error) {
-    stringRepr := link.String()
-    if strings.Contains(stringRepr, "regions") {
-        parts := strings.Split(stringRepr, "/")
-        regionPos := indexOf("regions", parts)
-        if regionPos != -1 {
-            if (regionPos + 1) < len(parts) {
-                return parts[regionPos+1], nil
-            }
-        }
-        return "", fmt.Errorf("not a region link")
-    }
-    return "", fail.InvalidRequestError("not a region link")
+	stringRepr := link.String()
+	if strings.Contains(stringRepr, "regions") {
+		parts := strings.Split(stringRepr, "/")
+		regionPos := indexOf("regions", parts)
+		if regionPos != -1 {
+			if (regionPos + 1) < len(parts) {
+				return parts[regionPos+1], nil
+			}
+		}
+		return "", fmt.Errorf("not a region link")
+	}
+	return "", fail.InvalidRequestError("not a region link")
 }
 
 // func assertEq(exp, got interface{}) error {

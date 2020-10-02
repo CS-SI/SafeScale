@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,12 @@ package providers
 
 // Capabilities represents key/value configuration.
 type Capabilities struct {
-    // PublicVirtualIP indicates if the provider has the capability to provide a Virtual IP with public IP address
-    PublicVirtualIP bool
-    // PrivateVirtualIP indicates if the provider has the capability to provide a Virtual IP with private IP address
-    PrivateVirtualIP bool
-    // Layer3Networking indicates if the provider uses Layer3 networking
-    Layer3Networking bool
+	// PublicVirtualIP indicates if the provider has the capability to provide a Virtual IP with public IP address
+	PublicVirtualIP bool
+	// PrivateVirtualIP indicates if the provider has the capability to provide a Virtual IP with private IP address
+	PrivateVirtualIP bool
+	// Layer3Networking indicates if the provider uses Layer3 networking
+	Layer3Networking bool
+	// SubnetSecurityGroup indicates if the provider supports to bind security group to subnet
+	SubnetSecurityGroup bool
 }

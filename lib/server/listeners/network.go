@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,21 +19,15 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
-	"github.com/CS-SI/SafeScale/lib/server/handlers"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
-	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -47,7 +41,7 @@ import (
 type NetworkListener struct{}
 
 // Create a new network
-func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefinition) (_ *protocol.Network, err error) {
+func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create network")
 
@@ -64,7 +58,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -78,50 +72,53 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkDefini
 		return nil, xerr
 	}
 	defer job.Close()
-
 	task := job.GetTask()
+	svc := job.GetService()
+
 	tracer := debug.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	//var (
+	//	sizing *abstract.HostSizingRequirements
+	//)
+	//if in.Gateway != nil {
+	//	if in.Gateway.SizingAsString != "" {
+	//		sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
+	//		if xerr != nil {
+	//			return nil, xerr
+	//		}
+	//	} else if in.Gateway.Sizing != nil {
+	//		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Gateway.Sizing)
+	//	}
+	//}
+	//if sizing == nil {
+	//	sizing = &abstract.HostSizingRequirements{MinGPU: -1}
+	//}
+	//sizing.Image = in.Gateway.GetImageId()
 
-	var (
-		sizing    *abstract.HostSizingRequirements
-		gwImageID string
-		gwName    string
-	)
-	if in.Gateway != nil {
-		if in.Gateway.SizingAsString != "" {
-			sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
-			if xerr != nil {
-				return nil, xerr
-			}
-		} else if in.Gateway.Sizing != nil {
-			sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Gateway.Sizing)
-		}
-	}
-	if sizing == nil {
-		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
-	}
-	sizing.Image = in.Gateway.GetImageId()
+	//handler := handlers.NewNetworkHandler(job)
+	//network, xerr := handler.Create(networkName, in.GetCidr(), in.GetDnsServers(), in.KeepOnFailure)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
 
-	handler := handlers.NewNetworkHandler(job)
-	network, xerr := handler.Create(
-		networkName,
-		in.GetCidr(),
-		ipversion.IPv4,
-		*sizing,
-		gwImageID,
-		gwName,
-		in.FailOver,
-		in.KeepOnFailure,
-		in.Domain,
-	)
+	rn, xerr := networkfactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer.Trace("Network '%s' successfuly created.", networkName)
-	return network.ToProtocol(task)
+	req := abstract.NetworkRequest{
+		Name:          in.GetName(),
+		CIDR:          in.GetCidr(),
+		DNSServers:    in.GetDnsServers(),
+		KeepOnFailure: in.GetKeepOnFailure(),
+	}
+	if xerr = rn.Create(task, req); xerr != nil {
+		return nil, xerr
+	}
+
+	tracer.Trace("Network '%s' successfully created.", networkName)
+	return rn.ToProtocol(task)
 }
 
 // List existing networks
@@ -151,16 +148,28 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 		return nil, xerr
 	}
 	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewNetworkHandler(job)
-	networks, err := handler.List(in.GetAll())
-	if err != nil {
-		return nil, err
+	//handler := handlers.NewNetworkHandler(job)
+	//networks, err := handler.List(in.GetAll())
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	rn, xerr := networkfactory.New(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
+	var networks []*abstract.Network
+	xerr = rn.Browse(task, func(an *abstract.Network) fail.Error {
+		networks = append(networks, an)
+		return nil
+	})
 
 	// Build response mapping abstract.Network to protocol.Network
 	var pbnetworks []*protocol.Network
@@ -203,9 +212,9 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 	defer job.Close()
-
 	task := job.GetTask()
-	tracer := debug.NewTracer(task, true, "(%s)", refLabel).WithStopwatch().Entering()
+
+	tracer := debug.NewTracer(task, true /*tracing.SjouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -249,297 +258,27 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return nil, xerr
 	}
 	defer job.Close()
+	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), true, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewNetworkHandler(job)
-	_, xerr = job.GetTask().Run(
-		func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-			return nil, handler.Delete(ref)
-		},
-		nil,
-	)
+	//handler := handlers.NewNetworkHandler(job)
+	//_, xerr = job.GetTask().Run(
+	//	func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	//		return nil, handler.Delete(ref)
+	//	},
+	//	nil,
+	//)
+	rn, xerr := networkfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
+		return empty, xerr
+	}
+	if xerr = rn.Delete(task); xerr != nil {
 		return empty, xerr
 	}
 
 	tracer.Trace("Network %s successfully deleted.", refLabel)
 	return empty, nil
-}
-
-// BindSecurityGroup attaches a Security Group to a hostnetwork
-func (s *NetworkListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	}
-
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference for Network")
-	}
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
-	}
-
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network bind-security-group")
-	if xerr != nil {
-		return empty, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
-
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	if xerr = rn.BindSecurityGroup(task, sg, in.GetEnable()); xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
-}
-
-// UnbindSecurityGroup detaches a Security Group from a network
-func (s *NetworkListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	}
-
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Network")
-	}
-
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
-	if sgRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
-	}
-
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network unbind-security-group")
-	if xerr != nil {
-		return empty, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
-
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	if xerr = rn.UnbindSecurityGroup(task, sg); xerr != nil {
-		return empty, xerr
-	}
-	return empty, nil
-}
-
-// EnableSecurityGroup applies the rules of a bound security group on a network
-func (s *NetworkListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	}
-
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference for Network")
-	}
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
-	}
-
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network security-group enable")
-	if xerr != nil {
-		return empty, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
-
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	if xerr = rn.EnableSecurityGroup(task, sg); xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
-}
-
-// DisableSecurityGroup detaches a Security Group from a network
-func (s *NetworkListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot disable security group on network")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	}
-
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
-	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Network")
-	}
-
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
-	if sgRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
-	}
-
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "network security-group disable")
-	if xerr != nil {
-		return empty, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
-
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
-	if xerr != nil {
-		return empty, xerr
-	}
-	if xerr = rn.DisableSecurityGroup(task, sg); xerr != nil {
-		return empty, xerr
-	}
-	return empty, nil
-}
-
-// ListSecurityGroups applies a Security Group already attached (if not already applied)
-func (s *NetworkListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupBondsRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	//defer fail.OnExitWrapError(&err, "cannot list security groups bound to network")
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	}
-
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetTarget())
-	if networkRef == "" {
-		return nil, fail.InvalidRequestError("neither name nor id given as reference of Network")
-	}
-
-	job, xerr := PrepareJob(ctx, in.GetTarget().GetTenantId(), "network security-group list")
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
-
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.network"), "(%s)", networkRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-	bonds, xerr := rn.ListSecurityGroups(task, in.GetKind())
-	if xerr != nil {
-		return nil, xerr
-	}
-	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "networks")
-	return resp, nil
 }
