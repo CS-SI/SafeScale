@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package listeners
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"reflect"
 	"strings"
 
@@ -33,6 +35,7 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
+	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -266,6 +269,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var sizing *abstract.HostSizingRequirements
 	if in.SizingAsString != "" {
 		sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.SizingAsString)
@@ -280,19 +284,62 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	sizing.Image = in.GetImageId()
 
-	network, xerr := networkfactory.Load(task, job.GetService(), in.GetNetwork())
-	if xerr != nil {
-		return nil, xerr
+	// Determine if the subnets to use exist
+	// Because of legacy, the subnet can be fully qualified by network+subnet, or can be qualified by network+network,
+	// because previous release of SafeScale created network AND subnet with the same name
+	var (
+		rs      resources.Subnet
+		subnets []*abstract.Subnet
+		xerr    fail.Error
+	)
+	networkValue := in.GetNetwork()
+	if networkValue != "" {
+		_, xerr = networkfactory.Load(task, job.GetService(), networkValue)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+	if len(in.GetSubnets()) == 0 {
+		rs, xerr = subnetfactory.Load(task, job.GetService(), networkValue, networkValue)
+		if xerr != nil {
+			return nil, xerr
+		}
+		err = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			subnets = []*abstract.Subnet{as}
+			return nil
+		})
+	} else {
+		for _, v := range in.GetSubnets() {
+			rs, xerr = subnetfactory.Load(task, job.GetService(), networkValue, v)
+			if xerr != nil {
+				return nil, xerr
+			}
+			xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				subnets = append(subnets, as)
+				return nil
+			})
+			if xerr != nil {
+				return nil, xerr
+			}
+		}
 	}
 
 	domain := in.Domain
 	if domain == "" {
-		xerr = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			an, ok := clonable.(*abstract.Network)
+		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			domain = an.Domain
+			domain = as.Domain
 			return nil
 		})
 		if xerr != nil {
@@ -309,15 +356,8 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		HostName:      name + domain,
 		PublicIP:      in.GetPublic(),
 		KeepOnFailure: in.GetKeepOnFailure(),
+		Subnets:       subnets,
 	}
-	err = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		networkCore, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		hostReq.Networks = []*abstract.Network{networkCore}
-		return nil
-	})
 
 	handler := handlers.NewHostHandler(job)
 	host, err := handler.Create(hostReq, *sizing, in.Force)
@@ -567,7 +607,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 }
 
 // BindSecurityGroup attaches a Security Group to an host
-func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot bind security group to Host")
 
@@ -584,10 +624,10 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Host")
 	}
@@ -616,14 +656,23 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rh.BindSecurityGroup(task, sg, !in.GetEnable()); xerr != nil {
+
+	var enable resources.SecurityGroupActivation
+	switch in.GetState() {
+	case protocol.SecurityGroupState_SGS_DISABLED:
+		enable = resources.SecurityGroupDisable
+	default:
+		enable = resources.SecurityGroupEnable
+	}
+
+	if xerr = rh.BindSecurityGroup(task, sg, enable); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
 }
 
 // UnbindSecurityGroup detaches a Security Group from an host
-func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot unbind security group from Host")
 
@@ -643,7 +692,7 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
 	}
@@ -680,7 +729,7 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 }
 
 // EnableSecurityGroup applies a Security Group already attached (if not already applied)
-func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot enable security group on Host")
 
@@ -700,7 +749,7 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
 	}
@@ -710,7 +759,7 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group enable")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group enable")
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -737,7 +786,7 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 }
 
 // DisableSecurityGroup applies a Security Group already attached (if not already applied)
-func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupBindRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	//defer fail.OnExitWrapError(&err, "cannot disable security group on host")
 
@@ -757,7 +806,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
 	}
@@ -767,7 +816,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group enable")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group enable")
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -794,7 +843,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 }
 
 // ListSecurityGroups applies a Security Group already attached (if not already applied)
-func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupBondsRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
+func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	//defer fail.OnExitWrapError(&err, "cannot disable security group on host")
 
@@ -813,12 +862,12 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetTarget())
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTarget().GetTenantId(), "host security-group list")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -834,7 +883,7 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	if xerr != nil {
 		return nil, xerr
 	}
-	bonds, xerr := rh.ListSecurityGroups(task, in.GetKind())
+	bonds, xerr := rh.ListSecurityGroups(task, securitygroupstate.All)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@
 package retry
 
 import (
-    "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-    "github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 )
 
 // Notify ...
@@ -27,5 +27,5 @@ type Notify func(Try, verdict.Enum)
 
 // NotifyByLog logs the status of each try
 func NotifyByLog(try Try, verdict verdict.Enum) {
-    logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, verdict.String(), try.Err)
+	logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, verdict.String(), try.Err)
 }

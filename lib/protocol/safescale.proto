@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,46 +154,27 @@ service ImageService{
 }
 
 
-// safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
+// safescale network create net1 --cidr="192.168.0.0/16"
 // safescale network list
 // safescale network delete net1
 // safescale network inspect net1
 
-message VirtualIp {
-	string id = 1;
-	string name = 2;
-	string network_id = 3;
-	string private_ip = 4;
-	string public_ip = 5;
-	repeated Host hosts = 6;
-}
-
-message NetworkDefinition{
+message NetworkCreateRequest{
 	string name = 2;
 	string cidr = 3;
-	GatewayDefinition gateway = 4;
-	bool fail_over = 5;
-	string domain = 6;
+	GatewayDefinition gateway = 4;  // Deprecated: moved to SubnetDefinition
+	bool fail_over = 5;             // Deprecated: moved to SubnetDefinition
+	string domain = 6;              // Deprecated: moved to SubnetDefinition
 	bool keep_on_failure = 7;
 	string tenant_id = 8;
-}
-
-message GatewayDefinition{
-	int32 cpu = 1;  // Deprecated: replaced by sizing field
-	float ram = 2;  // Deprecated: replaced by sizing field
-	int32 disk = 3; // Deprecated: replaced by sizing field
-	string image_id = 5;
-	string name = 6;
-	int32 gpu_count = 7;    // Deprecated: replaced by sizing field
-	string gpu_type = 8;    // Deprecated: replaced by sizing field
-	HostSizing sizing = 9;  // Deprecated: replaced by sizing_as_string field
-	string sizing_as_string = 10;
+	repeated string dns_servers = 9;
+	bool no_subnet = 10;
 }
 
 enum NetworkState {
 	NS_UNKNOWNSTATE = 0;
-	NS_PHASE1 = 1;
-	NS_PHASE2 = 2;
+	NS_PHASE1 = 1;  // Deprecated
+	NS_PHASE2 = 2;  // Deprecated
 	NS_READY = 3;
 	NS_NETWORKERROR = 4;
 }
@@ -202,11 +183,13 @@ message Network {
 	string id = 1;
 	string name = 2;
 	string cidr = 3;
-	string gateway_id = 4;
-	string secondary_gateway_id = 5;
-	VirtualIp virtual_ip = 6;
-	bool failover = 7;
+	string gateway_id = 4;              // Deprecated: moved to Subnet
+	string secondary_gateway_id = 5;    // Deprecated: moved to Subnet
+	VirtualIp virtual_ip = 6;           // Deprecated: moved to Subnet
+	bool failover = 7;                  // Deprecated: moved to Subnet
 	NetworkState state = 8;
+	repeated string subnets = 9;
+	repeated string dns_servers = 10;
 }
 
 message NetworkList {
@@ -219,15 +202,102 @@ message NetworkListRequest {
 }
 
 service NetworkService {
-	rpc Create(NetworkDefinition) returns (Network){}
+	rpc Create(NetworkCreateRequest) returns (Network){}
 	rpc List(NetworkListRequest) returns (NetworkList){}
 	rpc Inspect(Reference) returns (Network) {}
 	rpc Delete(Reference) returns (google.protobuf.Empty){}
-	rpc BindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc UnbindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc EnableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc DisableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc ListSecurityGroups(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
+//	rpc BindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+//	rpc UnbindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+//	rpc EnableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+//	rpc DisableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
+//	rpc ListSecurityGroups(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
+}
+
+// safescale network subnet create --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" net-1 subnet-1 (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw_net1)
+// safescale network subnet list net1
+// safescale network subnet delete net1 subnet-1
+// safescale network subnet inspect net1 subnet-1
+
+message VirtualIp {
+	string id = 1;
+	string name = 2;
+	string network_id = 3;
+	string private_ip = 4;
+	string public_ip = 5;
+	repeated Host hosts = 6;
+}
+
+message SubnetCreateRequest {
+	Reference network = 1;
+	string name = 2;
+	string cidr = 3;
+	GatewayDefinition gateway = 4;
+	bool fail_over = 5;
+	string domain = 6;
+	bool keep_on_failure = 7;
+}
+
+message GatewayDefinition {
+	int32 cpu = 1;  // Deprecated: replaced by sizing field
+	float ram = 2;  // Deprecated: replaced by sizing field
+	int32 disk = 3; // Deprecated: replaced by sizing field
+	string image_id = 5;
+	string name = 6;
+	int32 gpu_count = 7;    // Deprecated: replaced by sizing field
+	string gpu_type = 8;    // Deprecated: replaced by sizing field
+	HostSizing sizing = 9;  // Deprecated: replaced by sizing_as_string field
+	string sizing_as_string = 10;
+}
+
+enum SubnetState {
+	SS_UNKNOWNSTATE = 0;
+	SS_PHASE1 = 1;
+	SS_PHASE2 = 2;
+	SS_READY = 3;
+	SS_NETWORKERROR = 4;
+}
+
+message SubnetInspectRequest {
+	Reference network = 1;
+	Reference subnet = 2;
+}
+
+message Subnet {
+	string id = 1;
+	string name = 2;
+	string cidr = 3;
+	repeated string gateway_ids = 4;
+	VirtualIp virtual_ip = 5;
+	bool failover = 6;
+	SubnetState state = 7;
+	string network_id = 8;
+}
+
+message SubnetList {
+	repeated Subnet subnets = 1;
+}
+
+message SubnetListRequest {
+	Reference network = 1;
+	bool all = 2;
+}
+
+message SubnetSecurityGroupBondsRequest {
+	Reference network = 1;
+	Reference subnet = 2;
+	string kind = 3;
+}
+
+service SubnetService {
+	rpc Create(SubnetCreateRequest) returns (Subnet){}
+	rpc List(SubnetListRequest) returns (SubnetList){}
+	rpc Inspect(SubnetInspectRequest) returns (Subnet) {}
+	rpc Delete(SubnetInspectRequest) returns (google.protobuf.Empty){}
+	rpc BindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
+	rpc UnbindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
+	rpc EnableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
+	rpc DisableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
+	rpc ListSecurityGroups(SecurityGroupSubnetBindRequest) returns (SecurityGroupBondsResponse){}
 }
 
 // safescale host create host1 --net="net1" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" --public=true
@@ -261,6 +331,7 @@ message HostDefinition {
 	bool keep_on_failure = 16;
 	string sizing_as_string = 17;
 	string tenant_id = 18;
+	repeated string subnets = 19;
 }
 
 
@@ -281,7 +352,7 @@ enum HostState {
 	HS_UNKNOWN = 6;
 }
 
-message Host{
+message Host {
 	string id = 1;
 	string name = 2;
 	int32 cpu = 3;
@@ -302,11 +373,11 @@ message HostStatus {
 	string status = 2;
 }
 
-message HostList{
+message HostList {
 	repeated Host hosts = 1;
 }
 
-message SshConfig{
+message SshConfig {
 	string user = 1;
 	string host = 2;
 	string private_key = 3;
@@ -315,7 +386,7 @@ message SshConfig{
 	SshConfig secondary_gateway = 6;
 }
 
-message HostListRequest{
+message HostListRequest {
 	bool all = 1;
 	string tenant_id = 2;
 }
@@ -331,11 +402,11 @@ service HostService {
 	rpc Reboot(Reference) returns (google.protobuf.Empty){}
 	rpc Resize(HostDefinition) returns (Host){}
 	rpc SSH(Reference) returns (SshConfig){}
-	rpc BindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc UnbindSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc EnableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc DisableSecurityGroup(SecurityGroupBindRequest) returns (google.protobuf.Empty){}
-	rpc ListSecurityGroups(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
+	rpc BindSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
+	rpc UnbindSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
+	rpc EnableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
+	rpc DisableSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
+	rpc ListSecurityGroups(SecurityGroupHostBindRequest) returns (SecurityGroupBondsResponse){}
 }
 
 message HostTemplate {
@@ -422,7 +493,7 @@ message VolumeAttachmentResponse {
 	bool do_not_format = 5;
 }
 
-message VolumeListRequest{
+message VolumeListRequest {
 	bool all = 1;
 	string tenant_id = 2;
 }
@@ -431,7 +502,7 @@ message VolumeListResponse {
 	repeated VolumeInspectResponse volumes = 1;
 }
 
-service VolumeService{
+service VolumeService {
 	rpc Create(VolumeCreateRequest) returns (VolumeInspectResponse) {}
 	rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
 	rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
@@ -447,21 +518,21 @@ service VolumeService{
 // safescale bucket|container list
 // safescale bucket|container inspect C1
 
-message Bucket{
+message Bucket {
 	string name = 1;
 }
 
-message BucketList{
+message BucketList {
 	repeated Bucket buckets = 1;
 }
 
-message BucketMountingPoint{
+message BucketMountingPoint {
 	string bucket = 1;
 	Reference host = 2;
 	string path = 3;
 }
 
-service BucketService{
+service BucketService {
 	rpc Create(Bucket) returns (google.protobuf.Empty){}
 	rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
 	rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
@@ -504,7 +575,7 @@ service SshService {
 // safescale nas|share list
 // safescale nas|share inspect share1
 
-message NFSExportOptions{
+message NFSExportOptions {
 	bool read_only = 1;
 	bool root_squash = 2;
 	bool secure = 3;
@@ -514,7 +585,7 @@ message NFSExportOptions{
 	bool subtree_check = 7;
 }
 
-message ShareDefinition{
+message ShareDefinition {
 	string id = 1;
 	string name = 2;
 	Reference host = 3;
@@ -525,11 +596,11 @@ message ShareDefinition{
 	string options_as_string = 8;
 }
 
-message ShareList{
+message ShareList {
 	repeated ShareDefinition share_list = 1;
 }
 
-message ShareMountDefinition{
+message ShareMountDefinition {
 	Reference host = 1;
 	Reference share = 2;
 	string path = 3;
@@ -538,12 +609,12 @@ message ShareMountDefinition{
 	bool with_cache = 6;
 }
 
-message ShareMountList{
+message ShareMountList {
 	ShareDefinition share = 1;
 	repeated ShareMountDefinition mount_list = 2;
 }
 
-service ShareService{
+service ShareService {
 	rpc Create(ShareDefinition) returns (ShareDefinition){}
 	rpc Delete(Reference) returns (google.protobuf.Empty){}
 	rpc List(Reference) returns (ShareList){}     // Here, Reference is used to carry tenant
@@ -554,16 +625,16 @@ service ShareService{
 
 // Job Management
 
-message JobDefinition{
+message JobDefinition {
 	string uuid = 1;
 	string info = 2;
 }
 
-message JobList{
+message JobList {
 	repeated JobDefinition list = 1;
 }
 
-service JobService{
+service JobService {
 	rpc Stop(JobDefinition) returns (google.protobuf.Empty){}
 	rpc List(google.protobuf.Empty) returns (JobList){}
 }
@@ -660,7 +731,7 @@ message ClusterComposite {
 	repeated string tenants = 1;
 }
 
-message ClusterNetwork{
+message ClusterNetwork {
 	string network_id = 1;
 	string cidr = 2;
 	string domain = 3;
@@ -698,7 +769,7 @@ message ClusterNodeRequest {
 	Reference host = 2;     // on deletion, if not set, requests to delete last added node
 }
 
-service ClusterService{
+service ClusterService {
 	rpc List(Reference) returns (ClusterListResponse){}
 	rpc Inspect(Reference) returns (ClusterResponse){}
 	rpc Create(ClusterCreateRequest) returns (ClusterResponse){}
@@ -772,11 +843,11 @@ enum SecurityGroupRuleDirection {
 	SGRD_EGRESS = 2;
 }
 
-enum SecurityGroupRuleAction {
-	SGRA_UNKNOWN = 0;
-	SGRA_ALLOW = 1;
-	SGRA_DENY = 2;
-}
+//enum SecurityGroupRuleAction {
+//	SGRA_UNKNOWN = 0;
+//	SGRA_ALLOW = 1;
+//	SGRA_DENY = 2;
+//}
 
 enum SecurityGroupRuleEtherType {
 	SGRET_UNKNOWN = 0;
@@ -784,16 +855,22 @@ enum SecurityGroupRuleEtherType {
 	SGRET_IPV6 = 6;
 }
 
+enum SecurityGroupState {
+	SGS_ALL = 0;
+	SGS_ENABLED = 1;
+	SGS_DISABLED = 2;
+}
+
 message SecurityGroupRule {
-	string id = 1;
+	repeated string ids = 1;
 	string description = 2;
 	SecurityGroupRuleEtherType ether_type = 3;
 	SecurityGroupRuleDirection direction = 4;
 	string protocol = 5;
 	uint32 port_from = 6;
 	uint32 port_to = 7;
-	string cidr = 8;
-	SecurityGroupRuleAction action = 9;
+	repeated string ip_ranges = 8;
+//	SecurityGroupRuleAction action = 9;
 }
 
 message SecurityGroupRuleRequest {
@@ -803,14 +880,14 @@ message SecurityGroupRuleRequest {
 
 message SecurityGroupRuleDeleteRequest {
 	Reference group = 1;
-	string rule_id = 2;
+	SecurityGroupRule rule = 2;
 }
 
-message SecurityGroupRequest {
-	string name = 1;
-	string description = 2;
-	repeated SecurityGroupRule rules = 3;
-	string tenant_id = 4;
+message SecurityGroupCreateRequest {
+	Reference network = 1;
+	string name = 2;
+	string description = 3;
+	repeated SecurityGroupRule rules = 4;
 }
 
 message SecurityGroupResponse {
@@ -828,14 +905,21 @@ message SecurityGroupListResponse {
 	repeated SecurityGroupResponse security_groups = 1;
 }
 
-message SecurityGroupBindRequest {
+message SecurityGroupHostBindRequest {
 	Reference group = 1;
-	Reference target = 2;
-	bool enable = 3;
+	Reference host = 2;
+	SecurityGroupState state = 3;
+}
+
+message SecurityGroupSubnetBindRequest {
+	Reference group = 1;
+	Reference network = 2;
+	Reference subnet = 3;
+	SecurityGroupState state = 4;
 }
 
 message SecurityGroupBondsRequest {
-	Reference target = 1;   // can be used to describe a host, a network or a group
+	Reference target = 1;   // can be used to describe a host, a subnet or a group
 	string kind = 2;
 }
 
@@ -847,7 +931,7 @@ message SecurityGroupBond {
 
 message SecurityGroupBondsResponse {
 	repeated SecurityGroupBond hosts = 1;
-	repeated SecurityGroupBond networks = 2;
+	repeated SecurityGroupBond subnets = 2;
 }
 
 message SecurityGroupDeleteRequest {
@@ -859,7 +943,7 @@ service SecurityGroupService {
 	rpc AddRule(SecurityGroupRuleRequest) returns (SecurityGroupResponse){}
 	rpc Bonds(SecurityGroupBondsRequest) returns (SecurityGroupBondsResponse){}
 	rpc Clear(Reference) returns (google.protobuf.Empty){}
-	rpc Create(SecurityGroupRequest) returns (SecurityGroupResponse){}
+	rpc Create(SecurityGroupCreateRequest) returns (SecurityGroupResponse){}
 	rpc Delete(SecurityGroupDeleteRequest) returns (google.protobuf.Empty){}
 	rpc DeleteRule(SecurityGroupRuleDeleteRequest) returns (SecurityGroupResponse){}
 	rpc Inspect(Reference) returns (SecurityGroupResponse){}

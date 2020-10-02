@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,12 @@
 package images
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
 
 // Filter ...
 type Filter struct {
-    filter Predicate
+	filter Predicate
 }
 
 // Predicate ...
@@ -30,75 +30,75 @@ type Predicate func(img abstract.Image) bool
 
 // NewFilter creates a new filter with the given predicate
 func NewFilter(predicate Predicate) *Filter {
-    return &Filter{filter: predicate}
+	return &Filter{filter: predicate}
 }
 
 // Not ...
 func (f *Filter) Not() *Filter {
-    oldFilter := f.filter
-    f.filter = func(in abstract.Image) bool {
-        return !oldFilter(in)
-    }
-    return f
+	oldFilter := f.filter
+	f.filter = func(in abstract.Image) bool {
+		return !oldFilter(in)
+	}
+	return f
 }
 
 // And ...
 func (f *Filter) And(other *Filter) *Filter {
-    oldFilter := f.filter
-    f.filter = func(in abstract.Image) bool {
-        return oldFilter(in) && other.filter(in)
-    }
-    return f
+	oldFilter := f.filter
+	f.filter = func(in abstract.Image) bool {
+		return oldFilter(in) && other.filter(in)
+	}
+	return f
 }
 
 // Or ...
 func (f *Filter) Or(other *Filter) *Filter {
-    oldFilter := f.filter
-    f.filter = func(in abstract.Image) bool {
-        return oldFilter(in) || other.filter(in)
-    }
-    return f
+	oldFilter := f.filter
+	f.filter = func(in abstract.Image) bool {
+		return oldFilter(in) || other.filter(in)
+	}
+	return f
 }
 
 // Not ...
 func Not(f Predicate) Predicate {
-    return func(in abstract.Image) bool {
-        return !f(in)
-    }
+	return func(in abstract.Image) bool {
+		return !f(in)
+	}
 }
 
 // OrFilter ..
 func OrFilter(filters ...Predicate) Predicate {
-    return func(in abstract.Image) bool {
-        for _, f := range filters {
-            if f(in) {
-                return true
-            }
-        }
-        return false
-    }
+	return func(in abstract.Image) bool {
+		for _, f := range filters {
+			if f(in) {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 // AndFilter ...
 func AndFilter(filters ...Predicate) Predicate {
-    return func(in abstract.Image) bool {
-        for _, f := range filters {
-            if !f(in) {
-                return false
-            }
-        }
-        return true
-    }
+	return func(in abstract.Image) bool {
+		for _, f := range filters {
+			if !f(in) {
+				return false
+			}
+		}
+		return true
+	}
 }
 
 // FilterImages ...
 func FilterImages(images []abstract.Image, f *Filter) []abstract.Image {
-    res := make([]abstract.Image, 0)
-    for _, img := range images {
+	res := make([]abstract.Image, 0)
+	for _, img := range images {
 
-        if f.filter(img) {
-            res = append(res, img)
-        }
-    }
-    return res
+		if f.filter(img) {
+			res = append(res, img)
+		}
+	}
+	return res
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package operations
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"os"
 	"os/user"
 	"reflect"
@@ -36,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
@@ -145,7 +145,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 		innerXErr := props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			if len(hostNetworkV1.IPv4Addresses) > 0 {
@@ -165,7 +165,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 			}
 
 			if !hostNetworkV1.IsGateway {
-				objn, xerr := LoadNetwork(task, svc, hostNetworkV1.DefaultNetworkID)
+				objn, xerr := LoadSubnet(task, svc, "", hostNetworkV1.DefaultNetworkID)
 				if xerr != nil {
 					return xerr
 				}
@@ -344,13 +344,13 @@ func (rh *host) Reload(task concurrency.Task) fail.Error {
 			return innerXErr
 		}
 
-		// Updates host property propertiesv1.HostNetwork
+		// Updates host property propertiesv1.HostSubnet
 		innerXErr = props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Network))
+			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Subnet))
 			return nil
 		})
 		if innerXErr != nil {
@@ -438,26 +438,26 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}
 
-	var rn resources.Network
-	if len(hostReq.Networks) > 0 {
-		// By convention, default network is the first of the list
-		an := hostReq.Networks[0]
-		if rn, xerr = LoadNetwork(task, svc, an.ID); xerr != nil {
+	var rs resources.Subnet
+	if len(hostReq.Subnets) > 0 {
+		// By convention, default subnet is the first of the list
+		as := hostReq.Subnets[0]
+		if rs, xerr = LoadSubnet(task, svc, "", as.ID); xerr != nil {
 			return nil, xerr
 		}
 		if hostReq.DefaultRouteIP == "" {
-			hostReq.DefaultRouteIP = rn.(*network).getDefaultRouteIP(task)
+			hostReq.DefaultRouteIP = rs.(*subnet).getDefaultRouteIP(task)
 		}
 	} else {
-		if rn, _, xerr = getOrCreateDefaultNetwork(task, svc); xerr != nil {
+		if rs, _, xerr = getOrCreateDefaultSubnet(task, svc); xerr != nil {
 			return nil, xerr
 		}
-		xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			an, ok := clonable.(*abstract.Network)
+		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			hostReq.Networks = append(hostReq.Networks, an)
+			hostReq.Subnets = append(hostReq.Subnets, as)
 			return nil
 		})
 		if xerr != nil {
@@ -465,7 +465,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}
 
-	// If hostReq.ImageID is not explicitly defined, find an image GetID corresponding to the content of hostDef.Image
+	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
 		hostReq.ImageID, xerr = rh.findImageID(&hostDef)
 		if xerr != nil {
@@ -549,15 +549,15 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return innerXErr
 		}
 
-		// Updates host property propertiesv1.HostNetwork
+		// Updates host property propertiesv1.HostSubnet
 		return props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Network))
-			hostNetworkV1.DefaultNetworkID = rn.GetID()
-			hostNetworkV1.IsGateway = hostReq.IsGateway // hostReq.getDefaultRouteIP == "" && rn.GetName() != abstract.SingleHostNetworkName
+			_ = hostNetworkV1.Replace(converters.HostNetworkFromAbstractToPropertyV1(*ahf.Subnet))
+			hostNetworkV1.DefaultNetworkID = rs.GetID()
+			hostNetworkV1.IsGateway = hostReq.IsGateway // hostReq.getDefaultRouteIP == "" && rs.GetName() != abstract.SingleHostNetworkName
 			return nil
 		})
 	})
@@ -609,14 +609,14 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// -- Updates host link with networks --
 	if !hostReq.IsGateway {
-		for _, rn := range hostReq.Networks {
-			if xerr := rh.updateNetwork(task, rn.ID); xerr != nil {
+		for _, as := range hostReq.Subnets {
+			if xerr := rh.updateNetwork(task, as.ID); xerr != nil {
 				return nil, xerr
 			}
 		}
 	}
 
-	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure network and security
+	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure subnet and security
 	if xerr = rh.runInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent); xerr != nil {
 		return nil, xerr
 	}
@@ -627,7 +627,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return nil, xerr
 	}
 
-	// if host is a gateway, executes userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY script to configure network and security
+	// if host is a gateway, executes userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY script to configure subnet and security
 	if !hostReq.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
 		if xerr = rh.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userdataContent); xerr != nil {
@@ -814,48 +814,93 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (stri
 	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL, timeout)
 }
 
-// getOrCreateDefaultNetwork gets network abstract.SingleHostNetworkName or create it if necessary
-// We don't want metadata on this network, so we use directly provider api instead of services
-func getOrCreateDefaultNetwork(task concurrency.Task, svc iaas.Service) (resources.Network, resources.Host, fail.Error) {
-	if objn, xerr := LoadNetwork(task, svc, abstract.SingleHostNetworkName); xerr == nil {
-		objpgw, xerr := objn.GetGateway(task, true)
+// getOrCreateDefaultSubnet gets network abstract.SingleHostNetworkName or create it if necessary
+func getOrCreateDefaultSubnet(task concurrency.Task, svc iaas.Service) (rs resources.Subnet, gw resources.Host, xerr fail.Error) {
+	rn, xerr := LoadNetwork(task, svc, abstract.SingleHostNetworkName)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		// continue
+		default:
+			return nil, nil, xerr
+		}
+	}
+	if rn == nil {
+		rn, xerr = NewNetwork(svc)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
-		return objn, objpgw, nil
-	}
-
-	objn, xerr := NewNetwork(svc)
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	request := abstract.NetworkRequest{
-		Name:      abstract.SingleHostNetworkName,
-		IPVersion: ipversion.IPv4,
-		CIDR:      "10.0.0.0/8",
-	}
-	if xerr = objn.Create(task, request, "", nil); xerr != nil {
-		return nil, nil, xerr
-	}
-
-	defer func() {
-		if xerr != nil {
-			derr := objn.Delete(task)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
-			}
+		req := abstract.NetworkRequest{
+			Name: abstract.SingleHostNetworkName,
+			CIDR: "10.0.0.0/16",
 		}
-	}()
+		xerr = rn.Create(task, req)
+		if xerr != nil {
+			return nil, nil, xerr
+		}
 
-	objpgw, xerr := objn.GetGateway(task, true)
+		defer func() {
+			if xerr != nil {
+				derr := rn.Delete(task)
+				if derr != nil {
+					_ = xerr.AddConsequence(derr)
+				}
+			}
+		}()
+	}
+
+	rs, xerr = LoadSubnet(task, svc, rn.GetID(), abstract.SingleHostSubnetName)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		default:
+			return nil, nil, xerr
+		}
+	}
+	if rs.IsNull() {
+		rs, xerr = NewSubnet(svc)
+		if xerr != nil {
+			return nil, nil, xerr
+		}
+		var DNSServers []string
+		if opts, xerr := svc.GetConfigurationOptions(); xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+			default:
+				return nil, nil, xerr
+			}
+		} else {
+			DNSServers = strings.Split(opts.GetString("DNSServers"), ",")
+		}
+		req := abstract.SubnetRequest{
+			Name:       abstract.SingleHostSubnetName,
+			CIDR:       "10.0.0.0/17",
+			DNSServers: DNSServers,
+			HA:         false,
+		}
+		if xerr = rs.Create(task, req, "", nil); xerr != nil {
+			return nil, nil, xerr
+		}
+
+		defer func() {
+			if xerr != nil {
+				derr := rs.Delete(task)
+				if derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet '%s'", abstract.SingleHostSubnetName))
+				}
+			}
+		}()
+	}
+
+	rh, xerr := rs.GetGateway(task, true)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
-	return objn, objpgw, nil
+
+	return rs, rh, nil
 }
 
-// Delete deletes a host with its metadata and updates network links
+// Delete deletes a host with its metadata and updates subnet links
 func (rh *host) Delete(task concurrency.Task) fail.Error {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
@@ -918,10 +963,10 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		innerXErr = properties.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if hostNetworkV1.IsGateway {
-				return fail.NotAvailableError("cannot delete host, it's a gateway that can only be deleted through its network")
+				return fail.NotAvailableError("cannot delete host, it's a gateway that can only be deleted through its subnet")
 			}
 			return nil
 		})
@@ -995,7 +1040,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		innerXErr = properties.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			hostID := rh.GetID()
 			hostName := rh.GetName()
@@ -1094,7 +1139,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 // GetSSHConfig loads SSH configuration for host from metadata
 //
 // FIXME: system.SSHConfig should be able to carry data about secondary getGateway
-//        Currently, if primary gateway is down, ssh to a host in the network will fail
+//        Currently, if primary gateway is down, ssh to a host in the subnet will fail
 func (rh host) GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Error) {
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -1659,8 +1704,8 @@ func (rh host) getPrivateIP(task concurrency.Task) string {
 	return rh.privateIP
 }
 
-// GetPrivateIPOnNetwork returns the private IP of the host on its default Network
-func (rh host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, xerr fail.Error) {
+// GetPrivateIPOnSubnet returns the private IP of the host on its default Network
+func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip string, xerr fail.Error) {
 	ip = ""
 	if rh.IsNull() {
 		return ip, fail.InvalidInstanceError()
@@ -1668,18 +1713,30 @@ func (rh host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (i
 	if task == nil {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if networkID == "" {
-		return ip, fail.InvalidParameterError("networkID", "cannot be empty string")
+	if subnetID == "" {
+		return ip, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		if props.Lookup(hostproperty.NetworkV2) {
+			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				if ip, ok = hostNetworkV2.IPv4Addresses[subnetID]; !ok {
+					return fail.InvalidRequestError("host '%s' does not have an IP address on subnet '%s'", rh.GetName(), subnetID)
+				}
+				return nil
+			})
+		}
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			if ip, ok = hostNetworkV1.IPv4Addresses[networkID]; !ok {
-				return fail.InvalidRequestError("host '%s' does not have an IP address on network '%s'", rh.GetName(), networkID)
+			if ip, ok = hostNetworkV1.IPv4Addresses[subnetID]; !ok {
+				return fail.InvalidRequestError("host '%s' does not have an IP address on subnet '%s'", rh.GetName(), subnetID)
 			}
 			return nil
 		})
@@ -1687,12 +1744,12 @@ func (rh host) GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (i
 	return ip, xerr
 }
 
-// getPrivateIPOnNetwork returns the private IP of the host on its default Network
-// To be used when rh is notoriously not nil
-func (rh *host) getPrivateIPOnNetwork(task concurrency.Task, networkID string) string {
-	ip, _ := rh.GetPrivateIPOnNetwork(task, networkID)
-	return ip
-}
+//// getPrivateIPOnSubnet returns the private IP of the host on request subnet
+//// To be used when rh is notoriously not nil
+//func (rh *host) getPrivateIPOnSubnet(task concurrency.Task, networkID string) string {
+//	ip, _ := rh.GetPrivateIPOnSubnet(task, networkID)
+//	return ip
+//}
 
 // GetAccessIP returns the IP to reach the host
 func (rh *host) GetAccessIP(task concurrency.Task) (ip string, _ fail.Error) {
@@ -1886,27 +1943,12 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 		v["Username"] = abstract.DefaultUser
 	}
 
-	// FIXME: gateway stuff has to be refactored (2 gateways possible)
-	var rn resources.Network
-	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-			networkV1, ok := clonable.(*propertiesv1.HostNetwork)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			var innerXErr fail.Error
-			rn, innerXErr = LoadNetwork(task, rh.GetService(), networkV1.DefaultNetworkID)
-			if innerXErr != nil {
-				return innerXErr
-			}
-			return nil
-		})
-	})
+	rs, xerr := rh.GetDefaultSubnet(task)
 	if xerr != nil {
 		return xerr
 	}
 
-	rgw, xerr := rn.GetGateway(task, true)
+	rgw, xerr := rs.GetGateway(task, true)
 	if xerr != nil {
 		return xerr
 	}
@@ -1915,7 +1957,7 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
 	v["PrimaryPublicIP"] = rgwi.getPublicIP(task)
 
-	rgw, xerr = rn.GetGateway(task, false)
+	rgw, xerr = rs.GetGateway(task, false)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
@@ -1926,11 +1968,11 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 		v["SecondaryPublicIP"] = rgwi.getPublicIP(task)
 	}
 
-	if v["getEndpointIP"], xerr = rn.GetEndpointIP(task); xerr != nil {
+	if v["getEndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
 		return xerr
 	}
 	v["getPublicIP"] = v["getEndpointIP"]
-	if v["getDefaultRouteIP"], xerr = rn.GetDefaultRouteIP(task); xerr != nil {
+	if v["getDefaultRouteIP"], xerr = rs.GetDefaultRouteIP(task); xerr != nil {
 		return xerr
 	}
 	return nil
@@ -1992,7 +2034,7 @@ func (rh host) PushStringToFile(task concurrency.Task, content string, filename 
 				return innerXErr
 			}
 			if retcode != 0 {
-				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
+				// If retcode == 1 (general copy error), retry. It may be a temporary subnet incident
 				if retcode == 1 && !deleted {
 					// File may exist on target, try to remove it
 					_, _, _, innerXErr = rh.Run(task, "sudo rm -f "+filename, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
@@ -2054,33 +2096,48 @@ func (rh host) PushStringToFile(task concurrency.Task, content string, filename 
 	return nil
 }
 
-// GetDefaultNetwork returns the Network instance corresponding to host default network
-func (rh host) GetDefaultNetwork(task concurrency.Task) (objn resources.Network, xerr fail.Error) {
+// GetDefaultSubnet returns the Network instance corresponding to host default subnet
+func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xerr fail.Error) {
+	nullSubnet := nullSubnet()
 	if rh.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return nullSubnet, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nullSubnet, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
+	var innerXErr fail.Error
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		if props.Lookup(hostproperty.NetworkV2) {
+			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				networkV2, ok := clonable.(*propertiesv2.HostNetwork)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				rs, innerXErr = LoadSubnet(task, rh.GetService(), "", networkV2.DefaultSubnetID)
+				if innerXErr != nil {
+					return innerXErr
+				}
+				return nil
+			})
+		}
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			networkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			if networkV1.DefaultNetworkID != "" {
-				var innerXErr fail.Error
-				objn, innerXErr = LoadNetwork(task, rh.GetService(), networkV1.DefaultNetworkID)
+			rs, innerXErr = LoadSubnet(task, rh.GetService(), "", networkV1.DefaultNetworkID)
+			if innerXErr != nil {
 				return innerXErr
 			}
-			return fail.NotFoundError("no default network associated with host")
+			return nil
 		})
 	})
 	if xerr != nil {
-		return nil, xerr
+		return nullSubnet, xerr
 	}
-	return objn, nil
+
+	return rs, nil
 }
 
 // ToProtocol convert an resources.Host to protocol.Host
@@ -2114,7 +2171,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok = clonable.(*propertiesv1.HostNetwork)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String)
+				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String)
 			}
 			return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
 				hostSizingV1, ok = clonable.(*propertiesv1.HostSizing)
@@ -2158,7 +2215,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 }
 
 // BindSecurityGroup binds a security group to the host; if enabled is true, apply it immediately
-func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enable bool) fail.Error {
+func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enable resources.SecurityGroupActivation) fail.Error {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -2179,8 +2236,8 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 			sgID := sg.GetID()
 			// First check if the security group is not already registered for the host with the exact same state
 			for k, v := range hsgV1.ByID {
-				if k == sgID && v.Disabled == !enable {
-					return fail.DuplicateError("security group '%s' already binded to host")
+				if k == sgID && v.Disabled == bool(!enable) {
+					return fail.DuplicateError("security group '%s' already bound to host")
 				}
 			}
 
@@ -2188,7 +2245,7 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 			item := &propertiesv1.SecurityGroupBond{
 				ID:       sgID,
 				Name:     sg.GetName(),
-				Disabled: !enable,
+				Disabled: bool(!enable),
 			}
 			hsgV1.ByID[sgID] = item
 			hsgV1.ByName[sg.GetName()] = item
@@ -2224,7 +2281,7 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 			for k, v := range hsgV1.ByID {
 				if k == sgID {
 					if v.FromNetwork {
-						return fail.InvalidRequestError("cannot unbind a security group from host when from network")
+						return fail.InvalidRequestError("cannot unbind a security group from host when from subnet")
 					}
 					found = true
 					break
@@ -2250,7 +2307,7 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 }
 
 // ListSecurityGroups returns a slice of security groups binded to host
-func (rh *host) ListSecurityGroups(task concurrency.Task, kind string) (list []*propertiesv1.SecurityGroupBond, _ fail.Error) {
+func (rh *host) ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, _ fail.Error) {
 	var nullList []*propertiesv1.SecurityGroupBond
 	if rh.IsNull() {
 		return nullList, fail.InvalidInstanceError()
@@ -2259,25 +2316,13 @@ func (rh *host) ListSecurityGroups(task concurrency.Task, kind string) (list []*
 		return nullList, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	if kind == "" {
-		kind = "all"
-	}
-	loweredKind := strings.ToLower(kind)
-	switch loweredKind {
-	case "all", "enabled", "disabled":
-		// continue
-	default:
-		return nil, fail.InvalidParameterError("kind", fmt.Sprintf("invalid value '%s'", kind))
-
-	}
-
 	return list, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			list = filterBondsByKind(hsgV1.ByID, loweredKind)
+			list = filterBondsByKind(hsgV1.ByID, state)
 			return nil
 		})
 	})

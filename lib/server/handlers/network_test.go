@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +32,9 @@ package handlers
 // 		},
 // 	}
 
-// 	mockClientAPI.EXPECT().ListNetworks().Return(nil, nil).Times(1)
+// 	mockClientAPI.EXPECT().ListSubnets().Return(nil, nil).Times(1)
 
-// 	result, daerr := ness.service.ListNetworks()
+// 	result, daerr := ness.service.ListSubnets()
 // 	assert.Nil(t, daerr)
 
 // 	_ = result
@@ -62,9 +62,9 @@ package handlers
 // 		},
 // 	}
 
-// 	mockClientAPI.EXPECT().ListNetworks().Return(nil, theError).Times(1)
+// 	mockClientAPI.EXPECT().ListSubnets().Return(nil, theError).Times(1)
 
-// 	result, daerr := ness.service.ListNetworks()
+// 	result, daerr := ness.service.ListSubnets()
 // 	assert.NotNil(t, daerr)
 
 // 	assert.True(t, strings.Contains(daerr.Error(), "TransientFailure"))

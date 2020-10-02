@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,54 +17,54 @@
 package tracing
 
 import (
-    "encoding/json"
-    "fmt"
-    "os"
-    "strings"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 )
 
 var settings map[string]map[string]bool = nil
 
 // RegisterTraceSettings keeps track of what has to be traced
 func RegisterTraceSettings(jsonSettings string) error {
-    if settings != nil {
-        return fmt.Errorf("trace settings are already defined")
-    }
+	if settings != nil {
+		return fmt.Errorf("trace settings are already defined")
+	}
 
-    newSettings := map[string]map[string]bool{}
-    err := json.Unmarshal([]byte(jsonSettings), &newSettings)
-    if err != nil {
-        return fmt.Errorf("no trace are enabled, an error occured loading trace settings: %v", err)
-    }
+	newSettings := map[string]map[string]bool{}
+	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
+	if err != nil {
+		return fmt.Errorf("no trace are enabled, an error occured loading trace settings: %v", err)
+	}
 
-    // Check with env variable SAFESCALE_TRACE if key or key.subkey is inside
-    if env := os.Getenv("SAFESCALE_TRACE"); env != "" {
-        parts := strings.Split(env, ",")
-        for _, part := range parts {
-            if part == "" {
-                continue
-            }
-            keys := strings.Split(strings.TrimSpace(part), ".")
-            key := strings.TrimSpace(keys[0])
-            reverse := false
-            if key[0] == '!' {
-                key = key[1:]
-                reverse = true
-            }
+	// Check with env variable SAFESCALE_TRACE if key or key.subkey is inside
+	if env := os.Getenv("SAFESCALE_TRACE"); env != "" {
+		parts := strings.Split(env, ",")
+		for _, part := range parts {
+			if part == "" {
+				continue
+			}
+			keys := strings.Split(strings.TrimSpace(part), ".")
+			key := strings.TrimSpace(keys[0])
+			reverse := false
+			if key[0] == '!' {
+				key = key[1:]
+				reverse = true
+			}
 
-            keysLength := len(keys)
-            if _, ok := newSettings[key]; !ok || (keysLength == 1 && !reverse) {
-                newSettings[key] = map[string]bool{}
-            } else if ok && keysLength == 1 && reverse {
-                delete(newSettings, key)
-            }
-            if keysLength > 1 {
-                subkey := strings.TrimSpace(keys[1])
-                newSettings[key][subkey] = true
-            }
-        }
-    }
+			keysLength := len(keys)
+			if _, ok := newSettings[key]; !ok || (keysLength == 1 && !reverse) {
+				newSettings[key] = map[string]bool{}
+			} else if ok && keysLength == 1 && reverse {
+				delete(newSettings, key)
+			}
+			if keysLength > 1 {
+				subkey := strings.TrimSpace(keys[1])
+				newSettings[key][subkey] = true
+			}
+		}
+	}
 
-    settings = newSettings
-    return nil
+	settings = newSettings
+	return nil
 }

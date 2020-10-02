@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ type AuthenticationOptions struct {
 
 	// Name of the VPC (Virtual Private Cloud)
 	VPCName string
-	// CIDR if the VPC
+	// IPRanges if the VPC
 	VPCCIDR string
 }
 
@@ -105,8 +105,8 @@ type ConfigurationOptions struct {
 
 	UseNATService bool
 
-	ProviderName     string
-	BuildSubnetworks bool
+	ProviderName string
+	BuildSubnets bool
 
 	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool

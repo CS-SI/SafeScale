@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,55 +17,55 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// NetworkSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
+// SubnetSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
-type NetworkSecurityGroups struct {
+type SubnetSecurityGroups struct {
 	ByID   map[string]*SecurityGroupBond `json:"by_id,omitempty"`   // map of security groups by IDs; if value is true, security group is currently applied
 	ByName map[string]*SecurityGroupBond `json:"by_name,omitempty"` // map of security groups by Names; if value is true, security group is currently applied
 }
 
-// NewNetworkSecurityGroups ...
-func NewNetworkSecurityGroups() *NetworkSecurityGroups {
-	return &NetworkSecurityGroups{
+// NewSubnetSecurityGroups ...
+func NewSubnetSecurityGroups() *SubnetSecurityGroups {
+	return &SubnetSecurityGroups{
 		ByID:   map[string]*SecurityGroupBond{},
 		ByName: map[string]*SecurityGroupBond{},
 	}
 }
 
 // Reset ...
-func (hsg *NetworkSecurityGroups) Reset() {
-	*hsg = NetworkSecurityGroups{
+func (ssg *SubnetSecurityGroups) Reset() {
+	*ssg = SubnetSecurityGroups{
 		ByID:   map[string]*SecurityGroupBond{},
 		ByName: map[string]*SecurityGroupBond{},
 	}
 }
 
 // Clone ...
-func (hsg *NetworkSecurityGroups) Clone() data.Clonable {
-	return NewNetworkSecurityGroups().Replace(hsg)
+func (ssg *SubnetSecurityGroups) Clone() data.Clonable {
+	return NewSubnetSecurityGroups().Replace(ssg)
 }
 
 // Replace ...
-func (hsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
-	src := p.(*NetworkSecurityGroups)
-	hsg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
+func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) data.Clonable {
+	src := p.(*SubnetSecurityGroups)
+	ssg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		hsg.ByID[k] = v.Clone().(*SecurityGroupBond)
+		ssg.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	hsg.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
+	ssg.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
 	for k, v := range src.ByName {
-		hsg.ByName[k] = v.Clone().(*SecurityGroupBond)
+		ssg.ByName[k] = v.Clone().(*SecurityGroupBond)
 	}
-	return hsg
+	return ssg
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.SecurityGroupsV1, NewNetworkSecurityGroups())
+	serialize.PropertyTypeRegistry.Register("resources.subnet", subnetproperty.SecurityGroupsV1, NewSubnetSecurityGroups())
 }

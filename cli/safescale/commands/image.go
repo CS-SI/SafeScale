@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,50 +17,50 @@
 package commands
 
 import (
-    "github.com/sirupsen/logrus"
-    "github.com/urfave/cli/v2"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 
-    "github.com/CS-SI/SafeScale/lib/client"
-    clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/strprocess"
-    "github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/client"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var imageCmdName = "image"
 
 // ImageCommand command
 var ImageCommand = &cli.Command{
-    Name:  "image",
-    Usage: "image COMMAND",
-    Subcommands: []*cli.Command{
-        imageList,
-    },
+	Name:  "image",
+	Usage: "image COMMAND",
+	Subcommands: []*cli.Command{
+		imageList,
+	},
 }
 
 var imageList = &cli.Command{
-    Name:    "list",
-    Aliases: []string{"ls"},
-    Usage:   "ErrorList available images",
-    Flags: []cli.Flag{
-        &cli.BoolFlag{
-            Name:  "all",
-            Usage: "ErrorList all available images in tenant (without any filter)",
-        }},
-    Action: func(c *cli.Context) error {
-        logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", imageCmdName, c.Command.Name, c.Args())
+	Name:    "list",
+	Aliases: []string{"ls"},
+	Usage:   "ErrorList available images",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "all",
+			Usage: "ErrorList all available images in tenant (without any filter)",
+		}},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", imageCmdName, c.Command.Name, c.Args())
 
-        clientSession, xerr := client.New(c.String("server"))
-        if xerr != nil {
-            return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-        }
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
 
-        images, err := clientSession.Image.List(c.Bool("all"), temporal.GetExecutionTimeout())
-        if err != nil {
-            err = fail.FromGRPCStatus(err)
-            return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))
-        }
-        return clitools.SuccessResponse(images.GetImages())
-    },
+		images, err := clientSession.Image.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))
+		}
+		return clitools.SuccessResponse(images.GetImages())
+	},
 }

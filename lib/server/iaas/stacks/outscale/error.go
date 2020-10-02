@@ -18,48 +18,48 @@
 package outscale
 
 import (
-    "reflect"
+	"reflect"
 
-    "github.com/outscale/osc-sdk-go/osc"
+	"github.com/outscale/osc-sdk-go/osc"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func normalizeError(err error) fail.Error {
-    if err == nil {
-        return nil
-    }
+	if err == nil {
+		return nil
+	}
 
-    switch realErr := err.(type) {
-    case osc.GenericOpenAPIError:
-        switch model := realErr.Model().(type) {
-        case osc.ErrorResponse:
-            switch model.Errors[0].Code {
-            case "1":
-                return fail.NotAuthenticatedError("user is not authenticated")
-            case "4019":
-                return fail.InvalidRequestError("invalid device name")
-            case "4045":
-                return fail.InvalidRequestError("invalid CIDR")
-            case "5057":
-                return fail.NotFoundError("network not found")
-            case "5071":
-                return fail.NotFoundError("keypair not found")
-            case "9011":
-                return fail.DuplicateError("a keypair with this name already exists")
-            case "9044":
-                return fail.InvalidRequestError("not included in VPC CIDR")
-            case "9058":
-                return fail.DuplicateError("network already exist")
-            default:
-                merr := model.Errors[0]
-                reqId := model.ResponseContext.RequestId
-                return fail.UnknownError("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId)
-            }
-        default:
-            return fail.UnknownError("from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr), realErr.Error())
-        }
-    default:
-        return fail.ToError(err)
-    }
+	switch realErr := err.(type) {
+	case osc.GenericOpenAPIError:
+		switch model := realErr.Model().(type) {
+		case osc.ErrorResponse:
+			switch model.Errors[0].Code {
+			case "1":
+				return fail.NotAuthenticatedError("user is not authenticated")
+			case "4019":
+				return fail.InvalidRequestError("invalid device name")
+			case "4045":
+				return fail.InvalidRequestError("invalid IPRanges")
+			case "5057":
+				return fail.NotFoundError("network not found")
+			case "5071":
+				return fail.NotFoundError("keypair not found")
+			case "9011":
+				return fail.DuplicateError("a keypair with this name already exists")
+			case "9044":
+				return fail.InvalidRequestError("not included in VPC IPRanges")
+			case "9058":
+				return fail.DuplicateError("network already exist")
+			default:
+				merr := model.Errors[0]
+				reqId := model.ResponseContext.RequestId
+				return fail.UnknownError("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId)
+			}
+		default:
+			return fail.UnknownError("from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr), realErr.Error())
+		}
+	default:
+		return fail.ToError(err)
+	}
 }

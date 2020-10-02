@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package userdata
 type Phase string
 
 const (
-    PHASE1_INIT                      Phase = "init"
-    PHASE2_NETWORK_AND_SECURITY      Phase = "netsec"
-    PHASE3_GATEWAY_HIGH_AVAILABILITY Phase = "gwha"
-    PHASE4_SYSTEM_FIXES              Phase = "sysfix"
-    PHASE5_FINAL                     Phase = "final"
+	PHASE1_INIT                      Phase = "init"
+	PHASE2_NETWORK_AND_SECURITY      Phase = "netsec"
+	PHASE3_GATEWAY_HIGH_AVAILABILITY Phase = "gwha"
+	PHASE4_SYSTEM_FIXES              Phase = "sysfix"
+	PHASE5_FINAL                     Phase = "final"
 )

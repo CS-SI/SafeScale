@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,26 +17,16 @@
 package hostproperty
 
 const (
-	// DescriptionV1 contains (optional) additional info describing host (purpose, ...)
-	DescriptionV1 = "1"
-	// NetworkV1 contains additional info about the network of the host
-	NetworkV1 = "2"
-	// SizingV1 contains additional info about the sizing of the host
-	SizingV1 = "3"
-	// FeaturesV1 contains optional additional info describing installed features on a host
-	FeaturesV1 = "4"
-	// VolumesV1 contains optional additional info about attached volumes on the host
-	VolumesV1 = "5"
-	// SharesV1 contains optional additional info about Nas role of the host
-	SharesV1 = "6"
-	// MountsV1 contains optional additional info about mounted devices (locally attached or remote filesystem)
-	MountsV1 = "7"
-	// SystemV1 contains optional additional info about system
-	SystemV1 = "8"
-	// SizingV2 contains optional additional info about the sizing of the host
-	SizingV2 = "9"
-	// ClusterMembershipV1 contains optional additional information about the cluster membership of the host
-	ClusterMembershipV1 = "10"
-	// SecurityGroupsV1 contains optional additional information about security groups binded to the host
-	SecurityGroupsV1 = "11"
+	DescriptionV1       = "1"  // (optional) additional info describing host (purpose, ...)
+	NetworkV1           = "2"  // Deprecated: additional info about the network of the host
+	SizingV1            = "3"  // Deprecated: additional info about the sizing of the host
+	FeaturesV1          = "4"  // optional additional info describing installed features on a host
+	VolumesV1           = "5"  // optional additional info about attached volumes on the host
+	SharesV1            = "6"  // optional additional info about Nas role of the host
+	MountsV1            = "7"  // optional additional info about mounted devices (locally attached or remote filesystem)
+	SystemV1            = "8"  // optional additional info about system
+	SizingV2            = "9"  // optional additional info about the sizing of the host
+	ClusterMembershipV1 = "10" // optional additional information about the cluster membership of the host
+	SecurityGroupsV1    = "11" // optional additional information about security groups binded to the host
+	NetworkV2           = "12" // NetworkV2 contains optional additional information about network of the host
 )

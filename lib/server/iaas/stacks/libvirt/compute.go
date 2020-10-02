@@ -1,7 +1,7 @@
 // +build libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1030,7 +1030,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostCore.PrivateKey = keyPair.PrivateKey
 	hostCore.Password = request.Password
 
-	hostNetwork := abstract.NewHostNetwork()
+	hostNetwork := abstract.NewHostSubnet()
 	if bridgedVMs {
 		var vmInfo VMInfo
 		if publicIP {
@@ -1040,7 +1040,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		}
 	}
 
-	hostNetwork.DefaultNetworkID = request.Networks[0].ID
+	hostNetwork.DefaultSubnetID = request.Networks[0].ID
 	hostNetwork.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
 	if request.DefaultGateway != nil {
 		hostNetwork.DefaultGatewayID = request.DefaultGateway.ID

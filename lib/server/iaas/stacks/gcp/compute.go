@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -237,10 +237,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	defer fail.OnPanic(&xerr)
 
 	resourceName := request.ResourceName
-	networks := request.Networks
+	subnets := request.Subnets
 	hostMustHavePublicIP := request.PublicIP
 
-	if len(networks) == 0 {
+	if len(subnets) == 0 {
 		return nullAhf, nullUd, fail.InvalidRequestError("the host %s must be on at least one network (even if public)", resourceName)
 	}
 
@@ -270,9 +270,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	}
 
 	// The Default Network is the first of the provided list, by convention
-	defaultNetwork := request.Networks[0]
-	defaultNetworkID := defaultNetwork.ID
-	isGateway := defaultNetwork == nil // || defaultNetwork.Name == abstract.SingleHostNetworkName
+	defaultSubnet := request.Subnets[0]
+	defaultSubnetID := defaultSubnet.ID
+	isGateway := defaultSubnet == nil // || defaultSubnet.Name == abstract.SingleHostNetworkName
 
 	// if defaultGateway == nil && !hostMustHavePublicIP {
 	if request.DefaultRouteIP == "" && !hostMustHavePublicIP {
@@ -283,7 +283,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
+	xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
@@ -354,7 +354,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 				innerErr error
 				server   *abstract.HostCore
 			)
-			server, innerErr = buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway, template)
+			server, innerErr = buildGcpMachine(s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region, s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultSubnet.Name, string(userDataPhase1), isGateway, template)
 			if innerErr != nil {
 				if server != nil {
 					// try deleting server
@@ -421,8 +421,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	newHost := abstract.NewHostFull()
 	newHost.Core = hostCore
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
-	newHost.Network.IsGateway = isGateway
-	newHost.Network.DefaultNetworkID = defaultNetworkID
+	newHost.Subnet.IsGateway = isGateway
+	newHost.Subnet.DefaultSubnetID = defaultSubnetID
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
@@ -682,24 +682,24 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.Host
 		})
 	}
 
-	ip4bynetid := make(map[string]string)
-	netnamebyid := make(map[string]string)
-	netidbyname := make(map[string]string)
+	ip4BySubnetID := make(map[string]string)
+	subnetNameByID := make(map[string]string)
+	subnetIDByName := make(map[string]string)
 
 	ipv4 := ""
 	for _, rn := range resouceNetworks {
-		ip4bynetid[rn.ID] = rn.IP
-		netnamebyid[rn.ID] = rn.Name
-		netidbyname[rn.Name] = rn.ID
+		ip4BySubnetID[rn.ID] = rn.IP
+		subnetNameByID[rn.ID] = rn.Name
+		subnetIDByName[rn.Name] = rn.ID
 		if rn.PublicIP != "" {
 			ipv4 = rn.PublicIP
 		}
 	}
 
-	hostComplete.Network.IPv4Addresses = ip4bynetid
-	hostComplete.Network.NetworksByID = netnamebyid
-	hostComplete.Network.NetworksByName = netidbyname
-	hostComplete.Network.PublicIPv4 = ipv4
+	hostComplete.Subnet.IPv4Addresses = ip4BySubnetID
+	hostComplete.Subnet.SubnetsByID = subnetNameByID
+	hostComplete.Subnet.SubnetsByName = subnetIDByName
+	hostComplete.Subnet.PublicIPv4 = ipv4
 
 	hostComplete.Sizing = fromMachineTypeToAllocatedSize(gcpHost.MachineType)
 

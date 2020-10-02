@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -605,21 +605,18 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
 	if len(errors) > 0 {
 		return nil, fail.NewErrorList(errors)
 	}
-	host.Network = &abstract.HostNetwork{
-		PublicIPv4:     ipv4,
-		PublicIPv6:     ipv6,
-		NetworksByID:   networksByID,
-		NetworksByName: networksByName,
-		IPv4Addresses:  ipv4Addresses,
-		IPv6Addresses:  ipv6Addresses,
+	host.Subnet = &abstract.HostSubnet{
+		PublicIPv4:    ipv4,
+		PublicIPv6:    ipv6,
+		SubnetsByID:   networksByID,
+		SubnetsByName: networksByName,
+		IPv4Addresses: ipv4Addresses,
+		IPv6Addresses: ipv6Addresses,
 	}
 	return host, nil
 }
 
-// GetHostByName returns the host using the name passed as parameter
-// returns id of the host if found
-// returns abstract.ErrResourceNotFound if not found
-// returns abstract.ErrResourceNotAvailable if provider doesn't provide the id of the host in its response
+// InspectHostByName returns the host using the name passed as parameter
 func (s *Stack) InspectHostByName(name string) (*abstract.HostCore, fail.Error) {
 	nullAhc := abstract.NewHostCore()
 	if s == nil {
@@ -656,7 +653,7 @@ func (s *Stack) InspectHostByName(name string) (*abstract.HostCore, fail.Error) 
 				host.Name = name
 				hostFull, xerr := s.InspectHost(host)
 				if xerr != nil {
-					return nullAhc, fail.Prepend(xerr, "failed to inspect host '%s'", name)
+					return nullAhc, fail.Wrap(xerr, "failed to inspect host '%s'", name)
 				}
 				return hostFull.Core, nil
 			}
@@ -681,12 +678,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
-	if len(request.Networks) == 0 && !request.PublicIP {
+	if len(request.Subnets) == 0 && !request.PublicIP {
 		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// The Default Network is the first of the provided list, by convention
-	defaultNetwork := request.Networks[0]
+	defaultNetwork := request.Subnets[0]
 	defaultNetworkID := defaultNetwork.ID
 
 	var nets []servers.Network
@@ -698,7 +695,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		})
 	}
 	// Add private networks
-	for _, n := range request.Networks {
+	for _, n := range request.Subnets {
 		nets = append(nets, servers.Network{
 			UUID: n.ID,
 		})
@@ -734,20 +731,20 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// Constructs userdata content
 	xerr = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
 	if xerr != nil {
-		xerr = fail.Prepend(xerr, "failed to prepare user data content")
+		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return nullAhf, nullUdc, xerr
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Prepend(xerr, "failed to get image")
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get image")
 	}
 
 	// Select usable availability zone, the first one in the list
 	azone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Prepend(xerr, "failed to select availability zone")
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select availability zone")
 	}
 
 	// Sets provider parameters to create host
@@ -756,20 +753,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nullAhf, nullUdc, xerr
 	}
 
-	// Gets security group to use by default
-	// FUTURE: allow user to define default security group in tenants.json file ?
-	var securityGroups []string
-	if request.IsGateway || request.PublicIP {
-		asg, xerr := s.InspectSecurityGroup(stacks.DefaultSecurityGroupName)
-		if xerr != nil {
-			return nil, userData, xerr
-		}
-		securityGroups = append(securityGroups, asg.ID)
-	}
-
 	srvOpts := servers.CreateOpts{
-		Name:             request.ResourceName,
-		SecurityGroups:   securityGroups,
+		Name: request.ResourceName,
+		//SecurityGroups:   securityGroups,
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
@@ -858,7 +844,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 				case *fail.ErrNotAvailable:
 					return fail.NewError("host '%s' is in ERROR state", request.ResourceName)
 				default:
-					return fail.Prepend(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
+					return fail.Wrap(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
 				}
 			}
 			return nil
@@ -894,10 +880,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if xerr != nil {
 		return nullAhf, nullUdc, xerr
 	}
-	newHost.Network.DefaultNetworkID = defaultNetworkID
+	newHost.Subnet.DefaultSubnetID = defaultNetworkID
 	// newHost.Network.DefaultGatewayID = defaultGatewayID
 	// newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
-	newHost.Network.IsGateway = request.IsGateway
+	newHost.Subnet.IsGateway = request.IsGateway
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	// if Floating IP are used and public address is requested
@@ -950,9 +936,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		}
 
 		if ipversion.IPv4.Is(ip.IP) {
-			newHost.Network.PublicIPv4 = ip.IP
+			newHost.Subnet.PublicIPv4 = ip.IP
 		} else if ipversion.IPv6.Is(ip.IP) {
-			newHost.Network.PublicIPv6 = ip.IP
+			newHost.Subnet.PublicIPv6 = ip.IP
 		}
 		userData.PublicIP = ip.IP
 	}
@@ -1265,7 +1251,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.cfgOpts.UseFloatingIP {
 		fip, xerr := s.getFloatingIP(ahf.Core.ID)
 		if xerr != nil {
-			return fail.Prepend(xerr, "failed to find floating ip of host '%s'", hostRef)
+			return fail.Wrap(xerr, "failed to find floating ip of host '%s'", hostRef)
 		}
 		if fip != nil {
 			err := floatingips.DisassociateInstance(s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
@@ -1301,7 +1287,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						resourcePresent = false
 						return nil
 					default:
-						return fail.Prepend(innerXErr, "failed to submit host '%s' deletion", hostRef)
+						return fail.Wrap(innerXErr, "failed to submit host '%s' deletion", hostRef)
 					}
 				}
 			}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -106,15 +106,15 @@ func SecurityGroupBondsFromPropertyToProtocol(in []*propertiesv1.SecurityGroupBo
 			}
 			out.Hosts = append(out.Hosts, item)
 		}
-	case "network", "networks":
-		out.Networks = make([]*protocol.SecurityGroupBond, 0, len(in))
+	case "subnets", "subnet":
+		out.Subnets = make([]*protocol.SecurityGroupBond, 0, len(in))
 		for _, v := range in {
 			item := &protocol.SecurityGroupBond{
 				Id:       v.ID,
 				Name:     v.Name,
 				Disabled: v.Disabled,
 			}
-			out.Networks = append(out.Networks, item)
+			out.Subnets = append(out.Subnets, item)
 		}
 	default:
 	}

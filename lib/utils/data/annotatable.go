@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ type Annotations Map
 
 // Annotatable ...
 type Annotatable interface {
-    Annotate(key string, value Annotation) Annotatable // adds an annotation to instance, returning instance
-    Annotations() Annotations                          // gives the annotations
-    Annotation(key string) (Annotation, bool)          // gives one annotation identified by field
+	Annotate(key string, value Annotation) Annotatable // adds an annotation to instance, returning instance
+	Annotations() Annotations                          // gives the annotations
+	Annotation(key string) (Annotation, bool)          // gives one annotation identified by field
 }

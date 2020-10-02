@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -543,12 +543,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	defer fail.OnExitLogError(&xerr)
 
 	resourceName := request.ResourceName
-	networks := request.Networks
+	subnets := request.Subnets
 	// hostMustHavePublicIP := request.PublicIP
 	keyPairName := request.KeyPair.Name
 
-	if networks == nil || len(networks) == 0 {
-		return nullAhf, nullUdc, fail.InvalidRequestError("the host '%s' must be on at least one network (even if public)", resourceName)
+	if subnets == nil || len(subnets) == 0 {
+		return nullAhf, nullUdc, fail.InvalidRequestError("the host '%s' must be on at least one subnet (even if public)", resourceName)
 	}
 
 	// If no password is provided, create one
@@ -561,37 +561,36 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	}
 
 	// The Default Network is the first of the provided list, by convention
-	defaultNetwork := func() *abstract.Network {
-		if len(request.Networks) == 0 {
-			return nil
+	defaultSubnet, defaultSubnetID := func() (*abstract.Subnet, string) {
+		if len(request.Subnets) == 0 {
+			return nil, ""
 		}
-		return request.Networks[0]
+		return request.Subnets[0], request.Subnets[0].ID
 	}()
 	isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
 
-	if defaultNetwork == nil && !request.PublicIP {
+	if defaultSubnet == nil && !request.PublicIP {
 		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// FIXME: AWS Remove logs
-	if len(request.Networks) == 1 {
-		if s.Config.BuildSubnetworks {
+	if len(request.Subnets) == 1 {
+		if s.Config.BuildSubnets {
 			logrus.Warnf("We need either recalculate network segments here or pass the data through metadata")
-			logrus.Warnf("Working network: %s", spew.Sdump(request.Networks[0]))
+			logrus.Warnf("Working network: %s", spew.Sdump(request.Subnets[0]))
 		}
 	} else {
-		logrus.Warnf("Choosing between networks: %s", spew.Sdump(request.Networks))
+		logrus.Warnf("Choosing between subnets: %s", spew.Sdump(request.Subnets))
 	}
 
-	defaultNetworkID := defaultNetwork.ID
-	// defaultNetwork := request.Networks[0]
+	// defaultSubnet := request.Networks[0]
 	// defaultGateway := request.DefaultGateway
-	// isGateway := defaultGateway == nil && defaultNetwork.Name != abstract.SingleHostNetworkName
+	// isGateway := defaultGateway == nil && defaultSubnet.Name != abstract.SingleHostNetworkName
 	// defaultGatewayID := ""
 	// defaultGatewayPrivateIP := ""
 	// if defaultGateway != nil {
 	//	xerr = defaultGateway.Properties.Inspect(hostproperty.NetworkV1, func(v data.Clonable) fail.Error {
-	//		hostNetworkV1 := v.(*propertiesv1.HostNetwork)
+	//		hostNetworkV1 := v.(*propertiesv1.HostSubnet)
 	//		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
 	//		defaultGatewayID = defaultGateway.ID
 	//		return nil
@@ -608,7 +607,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
+	xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
 		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
@@ -647,9 +646,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	ahf.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
 	ahf.Core.Password = request.Password
 
-	// TODO: adapt to abstract.HostFull.HostNetwork
-	ahf.Network.DefaultNetworkID = defaultNetworkID
-	ahf.Network.IsGateway = isGateway
+	// TODO: adapt to abstract.HostFull.HostSubnet
+	ahf.Subnet.DefaultSubnetID = defaultSubnetID
+	ahf.Subnet.IsGateway = isGateway
 
 	// Adds Host property SizingV1
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
@@ -670,13 +669,19 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	logrus.Debugf("requesting host resource creation...")
 	var desistError error
 
+	sgRules := stacks.DefaultTCPRules()
+	sgRules = append(sgRules, stacks.DefaultUDPRules()...)
+	sgRules = append(sgRules, stacks.DefaultICMPRules()...)
+
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			if ok, innerErr := hasSecurityGroup(s.EC2Service, vpcnet.ID, request.ResourceName); innerErr == nil {
+			var asg *abstract.SecurityGroup
+			sgName := request.ResourceName + "-default-sg"
+			if ok, innerErr := hasSecurityGroup(s.EC2Service, vpcnet.ID, sgName); innerErr == nil {
 				if !ok {
 					logrus.Debug("Security group not found")
-					innerErr = createSecurityGroup(s.EC2Service, vpcnet.ID, request.ResourceName)
+					asg, innerErr = s.CreateSecurityGroup(vpcnet.ID, sgName, fmt.Sprintf("Default Security Group for host %s", request.ResourceName), nil)
 					if innerErr != nil {
 						desistError = innerErr
 						return nil
@@ -688,38 +693,35 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 				return nil
 			}
 
-			sgID, err := getSecurityGroupID(s.EC2Service, vpcnet.ID, request.ResourceName)
-			if err != nil {
-				desistError = err
-				return nil
-			}
-
+			//sgID, err := getSecurityGroupID(s.EC2Service, vpcnet.ID, request.ResourceName)
+			//if err != nil {
+			//	desistError = err
+			//	return nil
+			//}
+			//
 			var server *abstract.HostCore
 
-			// FIXME: AWS Here the defaultNetwork.ID must be different if the network is splitted
 			trick := request.Disposable
 			if trick {
-				netID := defaultNetwork.ID
-				if s.Config.BuildSubnetworks && len(defaultNetwork.Subnetworks) >= 2 {
-					if isGateway {
-						netID = defaultNetwork.Subnetworks[0].ID
-					} else {
-						netID = defaultNetwork.Subnetworks[1].ID
-					}
-				}
+				netID := defaultSubnet.ID
+				//if isGateway {
+				//	netID = defaultSubnet.ID
+				//} else {
+				//	netID = defaultSubnet.ID
+				//}
 
-				server, err = buildAwsSpotMachine(s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template, sgID)
+				server, xerr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template, asg.ID)
 			} else {
-				netID := defaultNetwork.ID
-				if s.Config.BuildSubnetworks && len(defaultNetwork.Subnetworks) >= 2 {
-					if isGateway {
-						netID = defaultNetwork.Subnetworks[0].ID
-					} else {
-						netID = defaultNetwork.Subnetworks[1].ID
-					}
-				}
+				netID := defaultSubnet.ID
+				//if s.Config.BuildSubnets && len(defaultSubnet.Subnetworks) >= 2 {
+				//	if isGateway {
+				//		netID = defaultSubnet.Subnetworks[0].ID
+				//	} else {
+				//		netID = defaultSubnet.Subnetworks[1].ID
+				//	}
+				//}
 
-				server, err = buildAwsMachine(s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template, sgID)
+				server, err = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template, asg.ID)
 			}
 			if err != nil {
 				logrus.Warnf("error creating ahf: %+v", err)
@@ -836,111 +838,110 @@ func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, err
 	return false, nil
 }
 
-func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, error) {
-	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []*ec2.Filter{{
-			Name:   aws.String("group-name"),
-			Values: []*string{aws.String(name)},
-		}},
-	})
-	if err != nil {
-		return "", err
-	}
+//func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, error) {
+//	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
+//		Filters: []*ec2.Filter{{
+//			Name:   aws.String("group-name"),
+//			Values: []*string{aws.String(name)},
+//		}},
+//	})
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	for _, sg := range dgo.SecurityGroups {
+//		if aws.StringValue(sg.VpcId) == vpcID {
+//			return aws.StringValue(sg.GroupId), nil
+//		}
+//	}
+//
+//	return "", fail.NotFoundError(fmt.Sprintf("Security group %s not found", name))
+//}
+//
+//func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
+//	logrus.Warnf("Creating security group for vpc %s with name %s", vpcID, name)
+//
+//	// Create the security group with the VPC, name and description.
+//	createRes, err := EC2Service.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
+//		Description: aws.String(fmt.Sprintf("Default group cfg for vpc %s", vpcID)),
+//		GroupName:   aws.String(name),
+//		VpcId:       aws.String(vpcID),
+//	})
+//	if err != nil {
+//		if aerr, ok := err.(awserr.Error); ok {
+//			switch aerr.Code() {
+//			case "InvalidVpcID.NotFound":
+//				return fail.Wrap(err, "unable to find VPC with ID %q", vpcID)
+//			case "InvalidGroup.Duplicate":
+//				return fail.Wrap(err, "security group %q already exists", name)
+//			}
+//		}
+//		return fail.Wrap(err, "unable to create security group %q", name)
+//	}
+//	fmt.Printf("Created security group %s with VPC %s.\n",
+//		aws.StringValue(createRes.GroupId), vpcID)
+//
+//	var ports []portDef
+//
+//	// Add common ports
+//	ports = append(ports, portDef{"tcp", 22, 22})
+//	ports = append(ports, portDef{"tcp", 80, 80})
+//	ports = append(ports, portDef{"tcp", 443, 443})
+//
+//	// Guacamole ports
+//	ports = append(ports, portDef{"tcp", 8080, 8080})
+//	ports = append(ports, portDef{"tcp", 8009, 8009})
+//	ports = append(ports, portDef{"tcp", 9009, 9009})
+//	ports = append(ports, portDef{"tcp", 3389, 3389})
+//	ports = append(ports, portDef{"tcp", 5900, 5900})
+//	ports = append(ports, portDef{"tcp", 63011, 63011})
+//
+//	// Add time server
+//	ports = append(ports, portDef{"udp", 123, 123})
+//
+//	// Add kubernetes see https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
+//	ports = append(ports, portDef{"tcp", 6443, 6443})
+//	ports = append(ports, portDef{"tcp", 2379, 2380})
+//	ports = append(ports, portDef{"tcp", 10250, 10250})
+//	ports = append(ports, portDef{"tcp", 10251, 10251})
+//	ports = append(ports, portDef{"tcp", 10252, 10252})
+//	ports = append(ports, portDef{"tcp", 10255, 10255})
+//	ports = append(ports, portDef{"tcp", 30000, 32767})
+//
+//	// Add docker swarm ports
+//	ports = append(ports, portDef{"tcp", 2376, 2376})
+//	ports = append(ports, portDef{"tcp", 2377, 2377})
+//	ports = append(ports, portDef{"tcp", 7946, 7946})
+//	ports = append(ports, portDef{"udp", 7946, 7946})
+//	ports = append(ports, portDef{"udp", 4789, 4789})
+//
+//	// ping
+//	ports = append(ports, portDef{"icmp", -1, -1})
+//
+//	var permissions []*ec2.IpPermission
+//	for _, item := range ports {
+//		permissions = append(permissions, (&ec2.IpPermission{}).
+//			SetIpProtocol(item.protocol).
+//			SetFromPort(item.fromPort).
+//			SetToPort(item.toPort).
+//			SetIpRanges([]*ec2.IpRange{
+//				{CidrIp: aws.String("0.0.0.0/0")},
+//			}))
+//	}
+//
+//	// Add permissions to the security group
+//	_, err = EC2Service.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
+//		GroupId:       createRes.GroupId,
+//		IpPermissions: permissions,
+//	})
+//	if err != nil {
+//		return fail.Wrap(err, "unable to set security group %q ingress", name)
+//	}
+//
+//	return nil
+//}
 
-	for _, sg := range dgo.SecurityGroups {
-		if aws.StringValue(sg.VpcId) == vpcID {
-			return aws.StringValue(sg.GroupId), nil
-		}
-	}
-
-	return "", fail.NotFoundError(fmt.Sprintf("Security group %s not found", name))
-}
-
-func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
-	logrus.Warnf("Creating security group for vpc %s with name %s", vpcID, name)
-
-	// Create the security group with the VPC, name and description.
-	createRes, err := EC2Service.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
-		Description: aws.String(fmt.Sprintf("Default group cfg for vpc %s", vpcID)),
-		GroupName:   aws.String(name),
-		VpcId:       aws.String(vpcID),
-	})
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "InvalidVpcID.NotFound":
-				return fail.Wrap(err, "unable to find VPC with ID %q", vpcID)
-			case "InvalidGroup.Duplicate":
-				return fail.Wrap(err, "security group %q already exists", name)
-			}
-		}
-		return fail.Wrap(err, "unable to create security group %q", name)
-	}
-	fmt.Printf("Created security group %s with VPC %s.\n",
-		aws.StringValue(createRes.GroupId), vpcID)
-
-	var ports []portDef
-
-	// Add common ports
-	ports = append(ports, portDef{"tcp", 22, 22})
-	ports = append(ports, portDef{"tcp", 80, 80})
-	ports = append(ports, portDef{"tcp", 443, 443})
-
-	// Guacamole ports
-	ports = append(ports, portDef{"tcp", 8080, 8080})
-	ports = append(ports, portDef{"tcp", 8009, 8009})
-	ports = append(ports, portDef{"tcp", 9009, 9009})
-	ports = append(ports, portDef{"tcp", 3389, 3389})
-	ports = append(ports, portDef{"tcp", 5900, 5900})
-	ports = append(ports, portDef{"tcp", 63011, 63011})
-
-	// Add time server
-	ports = append(ports, portDef{"udp", 123, 123})
-
-	// Add kubernetes see https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
-	ports = append(ports, portDef{"tcp", 6443, 6443})
-	ports = append(ports, portDef{"tcp", 2379, 2380})
-	ports = append(ports, portDef{"tcp", 10250, 10250})
-	ports = append(ports, portDef{"tcp", 10251, 10251})
-	ports = append(ports, portDef{"tcp", 10252, 10252})
-	ports = append(ports, portDef{"tcp", 10255, 10255})
-	ports = append(ports, portDef{"tcp", 30000, 32767})
-
-	// Add docker swarm ports
-	ports = append(ports, portDef{"tcp", 2376, 2376})
-	ports = append(ports, portDef{"tcp", 2377, 2377})
-	ports = append(ports, portDef{"tcp", 7946, 7946})
-	ports = append(ports, portDef{"udp", 7946, 7946})
-	ports = append(ports, portDef{"udp", 4789, 4789})
-
-	// ping
-	ports = append(ports, portDef{"icmp", -1, -1})
-
-	var permissions []*ec2.IpPermission
-	for _, item := range ports {
-		permissions = append(permissions, (&ec2.IpPermission{}).
-			SetIpProtocol(item.protocol).
-			SetFromPort(item.fromPort).
-			SetToPort(item.toPort).
-			SetIpRanges([]*ec2.IpRange{
-				{CidrIp: aws.String("0.0.0.0/0")},
-			}))
-	}
-
-	// Add permissions to the security group
-	_, err = EC2Service.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
-		GroupId:       createRes.GroupId,
-		IpPermissions: permissions,
-	})
-	if err != nil {
-		return fail.Wrap(err, "unable to set security group %q ingress", name)
-	}
-
-	return nil
-}
-
-func buildAwsSpotMachine(
-	EC2Service *ec2.EC2,
+func (s Stack) buildAwsSpotMachine(
 	keypairName string,
 	name string,
 	imageId string,
@@ -950,7 +951,7 @@ func buildAwsSpotMachine(
 	isGateway bool,
 	template abstract.HostTemplate,
 	sgID string,
-) (*abstract.HostCore, error) {
+) (*abstract.HostCore, fail.Error) {
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
@@ -959,13 +960,13 @@ func buildAwsSpotMachine(
 		Groups:                   []*string{aws.String(sgID)},
 	}
 
-	dspho, err := EC2Service.DescribeSpotPriceHistory(&ec2.DescribeSpotPriceHistoryInput{
+	dspho, err := s.EC2Service.DescribeSpotPriceHistory(&ec2.DescribeSpotPriceHistoryInput{
 		AvailabilityZone:    aws.String(zone),
 		InstanceTypes:       []*string{aws.String(template.ID)},
 		ProductDescriptions: []*string{aws.String("Linux/UNIX")},
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 
 	lastPrice := dspho.SpotPriceHistory[len(dspho.SpotPriceHistory)-1]
@@ -983,22 +984,13 @@ func buildAwsSpotMachine(
 			},
 			UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
 		},
-		SpotPrice: lastPrice.SpotPrice, // FIXME Round up
+		SpotPrice: lastPrice.SpotPrice, // FIXME: Round up
 		Type:      aws.String("one-time"),
 	}
 
-	result, err := EC2Service.RequestSpotInstances(input)
+	result, err := s.EC2Service.RequestSpotInstances(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return nil, aerr
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			return nil, err
-		}
+		return nil, normalizeError(err)
 	}
 
 	instance := result.SpotInstanceRequests[0]
@@ -1012,8 +1004,7 @@ func buildAwsSpotMachine(
 	return &host, nil
 }
 
-func buildAwsMachine(
-	EC2Service *ec2.EC2,
+func (s Stack) buildAwsMachine(
 	keypairName string,
 	name string,
 	imageId string,
@@ -1023,9 +1014,9 @@ func buildAwsMachine(
 	isGateway bool,
 	template abstract.HostTemplate,
 	sgID string,
-) (*abstract.HostCore, error) {
+) (*abstract.HostCore, fail.Error) {
 
-	logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
+	//logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
@@ -1035,7 +1026,7 @@ func buildAwsMachine(
 	}
 
 	// Run instance
-	out, err := EC2Service.RunInstances(&ec2.RunInstancesInput{
+	out, err := s.EC2Service.RunInstances(&ec2.RunInstancesInput{
 		ImageId:      aws.String(imageId),
 		InstanceType: aws.String(template.ID),
 		KeyName:      aws.String(keypairName),
@@ -1059,18 +1050,15 @@ func buildAwsMachine(
 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
 	})
 	if err != nil {
-		if isAWSErr(err) {
-			return nil, err
-		}
-		return nil, err
+		return nil, normalizeError(err)
 	}
 
-	_, err = EC2Service.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
+	_, err = s.EC2Service.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
 		InstanceId:      out.Instances[0].InstanceId,
 		SourceDestCheck: &ec2.AttributeBooleanValue{Value: aws.Bool(false)},
 	})
 	if err != nil {
-		return nil, err
+		return nil, normalizeError(err)
 	}
 
 	instance := out.Instances[0]
@@ -1139,7 +1127,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 
 	for _, r := range awsHost.Reservations {
 		for _, i := range r.Instances {
-			ahf.Core.LastState, xerr = getAwsInstanceState(i.State)
+			ahf.Core.LastState, xerr = toHostState(i.State)
 			if err != nil {
 				return nil, xerr
 			}
@@ -1188,25 +1176,25 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 	}
 
 	ip4bynetid := make(map[string]string)
-	netnamebyid := make(map[string]string)
-	netidbyname := make(map[string]string)
+	subnetnamebyid := make(map[string]string)
+	subnetidbyname := make(map[string]string)
 
 	ipv4 := ""
 	for _, rn := range subnets {
 		ip4bynetid[rn.ID] = rn.IP
-		netnamebyid[rn.ID] = rn.Name
-		netidbyname[rn.Name] = rn.ID
+		subnetnamebyid[rn.ID] = rn.Name
+		subnetidbyname[rn.Name] = rn.ID
 		if rn.PublicIP != "" {
 			ipv4 = rn.PublicIP
 		}
 	}
 
-	ahf.Network.IPv4Addresses = ip4bynetid
-	ahf.Network.IPv6Addresses = make(map[string]string)
-	ahf.Network.NetworksByID = netnamebyid
-	ahf.Network.NetworksByName = netidbyname
-	if ahf.Network.PublicIPv4 == "" {
-		ahf.Network.PublicIPv4 = ipv4
+	ahf.Subnet.IPv4Addresses = ip4bynetid
+	ahf.Subnet.IPv6Addresses = make(map[string]string)
+	ahf.Subnet.SubnetsByID = subnetnamebyid
+	ahf.Subnet.SubnetsByName = subnetidbyname
+	if ahf.Subnet.PublicIPv4 == "" {
+		ahf.Subnet.PublicIPv4 = ipv4
 	}
 
 	sizing := fromMachineTypeToHostEffectiveSizing(s, instanceType)
@@ -1268,7 +1256,7 @@ func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
 	return aws.StringValue(SubnetId)
 }
 
-// GetHostByName returns host information by its name
+// InspectHostByName returns host information by its name
 func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAhc := abstract.NewHostCore()
 	if s == nil {
@@ -1329,7 +1317,7 @@ func (s *Stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Erro
 		if reservation != nil {
 			for _, instance := range reservation.Instances {
 				if instance != nil {
-					state, _ := getAwsInstanceState(instance.State)
+					state, _ := toHostState(instance.State)
 					name := ""
 
 					for _, tag := range instance.Tags {
