@@ -54,7 +54,7 @@ import (
 )
 
 // ListRegions ...
-func (s *Stack) ListRegions() ([]string, error) {
+func (s *Stack) ListRegions() ([]string, fail.Error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	listOpts := regions.ListOpts{
@@ -80,10 +80,10 @@ func (s *Stack) ListRegions() ([]string, error) {
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
+func (s *Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 	tracer := debug.NewTracer(nil, "", true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)()
 
 	allPages, err := az.List(s.ComputeClient).AllPages()
 	if err != nil {
@@ -110,10 +110,10 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, err error) {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (imgList []abstract.Image, err error) {
+func (s *Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)()
 
 	opts := images.ListOpts{}
 
@@ -121,8 +121,8 @@ func (s *Stack) ListImages() (imgList []abstract.Image, err error) {
 	pager := images.List(s.ComputeClient, opts)
 
 	// Define an anonymous function to be executed on each page's iteration
-	err = pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+	xerr = pager.EachPage(
+		func(page pagination.Page) (bool, fail.Error) {
 			imageList, err := images.ExtractImages(page)
 			if err != nil {
 				return false, err
@@ -135,9 +135,9 @@ func (s *Stack) ListImages() (imgList []abstract.Image, err error) {
 			return true, nil
 		},
 	)
-	if (len(imgList) == 0) || (err != nil) {
-		if err != nil {
-			return nil, fail.Wrap(err, fmt.Sprintf("error listing images: %s", ProviderErrorToString(err)))
+	if (len(imgList) == 0) || (xerr != nil) {
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, fmt.Sprintf("error listing images: %s", ProviderErrorToString(xerr)))
 		}
 		logrus.Debugf("Image list empty !")
 	}
@@ -145,10 +145,10 @@ func (s *Stack) ListImages() (imgList []abstract.Image, err error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
+func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)()
 
 	var img *images.Image
 
@@ -166,17 +166,17 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, err error) {
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		return nil, fail.Wrap(err, fmt.Sprintf("error getting image: %s", ProviderErrorToString(err)))
+		return nil, fail.Wrap(xerr, fmt.Sprintf("error getting image: %s", ProviderErrorToString(xerr)))
 	}
 
 	return &abstract.Image{ID: img.ID, Name: img.Name, DiskSize: int64(img.MinDiskGigabytes)}, nil
 }
 
 // GetTemplate returns the Template referenced by id
-func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err error) {
+func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)()
 
 	// Try 10 seconds to get template
 	var flv *flavors.Flavor
@@ -202,7 +202,7 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, err err
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
+func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -219,7 +219,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
 		func() error {
 			pager = flavors.ListDetail(s.ComputeClient, opts)
 			return pager.EachPage(
-				func(page pagination.Page) (bool, error) {
+				func(page pagination.Page) (bool, fail.Error) {
 					flavorList, err := flavors.ExtractFlavors(page)
 					if err != nil {
 						return false, err
@@ -257,7 +257,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
 
 // TODO: restore code that call Openstack API to create keypair (even if we will not use it in SafeScale)
 // CreateKeyPair creates a key pair (no import)
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -270,7 +270,7 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) error {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
@@ -287,7 +287,7 @@ func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
@@ -297,7 +297,7 @@ func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
 
 	// Define an anonymous function to be executed on each page's iteration
 	err := pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			keyList, err := keypairs.ExtractKeyPairs(page)
 			if err != nil {
 				return false, err
@@ -371,7 +371,7 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fail.Error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
@@ -606,7 +606,7 @@ func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) erro
 }
 
 // GetHostByName returns the host using the name passed as parameter
-func (s *Stack) GetHostByName(name string) (*abstract.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -635,7 +635,7 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, xerr fail.Error) {
 	defer debug.NewTracer(
 		nil, fmt.Sprintf("(%s)", request.ResourceName), true,
 	).WithStopwatch().GoingIn().OnExitTrace()()
@@ -693,10 +693,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	err = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
-	if err != nil {
-		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
-		return nil, userData, fail.Errorf(msg, err)
+	xerr = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	if xerr != nil {
+		msg := fmt.Sprintf("failed to prepare user data content: %+v", xerr)
+		return nil, userData, fail.Errorf(msg, xerr)
 	}
 
 	// Determine system disk size based on vcpus count
@@ -961,7 +961,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
-func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
+func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
 	type ServerWithAZ struct {
 		servers.Server
 		az.ServerAvailabilityZoneExt
@@ -985,7 +985,7 @@ func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, error) {
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (s *Stack) SelectedAvailabilityZone() (string, error) {
+func (s *Stack) SelectedAvailabilityZone() (string, fail.Error) {
 	if s.selectedAvailabilityZone == "" {
 		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
@@ -1006,7 +1006,7 @@ func (s *Stack) SelectedAvailabilityZone() (string, error) {
 
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, err error) {
+func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
 	var host *abstract.Host
 
 	switch hostParam := hostParam.(type) {
@@ -1030,10 +1030,10 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 	previousIterationState := hoststate.UNKNOWN
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			server, err = servers.Get(s.ComputeClient, host.ID).Extract()
-			if err != nil {
+			server, xerr = servers.Get(s.ComputeClient, host.ID).Extract()
+			if xerr != nil {
 				return ReinterpretGophercloudErrorCode(
-					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
+					xerr, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
 						return fail.AbortedError("", ferr)
 					},
 				)
@@ -1101,7 +1101,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 
 // waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ hoststate.Enum, err error) {
+func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ hoststate.Enum, xerr fail.Error) {
 	var host *abstract.Host
 
 	switch hostParam := hostParam.(type) {
@@ -1168,7 +1168,7 @@ func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ ho
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.Host; any other type will return an fail.InvalidParameterError
-func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
 	defer debug.NewTracer(nil, "", false).WithStopwatch().GoingIn().OnExitTrace()()
 
 	hostState, err := s.getHostState(hostParam, temporal.GetDefaultDelay())
@@ -1177,13 +1177,13 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 }
 
 // ListHosts lists all hosts
-func (s *Stack) ListHosts() ([]*abstract.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	pager := servers.List(s.ComputeClient, servers.ListOpts{})
 	var hosts []*abstract.Host
 	err := pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := servers.ExtractServers(page)
 			if err != nil {
 				return false, err
@@ -1351,7 +1351,7 @@ func (s *Stack) StartHost(id string) error {
 }
 
 // ResizeHost ...
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// TODO: RESIZE Resize Host HERE

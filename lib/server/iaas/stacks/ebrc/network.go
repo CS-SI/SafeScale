@@ -35,7 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *StackEbrc) getOrgVdc() (govcd.Org, govcd.Vdc, error) {
+func (s *StackEbrc) getOrgVdc() (govcd.Org, govcd.Vdc, fail.Error) {
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
 		return govcd.Org{}, govcd.Vdc{}, err
@@ -49,7 +49,7 @@ func (s *StackEbrc) getOrgVdc() (govcd.Org, govcd.Vdc, error) {
 	return org, vdc, nil
 }
 
-func (s *StackEbrc) findVAppNames() ([]string, error) {
+func (s *StackEbrc) findVAppNames() ([]string, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return []string{}, err
@@ -72,7 +72,7 @@ func (s *StackEbrc) findVAppNames() ([]string, error) {
 	return vappNames, nil
 }
 
-func (s *StackEbrc) findVmNames() ([]string, error) {
+func (s *StackEbrc) findVmNames() ([]string, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return []string{}, err
@@ -94,7 +94,7 @@ func (s *StackEbrc) findVmNames() ([]string, error) {
 	return vmNames, nil
 }
 
-func (s *StackEbrc) findVMByID(id string) (govcd.VM, error) {
+func (s *StackEbrc) findVMByID(id string) (govcd.VM, fail.Error) {
 	var vm govcd.VM
 
 	if strings.Contains(id, ":vapp:") {
@@ -121,7 +121,7 @@ func (s *StackEbrc) findVMByID(id string) (govcd.VM, error) {
 	return vm, nil
 }
 
-func (s *StackEbrc) findVMByIDS(id string) (govcd.VM, error) {
+func (s *StackEbrc) findVMByIDS(id string) (govcd.VM, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *StackEbrc) findVMByIDS(id string) (govcd.VM, error) {
 	return vm, nil
 }
 
-func (s *StackEbrc) findVMByName(id string) (govcd.VM, error) {
+func (s *StackEbrc) findVMByName(id string) (govcd.VM, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 
 	appNames, err := s.findVAppNames()
@@ -162,7 +162,7 @@ func (s *StackEbrc) findVMByName(id string) (govcd.VM, error) {
 	return vm, nil
 }
 
-func (s *StackEbrc) findDiskByID(id string) (*govcd.Disk, error) {
+func (s *StackEbrc) findDiskByID(id string) (*govcd.Disk, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (s *StackEbrc) findDiskByID(id string) (*govcd.Disk, error) {
 	return nil, fail.Errorf(fmt.Sprintf("Disk with id [%s] not found", id), nil)
 }
 
-func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, error) {
+func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return nil, err
@@ -210,7 +210,7 @@ func (s *StackEbrc) findDiskByName(id string) (*govcd.Disk, error) {
 	return nil, fail.Errorf(fmt.Sprintf("Disk with name [%s] not found", id), nil)
 }
 
-func (s *StackEbrc) findEdgeGatewayNames() ([]string, error) {
+func (s *StackEbrc) findEdgeGatewayNames() ([]string, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return []string{}, err
@@ -232,7 +232,7 @@ func (s *StackEbrc) findEdgeGatewayNames() ([]string, error) {
 	return gateways, nil
 }
 
-func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
+func (s *StackEbrc) getPublicIPs() (types.IPRanges, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return types.IPRanges{}, err
@@ -261,7 +261,7 @@ func (s *StackEbrc) getPublicIPs() (types.IPRanges, error) {
 	return types.IPRanges{}, fail.Errorf(fmt.Sprintf("No public IPs found"), nil)
 }
 
-func ipv4MaskString(m []byte) (string, error) {
+func ipv4MaskString(m []byte) (string, fail.Error) {
 	if len(m) != 4 {
 		return "", fmt.Errorf("ipv4Mask: len must be 4 bytes")
 	}
@@ -269,7 +269,7 @@ func ipv4MaskString(m []byte) (string, error) {
 	return fmt.Sprintf("%d.%d.%d.%d", m[0], m[1], m[2], m[3]), nil
 }
 
-func toIPRange(cidr string) (types.IPRanges, error) {
+func toIPRange(cidr string) (types.IPRanges, fail.Error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return types.IPRanges{}, err
@@ -320,7 +320,7 @@ func dupIP(ip net.IP) net.IP {
 	return dup
 }
 
-func getGateway(cidr string) (net.IP, error) {
+func getGateway(cidr string) (net.IP, fail.Error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return net.IP{}, err
@@ -338,7 +338,7 @@ func getGateway(cidr string) (net.IP, error) {
 	return first, nil
 }
 
-func toValidIPRange(cidr string) (types.IPRanges, error) {
+func toValidIPRange(cidr string) (types.IPRanges, fail.Error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return types.IPRanges{}, err
@@ -392,7 +392,7 @@ func isReservedIP(ip net.IP) bool {
 	return reserved
 }
 
-func getLinks(org govcd.Org, typed string) ([]types.Link, error) {
+func getLinks(org govcd.Org, typed string) ([]types.Link, fail.Error) {
 	var result []types.Link
 
 	for _, item := range org.Org.Link {
@@ -405,7 +405,7 @@ func getLinks(org govcd.Org, typed string) ([]types.Link, error) {
 }
 
 // CreateNetwork creates a network named name
-func (s *StackEbrc) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
+func (s *StackEbrc) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, xerr fail.Error) {
 	logrus.Debug("ebrc.Client.CreateNetwork() called")
 	defer logrus.Debug("ebrc.Client.CreateNetwork() done")
 
@@ -604,7 +604,7 @@ func (s *StackEbrc) CreateNetwork(req abstract.NetworkRequest) (network *abstrac
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *StackEbrc) GetNetwork(ref string) (*abstract.Network, error) {
+func (s *StackEbrc) GetNetwork(ref string) (*abstract.Network, fail.Error) {
 	logrus.Debug("ebrc.Client.GetNetwork() called")
 	defer logrus.Debug("ebrc.Client.GetNetwork() done")
 
@@ -642,7 +642,7 @@ func (s *StackEbrc) GetNetwork(ref string) (*abstract.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *StackEbrc) GetNetworkByName(ref string) (*abstract.Network, error) {
+func (s *StackEbrc) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 	logrus.Debug("ebrc.Client.GetNetworkByName() called")
 	defer logrus.Debug("ebrc.Client.GetNetworkByName() done")
 
@@ -669,7 +669,7 @@ func (s *StackEbrc) GetNetworkByName(ref string) (*abstract.Network, error) {
 }
 
 // ListNetworks lists available networks
-func (s *StackEbrc) ListNetworks() ([]*abstract.Network, error) {
+func (s *StackEbrc) ListNetworks() ([]*abstract.Network, fail.Error) {
 	logrus.Debug("ebrc.Client.ListNetworks() called")
 	defer logrus.Debug("ebrc.Client.ListNetworks() done")
 
@@ -727,7 +727,7 @@ func (s *StackEbrc) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *StackEbrc) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, err error) {
+func (s *StackEbrc) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, xerr fail.Error) {
 	logrus.Debug("ebrc.Client.CreateGateway() called")
 	defer logrus.Debug("ebrc.Client.CreateGateway() done")
 

@@ -38,7 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/userdata"
 )
 
-func infoFromCidr(cidr string) (string, string, string, string, error) {
+func infoFromCidr(cidr string) (string, string, string, string, fail.Error) {
 	IP, IPNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return "", "", "", "", fail.Errorf(fmt.Sprintf("failed to parse cidr : %s", err.Error()), err)
@@ -55,7 +55,7 @@ func infoFromCidr(cidr string) (string, string, string, string, error) {
 	return IPNet.IP.String(), mask, dhcpStart, dhcpEnd, nil
 }
 
-func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Network, error) {
+func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Network, fail.Error) {
 	libvirtNetwork, err := libvirtService.LookupNetworkByUUIDString(ref)
 	if err != nil {
 		libvirtNetwork, err = libvirtService.LookupNetworkByName(ref)
@@ -74,7 +74,7 @@ func getNetworkFromRef(ref string, libvirtService *libvirt.Connect) (*libvirt.Ne
 	return libvirtNetwork, nil
 }
 
-func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, error) {
+func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Network, fail.Error) {
 	libvirtNetworkXML, err := libvirtNetwork.GetXMLDesc(0)
 	if err != nil {
 		return nil, fail.Errorf(
@@ -136,7 +136,7 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	name := req.Name
@@ -214,7 +214,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
@@ -243,13 +243,13 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 	return s.GetNetwork(ref)
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	var networks []*abstract.Network
@@ -305,7 +305,7 @@ func (s *Stack) DeleteNetwork(ref string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, fail.Error) {
 	defer debug.NewTracer(nil, "", true).GoingIn().OnExitTrace()()
 
 	network := req.Network
@@ -355,7 +355,7 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

@@ -45,7 +45,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *StackEbrc) ListImages(all bool) ([]abstract.Image, error) {
+func (s *StackEbrc) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	logrus.Debug(">>> stacks.ebrc::ListImages()")
 	defer logrus.Debug("<<< stacks.ebrc::ListImages()")
 
@@ -85,7 +85,7 @@ func (s *StackEbrc) ListImages(all bool) ([]abstract.Image, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *StackEbrc) GetImage(id string) (*abstract.Image, error) {
+func (s *StackEbrc) GetImage(id string) (*abstract.Image, fail.Error) {
 	images, err := s.ListImages(true)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (s *StackEbrc) GetImage(id string) (*abstract.Image, error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *StackEbrc) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (s *StackEbrc) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
 
@@ -113,7 +113,7 @@ func (s *StackEbrc) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 }
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, error) {
+func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, fail.Error) {
 	logrus.Debug(">>> stacks.ebrc::ListTemplates()")
 	defer logrus.Debug("<<< stacks.ebrc::ListTemplates()")
 
@@ -180,7 +180,7 @@ func (s *StackEbrc) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, err
 }
 
 // GetTemplate overload OpenStackEbrc GetTemplate method to add GPU configuration
-func (s *StackEbrc) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (s *StackEbrc) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	logrus.Debugf(">>> stacks.ebrc::GetTemplate(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetTemplate(%s)", id)
 
@@ -205,7 +205,7 @@ func (s *StackEbrc) GetTemplate(id string) (*abstract.HostTemplate, error) {
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *StackEbrc) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *StackEbrc) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -213,12 +213,12 @@ func (s *StackEbrc) CreateKeyPair(name string) (*abstract.KeyPair, error) {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *StackEbrc) GetKeyPair(id string) (*abstract.KeyPair, error) {
+func (s *StackEbrc) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("")
 }
 
 // ListKeyPairs lists available key pairs
-func (s *StackEbrc) ListKeyPairs() ([]abstract.KeyPair, error) {
+func (s *StackEbrc) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("")
 }
 
@@ -228,7 +228,7 @@ func (s *StackEbrc) DeleteKeyPair(id string) error {
 }
 
 // CreateHost creates an host satisfying request
-func (s *StackEbrc) CreateHost(request abstract.HostRequest) (host *abstract.Host, content *userdata.Content, err error) {
+func (s *StackEbrc) CreateHost(request abstract.HostRequest) (host *abstract.Host, content *userdata.Content, xerr fail.Error) {
 	logrus.Debug("ebrc.Client.CreateHost() called")
 	defer logrus.Debug("ebrc.Client.CreateHost() done")
 
@@ -607,7 +607,7 @@ func (s *StackEbrc) CreateHost(request abstract.HostRequest) (host *abstract.Hos
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
-func (s *StackEbrc) InspectHost(hostParam interface{}) (*abstract.Host, error) {
+func (s *StackEbrc) InspectHost(hostParam interface{}) (*abstract.Host, fail.Error) {
 	logrus.Debug("ebrc.Client.InspectHost() called")
 	defer logrus.Debug("ebrc.Client.InspectHost() done")
 
@@ -730,7 +730,7 @@ func stateConvert(stateVcd int) hoststate.Enum {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *StackEbrc) GetHostByName(name string) (*abstract.Host, error) {
+func (s *StackEbrc) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	logrus.Debug("ebrc.Client.GetHostByName() called")
 	defer logrus.Debug("ebrc.Client.GetHostByName() done")
 
@@ -800,12 +800,12 @@ func (s *StackEbrc) DeleteHost(id string) error {
 }
 
 // ResizeHost change the template used by an host
-func (s *StackEbrc) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *StackEbrc) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf("Not implemented yet"), nil)
 }
 
 // ListHosts lists available hosts
-func (s *StackEbrc) ListHosts() ([]*abstract.Host, error) {
+func (s *StackEbrc) ListHosts() ([]*abstract.Host, fail.Error) {
 	logrus.Debug("ebrc.Client.ListHosts() called")
 	defer logrus.Debug("ebrc.Client.ListHosts() done")
 
@@ -903,7 +903,7 @@ func (s *StackEbrc) RebootHost(id string) error {
 }
 
 // GetHostState returns the host identified by id
-func (s *StackEbrc) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
+func (s *StackEbrc) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
 	logrus.Debug("ebrc.Client.RebootHost() called")
 	defer logrus.Debug("ebrc.Client.RebootHost() done")
 
@@ -917,15 +917,15 @@ func (s *StackEbrc) GetHostState(hostParam interface{}) (hoststate.Enum, error) 
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *StackEbrc) ListAvailabilityZones() (map[string]bool, error) {
+func (s *StackEbrc) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	return map[string]bool{"local": true}, nil
 }
 
-func (s *StackEbrc) ListRegions() ([]string, error) {
+func (s *StackEbrc) ListRegions() ([]string, fail.Error) {
 	return nil, fail.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *StackEbrc) CreateVIP(s1 string, s2 string) (*abstract.VirtualIP, error) {
+func (s *StackEbrc) CreateVIP(s1 string, s2 string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

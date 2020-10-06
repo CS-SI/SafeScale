@@ -63,7 +63,7 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages(bool) ([]abstract.Image, error) {
+func (s *Stack) ListImages(bool) ([]abstract.Image, fail.Error) {
 	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
 	if err != nil {
 		return nil, fail.Wrap(normalizeError(err), "failed to list images")
@@ -108,7 +108,7 @@ func (s *Stack) cpuFreq(perf int) float32 {
 	return freq
 }
 
-func parseSizing(s string) (cpus, ram, perf int, err error) {
+func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
 	tokens := strings.FieldsFunc(
 		s, func(r rune) bool {
 			return r == 'c' || r == 'r' || r == 'p' || r == 'g'
@@ -119,45 +119,45 @@ func parseSizing(s string) (cpus, ram, perf int, err error) {
 		return 0, 0, 0, fail.InconsistentError("error parsing sizing string")
 	}
 
-	cpus, err = strconv.Atoi(tokens[0])
-	if err != nil {
+	cpus, xerr = strconv.Atoi(tokens[0])
+	if xerr != nil {
 		return
 	}
-	ram, err = strconv.Atoi(tokens[1])
-	if err != nil {
+	ram, xerr = strconv.Atoi(tokens[1])
+	if xerr != nil {
 		return
 	}
 	perf = 2
 	if len(tokens) < 3 {
 		return
 	}
-	perf, err = strconv.Atoi(tokens[2])
-	if err != nil {
+	perf, xerr = strconv.Atoi(tokens[2])
+	if xerr != nil {
 		return
 	}
 
 	return
 }
 
-func parseGPU(s string) (gpus int, gpuType string, err error) {
+func parseGPU(s string) (gpus int, gpuType string, xerr fail.Error) {
 	tokens := strings.FieldsFunc(
 		s, func(r rune) bool {
 			return r == 'g' || r == 't'
 		},
 	)
 	if len(tokens) < 2 {
-		err = fail.InvalidParameterError("id", "malformed id")
+		xerr = fail.InvalidParameterError("id", "malformed id")
 		return
 	}
-	gpus, err = strconv.Atoi(tokens[0])
-	if err != nil {
+	gpus, xerr = strconv.Atoi(tokens[0])
+	if xerr != nil {
 		return
 	}
 	gpuType = tokens[1]
 	return
 }
 
-func (s *Stack) parseTemplateID(id string) (*abstract.HostTemplate, error) {
+func (s *Stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 || !strings.HasPrefix(id, "tina") {
 		return nil, fail.InvalidParameterError("id", "invalid template id")
@@ -189,7 +189,7 @@ func (s *Stack) parseTemplateID(id string) (*abstract.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates(bool) ([]abstract.HostTemplate, error) {
+func (s *Stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	// without GPU
 	cpus := intRange(1, 78, 1)
 	ramPerCore := intRange(1, 16, 1)
@@ -314,10 +314,10 @@ func (s *Stack) ListTemplates(bool) ([]abstract.HostTemplate, error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (_ *abstract.Image, err error) {
+func (s *Stack) GetImage(id string) (_ *abstract.Image, xerr fail.Error) {
 	defer func() {
-		if err != nil {
-			err = fail.Wrap(err, fmt.Sprintf("failed to get image '%s'", id))
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, fmt.Sprintf("failed to get image '%s'", id))
 		}
 	}()
 
@@ -350,11 +350,11 @@ func (s *Stack) GetImage(id string) (_ *abstract.Image, err error) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	return s.parseTemplateID(id)
 }
 
-func (s *Stack) getOrCreatePassword(request abstract.HostRequest) (string, error) {
+func (s *Stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.Error) {
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
@@ -381,7 +381,7 @@ func (s *Stack) prepareUserData(request abstract.HostRequest, ud *userdata.Conte
 	return nil
 }
 
-func (s *Stack) createNIC(request *abstract.HostRequest, net *abstract.Network) (*osc.Nic, error) {
+func (s *Stack) createNIC(request *abstract.HostRequest, net *abstract.Network) (*osc.Nic, fail.Error) {
 
 	group, err := s.getNetworkSecurityGroup(s.Options.Network.VPCID)
 	if err != nil {
@@ -404,7 +404,7 @@ func (s *Stack) createNIC(request *abstract.HostRequest, net *abstract.Network) 
 	return &res.Nic, nil
 }
 
-func (s *Stack) createNICS(request *abstract.HostRequest) ([]osc.Nic, error) {
+func (s *Stack) createNICS(request *abstract.HostRequest) ([]osc.Nic, fail.Error) {
 	var nics []osc.Nic
 	var err error
 	// first network is the default network
@@ -420,7 +420,7 @@ func (s *Stack) createNICS(request *abstract.HostRequest) ([]osc.Nic, error) {
 	return nics, err
 }
 
-func (s *Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]osc.Nic, error) {
+func (s *Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]osc.Nic, fail.Error) {
 	for _, n := range request.Networks[1:] {
 		nic, err := s.createNIC(request, n)
 		if err != nil {
@@ -475,7 +475,7 @@ func hostState(state string) hoststate.Enum {
 	return hoststate.UNKNOWN
 }
 
-func (s *Stack) hostState(id string) (hoststate.Enum, error) {
+func (s *Stack) hostState(id string) (hoststate.Enum, fail.Error) {
 	vm, err := s.getVM(id)
 	if err != nil {
 		return hoststate.ERROR, err
@@ -506,7 +506,7 @@ func (s *Stack) WaitForHostState(hostID string, state hoststate.Enum) error {
 	return err
 }
 
-func outscaleTemplateID(id string) (string, error) {
+func outscaleTemplateID(id string) (string, fail.Error) {
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 {
 		return "", fail.InvalidParameterError("id", "malformed template id")
@@ -517,7 +517,7 @@ func outscaleTemplateID(id string) (string, error) {
 	return fmt.Sprintf("%s.%s", tokens[0], tokens[1]), nil
 }
 
-func (s *Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, error) {
+func (s *Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
 	if len(request.Networks) > 1 {
 		nics, err := s.createNICS(request)
 		if err != nil {
@@ -654,7 +654,7 @@ func (s *Stack) addVolume(request *abstract.HostRequest, vmID string) (err error
 	return nil
 }
 
-func (s *Stack) getNICS(vmID string) ([]osc.Nic, error) {
+func (s *Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
 	request := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{vmID},
@@ -667,7 +667,7 @@ func (s *Stack) getNICS(vmID string) ([]osc.Nic, error) {
 	return res.Nics, nil
 }
 
-func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, error) {
+func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, fail.Error) {
 
 	resIP, _, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
 	if err != nil {
@@ -838,7 +838,7 @@ func (s *Stack) initHostProperties(request *abstract.HostRequest, host *abstract
 	)
 }
 
-func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, error) {
+func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, fail.Error) {
 	ip, err := s.addPublicIP(primaryNIC)
 	if err != nil {
 		return nil, err
@@ -854,7 +854,7 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 }
 
 // CreateHost creates an host that fulfills the request
-func (s *Stack) CreateHost(request abstract.HostRequest) (_ *abstract.Host, _ *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (_ *abstract.Host, _ *userdata.Content, xerr fail.Error) {
 	userData := userdata.NewContent()
 	if request.DefaultGateway == nil && !request.PublicIP {
 		return nil, userData, abstract.ResourceInvalidRequestError(
@@ -1044,7 +1044,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (_ *abstract.Host, _ *u
 	return host, userData, err
 }
 
-func (s *Stack) getSubnetID(request abstract.HostRequest) (string, error) {
+func (s *Stack) getSubnetID(request abstract.HostRequest) (string, fail.Error) {
 	if len(request.Networks) == 0 {
 		return "", nil
 	}
@@ -1059,7 +1059,7 @@ func (s *Stack) getSubnetID(request abstract.HostRequest) (string, error) {
 	return subnet.SubnetId, nil
 }
 
-func (s *Stack) getVM(vmID string) (*osc.Vm, error) {
+func (s *Stack) getVM(vmID string) (*osc.Vm, fail.Error) {
 	readVmsRequest := osc.ReadVmsRequest{
 		Filters: osc.FiltersVm{
 			VmIds: []string{vmID},
@@ -1159,7 +1159,7 @@ func (s *Stack) DeleteHost(id string) error {
 }
 
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
-func (s *Stack) InspectHost(hostParam interface{}) (*abstract.Host, error) {
+func (s *Stack) InspectHost(hostParam interface{}) (*abstract.Host, fail.Error) {
 	var host *abstract.Host
 	hostName := ""
 	switch hostParam := hostParam.(type) {
@@ -1205,7 +1205,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (*abstract.Host, error) {
 }
 
 // GetHostByName returns the host identified by name
-func (s *Stack) GetHostByName(name string) (*abstract.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	res, _, err := s.client.VmApi.ReadVms(
 		s.auth, &osc.ReadVmsOpts{
 			ReadVmsRequest: optional.NewInterface(
@@ -1228,7 +1228,7 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, error) {
 }
 
 // GetHostState returns the current state of the host identified by id
-func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
 	var host *abstract.Host
 	switch hostParam := hostParam.(type) {
 	case string:
@@ -1250,7 +1250,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 }
 
 // ListHosts lists all hosts
-func (s *Stack) ListHosts() ([]*abstract.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
 	if err != nil {
 		return nil, normalizeError(err)
@@ -1325,7 +1325,7 @@ func (s *Stack) perfFromFreq(freq float32) int {
 }
 
 // ResizeHost Resize host
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
 	perf := s.perfFromFreq(request.MinFreq)
 	t := gpuTemplateName(0, request.MaxCores, int(request.MaxRAMSize), perf, 0, "")
 	updateVmRequest := osc.UpdateVmRequest{

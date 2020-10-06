@@ -36,7 +36,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *StackEbrc) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
+func (s *StackEbrc) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: &types.Disk{
 			Name:       request.Name,
@@ -96,7 +96,7 @@ func (s *StackEbrc) CreateVolume(request abstract.VolumeRequest) (*abstract.Volu
 }
 
 // GetVolume returns the volume identified by id
-func (s *StackEbrc) GetVolume(ref string) (*abstract.Volume, error) {
+func (s *StackEbrc) GetVolume(ref string) (*abstract.Volume, fail.Error) {
 	logrus.Debug("ebrc.Client.GetVolume() called")
 	defer logrus.Debug("ebrc.Client.GetVolume() done")
 
@@ -128,7 +128,7 @@ func (s *StackEbrc) GetVolume(ref string) (*abstract.Volume, error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *StackEbrc) ListVolumes() ([]abstract.Volume, error) {
+func (s *StackEbrc) ListVolumes() ([]abstract.Volume, fail.Error) {
 	logrus.Debug("ebrc.Client.ListVolumes() called")
 	defer logrus.Debug("ebrc.Client.ListVolumes() done")
 
@@ -190,7 +190,7 @@ func getAttachmentID(volume string, domain string) string {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *StackEbrc) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *StackEbrc) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	logrus.Debugf(">>> stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 	defer logrus.Debugf("<<< stacks.ebrc::CreateVolumeAttachment(%s)", request.Name)
 
@@ -218,7 +218,7 @@ func (s *StackEbrc) CreateVolumeAttachment(request abstract.VolumeAttachmentRequ
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *StackEbrc) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	logrus.Debugf(">>> stacks.ebrc::GetVolumeAttachment(%s)", id)
 	defer logrus.Debugf("<<< stacks.ebrc::GetVolumeAttachment(%s)", id)
 
@@ -268,7 +268,7 @@ func (s *StackEbrc) DeleteVolumeAttachment(serverID, id string) error {
 }
 
 // ListVolumeAttachments lists available volume attachments
-func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *StackEbrc) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	vms, err := s.findVmNames()
 	if err != nil {
 		return []abstract.VolumeAttachment{}, err

@@ -35,6 +35,8 @@ import (
 
 var removePart atomic.Value
 
+type Error = error
+
 type consequencer interface {
 	Consequences() []error
 	AddConsequence(error) error

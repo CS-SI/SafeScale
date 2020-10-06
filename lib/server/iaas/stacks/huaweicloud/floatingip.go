@@ -42,7 +42,7 @@ type bandwidthCreateOpts struct {
 	ChargeMode string `json:"charge_mode,omitempty"`
 }
 
-func (opts bandwidthCreateOpts) toBandwidthCreateMap() (map[string]interface{}, error) {
+func (opts bandwidthCreateOpts) toBandwidthCreateMap() (map[string]interface{}, fail.Error) {
 	return gophercloud.BuildRequestBody(opts, "bandwidth")
 }
 
@@ -51,7 +51,7 @@ type ipCreateOpts struct {
 	IPAddress string `json:"ip_address,omitempty"`
 }
 
-func (opts ipCreateOpts) toFloatingIPCreateMap() (map[string]interface{}, error) {
+func (opts ipCreateOpts) toFloatingIPCreateMap() (map[string]interface{}, fail.Error) {
 	return gophercloud.BuildRequestBody(opts, "publicip")
 }
 
@@ -73,7 +73,7 @@ type floatingIPPage struct {
 // NextPageURL is invoked when a paginated collection of floating IPs has
 // reached the end of a page and the pager seeks to traverse over a new one.
 // In order to do this, it needs to construct the next page's URL.
-func (r floatingIPPage) NextPageURL() (string, error) {
+func (r floatingIPPage) NextPageURL() (string, fail.Error) {
 	var s struct {
 		Links []gophercloud.Link `json:"floatingips_links"`
 	}
@@ -85,7 +85,7 @@ func (r floatingIPPage) NextPageURL() (string, error) {
 }
 
 // IsEmpty checks whether a FloatingIPPage struct is empty.
-func (r floatingIPPage) IsEmpty() (bool, error) {
+func (r floatingIPPage) IsEmpty() (bool, fail.Error) {
 	is, err := extractFloatingIPs(r)
 	return len(is) == 0, err
 }
@@ -93,7 +93,7 @@ func (r floatingIPPage) IsEmpty() (bool, error) {
 // extractFloatingIPs accepts a Page struct, specifically a FloatingIPPage
 // struct, and extracts the elements into a slice of FloatingIP structs. In
 // other words, a generic collection is mapped into a relevant slice.
-func extractFloatingIPs(r pagination.Page) ([]FloatingIP, error) {
+func extractFloatingIPs(r pagination.Page) ([]FloatingIP, fail.Error) {
 	var s struct {
 		FloatingIPs []FloatingIP `json:"floatingips"`
 	}
@@ -106,7 +106,7 @@ type commonResult struct {
 }
 
 // Extract will extract a FloatingIP resource from a result.
-func (r commonResult) Extract() (*FloatingIP, error) {
+func (r commonResult) Extract() (*FloatingIP, fail.Error) {
 	var s struct {
 		FloatingIP *FloatingIP `json:"publicip"`
 	}
@@ -141,7 +141,7 @@ func (s *Stack) ListFloatingIPs() pagination.Pager {
 }
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
-func (s *Stack) GetFloatingIP(id string) (*FloatingIP, error) {
+func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 	r := getResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
@@ -162,12 +162,12 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, error) {
 }
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
-func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
+func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, fail.Error) {
 	pager := s.ListFloatingIPs()
 	found := false
 	fip := FloatingIP{}
 	err := pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := extractFloatingIPs(page)
 			if err != nil {
 				return false, err
@@ -196,7 +196,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
+func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	ipOpts := ipCreateOpts{
 		Type: "5_bgp",
 	}

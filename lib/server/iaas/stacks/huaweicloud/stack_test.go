@@ -32,7 +32,7 @@ import (
 var tester *tests.ServiceTester
 var service iaas.Service
 
-func getTester() (*tests.ServiceTester, error) {
+func getTester() (*tests.ServiceTester, fail.Error) {
 	if tester == nil {
 		theService, err := getClient()
 		if err != nil {
@@ -49,7 +49,7 @@ func getTester() (*tests.ServiceTester, error) {
 	return tester, nil
 }
 
-func getClient() (iaas.Service, error) {
+func getClient() (iaas.Service, fail.Error) {
 	if service == nil {
 		tenantName := ""
 		if tenantOverride := os.Getenv("TEST_FLEXIBLE"); tenantOverride != "" {

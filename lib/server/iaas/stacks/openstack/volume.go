@@ -88,13 +88,13 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, err error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, xerr fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", request.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
-	volume, err = s.GetVolume(request.Name)
-	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); !ok {
-			return nil, err
+	volume, xerr = s.GetVolume(request.Name)
+	if xerr != nil {
+		if _, ok := xerr.(fail.ErrNotFound); !ok {
+			return nil, xerr
 		}
 	}
 	if volume != nil {
@@ -171,7 +171,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (volume *abstract.Volume, err error) {
+func (s *Stack) GetVolume(id string) (volume *abstract.Volume, xerr fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vol *volumesv2.Volume
@@ -179,10 +179,10 @@ func (s *Stack) GetVolume(id string) (volume *abstract.Volume, err error) {
 	getErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			r := volumesv2.Get(s.VolumeClient, id)
-			vol, err = r.Extract()
-			if err != nil {
+			vol, xerr = r.Extract()
+			if xerr != nil {
 				return ReinterpretGophercloudErrorCode(
-					err, nil, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
+					xerr, nil, []int64{408, 429, 500, 503}, []int64{409}, func(ferr error) error {
 						if _, ok := ferr.(gc.ErrDefault404); ok {
 							unwrap = true
 							return fail.AbortedError("", abstract.ResourceNotFoundError("volume", id))
@@ -215,12 +215,12 @@ func (s *Stack) GetVolume(id string) (volume *abstract.Volume, err error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vs []abstract.Volume
 	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := volumesv2.ExtractVolumes(page)
 			if err != nil {
 				log.Errorf("Error listing volumes: volume extraction: %+v", err)
@@ -285,7 +285,7 @@ func (s *Stack) DeleteVolume(id string) (err error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	defer debug.NewTracer(nil, "("+request.Name+")", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Creates the attachment
@@ -308,7 +308,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	defer debug.NewTracer(nil, "('"+serverID+"', '"+id+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	va, err := volumeattach.Get(s.ComputeClient, serverID, id).Extract()
@@ -326,12 +326,12 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	defer debug.NewTracer(nil, "('"+serverID+"')", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vs []abstract.VolumeAttachment
 	err := volumeattach.List(s.ComputeClient, serverID).EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := volumeattach.ExtractVolumeAttachments(page)
 			if err != nil {
 				return false, fail.Wrap(err, "Error listing volume attachment: extracting attachments")

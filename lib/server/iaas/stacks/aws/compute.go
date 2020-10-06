@@ -50,7 +50,7 @@ type portDef struct {
 	toPort   int64
 }
 
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	keypair, err := abstract.NewKeyPair(name)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) error {
 	return err
 }
 
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	out, err := s.EC2Service.DescribeKeyPairs(
 		&ec2.DescribeKeyPairsInput{
 			KeyNames: []*string{aws.String(id)},
@@ -110,7 +110,7 @@ func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
 
 }
 
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	out, err := s.EC2Service.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{})
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 	return err
 }
 
-func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	zones := make(map[string]bool)
 
 	ro, err := s.EC2Service.DescribeAvailabilityZones(&ec2.DescribeAvailabilityZonesInput{})
@@ -159,7 +159,7 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 	return zones, nil
 }
 
-func (s *Stack) ListRegions() ([]string, error) {
+func (s *Stack) ListRegions() ([]string, fail.Error) {
 	var regions []string
 
 	ro, err := s.EC2Service.DescribeRegions(&ec2.DescribeRegionsInput{})
@@ -175,7 +175,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 	return regions, nil
 }
 
-func (s *Stack) GetImage(id string) (*abstract.Image, error) {
+func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
 	imagesList, err := s.ListImages()
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (s *Stack) GetImage(id string) (*abstract.Image, error) {
 	return nil, abstract.ResourceNotFoundError("Image", id)
 }
 
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	template := abstract.HostTemplate{}
 
 	prods, err := s.PricingService.GetProducts(
@@ -290,7 +290,7 @@ func createFilters() []*ec2.Filter {
 	return filters
 }
 
-func (s *Stack) ListImages() ([]abstract.Image, error) {
+func (s *Stack) ListImages() ([]abstract.Image, fail.Error) {
 	var images []abstract.Image
 
 	filters := []*ec2.Filter{
@@ -346,7 +346,7 @@ func (s *Stack) ListImages() ([]abstract.Image, error) {
 	return images, nil
 }
 
-func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
+func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	var templates []abstract.HostTemplate
 
 	prods, err := s.PricingService.GetProducts(
@@ -405,7 +405,7 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, error) {
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.Host; any other type will panic
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.Host, error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*abstract.Host, fail.Error) {
 	var (
 		host *abstract.Host
 	)
@@ -465,7 +465,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*ab
 	return host, nil
 }
 
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, xerr fail.Error) {
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -502,9 +502,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		}
 	*/
 
-	err = s.ImportKeyPair(request.KeyPair)
-	if err != nil {
-		return nil, nil, err
+	xerr = s.ImportKeyPair(request.KeyPair)
+	if xerr != nil {
+		return nil, nil, xerr
 	}
 	defer func() {
 		derr := s.DeleteKeyPair(request.KeyPair.Name)
@@ -543,11 +543,11 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	err = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
-	if err != nil {
-		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
+	xerr = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
+	if xerr != nil {
+		msg := fmt.Sprintf("failed to prepare user data content: %+v", xerr)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, userData, fail.Errorf(fmt.Sprintf(msg), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf(msg), xerr)
 	}
 
 	// Determine system disk size based on vcpus count
@@ -799,7 +799,7 @@ func isAWSErr(err error) bool {
 	return false
 }
 
-func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, error) {
+func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, fail.Error) {
 	dgo, err := EC2Service.DescribeSecurityGroups(
 		&ec2.DescribeSecurityGroupsInput{
 			Filters: []*ec2.Filter{
@@ -823,7 +823,7 @@ func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, err
 	return false, nil
 }
 
-func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, error) {
+func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, fail.Error) {
 	dgo, err := EC2Service.DescribeSecurityGroups(
 		&ec2.DescribeSecurityGroupsInput{
 			Filters: []*ec2.Filter{
@@ -940,7 +940,7 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 	return nil
 }
 
-func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, error) {
+func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, fail.Error) {
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
@@ -1013,7 +1013,7 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 	return &host, nil
 }
 
-func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, error) {
+func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, fail.Error) {
 	logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
@@ -1085,7 +1085,7 @@ func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, image
 	return &host, nil
 }
 
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fail.Error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		host = abstract.NewHost()
@@ -1293,7 +1293,7 @@ func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
 	return aws.StringValue(SubnetId)
 }
 
-func (s *Stack) GetHostByName(name string) (_ *abstract.Host, err error) {
+func (s *Stack) GetHostByName(name string) (_ *abstract.Host, xerr fail.Error) {
 	hosts, err := s.ListHosts()
 	if err != nil {
 		return nil, err
@@ -1308,7 +1308,7 @@ func (s *Stack) GetHostByName(name string) (_ *abstract.Host, err error) {
 	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
-func (s *Stack) GetHostState(hostParam interface{}) (_ hoststate.Enum, err error) {
+func (s *Stack) GetHostState(hostParam interface{}) (_ hoststate.Enum, xerr fail.Error) {
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return hoststate.ERROR, err
@@ -1317,7 +1317,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (_ hoststate.Enum, err error
 	return host.LastState, nil
 }
 
-func (s *Stack) ListHosts() ([]*abstract.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 	var hosts []*abstract.Host
 
 	dio, err := s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{})
@@ -1634,6 +1634,6 @@ func (s *Stack) RebootHost(id string) error {
 	return err
 }
 
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }

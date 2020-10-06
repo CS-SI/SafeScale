@@ -24,7 +24,7 @@ type commonResult struct {
 }
 
 // Extract will extract a FloatingIP resource from a result.
-func (r commonResult) Extract() (*FloatingIP, error) {
+func (r commonResult) Extract() (*FloatingIP, fail.Error) {
 	var s struct {
 		FloatingIP *FloatingIP `json:"publicip"`
 	}
@@ -38,7 +38,7 @@ type createResult struct {
 	commonResult
 }
 
-func (opts bandwidthCreateOpts) toBandwidthCreateMap() (map[string]interface{}, error) {
+func (opts bandwidthCreateOpts) toBandwidthCreateMap() (map[string]interface{}, fail.Error) {
 	return gophercloud.BuildRequestBody(opts, "bandwidth")
 }
 
@@ -47,7 +47,7 @@ type ipCreateOpts struct {
 	IPAddress string `json:"ip_address,omitempty"`
 }
 
-func (opts ipCreateOpts) toFloatingIPCreateMap() (map[string]interface{}, error) {
+func (opts ipCreateOpts) toFloatingIPCreateMap() (map[string]interface{}, fail.Error) {
 	return gophercloud.BuildRequestBody(opts, "publicip")
 }
 
@@ -63,7 +63,7 @@ type FloatingIP struct {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
+func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	ipOpts := ipCreateOpts{
 		Type: "5_bgp",
 	}
@@ -117,14 +117,14 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, error) {
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
-func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, error) {
+func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 
 	pager := floatingips.List(s.ComputeClient)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			err := pager.EachPage(
-				func(page pagination.Page) (bool, error) {
+				func(page pagination.Page) (bool, fail.Error) {
 					list, err := floatingips.ExtractFloatingIPs(page)
 					if err != nil {
 						return false, err

@@ -191,7 +191,7 @@ import (
 
 // // getDefaultSecurityGroup returns the default security group for the client, in the form
 // // sg-<VPCName>, if it exists.
-// func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
+// func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, fail.Error) {
 // 	sg, err := s.Stack.GetSecurityGroup(s.defaultSecurityGroupName)
 // 	if err != nil {
 // 		return nil, fail.Errorf(fmt.Sprintf("error listing routers: %s", openstack.ProviderErrorToString(err))

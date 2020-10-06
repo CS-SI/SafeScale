@@ -19,7 +19,7 @@ type Stack struct {
 }
 
 // Build Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
+func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
 	stack := &Stack{
 		Config:        &cfg,
 		LibvirtConfig: &localCfg,

@@ -31,7 +31,7 @@ import (
 )
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -61,7 +61,7 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) error {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	readKeypairsRequest := osc.ReadKeypairsRequest{
 		Filters: osc.FiltersKeypair{
 			KeypairNames: []string{id},
@@ -89,7 +89,7 @@ func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
 	if err != nil {
 		return nil, normalizeError(err)

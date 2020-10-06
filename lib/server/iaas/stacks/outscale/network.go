@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *Stack) createSubnet(req abstract.NetworkRequest, vpcID string) (_ *osc.Subnet, err error) {
+func (s *Stack) createSubnet(req abstract.NetworkRequest, vpcID string) (_ *osc.Subnet, xerr fail.Error) {
 	// Create a subnet with the same CIDR than the network
 	createSubnetRequest := osc.CreateSubnetRequest{
 		IpRange:       req.CIDR,
@@ -91,7 +91,7 @@ func (s *Stack) createSubnet(req abstract.NetworkRequest, vpcID string) (_ *osc.
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, err := s.getVpc(s.Options.Network.VPCID)
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 	return net, nil
 }
 
-func (s *Stack) getSubnet(id string) (*osc.Subnet, error) {
+func (s *Stack) getSubnet(id string) (*osc.Subnet, fail.Error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			SubnetIds: []string{id},
@@ -184,7 +184,7 @@ func toNetwork(subnet *osc.Subnet) *abstract.Network {
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
 	onet, err := s.getSubnet(id)
 	if err != nil {
 		return nil, err
@@ -197,7 +197,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by name)
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
@@ -231,7 +231,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 }
 
 // ListNetworks lists all networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	readSubnetsRequest := osc.ReadSubnetsRequest{
 		Filters: osc.FiltersSubnet{
 			NetIds: []string{s.Options.Network.VPCID},
@@ -254,7 +254,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 }
 
 // ListNetworks lists all networks
-func (s *Stack) listNetworksByHost(hostID string) ([]*abstract.Network, []osc.Nic, error) {
+func (s *Stack) listNetworksByHost(hostID string) ([]*abstract.Network, []osc.Nic, fail.Error) {
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},

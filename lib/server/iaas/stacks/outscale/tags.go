@@ -19,9 +19,11 @@ package outscale
 import (
 	"github.com/antihax/optional"
 	"github.com/outscale-dev/osc-sdk-go/osc"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *Stack) getResourceTags(id string) (map[string]string, error) {
+func (s *Stack) getResourceTags(id string) (map[string]string, fail.Error) {
 	readTagsRequest := osc.ReadTagsRequest{
 		Filters: osc.FiltersTag{ResourceIds: []string{id}},
 	}

@@ -29,7 +29,7 @@ type Result struct {
 }
 
 // RefreshResult ...
-func RefreshResult(oco OpContext) (res Result, err error) {
+func RefreshResult(oco OpContext) (res Result, xerr fail.Error) {
 	res = Result{}
 
 	if oco.Operation != nil {
@@ -39,30 +39,30 @@ func RefreshResult(oco OpContext) (res Result, err error) {
 				return res, ierr
 			}
 			zone := getResourceNameFromSelfLink(*zoneURL)
-			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
+			oco.Operation, xerr = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 		} else if oco.Operation.Region != "" {
 			regionURL, ierr := url.Parse(oco.Operation.Region)
 			if ierr != nil {
 				return res, ierr
 			}
 			region := getResourceNameFromSelfLink(*regionURL)
-			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
+			oco.Operation, xerr = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
 		} else {
-			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
+			oco.Operation, xerr = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
 		}
 
 		if oco.Operation == nil {
-			if err == nil {
-				return res, fail.Errorf(fmt.Sprintf("no operation"), err)
+			if xerr == nil {
+				return res, fail.Errorf(fmt.Sprintf("no operation"), xerr)
 			}
-			return res, err
+			return res, xerr
 		}
 
 		res.State = oco.Operation.Status
-		res.Error = err
+		res.Error = xerr
 		res.Done = res.State == oco.DesiredState
 
-		return res, err
+		return res, xerr
 	}
 
 	return res, fail.Errorf(fmt.Sprintf("no operation"), nil)
@@ -120,7 +120,7 @@ func indexOf(element string, data []string) int {
 	return -1 // not found.
 }
 
-func getRegionFromSelfLink(link SelfLink) (string, error) {
+func getRegionFromSelfLink(link SelfLink) (string, fail.Error) {
 	stringRepr := link.String()
 	if strings.Contains(stringRepr, "regions") {
 		parts := strings.Split(stringRepr, "/")

@@ -38,7 +38,7 @@ import (
 )
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	// disable subnetwork auto-creation
 	ne := compute.Network{
 		Name:                  s.GcpConfig.NetworkName,
@@ -236,7 +236,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, e
 }
 
 // GetNetwork returns the network identified by ref (id or name)
-func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(ref string) (*abstract.Network, fail.Error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func (s *Stack) GetNetwork(ref string) (*abstract.Network, error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -266,7 +266,7 @@ func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, error) {
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	var networks []*abstract.Network
 
 	compuService := s.ComputeService
@@ -417,7 +417,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, fail.Error) {
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
@@ -469,7 +469,7 @@ func (s *Stack) DeleteGateway(ref string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

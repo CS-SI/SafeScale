@@ -72,14 +72,14 @@ type Subnet struct {
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, xerr fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Checks if CIDR is valid...
-	_, _, err = net.ParseCIDR(req.CIDR)
-	if err != nil {
+	_, _, xerr = net.ParseCIDR(req.CIDR)
+	if xerr != nil {
 		return nil, fail.Errorf(
-			fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, err.Error()), err,
+			fmt.Sprintf("failed to create subnet '%s (%s)': %s", req.Name, req.CIDR, xerr.Error()), xerr,
 		)
 	}
 
@@ -136,7 +136,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -175,7 +175,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (_ *abstract.Network, err error) {
+func (s *Stack) GetNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", id), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// If not found, we look for any network from provider
@@ -184,11 +184,11 @@ func (s *Stack) GetNetwork(id string) (_ *abstract.Network, err error) {
 
 	getErr := retry.WhileSuccessfulDelay1Second(
 		func() error {
-			network, err = networks.Get(s.NetworkClient, id).Extract()
+			network, xerr = networks.Get(s.NetworkClient, id).Extract()
 
-			if err != nil {
+			if xerr != nil {
 				return ReinterpretGophercloudErrorCode(
-					err, []int64{404}, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
+					xerr, []int64{404}, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
 						return fail.Wrap(
 							ferr, fmt.Sprintf("error getting network '%s': %s", id, ProviderErrorToString(ferr)),
 						)
@@ -231,14 +231,14 @@ func (s *Stack) GetNetwork(id string) (_ *abstract.Network, err error) {
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*abstract.Network
 	pager := networks.List(s.NetworkClient, networks.ListOpts{})
 	err := pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			networkList, err := networks.ExtractNetworks(page)
 			if err != nil {
 				return false, err
@@ -326,7 +326,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway creates a public Gateway for a private network
-func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, userData *userdata.Content, xerr fail.Error) {
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	userData = userdata.NewContent()
@@ -431,7 +431,7 @@ func FromIntIPversion(v int) ipversion.Enum {
 // - netID ID of the parent network
 // - name is the name of the sub network
 // - mask is a network mask defined in CIDR notation
-func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion ipversion.Enum, dnsServers []string) (subn *Subnet, err error) {
+func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion ipversion.Enum, dnsServers []string) (subn *Subnet, xerr fail.Error) {
 	// You must associate a new subnet with an existing network - to do this you
 	// need its UUID. You must also provide a well-formed CIDR value.
 	dhcp := true
@@ -473,12 +473,12 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 		func() error {
 			// Execute the operation and get back a subnets.Subnet struct
 			r := subnets.Create(s.NetworkClient, opts)
-			subnet, err = r.Extract()
-			if err != nil {
+			subnet, xerr = r.Extract()
+			if xerr != nil {
 				return ReinterpretGophercloudErrorCode(
-					err, nil, []int64{408, 409, 425, 429, 500, 503, 504}, nil, func(ferr error) error {
+					xerr, nil, []int64{408, 409, 425, 429, 500, 503, 504}, nil, func(ferr error) error {
 						return fail.AbortedError(
-							fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(err)), ferr,
+							fmt.Sprintf("error creating subnet: %s", ProviderErrorToString(xerr)), ferr,
 						)
 					},
 				)
@@ -495,11 +495,11 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 
 	// Starting from here, delete subnet if exit with error
 	defer func() {
-		if err != nil {
+		if xerr != nil {
 			derr := s.deleteSubnet(subnet.ID)
 			if derr != nil {
 				log.Warnf("Error deleting subnet: %v", derr)
-				err = fail.AddConsequence(err, derr)
+				xerr = fail.AddConsequence(xerr, derr)
 			}
 		}
 	}()
@@ -542,7 +542,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 }
 
 // getSubnet returns the sub network identified by id
-func (s *Stack) getSubnet(id string) (*Subnet, error) {
+func (s *Stack) getSubnet(id string) (*Subnet, fail.Error) {
 	// Execute the operation and get back a subnets.Subnet struct
 	subnet, err := subnets.Get(s.NetworkClient, id).Extract()
 	if err != nil {
@@ -558,7 +558,7 @@ func (s *Stack) getSubnet(id string) (*Subnet, error) {
 }
 
 // listSubnets lists available sub networks of network net
-func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
+func (s *Stack) listSubnets(netID string) ([]Subnet, fail.Error) {
 	pager := subnets.List(
 		s.NetworkClient, subnets.ListOpts{
 			NetworkID: netID,
@@ -566,7 +566,7 @@ func (s *Stack) listSubnets(netID string) ([]Subnet, error) {
 	)
 	var subnetList []Subnet
 	paginationErr := pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := subnets.ExtractSubnets(page)
 			if err != nil {
 				return false, fail.Errorf(fmt.Sprintf("error listing subnets: %s", ProviderErrorToString(err)), err)
@@ -665,7 +665,7 @@ func (s *Stack) deleteSubnet(id string) error {
 }
 
 // createRouter creates a router satisfying req
-func (s *Stack) createRouter(req RouterRequest) (*Router, error) {
+func (s *Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 	// Create a router to connect external Provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
@@ -691,7 +691,7 @@ func (s *Stack) createRouter(req RouterRequest) (*Router, error) {
 }
 
 // getRouter returns the router identified by id
-func (s *Stack) getRouter(id string) (*Router, error) {
+func (s *Stack) getRouter(id string) (*Router, fail.Error) {
 	r, err := routers.Get(s.NetworkClient, id).Extract()
 	if err != nil {
 		return nil, fail.Wrap(err, fmt.Sprintf("error getting Router: %s", ProviderErrorToString(err)))
@@ -704,10 +704,10 @@ func (s *Stack) getRouter(id string) (*Router, error) {
 }
 
 // ListRouters lists available routers
-func (s *Stack) ListRouters() ([]Router, error) {
+func (s *Stack) ListRouters() ([]Router, fail.Error) {
 	var ns []Router
 	err := routers.List(s.NetworkClient, routers.ListOpts{}).EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := routers.ExtractRouters(page)
 			if err != nil {
 				return false, err
@@ -769,7 +769,7 @@ func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) error {
 }
 
 // listPorts lists all ports available
-func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
+func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
 	allPages, err := ports.List(s.NetworkClient, options).AllPages()
 	if err != nil {
 		return nil, err
@@ -779,7 +779,7 @@ func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, error) {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{
