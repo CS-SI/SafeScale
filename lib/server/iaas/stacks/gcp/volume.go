@@ -36,7 +36,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
 	if request.Speed == volumespeed.SSD {
 		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
@@ -92,7 +92,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
+func (s *Stack) GetVolume(ref string) (*abstract.Volume, fail.Error) {
 	gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (s *Stack) GetVolume(ref string) (*abstract.Volume, error) {
 	return nvol, nil
 }
 
-func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, error) {
+func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, fail.Error) {
 	switch gcpDriveStatus {
 	case "CREATING":
 		return volumestate.CREATING, nil
@@ -133,7 +133,7 @@ func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var volumes []abstract.Volume
 
 	compuService := s.ComputeService
@@ -187,7 +187,7 @@ func (s *Stack) DeleteVolume(ref string) error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	service := s.ComputeService
 
 	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.HostID).Do()
@@ -228,7 +228,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	dat := newGcpDiskAttachmentFromID(id)
 
 	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, dat.hostName).Do()
@@ -293,7 +293,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	var vats []abstract.VolumeAttachment
 
 	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverID).Do()

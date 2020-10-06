@@ -44,7 +44,7 @@ type Stack struct {
 }
 
 // New authenticates and return interface Stack
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*Stack, error) {
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
@@ -149,7 +149,7 @@ func (s *Stack) initVPC() error {
 }
 
 // findVPC returns the ID about the VPC
-func (s *Stack) findVPCID() (*string, error) {
+func (s *Stack) findVPCID() (*string, fail.Error) {
 	var router *openstack.Router
 	found := false
 	routers, err := s.Stack.ListRouters()

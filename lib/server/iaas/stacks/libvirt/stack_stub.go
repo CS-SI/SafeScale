@@ -37,47 +37,47 @@ type Stack struct {
 }
 
 // ListAvailabilityZones stub
-func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListRegions stub
-func (s *Stack) ListRegions() ([]string, error) {
+func (s *Stack) ListRegions() ([]string, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListImages stub
-func (s *Stack) ListImages(all bool) ([]abstract.Image, error) {
+func (s *Stack) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetImage stub
-func (s *Stack) GetImage(id string) (*abstract.Image, error) {
+func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetTemplate stub
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListTemplates stub
-func (s *Stack) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (s *Stack) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // CreateKeyPair stub
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetKeyPair stub
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListKeyPairs stub
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
@@ -87,22 +87,22 @@ func (s *Stack) DeleteKeyPair(id string) error {
 }
 
 // CreateNetwork stub
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetNetwork stub
-func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetNetworkByName stub
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListNetworks stub
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
@@ -112,7 +112,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 }
 
 // CreateGateway stub
-func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, fail.Error) {
 	return nil, nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
@@ -122,7 +122,7 @@ func (s *Stack) DeleteGateway(string) error {
 }
 
 // CreateVIP stub
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
@@ -147,32 +147,32 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) error {
 }
 
 // CreateHost stub
-func (s *Stack) CreateHost(request abstract.HostRequest) (*abstract.Host, *userdata.Content, error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (*abstract.Host, *userdata.Content, fail.Error) {
 	return nil, nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ResizeHost stub
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // InspectHost stub
-func (s *Stack) InspectHost(interface{}) (*abstract.Host, error) {
+func (s *Stack) InspectHost(interface{}) (*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetHostByName stub
-func (s *Stack) GetHostByName(string) (*abstract.Host, error) {
+func (s *Stack) GetHostByName(string) (*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetHostState stub
-func (s *Stack) GetHostState(interface{}) (hoststate.Enum, error) {
+func (s *Stack) GetHostState(interface{}) (hoststate.Enum, fail.Error) {
 	return hoststate.ERROR, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListHosts stub
-func (s *Stack) ListHosts() ([]*abstract.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
@@ -197,17 +197,17 @@ func (s *Stack) RebootHost(id string) error {
 }
 
 // CreateVolume stub
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetVolume stub
-func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListVolumes stub
-func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
@@ -217,17 +217,17 @@ func (s *Stack) DeleteVolume(id string) error {
 }
 
 // CreateVolumeAttachment stub
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	return "", fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // GetVolumeAttachment stub
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
 // ListVolumeAttachments stub
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 

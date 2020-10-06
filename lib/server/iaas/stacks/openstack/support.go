@@ -24,7 +24,7 @@ func IsServiceUnavailableError(err error) bool {
 	return false
 }
 
-func GetUnexpectedGophercloudErrorCode(err error) (int64, error) {
+func GetUnexpectedGophercloudErrorCode(err error) (int64, fail.Error) {
 	xType := reflect.TypeOf(err)
 	xValue := reflect.ValueOf(err)
 

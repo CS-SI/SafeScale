@@ -167,7 +167,7 @@ func New(
 	authScope *gophercloud.AuthScope,
 	cfg stacks.ConfigurationOptions,
 	serviceVersions map[string]string,
-) (*Stack, error) {
+) (*Stack, fail.Error) {
 
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"

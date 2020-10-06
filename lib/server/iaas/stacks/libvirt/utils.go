@@ -73,7 +73,7 @@ func (iw *VMInfoWaiterStruct) deregister(name string) error {
 }
 
 // GetInfoWaiter get the global var vmInfoWaiter and setup the listener if it is not set
-func GetInfoWaiter() (*VMInfoWaiterStruct, error) {
+func GetInfoWaiter() (*VMInfoWaiterStruct, fail.Error) {
 	if vmInfoWaiter.listner == nil {
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {

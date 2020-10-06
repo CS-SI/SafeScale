@@ -29,7 +29,7 @@ import (
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, err error) {
+func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, xerr fail.Error) {
 	subnet, err := s.getSubnet(subnetID)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (s *Stack) AddPublicIPToVIP(*abstract.VirtualIP) error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, error) {
+func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},

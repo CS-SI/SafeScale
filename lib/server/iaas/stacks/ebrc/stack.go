@@ -25,7 +25,7 @@ func (s *StackEbrc) GetAuthenticationOptions() stacks.AuthenticationOptions {
 }
 
 // Build Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (*StackEbrc, error) {
+func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (*StackEbrc, fail.Error) {
 	stack := &StackEbrc{
 		Config:      &cfg,
 		AuthOptions: &auth,

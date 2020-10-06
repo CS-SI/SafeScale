@@ -63,7 +63,7 @@ func IsOperation(op interface{}, name string, fieldType reflect.Type) bool {
 	return result
 }
 
-func GetOperationStatus(op interface{}, name string, fieldType reflect.Type) (reflect.Value, error) {
+func GetOperationStatus(op interface{}, name string, fieldType reflect.Type) (reflect.Value, fail.Error) {
 	val := reflect.Indirect(reflect.ValueOf(op))
 
 	for i := 0; i < val.Type().NumField(); i++ {

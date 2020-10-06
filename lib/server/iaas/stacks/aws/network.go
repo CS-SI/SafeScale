@@ -41,7 +41,7 @@ import (
 	propsv1 "github.com/CS-SI/SafeScale/lib/server/iaas/abstract/properties/v1"
 )
 
-func (s *Stack) CreateVIP(string, string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(string, string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -61,7 +61,7 @@ func (s *Stack) DeleteVIP(*abstract.VirtualIP) error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, xerr fail.Error) {
 	logrus.Warnf("CreateNetwork invocation")
 
 	var theVpc *ec2.Vpc
@@ -410,7 +410,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 	return subnet, nil
 }
 
-func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -425,7 +425,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 	return nil, abstract.ResourceNotFoundError("Network", id)
 }
 
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 	nets, err := s.ListNetworks()
 	if err != nil {
 		return nil, err
@@ -440,7 +440,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 	return nil, abstract.ResourceNotFoundError("Network", name)
 }
 
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	out, err := s.EC2Service.DescribeVpcs(&ec2.DescribeVpcsInput{})
 	if err != nil {
 		return nil, err
@@ -674,7 +674,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 	return nil
 }
 
-func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
+func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
 	// The low byte represents the state. The high byte is an opaque internal value
 	// and should be ignored.
 	//
@@ -713,7 +713,7 @@ func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, error) {
 	return hoststate.ERROR, fail.Errorf(fmt.Sprintf("unexpected host state"), nil)
 }
 
-func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (_ *abstract.Host, _ *userdata.Content, err error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (_ *abstract.Host, _ *userdata.Content, xerr fail.Error) {
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name

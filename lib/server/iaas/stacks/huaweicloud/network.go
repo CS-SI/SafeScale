@@ -65,7 +65,7 @@ type vpcCommonResult struct {
 }
 
 // Extract is a function that accepts a result and extracts a Network/VPC from FlexibleEngine response.
-func (r vpcCommonResult) Extract() (*VPC, error) {
+func (r vpcCommonResult) Extract() (*VPC, fail.Error) {
 	var s struct {
 		VPC *VPC `json:"vpc"`
 	}
@@ -81,7 +81,7 @@ type vpcGetResult struct {
 }
 
 // CreateVPC creates a network, which is managed by VPC in FlexibleEngine
-func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
+func (s *Stack) CreateVPC(req VPCRequest) (*VPC, fail.Error) {
 	// Only one VPC allowed by client instance
 	if s.vpc != nil {
 		return nil, fail.Errorf(
@@ -153,7 +153,7 @@ func (s *Stack) CreateVPC(req VPCRequest) (*VPC, error) {
 	return vpc, nil
 }
 
-func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) {
+func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, fail.Error) {
 	var router *openstack.Router
 	found := false
 	routerList, err := s.Stack.ListRouters()
@@ -183,7 +183,7 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, error) 
 }
 
 // GetVPC returns the information about a VPC identified by 'id'
-func (s *Stack) GetVPC(id string) (*VPC, error) {
+func (s *Stack) GetVPC(id string) (*VPC, fail.Error) {
 	r := vpcGetResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id
 	opts := gophercloud.RequestOpts{
@@ -202,7 +202,7 @@ func (s *Stack) GetVPC(id string) (*VPC, error) {
 }
 
 // ListVPCs lists all the VPC created
-func (s *Stack) ListVPCs() ([]VPC, error) {
+func (s *Stack) ListVPCs() ([]VPC, fail.Error) {
 	var vpcList []VPC
 	return vpcList, fail.NotImplementedError("huaweicloud.Stack::ListVPCs() not implemented yet") // FIXME: Technical debt
 }
@@ -213,7 +213,7 @@ func (s *Stack) DeleteVPC(id string) error {
 }
 
 // CreateNetwork creates a network (ie a subnet in the network associated to VPC in FlexibleEngine
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, err error) {
+func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, xerr fail.Error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", req.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 
@@ -288,7 +288,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 }
 
 // validateNetworkName validates the name of a Network based on known FlexibleEngine requirements
-func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
+func validateNetworkName(req abstract.NetworkRequest) (bool, fail.Error) {
 	s := check.Struct{
 		"Name": check.Composite{
 			check.NonEmpty{},
@@ -311,7 +311,7 @@ func validateNetworkName(req abstract.NetworkRequest) (bool, error) {
 }
 
 // GetNetworkByName ...
-func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
+func (s *Stack) GetNetworkByName(name string) (*abstract.Network, fail.Error) {
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
 	getErr := retry.WhileSuccessfulDelay1Second(
@@ -353,7 +353,7 @@ func (s *Stack) GetNetworkByName(name string) (*abstract.Network, error) {
 }
 
 // GetNetwork returns the network identified by id
-func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
+func (s *Stack) GetNetwork(id string) (*abstract.Network, fail.Error) {
 	subnet, err := s.getSubnet(id)
 	if err != nil {
 		if !strings.Contains(err.Error(), id) {
@@ -377,7 +377,7 @@ func (s *Stack) GetNetwork(id string) (*abstract.Network, error) {
 }
 
 // ListNetworks lists networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
+func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
 		return nil, fail.Errorf(
@@ -423,7 +423,7 @@ type subnetEx struct {
 }
 
 // Extract is a function that accepts a result and extracts a Subnet from FlexibleEngine response.
-func (r subnetCommonResult) Extract() (*subnetEx, error) {
+func (r subnetCommonResult) Extract() (*subnetEx, fail.Error) {
 	var s struct {
 		//		Subnet *subnets.Subnet `json:"subnet"`
 		Subnet *subnetEx `json:"subnet"`
@@ -443,7 +443,7 @@ type subnetDeleteResult struct {
 }
 
 // convertIPv4ToNumber converts a net.IP to a uint32 representation
-func convertIPv4ToNumber(ip net.IP) (uint32, error) {
+func convertIPv4ToNumber(ip net.IP) (uint32, fail.Error) {
 	if ip.To4() == nil {
 		return 0, fail.Errorf(fmt.Sprintf("not an IPv4"), nil)
 	}
@@ -468,7 +468,7 @@ func convertNumberToIPv4(n uint32) net.IP {
 // }
 
 // createSubnet creates a subnet using native FlexibleEngine API
-func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) {
+func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Error) {
 	network, _, _ := net.ParseCIDR(cidr)
 
 	// Validates CIDR regarding the existing subnets
@@ -587,7 +587,7 @@ func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, error) 
 }
 
 // ListSubnets lists available subnet in VPC
-func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
+func (s *Stack) listSubnets() (*[]subnets.Subnet, fail.Error) {
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets?vpc_id=" + s.vpc.ID
 	pager := pagination.NewPager(
 		s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
@@ -596,7 +596,7 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 	)
 	var subnetList []subnets.Subnet
 	paginationErr := pager.EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := subnets.ExtractSubnets(page)
 			if err != nil {
 				return false, fail.Errorf(
@@ -621,7 +621,7 @@ func (s *Stack) listSubnets() (*[]subnets.Subnet, error) {
 }
 
 // getSubnet lists available subnet in VPC
-func (s *Stack) getSubnet(id string) (*subnets.Subnet, error) {
+func (s *Stack) getSubnet(id string) (*subnets.Subnet, fail.Error) {
 	r := subnetGetResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id
 	opts := gophercloud.RequestOpts{
@@ -696,7 +696,7 @@ func (s *Stack) deleteSubnet(id string) error {
 }
 
 // findSubnetByName returns a subnets.Subnet if subnet named as 'name' exists
-func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, error) {
+func (s *Stack) findSubnetByName(name string) (*subnets.Subnet, fail.Error) {
 	subnetList, err := s.listSubnets()
 	if err != nil {
 		return nil, fail.Errorf(
@@ -731,7 +731,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // CreateGateway creates a gateway for a network.
 // By current implementation, only one gateway can exist by Network because the object is intended
 // to contain only one hostID
-func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, error) {
+func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (*abstract.Host, *userdata.Content, fail.Error) {
 	gwname := strings.Split(req.Name, ".")[0] // req.Name may contain a FQDN...
 	if gwname == "" {
 		gwname = "gw-" + req.Network.Name
@@ -775,7 +775,7 @@ func (s *Stack) DeleteGateway(id string) error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, error) {
+func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
 	asu := true
 	sg := []string{s.SecurityGroup.ID}
 	options := ports.CreateOpts{

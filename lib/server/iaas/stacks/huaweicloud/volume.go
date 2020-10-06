@@ -88,7 +88,7 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 }
 
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	volume, err := s.GetVolume(request.Name)
 	if volume != nil && err == nil {
 		return nil, fail.Errorf(fmt.Sprintf("volume '%s' already exists", request.Name), err)
@@ -120,17 +120,17 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 
 // GetVolume returns the volume identified by id
 // If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
-func (s *Stack) GetVolume(id string) (_ *abstract.Volume, err error) {
+func (s *Stack) GetVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
 	var volume *volumes.Volume
 
 	unwrap := false
 	getErr := retry.WhileSuccessfulDelay1Second(
 		func() error {
 			r := volumes.Get(s.Stack.VolumeClient, id)
-			volume, err = r.Extract()
-			if err != nil {
+			volume, xerr = r.Extract()
+			if xerr != nil {
 				return openstack.ReinterpretGophercloudErrorCode(
-					err, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
+					xerr, nil, []int64{408, 429, 500, 503}, []int64{401, 403, 409}, func(ferr error) error {
 						if _, ok := ferr.(gc.ErrDefault404); ok {
 							unwrap = true
 							return fail.AbortedError("", abstract.ResourceNotFoundError("volume", id))
@@ -166,10 +166,10 @@ func (s *Stack) GetVolume(id string) (_ *abstract.Volume, err error) {
 }
 
 // ListVolumes lists volumes
-func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var vs []abstract.Volume
 	err := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := volumes.ExtractVolumes(page)
 			if err != nil {
 				log.Errorf("Error listing volumes: volume extraction: %+v", err)
@@ -200,17 +200,17 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	return s.Stack.CreateVolumeAttachment(request)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	return s.Stack.GetVolumeAttachment(serverID, id)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	return s.Stack.ListVolumeAttachments(serverID)
 }
 

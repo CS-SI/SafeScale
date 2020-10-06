@@ -44,7 +44,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []abstract.Image, err error) {
+func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
 	compuService := s.ComputeService
 
 	images = []abstract.Image{}
@@ -74,14 +74,14 @@ func (s *Stack) ListImages() (images []abstract.Image, err error) {
 	}
 
 	if len(images) == 0 {
-		return images, err
+		return images, xerr
 	}
 
 	return images, nil
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*abstract.Image, error) {
+func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
 	images, err := s.ListImages()
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (s *Stack) GetImage(id string) (*abstract.Image, error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err error) {
+func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	compuService := s.ComputeService
 
 	templates = []abstract.HostTemplate{}
@@ -128,14 +128,14 @@ func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, err 
 	}
 
 	if len(templates) == 0 {
-		return templates, err
+		return templates, xerr
 	}
 
 	return templates, nil
 }
 
 // GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	templates, err := s.ListTemplates(true)
 	if err != nil {
 		return nil, err
@@ -153,17 +153,17 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, error) {
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates a key pair (no import)
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, error) {
+func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	return abstract.NewKeyPair(name)
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, error) {
+func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("GetKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, error) {
+func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
@@ -173,7 +173,7 @@ func (s *Stack) DeleteKeyPair(id string) error {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, err error) {
+func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, xerr fail.Error) {
 	userData = userdata.NewContent()
 
 	resourceName := request.ResourceName
@@ -226,11 +226,11 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	err = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
-	if err != nil {
-		msg := fmt.Sprintf("failed to prepare user data content: %+v", err)
+	xerr = userData.Prepare(*s.Config, request, defaultNetwork.CIDR, "")
+	if xerr != nil {
+		msg := fmt.Sprintf("failed to prepare user data content: %+v", xerr)
 		logrus.Debugf(utils.Capitalize(msg))
-		return nil, userData, fail.Errorf(fmt.Sprintf(msg), err)
+		return nil, userData, fail.Errorf(fmt.Sprintf(msg), xerr)
 	}
 
 	// Determine system disk size based on vcpus count
@@ -438,7 +438,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.Host, err error) {
+func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res *abstract.Host, xerr fail.Error) {
 	var host *abstract.Host
 	switch hostParam := hostParam.(type) {
 	case string:
@@ -453,7 +453,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (res
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("(%s)", host.ID), true).GoingIn()
 	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &xerr)()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -498,7 +498,7 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *abstract.HostTemplate) (*abstract.Host, error) {
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *abstract.HostTemplate) (*abstract.Host, fail.Error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageID
@@ -593,7 +593,7 @@ func buildGcpMachine(service *compute.Service, projectID string, instanceName st
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, err error) {
+func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fail.Error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
@@ -740,7 +740,7 @@ func fromMachineTypeToAllocatedSize(machineType string) propsv1.HostSize {
 	return hz
 }
 
-func stateConvert(gcpHostStatus string) (hoststate.Enum, error) {
+func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 	switch gcpHostStatus {
 	case "PROVISIONING":
 		return hoststate.STARTING, nil
@@ -766,7 +766,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, error) {
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstract.Host, error) {
+func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	hosts, err := s.ListHosts()
 	if err != nil {
 		return nil, err
@@ -829,12 +829,12 @@ func (s *Stack) DeleteHost(id string) (err error) {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, error) {
+func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*abstract.Host, error) {
+func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 	compuService := s.ComputeService
 
 	var hostList []*abstract.Host
@@ -938,7 +938,7 @@ func (s *Stack) RebootHost(id string) error {
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
+func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
 	host, err := s.InspectHost(hostParam)
 	if err != nil {
 		return hoststate.ERROR, err
@@ -950,7 +950,7 @@ func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, error) {
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	zones := make(map[string]bool)
 
 	resp, err := s.ComputeService.Zones.List(s.GcpConfig.ProjectID).Do()
@@ -965,7 +965,7 @@ func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
 }
 
 // ListRegions ...
-func (s *Stack) ListRegions() ([]string, error) {
+func (s *Stack) ListRegions() ([]string, fail.Error) {
 	var regions []string
 
 	compuService := s.ComputeService

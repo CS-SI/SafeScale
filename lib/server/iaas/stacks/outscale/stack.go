@@ -9,6 +9,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Credentials outscale credentials
@@ -80,7 +81,7 @@ type Stack struct {
 }
 
 // New creates a new Stack
-func New(options *ConfigurationOptions) (*Stack, error) {
+func New(options *ConfigurationOptions) (*Stack, fail.Error) {
 	client := osc.NewAPIClient(osc.NewConfiguration())
 	auth := context.WithValue(
 		context.Background(), osc.ContextAWSv4, osc.AWSv4{
@@ -157,7 +158,7 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s *Stack) ListRegions() ([]string, error) {
+func (s *Stack) ListRegions() ([]string, fail.Error) {
 	return []string{
 		"cn-southeast-1",
 		"eu-west-2",
@@ -167,7 +168,7 @@ func (s *Stack) ListRegions() ([]string, error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s *Stack) ListAvailabilityZones() (map[string]bool, error) {
+func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {
 		return nil, err

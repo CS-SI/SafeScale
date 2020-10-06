@@ -29,13 +29,13 @@ import (
 )
 
 // GetSecurityGroup returns the default security group
-func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
+func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, fail.Error) {
 	var sgList []secgroups.SecGroup
 	opts := secgroups.ListOpts{
 		Name: s.DefaultSecurityGroupName,
 	}
 	err := secgroups.List(s.NetworkClient, opts).EachPage(
-		func(page pagination.Page) (bool, error) {
+		func(page pagination.Page) (bool, fail.Error) {
 			list, err := secgroups.ExtractGroups(page)
 			if err != nil {
 				return false, err
@@ -58,7 +58,7 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, error) {
 	return &sgList[0], nil
 }
 
-func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, error) {
+func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, fail.Error) {
 	sg, err := s.GetSecurityGroup(s.DefaultSecurityGroupName)
 	if err != nil {
 		return nil, fail.Errorf(fmt.Sprintf("error listing routers: %s", ProviderErrorToString(err)), err)

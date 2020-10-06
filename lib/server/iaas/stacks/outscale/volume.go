@@ -17,7 +17,7 @@ import (
 )
 
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, err error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
 	v, _ := s.GetVolumeByName(request.Name)
 	if v != nil {
 		return nil, abstract.ResourceDuplicateError("volume", request.Name)
@@ -135,7 +135,7 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) erro
 }
 
 // GetVolume returns the volume identified by id
-func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
@@ -167,7 +167,7 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
 }
 
 // GetVolumeByName returns the volume with name name
-func (s *Stack) GetVolumeByName(name string) (*abstract.Volume, error) {
+func (s *Stack) GetVolumeByName(name string) (*abstract.Volume, fail.Error) {
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -204,7 +204,7 @@ func (s *Stack) GetVolumeByName(name string) (*abstract.Volume, error) {
 }
 
 // ListVolumes list available volumes
-func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	subregion := s.Options.Compute.Subregion
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
@@ -255,7 +255,7 @@ func freeDevice(usedDevices []string, device string) bool {
 	return true
 }
 
-func (s *Stack) getFirstFreeDeviceName(serverID string) (string, error) {
+func (s *Stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
 	var usedDeviceNames []string
 	atts, _ := s.ListVolumeAttachments(serverID)
 	if atts == nil {
@@ -276,7 +276,7 @@ func (s *Stack) getFirstFreeDeviceName(serverID string) (string, error) {
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	firstDeviceName, err := s.getFirstFreeDeviceName(request.HostID)
 	if err != nil {
 		return "", normalizeError(err)
@@ -301,7 +301,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	readVolumesRequest := osc.ReadVolumesRequest{
 		Filters: osc.FiltersVolume{
 			VolumeIds: []string{id},
@@ -341,7 +341,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	volumes, err := s.ListVolumes()
 	if err != nil {
 		return nil, err

@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 )
 
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	v, err := s.EC2Service.CreateVolume(
 		&ec2.CreateVolumeInput{
 			Size:             aws.Int64(int64(request.Size)),
@@ -69,7 +69,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	return &volume, nil
 }
 
-func (s *Stack) GetVolume(id string) (*abstract.Volume, error) {
+func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			VolumeIds: []*string{aws.String(id)},
@@ -153,7 +153,7 @@ func toVolumeState(s *string) volumestate.Enum {
 	return volumestate.OTHER
 }
 
-func (s *Stack) ListVolumes() ([]abstract.Volume, error) {
+func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	out, err := s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func (s *Stack) DeleteVolume(id string) error {
 	return err
 }
 
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, error) {
+func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	va, err := s.EC2Service.AttachVolume(
 		&ec2.AttachVolumeInput{
 			Device:     aws.String(request.Name),
@@ -207,7 +207,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 	return aws.StringValue(va.Device) + aws.StringValue(va.VolumeId), nil
 }
 
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, error) {
+func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			VolumeIds: []*string{aws.String(id)},
@@ -231,7 +231,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 	)
 }
 
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
+func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{

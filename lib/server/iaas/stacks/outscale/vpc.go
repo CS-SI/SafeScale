@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, error) {
+func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, fail.Error) {
 	tags, err := s.getResourceTags(onet.DhcpOptionsSetId)
 	if err != nil {
 		return false, err
@@ -108,7 +108,7 @@ func (s *Stack) deleteInternetService(onet *osc.Net) error {
 	return nil
 }
 
-func (s *Stack) getDefaultRouteTable(onet *osc.Net) (*osc.RouteTable, error) {
+func (s *Stack) getDefaultRouteTable(onet *osc.Net) (*osc.RouteTable, fail.Error) {
 	readRouteTablesRequest := osc.ReadRouteTablesRequest{
 		Filters: osc.FiltersRouteTable{
 			NetIds: []string{onet.NetId},
@@ -270,7 +270,7 @@ func (s *Stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) error {
 	return normalizeError(err)
 }
 
-func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, error) {
+func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
 	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
 		Filters: osc.FiltersSecurityGroup{
 			SecurityGroupNames: []string{"default"},
@@ -294,7 +294,7 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, error
 	return nil, fail.InconsistentError("invalid provider response")
 }
 
-func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
+func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, xerr fail.Error) {
 
 	createNetRequest := osc.CreateNetRequest{
 		IpRange: cidr,
@@ -364,7 +364,7 @@ func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, err error) {
 	return &onet, nil
 }
 
-func (s *Stack) getVpc(id string) (*osc.Net, error) {
+func (s *Stack) getVpc(id string) (*osc.Net, fail.Error) {
 	readNetsRequest := osc.ReadNetsRequest{
 		Filters: osc.FiltersNet{
 			NetIds: []string{id},
@@ -385,7 +385,7 @@ func (s *Stack) getVpc(id string) (*osc.Net, error) {
 }
 
 // GetNetworkByName returns the network identified by name)
-func (s *Stack) getVpcByName(name string) (*osc.Net, error) {
+func (s *Stack) getVpcByName(name string) (*osc.Net, fail.Error) {
 	readNetsRequest := osc.ReadNetsRequest{
 		Filters: osc.FiltersNet{
 			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
@@ -406,7 +406,7 @@ func (s *Stack) getVpcByName(name string) (*osc.Net, error) {
 
 }
 
-func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, error) {
+func (s *Stack) getDefaultDhcpNptpServers(net *osc.Net) ([]string, fail.Error) {
 	readDhcpOptionsRequest := osc.ReadDhcpOptionsRequest{
 		Filters: osc.FiltersDhcpOptions{
 			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
