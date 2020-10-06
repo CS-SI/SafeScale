@@ -1101,7 +1101,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 						case fail.ErrNotFound:
 							return abstract.ResourceNotFoundError("host", hostID)
 						default:
-							return err
+							return innerErr
 						}
 					}
 					return nil
@@ -1336,15 +1336,8 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 					var innerErr error
 					node, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
 					if innerErr != nil {
-						return err
+						return innerErr
 					}
-					// length := len(nodesV1.PrivateNodes)
-					// _, idx := findNodeByID(nodesV1.PrivateNodes, node.ID)
-					// if idx < length-1 {
-					//    nodesV1.PrivateNodes = append(nodesV1.PrivateNodes[:idx], nodesV1.PrivateNodes[idx+1:]...)
-					// } else {
-					//    nodesV1.PrivateNodes = nodesV1.PrivateNodes[:idx]
-					// }
 					return nil
 				},
 			)
