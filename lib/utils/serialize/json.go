@@ -147,6 +147,8 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 		panic("key is empty!")
 	}
 
+	// FIXME Zero can panic, look at deferred code
+
 	x.Lock()
 	defer x.Unlock()
 
@@ -187,6 +189,8 @@ func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 
 	x.Lock()
 	defer x.Unlock()
+
+	// FIXME Zero can panic, look at deferred code
 
 	var (
 		item  *jsonProperty
@@ -232,7 +236,9 @@ func (x *JSONProperties) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implement json.Unmarshaller
 // Note: DO NOT LOCK property here, deadlock risk
-func (x *JSONProperties) UnmarshalJSON(b []byte) error {
+func (x *JSONProperties) UnmarshalJSON(b []byte) (xerr error) {
+	defer fail.OnPanic(&xerr)()
+
 	// Decode JSON data
 	unjsoned := map[string]string{}
 	err := FromJSON(b, &unjsoned)

@@ -51,7 +51,9 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of Network
-func NewNetwork(svc iaas.Service) (*Network, error) {
+func NewNetwork(svc iaas.Service) (_ *Network, err error) {
+	defer fail.OnPanic(&err)()
+
 	aNet, err := metadata.NewItem(svc, networksFolderName)
 	if err != nil {
 		return nil, err
@@ -67,7 +69,9 @@ func (m *Network) GetService() iaas.Service {
 }
 
 // GetPath returns the path in Object Storage where the item is stored
-func (m *Network) GetPath() (string, error) {
+func (m *Network) GetPath() (_ string, err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -97,7 +101,9 @@ func (m *Network) OK() (bool, error) {
 }
 
 // Carry links a Network instance to the Metadata instance
-func (m *Network) Carry(network *abstract.Network) (*Network, error) {
+func (m *Network) Carry(network *abstract.Network) (_ *Network, err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -120,7 +126,9 @@ func (m *Network) Carry(network *abstract.Network) (*Network, error) {
 }
 
 // Get returns the abstract.Network instance linked to metadata
-func (m *Network) Get() (*abstract.Network, error) {
+func (m *Network) Get() (_ *abstract.Network, err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -132,6 +140,8 @@ func (m *Network) Get() (*abstract.Network, error) {
 
 // Write updates the metadata corresponding to the network in the Object Storage
 func (m *Network) Write() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -157,6 +167,8 @@ func (m *Network) Write() (err error) {
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (m *Network) Reload() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -177,6 +189,8 @@ func (m *Network) Reload() (err error) {
 
 // ReadByReference tries to read first using 'ref' as an ID then as a name
 func (m *Network) ReadByReference(ref string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -267,6 +281,8 @@ func (m *Network) mayReadByName(name string) (err error) {
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (m *Network) ReadByID(id string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -305,6 +321,8 @@ func (m *Network) ReadByName(name string) (err error) {
 
 // Delete deletes the metadata corresponding to the network
 func (m *Network) Delete() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -333,6 +351,8 @@ func (m *Network) Delete() (err error) {
 
 // Browse walks through all the metadata objects in network
 func (m *Network) Browse(callback func(*abstract.Network) error) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -361,6 +381,8 @@ func (m *Network) Browse(callback func(*abstract.Network) error) (err error) {
 
 // AttachHost links host ID to the network
 func (m *Network) AttachHost(host *abstract.Host) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -391,6 +413,8 @@ func (m *Network) AttachHost(host *abstract.Host) (err error) {
 
 // DetachHost unlinks host ID from network
 func (m *Network) DetachHost(hostID string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -428,6 +452,8 @@ func (m *Network) DetachHost(hostID string) (err error) {
 
 // ListHosts returns the list of abstract.Host attached to the network (excluding gateway)
 func (m *Network) ListHosts() (list []*abstract.Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	if m == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -482,6 +508,8 @@ func (m *Network) Release() {
 
 // SaveNetwork saves the Network definition in Object Storage
 func SaveNetwork(svc iaas.Service, net *abstract.Network) (mn *Network, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -508,6 +536,8 @@ func SaveNetwork(svc iaas.Service, net *abstract.Network) (mn *Network, err erro
 
 // RemoveNetwork removes the Network definition from Object Storage
 func RemoveNetwork(svc iaas.Service, net *abstract.Network) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -537,6 +567,8 @@ func RemoveNetwork(svc iaas.Service, net *abstract.Network) (err error) {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -603,6 +635,8 @@ type Gateway struct {
 
 // NewGateway creates an instance of metadata.Gateway
 func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -633,6 +667,8 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 
 // Carry links a Network instance to the Metadata instance
 func (mg *Gateway) Carry(host *abstract.Host) (gw *Gateway, err error) {
+	defer fail.OnPanic(&err)()
+
 	if mg.host == nil {
 		mg.host, err = NewHost(mg.network.GetService())
 		if err != nil {
@@ -649,7 +685,9 @@ func (mg *Gateway) Carry(host *abstract.Host) (gw *Gateway, err error) {
 }
 
 // Get returns the *abstract.Host linked to the metadata
-func (mg *Gateway) Get() (*abstract.Host, error) {
+func (mg *Gateway) Get() (_ *abstract.Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	if mg == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -667,7 +705,9 @@ func (mg *Gateway) Get() (*abstract.Host, error) {
 
 // Write updates the metadata corresponding to the network in the Object Storage
 // A Gateway is a particular host : we want it listed in hosts, but not listed as attached to the network
-func (mg *Gateway) Write() error {
+func (mg *Gateway) Write() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mg.host == nil {
 		return fail.InvalidInstanceContentError("mg.host", "cannot be nil")
 	}
@@ -676,6 +716,8 @@ func (mg *Gateway) Write() error {
 
 // Read reads the metadata of a gateway of a network identified by ID from Object Storage
 func (mg *Gateway) Read() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mg == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -713,6 +755,8 @@ func (mg *Gateway) Read() (err error) {
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 // It's advised to Acquire/Release around Reload()...
 func (mg *Gateway) Reload() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mg == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -737,6 +781,8 @@ func (mg *Gateway) Reload() (err error) {
 
 // Delete updates the metadata of the network concerning the gateway
 func (mg *Gateway) Delete() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mg == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -781,6 +827,8 @@ func (mg *Gateway) Release() {
 
 // LoadGateway returns the metadata of the Gateway of a network
 func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -826,6 +874,8 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 
 // SaveGateway saves the metadata of a gateway
 func SaveGateway(svc iaas.Service, host *abstract.Host, networkID string) (mg *Gateway, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}

@@ -46,7 +46,9 @@ type Host struct {
 }
 
 // NewHost creates an instance of api.Host
-func NewHost(svc iaas.Service) (*Host, error) {
+func NewHost(svc iaas.Service) (_ *Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	aHost, err := metadata.NewItem(svc, hostsFolderName)
 	if err != nil {
 		return nil, err
@@ -76,7 +78,9 @@ func (mh *Host) OK() (bool, error) {
 }
 
 // Carry links an host instance to the Metadata instance
-func (mh *Host) Carry(host *abstract.Host) (*Host, error) {
+func (mh *Host) Carry(host *abstract.Host) (_ *Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	if host == nil {
 		return nil, fail.InvalidParameterError("host", "cannot be nil!")
 	}
@@ -90,7 +94,9 @@ func (mh *Host) Carry(host *abstract.Host) (*Host, error) {
 }
 
 // Get returns the Network instance linked to metadata
-func (mh *Host) Get() (*abstract.Host, error) {
+func (mh *Host) Get() (_ *abstract.Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -104,6 +110,8 @@ func (mh *Host) Get() (*abstract.Host, error) {
 
 // Write updates the metadata corresponding to the host in the Object Storage
 func (mh *Host) Write() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -124,6 +132,8 @@ func (mh *Host) Write() (err error) {
 
 // ReadByReference ...
 func (mh *Host) ReadByReference(ref string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -214,6 +224,8 @@ func (mh *Host) mayReadByName(name string) (err error) {
 
 // ReadByID reads the metadata of a network identified by ID from Object Storage
 func (mh *Host) ReadByID(id string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -233,6 +245,8 @@ func (mh *Host) ReadByID(id string) (err error) {
 
 // ReadByName reads the metadata of a host identified by name
 func (mh *Host) ReadByName(name string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -252,6 +266,8 @@ func (mh *Host) ReadByName(name string) (err error) {
 
 // Delete updates the metadata corresponding to the host
 func (mh *Host) Delete() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -275,6 +291,8 @@ func (mh *Host) Delete() (err error) {
 
 // Browse walks through host folder and executes a callback for each entries
 func (mh *Host) Browse(callback func(*abstract.Host) error) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mh == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -286,20 +304,26 @@ func (mh *Host) Browse(callback func(*abstract.Host) error) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
-	return mh.item.BrowseInto(
+	err = mh.item.BrowseInto(
 		ByIDFolderName, func(buf []byte) error {
 			host := abstract.NewHost()
-			err := host.Deserialize(buf)
-			if err != nil {
-				return err
+			nerr := host.Deserialize(buf)
+			if nerr != nil {
+				return nerr
 			}
-			return callback(host)
+
+			cav := callback(host)
+			return cav
 		},
 	)
+
+	return err
 }
 
 // SaveHost saves the Host definition in Object Storage
 func SaveHost(svc iaas.Service, host *abstract.Host) (mh *Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -325,29 +349,14 @@ func SaveHost(svc iaas.Service, host *abstract.Host) (mh *Host, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// mn := NewNetwork(svc)
-	// err = host.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-	// 	hostNetworkV1 := v.(*propsv1.HostNetwork)
-	// 	for netID := range hostNetworkV1.NetworksByID {
-	// 		err := mn.ReadByID(netID)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		err = mn.AttachHost(host)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
+
 	return mh, nil
 }
 
 // RemoveHost removes the host definition from Object Storage
 func RemoveHost(svc iaas.Service, host *abstract.Host) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -377,6 +386,8 @@ func RemoveHost(svc iaas.Service, host *abstract.Host) (err error) {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
