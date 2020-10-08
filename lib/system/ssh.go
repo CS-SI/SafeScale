@@ -797,7 +797,14 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withT
 	}
 	cmd := ""
 	if username != "" {
-		cmd = "sudo -u " + username + " -i "
+		// we want to force a password prompt for the user
+		// a first ssh is issued dedicated to ask it and in case of a success a second ssh is issued entering the asked user via sudo
+		// this is done is for theses reasons:
+		//  a direct ssh to the user would force the host admin to tweak ssh and weaken the security by mistake
+		//  sudo can not be forced to ask the password unless you modify the sudoers file to do so
+		//	su may be used to ask password then launch a command but it launches a shell without tty (sudo for example would refuse to work)
+		cmd = "su " + username + " -c exit && " + sshCmdString + " -t sudo -u " + username
+		withTty = true
 	}
 
 	if withTty {
@@ -819,6 +826,8 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withT
 	if cmdString != "" {
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
+	logrus.Debugf("createSSHCmd() sshCmdString: %s\n", sshCmdString)
+
 	return sshCmdString, f, nil
 
 }
