@@ -44,7 +44,9 @@ type Share struct {
 }
 
 // NewShare creates an instance of metadata.Nas
-func NewShare(svc iaas.Service) (*Share, error) {
+func NewShare(svc iaas.Service) (_ *Share, err error) {
+	defer fail.OnPanic(&err)()
+
 	aShare, err := metadata.NewItem(svc, shareFolderName)
 	if err != nil {
 		return nil, err
@@ -62,17 +64,23 @@ type shareItem struct {
 }
 
 // Serialize ...
-func (n *shareItem) Serialize() ([]byte, error) {
+func (n *shareItem) Serialize() (_ []byte, err error) {
+	defer fail.OnPanic(&err)()
+
 	return serialize.ToJSON(n)
 }
 
 // Deserialize ...
-func (n *shareItem) Deserialize(buf []byte) error {
+func (n *shareItem) Deserialize(buf []byte) (err error) {
+	defer fail.OnPanic(&err)()
+
 	return serialize.FromJSON(buf, n)
 }
 
 // Carry links an export instance to the Metadata instance
-func (ms *Share) Carry(hostID, hostName, shareID, shareName string) (*Share, error) {
+func (ms *Share) Carry(hostID, hostName, shareID, shareName string) (_ *Share, err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -105,7 +113,9 @@ func (ms *Share) Carry(hostID, hostName, shareID, shareName string) (*Share, err
 }
 
 // Get returns the ID of the host owning the share
-func (ms *Share) Get() (string, error) {
+func (ms *Share) Get() (_ string, err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -120,14 +130,16 @@ func (ms *Share) Get() (string, error) {
 }
 
 // Write updates the metadata corresponding to the share in the Object Storage
-func (ms *Share) Write() error {
+func (ms *Share) Write() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return fail.InvalidInstanceError()
 	}
 	if ms.item == nil {
 		return fail.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
-	err := ms.item.WriteInto(ByIDFolderName, *ms.id)
+	err = ms.item.WriteInto(ByIDFolderName, *ms.id)
 	if err != nil {
 		return err
 	}
@@ -136,6 +148,8 @@ func (ms *Share) Write() error {
 
 // ReadByReference tries to read 'ref' as an ID, and if not found as a name
 func (ms *Share) ReadByReference(ref string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -226,6 +240,8 @@ func (ms *Share) mayReadByName(name string) error {
 
 // ReadByID reads the metadata of an export identified by ID from Object Storage
 func (ms *Share) ReadByID(id string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -245,6 +261,8 @@ func (ms *Share) ReadByID(id string) (err error) {
 
 // ReadByName reads the metadata of a nas identified by name
 func (ms *Share) ReadByName(name string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -263,14 +281,16 @@ func (ms *Share) ReadByName(name string) (err error) {
 }
 
 // Delete updates the metadata corresponding to the share
-func (ms *Share) Delete() error {
+func (ms *Share) Delete() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return fail.InvalidInstanceError()
 	}
 	if ms.item == nil {
 		return fail.InvalidInstanceContentError("ms.item", "cannot be nil")
 	}
-	err := ms.item.DeleteFrom(ByIDFolderName, *ms.id)
+	err = ms.item.DeleteFrom(ByIDFolderName, *ms.id)
 	if err != nil {
 		return err
 	}
@@ -278,7 +298,9 @@ func (ms *Share) Delete() error {
 }
 
 // Browse walks through shares folder and executes a callback for each entry
-func (ms *Share) Browse(callback func(string, string) error) error {
+func (ms *Share) Browse(callback func(string, string) error) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if ms == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -374,7 +396,9 @@ func (ms *Share) Release() {
 }
 
 // SaveShare saves the Nas definition in Object Storage
-func SaveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) (*Share, error) {
+func SaveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) (_ *Share, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -403,7 +427,9 @@ func SaveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) (*
 }
 
 // RemoveShare removes the share definition from Object Storage
-func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) error {
+func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -438,6 +464,8 @@ func RemoveShare(svc iaas.Service, hostID, hostName, shareID, shareName string) 
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadShare(svc iaas.Service, ref string) (share string, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return "", fail.InvalidParameterError("svc", "cannot be nil")
 	}

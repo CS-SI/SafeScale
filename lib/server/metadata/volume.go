@@ -45,7 +45,9 @@ type Volume struct {
 }
 
 // NewVolume creates an instance of metadata.Volume
-func NewVolume(svc iaas.Service) (*Volume, error) {
+func NewVolume(svc iaas.Service) (_ *Volume, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -62,7 +64,9 @@ func NewVolume(svc iaas.Service) (*Volume, error) {
 }
 
 // Carry links a Volume instance to the Metadata instance
-func (mv *Volume) Carry(volume *abstract.Volume) (*Volume, error) {
+func (mv *Volume) Carry(volume *abstract.Volume) (_ *Volume, err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -82,7 +86,9 @@ func (mv *Volume) Carry(volume *abstract.Volume) (*Volume, error) {
 }
 
 // Get returns the Volume instance linked to metadata
-func (mv *Volume) Get() (*abstract.Volume, error) {
+func (mv *Volume) Get() (_ *abstract.Volume, err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -96,7 +102,9 @@ func (mv *Volume) Get() (*abstract.Volume, error) {
 }
 
 // Write updates the metadata corresponding to the volume in the Object Storage
-func (mv *Volume) Write() error {
+func (mv *Volume) Write() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -104,7 +112,7 @@ func (mv *Volume) Write() error {
 		return fail.InvalidInstanceContentError("mv.item", "cannot be nil!")
 	}
 
-	err := mv.item.WriteInto(ByIDFolderName, *mv.id)
+	err = mv.item.WriteInto(ByIDFolderName, *mv.id)
 	if err != nil {
 		return err
 	}
@@ -112,14 +120,16 @@ func (mv *Volume) Write() error {
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance
-func (mv *Volume) Reload() error {
+func (mv *Volume) Reload() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
 	if mv.item == nil {
 		return fail.InvalidInstanceContentError("mv.item", "cannot be nil")
 	}
-	err := mv.ReadByID(*mv.id)
+	err = mv.ReadByID(*mv.id)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
 			return fail.NotFoundError(fmt.Sprintf("metadata of volume '%s' vanished", *mv.name))
@@ -131,6 +141,8 @@ func (mv *Volume) Reload() error {
 
 // ReadByReference tries to read with 'ref' as id, then if not found as name
 func (mv *Volume) ReadByReference(ref string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -226,6 +238,8 @@ func (mv *Volume) mayReadByName(name string) error {
 
 // ReadByID reads the metadata of a volume identified by ID from Object Storage
 func (mv *Volume) ReadByID(id string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -245,6 +259,8 @@ func (mv *Volume) ReadByID(id string) (err error) {
 
 // ReadByName reads the metadata of a volume identified by name
 func (mv *Volume) ReadByName(name string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -264,6 +280,8 @@ func (mv *Volume) ReadByName(name string) (err error) {
 
 // Delete delete the metadata corresponding to the volume
 func (mv *Volume) Delete() (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -291,6 +309,8 @@ func (mv *Volume) Delete() (err error) {
 
 // Browse walks through volume folder and executes a callback for each entries
 func (mv *Volume) Browse(callback func(*abstract.Volume) error) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if mv == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -316,6 +336,8 @@ func (mv *Volume) Browse(callback func(*abstract.Volume) error) (err error) {
 
 // SaveVolume saves the Volume definition in Object Storage
 func SaveVolume(svc iaas.Service, volume *abstract.Volume) (mv *Volume, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -347,6 +369,8 @@ func SaveVolume(svc iaas.Service, volume *abstract.Volume) (mv *Volume, err erro
 
 // RemoveVolume removes the Volume definition from Object Storage
 func RemoveVolume(svc iaas.Service, volumeID string) (err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -370,6 +394,8 @@ func RemoveVolume(svc iaas.Service, volumeID string) (err error) {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return errNotFound
 func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
+	defer fail.OnPanic(&err)()
+
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}

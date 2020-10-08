@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
@@ -185,8 +183,7 @@ func (f *Folder) Write(path string, name string, content []byte) error {
 func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 	list, err := f.service.GetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
 	if err != nil {
-		logrus.Errorf("Error browsing metadata: listing objects: %+v", err)
-		return err
+		return fail.Wrap(err, "Error browsing metadata: listing objects")
 	}
 
 	// Special case where there is only an empty folder...
@@ -198,27 +195,41 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 		var buffer bytes.Buffer
 		_, err = f.service.GetMetadataBucket().ReadObject(i, &buffer, 0, 0)
 		if err != nil {
-			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", err)
-			return err
+			return fail.Wrap(err, "Error browsing metadata: reading from buffer")
 		}
 		data := buffer.Bytes()
 		if f.crypt {
+			dal := len(data)
+
 			data, err = crypt.Decrypt(data, f.cryptKey)
 			if err != nil {
+				if dal > 0 {
+					return fail.ForbiddenError(fmt.Sprintf("problem decrypting data with the key provided in (tenants.metadata.CryptKey): %s", err))
+				}
 				return err
 			}
 		}
+
 		err = callback(data)
 		if err != nil {
 			if _, ok := err.(*json.SyntaxError); ok && strings.Contains(err.Error(), "invalid character") {
-				err = fail.SyntaxError(
-					fmt.Sprintf(
-						"seems metadata '%s' is encrypted but not encryption key provided", i,
-					),
-				)
+				if f.crypt {
+					err = fail.SyntaxError(
+						fmt.Sprintf(
+							"seems metadata '%s' is crypted but there was a problem decrypting with the key provided in (tenants.metadata.CryptKey)", i,
+						),
+					)
+					return err
+				} else {
+					err = fail.SyntaxError(
+						fmt.Sprintf(
+							"seems metadata '%s' is unencrypted but a encryption key is provided in (tenants.metadata.CryptKey), this leads to a decryption error; please remove decryption key", i,
+						),
+					)
+					return err
+				}
 			}
-			logrus.Errorf("Error browsing metadata: running callback: %+v", err)
-			return err
+			return fail.Wrap(err, "Error browsing metadata: running callback")
 		}
 	}
 	return nil

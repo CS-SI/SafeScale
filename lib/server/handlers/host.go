@@ -171,6 +171,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
+		logrus.Warnf("Problem loading host...")
 		return err
 	}
 	if mh == nil {
@@ -178,6 +179,7 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	}
 	mhm, err := mh.Get()
 	if err != nil {
+		logrus.Warnf("Problem loading metadata itself")
 		return err
 	}
 
