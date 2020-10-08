@@ -699,11 +699,11 @@ func findNodeByName(list []*clusterpropsv1.Node, name string) (bool, int) {
 	return found, idx
 }
 
-func deleteNodeFromListByID(list []*clusterpropsv1.Node, ID string) (*clusterpropsv1.Node, error) {
+func deleteNodeFromListByID(list []*clusterpropsv1.Node, ID string) (*clusterpropsv1.Node, []*clusterpropsv1.Node, error) {
 	length := len(list)
 	found, idx := findNodeByID(list, ID)
 	if !found {
-		return nil, fail.NotFoundError(fmt.Sprintf("failed to find node with ID '%s'", ID))
+		return nil, nil, fail.NotFoundError(fmt.Sprintf("failed to find node with ID '%s'", ID))
 	}
 	node := list[idx]
 	if idx < length-1 {
@@ -711,7 +711,7 @@ func deleteNodeFromListByID(list []*clusterpropsv1.Node, ID string) (*clusterpro
 	} else {
 		list = list[:idx]
 	}
-	return node, nil
+	return node, list, nil
 }
 
 func deleteNodeFromListByName(list []*clusterpropsv1.Node, name string) (*clusterpropsv1.Node, error) {
@@ -891,12 +891,12 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			}
 		}
 	}
+	// FIXME: Make sure all AddConsequence works...
 
 	// Starting from here, delete nodes if exiting with error
 	newHosts := hosts
 	defer func() {
 		if err != nil && len(newHosts) > 0 && !req.KeepOnFailure {
-			log.Warnf("Running taskDeleteNode after all")
 			var subtasks []concurrency.Task
 			for _, v := range newHosts {
 				subtask, tErr := task.New()
@@ -1084,18 +1084,9 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 				func(clonable data.Clonable) error {
 					nodesV1 := clonable.(*clusterpropsv1.Nodes)
 
-					// found, idx := findNodeByID(nodesV1.Masters, hostID)
-					// if !found {
-					//	return abstract.ResourceNotFoundError("host", hostID)
-					// }
-					// master = nodesV1.Masters[idx]
-					// if idx < len(nodesV1.Masters)-1 {
-					//	nodesV1.Masters = append(nodesV1.Masters[:idx], nodesV1.Masters[idx+1:]...)
-					// } else {
-					//	nodesV1.Masters = nodesV1.Masters[:idx]
-					// }
 					var innerErr error
-					master, innerErr = deleteNodeFromListByID(nodesV1.Masters, hostID)
+					var newMasters []*clusterpropsv1.Node
+					master, newMasters, innerErr = deleteNodeFromListByID(nodesV1.Masters, hostID)
 					if innerErr != nil {
 						switch innerErr.(type) {
 						case fail.ErrNotFound:
@@ -1104,6 +1095,7 @@ func (c *Controller) deleteMaster(task concurrency.Task, hostID string) (err err
 							return innerErr
 						}
 					}
+					nodesV1.Masters = newMasters
 					return nil
 				},
 			)
@@ -1158,7 +1150,7 @@ func (c *Controller) DeleteLastNode(task concurrency.Task, selectedMaster string
 
 	var node *clusterpropsv1.Node
 
-	// Removed reference of the node from cluster metadata
+	// Get last node id from metadata
 	c.RLock(task)
 	err = c.Properties.LockForRead(property.NodesV1).ThenUse(
 		func(clonable data.Clonable) error {
@@ -1292,7 +1284,10 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	hostExist := true
+	yes := true
+	no := false
+
+	var hostExistsInNodeMetadata *bool
 
 	// Do not remove a node with volume(s) attached
 	mh, err := metadata.LoadHost(c.GetService(task), node.ID)
@@ -1300,11 +1295,12 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 		switch err.(type) {
 		case fail.ErrNotFound:
 			// If host is not found, deletion is considered a success, but we continue to update metadata
-			hostExist = false
+			hostExistsInNodeMetadata = &no
 		default:
 			return err
 		}
 	} else {
+		hostExistsInNodeMetadata = &yes
 		host, err := mh.Get()
 		if err != nil {
 			return err
@@ -1334,10 +1330,12 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 				func(clonable data.Clonable) error {
 					nodesV1 := clonable.(*clusterpropsv1.Nodes)
 					var innerErr error
-					node, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
+					var newMasters []*clusterpropsv1.Node
+					node, newMasters, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
 					if innerErr != nil {
 						return innerErr
 					}
+					nodesV1.PrivateNodes = newMasters
 					return nil
 				},
 			)
@@ -1349,7 +1347,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 
 	// Starting from here, restore node in cluster metadata if exiting with error
 	defer func() {
-		if err != nil && hostExist {
+		if err != nil && hostExistsInNodeMetadata != nil && *hostExistsInNodeMetadata == true {
 			derr := c.UpdateMetadata(
 				task, func() error {
 					return c.Properties.LockForWrite(property.NodesV1).ThenUse(
@@ -1369,7 +1367,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	}()
 
 	// Leave node from cluster (for example leave Docker SWARM), if selectedMaster isn't empty
-	if hostExist && selectedMaster != "" {
+	if hostExistsInNodeMetadata != nil && *hostExistsInNodeMetadata == true && selectedMaster != "" {
 		err = c.foreman.leaveNodesFromList(task, []string{node.ID}, selectedMaster)
 		if err != nil {
 			return err
@@ -1385,11 +1383,12 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 	// Host may have mounted volume, we must detach it before being able to remove the host
 
 	// Finally delete host
-	if hostExist {
+	if hostExistsInNodeMetadata != nil && *hostExistsInNodeMetadata == true {
 		err = client.New().Host.Delete([]string{node.ID}, temporal.GetLongOperationTimeout())
 		if err != nil {
 			if _, ok := err.(fail.ErrNotFound); ok {
 				// host seems already deleted, so it's a success :-)
+				hostExistsInNodeMetadata = &no
 				return nil
 			}
 			return err
