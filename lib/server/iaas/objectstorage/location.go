@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,7 +104,7 @@ type Location interface {
 	// ItemEtag(ContainerName string, item string) (string, fail.Error)
 	// // ItemLastMod returns the dagte of last update
 	// ItemLastMod(ContainerName string, item string) (time.Time, fail.Error)
-	// // ItemID returns the GetID of the item
+	// // ItemID returns the ID of the item
 	// ItemID(ContainerName string, item string) (id string)
 	// // ItemMetadata returns the metadata of an Item
 	// ItemMetadata(ContainerName string, item string) (abstract.ObjectStorageItemMetadata, fail.Error)

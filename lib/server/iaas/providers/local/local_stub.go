@@ -1,7 +1,7 @@
 // +build !libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,6 +120,22 @@ func (provider *provider) DeleteNetwork(id string) fail.Error {
 	return gReport
 }
 
+func (provider *provider) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) DeleteSubnet(id string) fail.Error {
+	return gReport
+}
+
 func (provider *provider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
 	return nil, gReport
 }
@@ -214,23 +230,23 @@ func (provider *provider) UnbindSecurityGroupFromHost(hostParam stacks.HostParam
 	return gReport
 }
 
-// BindSecurityGroupToHost ...
-func (provider *provider) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// BindSecurityGroupToSubnet ...
+func (provider *provider) BindSecurityGroupToSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
 	return gReport
 }
 
-// UnbindSecurityGroupFromHost ...
-func (provider *provider) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// UnbindSecurityGroupFromSubnet ...
+func (provider *provider) UnbindSecurityGroupFromSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
 	return gReport
 }
 
 // ListSecurityGroup lists existing security groups
-func (provider *provider) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // CreateSecurityGroup creates a security group
-func (provider *provider) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
@@ -255,7 +271,7 @@ func (provider *provider) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupPar
 }
 
 // DeleteRuleFromSecurityGroup adds a rule to a security group
-func (provider *provider) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 

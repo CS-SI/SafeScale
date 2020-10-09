@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,35 +17,35 @@
 package converters
 
 import (
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    "github.com/CS-SI/SafeScale/lib/server/resources"
-    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // BucketMountPointFromResourceToProtocol converts a bucket mount point from resource to protocol
 func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.Bucket) (*protocol.BucketMountingPoint, fail.Error) {
-    if task == nil {
-        return nil, fail.InvalidParameterError("task", "cannot be nil")
-    }
-    if in.IsNull() {
-        return nil, fail.InvalidParameterError("in", "cannot be nil")
-    }
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if in.IsNull() {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
 
-    host, xerr := in.GetHost(task)
-    if xerr != nil {
-        return nil, xerr
-    }
-    path, err := in.GetMountPoint(task)
-    if err != nil {
-        return nil, err
-    }
-    out := &protocol.BucketMountingPoint{
-        Bucket: in.GetName(),
-        Host:   &protocol.Reference{Name: host},
-        Path:   path,
-    }
-    return out, nil
+	host, xerr := in.GetHost(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	path, err := in.GetMountPoint(task)
+	if err != nil {
+		return nil, err
+	}
+	out := &protocol.BucketMountingPoint{
+		Bucket: in.GetName(),
+		Host:   &protocol.Reference{Name: host},
+		Path:   path,
+	}
+	return out, nil
 }
 
 // func VolumeFromResourceToProtocol(task concurrency.Task, in resources.Volume) (*protocol.VolumeInspectResponse, error) {
@@ -110,4 +110,3 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 // 	}
 // 	return out, nil
 // }
-

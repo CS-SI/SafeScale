@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -131,7 +131,7 @@ feature:
 
                             cat >Dockerfile <<'EOF'
                             FROM alpine:latest
-                            MAINTAINER SafeScale C-S <safescale@c-s.fr>
+                            MAINTAINER SafeScale C-S <safescale@csgroup.eu>
 
                             RUN apk --update --no-cache add acf-squid shadow \
                              && rm -fr /var/cache/apk/* /tmp/* /root/.cache /root/.cached

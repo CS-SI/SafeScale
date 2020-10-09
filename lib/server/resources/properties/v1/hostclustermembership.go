@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostClusterMembership ...
@@ -27,32 +27,32 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostClusterMembership struct {
-    Cluster string `json:"cluster,omitempty"`   // Cluster is the name of the cluster the host is member of
-    Type    string `json:"node_type,omitempty"` // Tells if host is "node", "master" or "gateway"
+	Cluster string `json:"cluster,omitempty"`   // Cluster is the name of the cluster the host is member of
+	Type    string `json:"node_type,omitempty"` // Tells if host is "node", "master" or "gateway"
 }
 
 // NewHostClusterMembership ...
 func NewHostClusterMembership() *HostClusterMembership {
-    return &HostClusterMembership{}
+	return &HostClusterMembership{}
 }
 
 // Reset resets the content of the property
 func (hcm *HostClusterMembership) Reset() {
-    *hcm = HostClusterMembership{}
+	*hcm = HostClusterMembership{}
 }
 
 // Clone ...
 func (hcm *HostClusterMembership) Clone() data.Clonable {
-    return NewHostClusterMembership().Replace(hcm)
+	return NewHostClusterMembership().Replace(hcm)
 }
 
 // Replace ...
 func (hcm *HostClusterMembership) Replace(p data.Clonable) data.Clonable {
-    src := p.(*HostClusterMembership)
-    *hcm = *src
-    return hcm
+	src := p.(*HostClusterMembership)
+	*hcm = *src
+	return hcm
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.ClusterMembershipV1, NewHostClusterMembership())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.ClusterMembershipV1, NewHostClusterMembership())
 }

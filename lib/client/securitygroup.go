@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 package client
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"strings"
 	"sync"
 	"time"
@@ -63,17 +65,30 @@ func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.Se
 }
 
 // Create creates a new security group
-func (sg securityGroup) Create(req *protocol.SecurityGroupRequest, timeout time.Duration) (*protocol.SecurityGroupResponse, error) {
+func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, timeout time.Duration) (abstract.SecurityGroup, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
+	nullSg := abstract.SecurityGroup{}
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
-		return nil, xerr
+		return nullSg, xerr
 	}
 
+	protoRequest := &protocol.SecurityGroupCreateRequest{
+		Network:     &protocol.Reference{Name: networkRef},
+		Name:        req.Name,
+		Description: req.Description,
+		Rules:       converters.SecurityGroupRulesFromAbstractToProtocol(req.Rules),
+	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	return service.Create(ctx, req)
+	resp, err := service.Create(ctx, protoRequest)
+	if err != nil {
+		return nullSg, err
+	}
+
+	return converters.SecurityGroupFromProtocolToAbstract(resp)
 }
 
 // Delete deletes several hosts at the same time in goroutines
@@ -150,7 +165,7 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 }
 
 // AddRule ...
-func (sg securityGroup) AddRule(def *protocol.SecurityGroupRuleRequest, duration time.Duration) error {
+func (sg securityGroup) AddRule(group string, rule abstract.SecurityGroupRule, duration time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -160,12 +175,16 @@ func (sg securityGroup) AddRule(def *protocol.SecurityGroupRuleRequest, duration
 	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.AddRule(ctx, def)
+	req := &protocol.SecurityGroupRuleRequest{
+		Group: &protocol.Reference{Name: group},
+		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
+	}
+	_, err := service.AddRule(ctx, req)
 	return err
 }
 
 // DeleteRule ...
-func (sg securityGroup) DeleteRule(group, ruleID string, duration time.Duration) error {
+func (sg securityGroup) DeleteRule(group string, rule abstract.SecurityGroupRule, duration time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -175,10 +194,8 @@ func (sg securityGroup) DeleteRule(group, ruleID string, duration time.Duration)
 	}
 
 	def := &protocol.SecurityGroupRuleDeleteRequest{
-		Group: &protocol.Reference{
-			Name: group,
-		},
-		RuleId: ruleID,
+		Group: &protocol.Reference{Name: group},
+		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.DeleteRule(ctx, def)

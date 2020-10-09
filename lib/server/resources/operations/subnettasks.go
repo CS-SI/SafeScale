@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func (rn *network) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var (
@@ -51,20 +51,16 @@ func (rn *network) taskCreateGateway(task concurrency.Task, params concurrency.T
 	if hostReq.TemplateID == "" {
 		return nil, fail.InvalidRequestError("params['request'].TemplateID cannot be empty string")
 	}
-	if len(hostReq.Networks) == 0 {
+	if len(hostReq.Subnets) == 0 {
 		return nil, fail.InvalidRequestError("params['request'].Networks cannot be an empty '[]*abstract.Network'")
 	}
 	hostSizing, ok := inputs["sizing"].(abstract.HostSizingRequirements)
 	if !ok {
 		hostSizing = abstract.HostSizingRequirements{}
 	}
-	primary, ok := inputs["primary"].(bool)
-	if !ok {
-		return nil, fail.InvalidRequestError("params['primary']", "is mandatory")
-	}
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
-	svc := rn.GetService()
+	svc := rs.GetService()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
 
@@ -80,7 +76,7 @@ func (rn *network) taskCreateGateway(task concurrency.Task, params concurrency.T
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
-			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' host resource...", hostReq.ResourceName)
+			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
 			derr := rgw.Delete(task)
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
@@ -100,17 +96,13 @@ func (rn *network) taskCreateGateway(task concurrency.Task, params concurrency.T
 		}
 	}()
 
-	// Set link to network
-	xerr = rn.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		an, ok := clonable.(*abstract.Network)
+	// Set link to subnet
+	xerr = rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		if primary {
-			an.GatewayID = rgw.GetID()
-		} else {
-			an.SecondaryGatewayID = rgw.GetID()
-		}
+		as.GatewayIDs = append(as.GatewayIDs, rgw.GetID())
 		return nil
 	})
 	if xerr != nil {
@@ -118,8 +110,8 @@ func (rn *network) taskCreateGateway(task concurrency.Task, params concurrency.T
 	}
 
 	// Binds gateway to VIP if needed
-	if an := hostReq.Networks[0]; an != nil && an.VIP != nil {
-		if xerr = svc.BindHostToVIP(an.VIP, rgw.GetID()); xerr != nil {
+	if as := hostReq.Subnets[0]; as != nil && as.VIP != nil {
+		if xerr = svc.BindHostToVIP(as.VIP, rgw.GetID()); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -131,7 +123,7 @@ func (rn *network) taskCreateGateway(task concurrency.Task, params concurrency.T
 	return r, nil
 }
 
-func (rn *network) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	var (
 		objgw    *host
 		userData *userdata.Content

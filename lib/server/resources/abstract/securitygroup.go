@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,25 +26,58 @@ import (
 
 // SecurityGroupRule represents a rule of a SecurityGroup
 type SecurityGroupRule struct {
-	ID          string                          `json:"id"`                    // id of the rule
+	IDs         []string                        `json:"ids"`                   // ids of the rule (an abstracted rule may be split to several provider rules)
 	Description string                          `json:"description,omitempty"` // description of the rule
 	EtherType   ipversion.Enum                  `json:"ether_type,omitempty"`  // IPv4 or IPv6
 	Direction   securitygroupruledirection.Enum `json:"direction"`             // ingress (input) or egress (output)
 	Protocol    string                          `json:"protocol,omitempty"`    // concerned protocol
 	PortFrom    uint16                          `json:"port_from,omitempty"`   // first port of the rule
 	PortTo      uint16                          `json:"port_to,omitempty"`     // last port of the rule
-	CIDR        string                          `json:"cidr"`                  // concerned CIDR (source or target depending of Direction)
+	IPRanges    []string                        `json:"ip_ranges"`             // concerned IPRanges (source or target depending of Direction)
 	//Action      securitygroupruleaction.Enum    `json:"action,omitempty"`      // action of the rule: ALLOW, DENY
 }
 
 // IsNull tells if the Security Group Rule is a null value
 func (sgr *SecurityGroupRule) IsNull() bool {
-	return sgr == nil || (sgr.ID == "" && sgr.Protocol == "" && sgr.PortFrom == 0)
+	return sgr == nil || (len(sgr.IDs) == 0 && sgr.Protocol == "" && sgr.PortFrom == 0)
 }
 
 // EqualTo is a strict equality tester between 2 rules
 func (sgr SecurityGroupRule) EqualTo(in SecurityGroupRule) bool {
-	return sgr == in
+	if sgr.Description != in.Description {
+		return false
+	}
+	if sgr.EtherType != in.EtherType {
+		return false
+	}
+	if sgr.Direction != in.Direction {
+		return false
+	}
+	if sgr.Protocol != in.Protocol {
+		return false
+	}
+	if sgr.PortFrom != in.PortFrom {
+		return false
+	}
+	if sgr.PortTo != in.PortTo {
+		return false
+	}
+	if len(sgr.IDs) != len(in.IDs) {
+		return false
+	}
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for k, v := range sgr.IDs {
+		if in.IDs[k] != v {
+			return false
+		}
+	}
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for k, v := range sgr.IPRanges {
+		if v != in.IPRanges[k] {
+			return false
+		}
+	}
+	return true
 }
 
 // EquivalentTo compares 2 rules, except ID and Description, to tell if the target is comparable
@@ -64,8 +97,36 @@ func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
 	if sgr.PortTo != in.PortTo {
 		return false
 	}
-	if sgr.CIDR != in.CIDR {
+
+	if len(sgr.IDs) != len(in.IDs) {
 		return false
+	}
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for _, v := range sgr.IDs {
+		found := false
+		for _, w := range in.IDs {
+			if w == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for _, v := range sgr.IPRanges {
+		found := false
+		for _, w := range in.IPRanges {
+			if v == w {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
 	}
 	return true
 }
@@ -78,7 +139,7 @@ func NewSecurityGroupRule() SecurityGroupRule {
 // SecurityGroupRules ...
 type SecurityGroupRules []SecurityGroupRule
 
-// IndexOfEquivalentRule ...
+// IndexOfEquivalentRule returns the index of the rule equivalent to the one provided
 func (sgr SecurityGroupRules) IndexOfEquivalentRule(rule SecurityGroupRule) (int, fail.Error) {
 	found := false
 	index := -1
@@ -95,19 +156,24 @@ func (sgr SecurityGroupRules) IndexOfEquivalentRule(rule SecurityGroupRule) (int
 	return index, nil
 }
 
-// IndexOfRuleByID ...
+// IndexOfRuleByID returns the index of the rule containing the provider rule ID provided
 func (sgr SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
 	found := false
 	index := -1
 	for k, v := range sgr {
-		if v.ID == id {
-			found = true
-			index = k
+		for _, item := range v.IDs {
+			if item == id {
+				found = true
+				index = k
+				break
+			}
+		}
+		if found {
 			break
 		}
 	}
 	if !found {
-		return -1, fail.NotFoundError("no rule with id '%s' in rules")
+		return -1, fail.NotFoundError("failed to find a rule with id %s", id)
 	}
 	return index, nil
 }
@@ -129,16 +195,30 @@ func (sgr SecurityGroupRules) RemoveRuleByIndex(index int) (SecurityGroupRules, 
 }
 
 // SecurityGroup represents a security group
+// Note: by design, security group names must be unique tenant-wide
 type SecurityGroup struct {
-	ID          string             `json:"id"`          // ID of the group
-	Name        string             `json:"name"`        // name of the group
-	Description string             `json:"description"` // description of the group
-	Rules       SecurityGroupRules `json:"rules"`       // rules of the Security Group
+	ID               string             `json:"id"`                  // ID of the group
+	Name             string             `json:"name"`                // name of the group
+	Description      string             `json:"description"`         // description of the group
+	Rules            SecurityGroupRules `json:"rules"`               // rules of the Security Group
+	DefaultForSubnet string             `json:"default_for_subnets"` // lists the ID of the subnet for which this SecurityGroup is considered as default (to be able to prevent removal of Subnet default Security Group until removal of the Subnet itself)
+	DefaultForHost   string             `json:"default_for_hosts"`   // lists the ID of the host for which this SecurityGroup is considered as default (to be able to prevent removal of default Security Group until removal of the Host itself)
 }
 
 // IsNull tells if the SecurityGroup is a null value
 func (sg *SecurityGroup) IsNull() bool {
 	return sg == nil || (sg.Name == "" && sg.ID == "")
+}
+
+// IsConsistent tells if the content of the security group is consistent
+func (sg SecurityGroup) IsConsistent() bool {
+	if sg.ID == "" {
+		return false
+	}
+	if sg.Name == "" {
+		return false
+	}
+	return true
 }
 
 // NewSecurityGroup ...
@@ -219,7 +299,7 @@ func (sg *SecurityGroup) GetName() string {
 	return sg.Name
 }
 
-// GetID returns the GetID of the volume
+// GetID returns the ID of the volume
 // Satisfies interface data.Identifiable
 func (sg *SecurityGroup) GetID() string {
 	if sg == nil {

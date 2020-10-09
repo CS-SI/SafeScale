@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,27 +22,27 @@ package exitcode
 type Enum int
 
 const (
-    // OK (=0) is returned when everything is ok
-    OK Enum = iota
-    // Run ...
-    Run
-    // InvalidArgument is returned on invalid argument
-    InvalidArgument
-    // InvalidOption is returned on invalid option
-    InvalidOption
-    // NotFound is returned when resource is not found
-    NotFound
-    // Timeout is returned when something timed out
-    Timeout
-    // RPC is returned when an RPC call fails
-    RPC
-    // NotApplicable is returned when the command cannot be honored in the context
-    NotApplicable
-    // Duplicate is returned when resource already exists
-    Duplicate
-    // NotImplemented is returned when a function is not yet implemented
-    NotImplemented
+	// OK (=0) is returned when everything is ok
+	OK Enum = iota
+	// Run ...
+	Run
+	// InvalidArgument is returned on invalid argument
+	InvalidArgument
+	// InvalidOption is returned on invalid option
+	InvalidOption
+	// NotFound is returned when resource is not found
+	NotFound
+	// Timeout is returned when something timed out
+	Timeout
+	// RPC is returned when an RPC call fails
+	RPC
+	// NotApplicable is returned when the command cannot be honored in the context
+	NotApplicable
+	// Duplicate is returned when resource already exists
+	Duplicate
+	// NotImplemented is returned when a function is not yet implemented
+	NotImplemented
 
-    // // NextExitCode is the next error code usable
-    // NextExitCode
+	// // NextExitCode is the next error code usable
+	// NextExitCode
 )
