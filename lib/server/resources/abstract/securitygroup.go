@@ -197,10 +197,12 @@ func (sgr SecurityGroupRules) RemoveRuleByIndex(index int) (SecurityGroupRules, 
 // SecurityGroup represents a security group
 // Note: by design, security group names must be unique tenant-wide
 type SecurityGroup struct {
-	ID          string             `json:"id"`          // ID of the group
-	Name        string             `json:"name"`        // name of the group
-	Description string             `json:"description"` // description of the group
-	Rules       SecurityGroupRules `json:"rules"`       // rules of the Security Group
+	ID               string             `json:"id"`                  // ID of the group
+	Name             string             `json:"name"`                // name of the group
+	Description      string             `json:"description"`         // description of the group
+	Rules            SecurityGroupRules `json:"rules"`               // rules of the Security Group
+	DefaultForSubnet string             `json:"default_for_subnets"` // lists the ID of the subnet for which this SecurityGroup is considered as default (to be able to prevent removal of Subnet default Security Group until removal of the Subnet itself)
+	DefaultForHost   string             `json:"default_for_hosts"`   // lists the ID of the host for which this SecurityGroup is considered as default (to be able to prevent removal of default Security Group until removal of the Host itself)
 }
 
 // IsNull tells if the SecurityGroup is a null value

@@ -105,7 +105,7 @@ func NetworkFromAbstractToProtocol(in *abstract.Network) *protocol.Network {
 		Name:       in.Name,
 		Cidr:       in.CIDR,
 		DnsServers: in.DNSServers,
-		Subnets:    in.Subnets,
+		//Subnets:    in.Subnets,
 	}
 	return out
 }

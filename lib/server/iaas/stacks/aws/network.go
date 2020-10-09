@@ -251,10 +251,10 @@ func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error)
 	if xerr != nil {
 		return nil, xerr
 	}
-	net.Subnets, xerr = s.listSubnetIDs(net.ID)
-	if xerr != nil {
-		return nil, xerr
-	}
+	//net.Subnets, xerr = s.listSubnetIDs(net.ID)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
 	return net, nil
 }
 
@@ -313,10 +313,10 @@ func (s *Stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fai
 		return nil, xerr
 	}
 
-	net.Subnets, xerr = s.listSubnetIDs(net.ID)
-	if xerr != nil {
-		return nil, xerr
-	}
+	//net.Subnets, xerr = s.listSubnetIDs(net.ID)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
 	return net, nil
 }
 

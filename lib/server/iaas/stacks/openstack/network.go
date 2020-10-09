@@ -267,7 +267,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 						newNet := abstract.NewNetwork()
 						newNet.ID = n.ID
 						newNet.Name = n.Name
-						newNet.Subnets = n.Subnets
+						//newNet.Subnets = n.Subnets
 
 						netList = append(netList, newNet)
 					}
@@ -821,21 +821,65 @@ func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Er
 	)
 }
 
-// listPorts lists all ports available
-func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
-	var allPages pagination.Page
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
+// BindSecurityGroupToSubnet binds a security group to a subnet
+func (s Stack) BindSecurityGroupToSubnet(subnetID string, sgParam stacks.SecurityGroupParameter) fail.Error {
+	//if s == nil {
+	//	return fail.InvalidInstanceError()
+	//}
+	if subnetID != "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
+
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			// FIXME: bind security group to port associated to subnet
+			//innerErr = secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 			return NormalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
-	if xerr != nil {
-		return nil, xerr
+}
+
+// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
+func (s Stack) UnbindSecurityGroupFromSubnet(subnetID string, sgParam stacks.SecurityGroupParameter) fail.Error {
+	//if s == nil {
+	//	return fail.InvalidInstanceError()
+	//}
+	if subnetID == "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-	r, err := ports.ExtractPorts(allPages)
-	return r, NormalizeError(err)
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			// FIXME: unbind security group from port associated to subnet
+			//innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // BindSecurityGroupToSubnet binds a security group to a subnet
@@ -1076,4 +1120,108 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 		},
 		temporal.GetCommunicationTimeout(),
 	)
+}
+
+// createPort creates a port
+func (s *Stack) createPort(req ports.CreateOpts) (port *ports.Port, xerr fail.Error) {
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return port, nil
+}
+
+func (s *Stack) deletePort(id string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	if _, xerr := s.inspectPort(id); xerr != nil {
+		return fail.NotFoundError("failed to query port %s", id)
+	}
+
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			innerErr = ports.Delete(s.NetworkClient, id).ExtractErr()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// listPorts lists all ports available
+func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
+	var allPages pagination.Page
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	r, err := ports.ExtractPorts(allPages)
+	return r, NormalizeError(err)
+}
+
+// updatePort updates the settings of a port
+func (s *Stack) updatePort(id string, options ports.UpdateOpts) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
+			_ = resp
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+}
+
+// inspectPort returns port from its ID
+func (s *Stack) inspectPort(id string) (port *ports.Port, xerr fail.Error) {
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return port, nil
 }

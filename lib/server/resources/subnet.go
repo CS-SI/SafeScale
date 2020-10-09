@@ -45,6 +45,7 @@ type Subnet interface {
 	GetEndpointIP(concurrency.Task) (string, fail.Error)                                                                           // returns the IP address corresponding to the default route
 	GetState(concurrency.Task) (subnetstate.Enum, fail.Error)                                                                      // gives the current state of the subnet
 	HasVirtualIP(concurrency.Task) bool                                                                                            // tells if the subnet is using a VIP a default route
+	InspectNetwork(concurrency.Task) (Network, fail.Error)                                                                         // returns the instance of the parent Network of the Subnet
 	ListHosts(concurrency.Task) ([]Host, fail.Error)                                                                               // returns the list of Host attached to the subnet (excluding gateway)
 	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)       // lists the security groups bound to the subnet
 	ToProtocol(concurrency.Task) (*protocol.Subnet, fail.Error)                                                                    // converts the subnet to protobuf message

@@ -27,8 +27,9 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SubnetSecurityGroups struct {
-	ByID   map[string]*SecurityGroupBond `json:"by_id,omitempty"`   // map of security groups by IDs; if value is true, security group is currently applied
-	ByName map[string]*SecurityGroupBond `json:"by_name,omitempty"` // map of security groups by Names; if value is true, security group is currently applied
+	DefaultID string                        `json:"default_id,omitempty"` // Contains the ID of the default security group
+	ByID      map[string]*SecurityGroupBond `json:"by_id,omitempty"`      // map of security groups by IDs; if value is true, security group is currently applied
+	ByName    map[string]*SecurityGroupBond `json:"by_name,omitempty"`    // map of security groups by Names; if value is true, security group is currently applied
 }
 
 // NewSubnetSecurityGroups ...
@@ -55,6 +56,7 @@ func (ssg *SubnetSecurityGroups) Clone() data.Clonable {
 // Replace ...
 func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) data.Clonable {
 	src := p.(*SubnetSecurityGroups)
+	*ssg = *src
 	ssg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
 		ssg.ByID[k] = v.Clone().(*SecurityGroupBond)

@@ -328,7 +328,12 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	if xerr != nil {
 		return empty, xerr
 	}
-	xerr = rsg.Remove(task, in.GetForce())
+	switch in.GetForce() {
+	case true:
+		xerr = rsg.ForceDelete(task)
+	case false:
+		xerr = rsg.Delete(task)
+	}
 	if xerr != nil {
 		return empty, xerr
 	}

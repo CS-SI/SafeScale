@@ -22,17 +22,18 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// SecurityGroupSubnets contains information about attached networks to a security group
+// SecurityGroupSubnets contains information about attached subnets to a security group
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupSubnets struct {
-	ByID   map[string]*SecurityGroupBond `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network ID
-	ByName map[string]*SecurityGroupBond `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of networks using it, indexed on network Name
+	DefaultFor string                        `json:"default_for,omitempty"` // contains the ID of the subnet for which the Security Group is default
+	ByID       map[string]*SecurityGroupBond `json:"by_id"`                 // contains the status of a security group (true=active, false=suspended) of subnets using it, indexed on network ID
+	ByName     map[string]*SecurityGroupBond `json:"by_name"`               // contains the status of a security group (true=active, false=suspended) of subnets using it, indexed on network Name
 }
 
-// NewSecurityGroupNetworks ...
-func NewSecurityGroupNetworks() *SecurityGroupSubnets {
+// NewSecurityGroupSubnets ...
+func NewSecurityGroupSubnets() *SecurityGroupSubnets {
 	return &SecurityGroupSubnets{
 		ByID:   map[string]*SecurityGroupBond{},
 		ByName: map[string]*SecurityGroupBond{},
@@ -46,12 +47,12 @@ func (sgn *SecurityGroupSubnets) Reset() *SecurityGroupSubnets {
 		sgn.ByName = map[string]*SecurityGroupBond{}
 		return sgn
 	}
-	return NewSecurityGroupNetworks()
+	return NewSecurityGroupSubnets()
 }
 
 // Clone ...
 func (sgn *SecurityGroupSubnets) Clone() data.Clonable {
-	return NewSecurityGroupNetworks().Replace(sgn)
+	return NewSecurityGroupSubnets().Replace(sgn)
 }
 
 // Replace ...
@@ -69,5 +70,5 @@ func (sgn *SecurityGroupSubnets) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.security-group", securitygroupproperty.SubnetsV1, NewSecurityGroupNetworks())
+	serialize.PropertyTypeRegistry.Register("resources.security-group", securitygroupproperty.SubnetsV1, NewSecurityGroupSubnets())
 }

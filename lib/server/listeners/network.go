@@ -19,17 +19,25 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/asaskevich/govalidator"
+	"net"
+
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/asaskevich/govalidator"
+)
+
+const (
+	defaultCIDR = "192.168.0.0/23"
 )
 
 // safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
@@ -43,7 +51,7 @@ type NetworkListener struct{}
 // Create a new network
 func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create network")
+	defer fail.OnExitLogError(&err, "cannot create network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -107,14 +115,52 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, xerr
 	}
 
+	cidr := in.GetCidr()
+	if cidr == "" {
+		cidr = defaultCIDR
+	}
+
 	req := abstract.NetworkRequest{
-		Name:          in.GetName(),
-		CIDR:          in.GetCidr(),
-		DNSServers:    in.GetDnsServers(),
-		KeepOnFailure: in.GetKeepOnFailure(),
+		Name:       in.GetName(),
+		CIDR:       cidr,
+		DNSServers: in.GetDnsServers(),
+		//KeepOnFailure: in.GetKeepOnFailure(),
 	}
 	if xerr = rn.Create(task, req); xerr != nil {
 		return nil, xerr
+	}
+
+	defer func() {
+		if err != nil && !in.GetKeepOnFailure() {
+			derr := rn.Delete(task)
+			if derr != nil {
+				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+			}
+		}
+	}()
+
+	if !in.GetNoSubnet() {
+		logrus.Debugf("Creating default Subnet of Network '%s'", req.Name)
+
+		_, networkNet, _ := net.ParseCIDR(cidr)
+		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", in.GetCidr())
+		}
+
+		rs, xerr := subnetfactory.New(svc)
+		if xerr != nil {
+			return nil, xerr
+		}
+		req := abstract.SubnetRequest{
+			Network: rn.GetID(),
+			Name:    in.GetName(),
+			CIDR:    subnetNet.String(),
+		}
+		xerr = rs.Create(task, req, "", nil)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
+		}
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)

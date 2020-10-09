@@ -33,10 +33,10 @@ type HostNetwork struct {
 	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Network
 	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network bound to the host (indexed by ID)
 	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the ID of each network bound to the host (indexed by GetName)
-	PublicIPv4              string            `json:"public_ip_v4,omitempty"`
-	PublicIPv6              string            `json:"public_ip_v6,omitempty"`
-	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
-	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+	PublicIPv4              string            `json:"public_ip_v4,omitempty"`               // contains the public IPv4 address of the host
+	PublicIPv6              string            `json:"public_ip_v6,omitempty"`               // contains the public IPv6 address of the host
+	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"`             // contains ipv4 (indexed by Network ID) allocated to the host
+	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"`             // contains ipv6 (indexed by Network ID) allocated to the host
 }
 
 // NewHostNetwork ...

@@ -302,22 +302,37 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 	return c.updateIdentity(task)
 }
 
-// readByReference gets the data from Object Storage
-// if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
-func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
-	if xerr = c.readByID(task, ref); xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
-			return xerr
-		}
-		xerr = c.readByName(task, ref)
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+// ReadByID reads a metadata identified by ID from Object Storage
+func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+	if id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
+
+	if c.loaded {
+		return fail.NotAvailableError("metadata is already carrying a value")
+	}
+
+	if xerr := c.readByID(task, id); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound, *fail.ErrTimeout:
+			return fail.NotFoundError("failed to find object with id %s", id)
+		default:
 			return xerr
 		}
 	}
-	if xerr != nil {
-		return fail.NotFoundError("failed to find '%s'", ref)
-	}
-	return nil
+
+	c.loaded = true
+	c.committed = true
+	return c.updateIdentity(task)
 }
 
 // readByID reads a metadata identified by ID from Object Storage
@@ -325,6 +340,29 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		return c.Deserialize(task, buf)
 	})
+}
+
+// readByReference gets the data from Object Storage
+// if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
+func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
+	if xerr = c.readByID(task, ref); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound, *fail.ErrTimeout:
+			// continue
+		default:
+			return xerr
+		}
+		xerr = c.readByName(task, ref)
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound, *fail.ErrTimeout:
+			return fail.NotFoundError("failed to find '%s'", ref)
+		default:
+			return xerr
+		}
+	}
+	return nil
 }
 
 // readByName reads a metadata identified by name

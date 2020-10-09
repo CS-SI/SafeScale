@@ -52,6 +52,9 @@ import (
 const (
 	// networksFolderName is the technical name of the container used to store networks info
 	subnetsFolderName = "subnets"
+
+	subnetGWSecurityGroupNamePattern     = "subnet_%s_gateway_sg"
+	subnetPublicSecurityGroupNamePattern = "subnet_%s_public_sg"
 )
 
 // subnet links Object Storage folder and Subnet
@@ -77,6 +80,75 @@ func NewSubnet(svc iaas.Service) (resources.Subnet, fail.Error) {
 	return &subnet{core: coreInstance}, nil
 }
 
+// lookupSubnet tells if a Subnet exists
+func lookupSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (_ bool, xerr fail.Error) {
+	if task.IsNull() {
+		return false, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if svc.IsNull() {
+		return false, fail.InvalidParameterError("svc", "cannot be null value")
+	}
+	if subnetRef == "" {
+		return false, fail.InvalidParameterError("subnetRef", "cannot be empty string")
+	}
+
+	var subnetID string
+	if networkRef != "" {
+		// If networkRef is not empty, make sure the subnetRef is inside the network
+		rn, xerr := LoadNetwork(task, svc, networkRef)
+		if xerr != nil {
+			return false, xerr
+		}
+
+		xerr = rn.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				var found bool
+				for k, v := range subnetsV1.ByName {
+					if k == subnetRef || v == subnetRef {
+						subnetID = v
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fail.NotFoundError("failed to find a Subnet referenced by '%s' in Network '%s'", subnetRef, rn.GetName())
+				}
+				return nil
+			})
+		})
+		if xerr != nil {
+			return false, xerr
+		}
+	} else {
+		// If networkRef is empty, subnetRef must be subnetID
+		subnetID = subnetRef
+	}
+
+	rs, xerr := NewSubnet(svc)
+	if xerr != nil {
+		return false, xerr
+	}
+	xerr = retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			return rs.ReadByID(task, subnetID)
+		},
+		10*time.Second, // FIXME: parameterize
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return false, nil
+		default:
+			return false, xerr
+		}
+	}
+	return true, nil
+}
+
 // LoadSubnet loads the metadata of a subnet
 func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (rs resources.Subnet, xerr fail.Error) {
 	if task.IsNull() {
@@ -90,32 +162,54 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 	}
 
 	rs = nil
+	var subnetID string
 	if networkRef != "" {
+		// If networkRef is not empty, make sure the subnetRef is inside the network
 		rn, xerr := LoadNetwork(task, svc, networkRef)
 		if xerr != nil {
-			return nullSubnet(), xerr
+			return nil, xerr
 		}
 
-		rs, xerr = rn.InspectSubnet(task, subnetRef)
+		xerr = rn.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				var found bool
+				for k, v := range subnetsV1.ByName {
+					if k == subnetRef || v == subnetRef {
+						subnetID = v
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fail.NotFoundError("failed to find a subnet referenced by '%s' in network '%s'", subnetRef, rn.GetName())
+				}
+				return nil
+			})
+		})
 		if xerr != nil {
-			return nullSubnet(), xerr
+			return nil, xerr
 		}
+	} else {
+		// If networkRef is empty, subnetRef must be subnetID
+		subnetID = subnetRef
 	}
-	if rs == nil {
-		// Leave a chance to load a subnet from its its ID or its name (if unique)
-		rs, xerr = NewSubnet(svc)
-		if xerr != nil {
-			return nullSubnet(), xerr
-		}
-		xerr = retry.WhileUnsuccessfulDelay1Second(
-			func() error {
-				return rs.Read(task, subnetRef)
-			},
-			10*time.Second, // FIXME: parameterize
-		)
-		if xerr != nil {
-			return nullSubnet(), xerr
-		}
+
+	rs, xerr = NewSubnet(svc)
+	if xerr != nil {
+		return nullSubnet(), xerr
+	}
+	xerr = retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			return rs.ReadByID(task, subnetID)
+		},
+		10*time.Second, // FIXME: parameterize
+	)
+	if xerr != nil {
+		return nullSubnet(), xerr
 	}
 
 	return rs, nil
@@ -142,12 +236,12 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := rs.GetService()
-	if _, xerr = LoadSubnet(task, svc, req.Network, req.Name); xerr == nil {
+	if found, xerr := lookupSubnet(task, svc, req.Network, req.Name); xerr == nil && found {
 		return fail.DuplicateError("subnet '%s' already exists", req.Name)
 	}
 
@@ -182,6 +276,52 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 	req.Network = rn.GetID()
 
+	// Creates security group for gateway(s) of Subnet
+	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name)
+	rules := stacks.DefaultTCPRules()
+	rules = append(rules, stacks.DefaultUDPRules()...)
+	rules = append(rules, stacks.DefaultICMPRules()...)
+	subnetGWSG, xerr := NewSecurityGroup(svc)
+	if xerr != nil {
+		return xerr
+	}
+	xerr = subnetGWSG.Create(task, rn, sgName, fmt.Sprintf("Subnet '%s' Security Group for gateway", req.Name), rules)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Starting from here, delete the security group in exiting with error
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := subnetGWSG.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Security Group for gateways '%s'", sgName))
+			}
+		}
+	}()
+
+	// Creates security group for host with public IP in Subnet
+	sgName = fmt.Sprintf(subnetPublicSecurityGroupNamePattern, req.Name)
+	rules = stacks.DefaultTCPRules()
+	rules = append(rules, stacks.DefaultUDPRules()...)
+	rules = append(rules, stacks.DefaultICMPRules()...)
+	subnetPublicSG, xerr := NewSecurityGroup(svc)
+	if xerr != nil {
+		return xerr
+	}
+	xerr = subnetPublicSG.Create(task, rn, sgName, fmt.Sprintf("Subnet '%s' Security Group for host with public IP (excluding gateway)", req.Name), rules)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Starting from here, delete the Security Group if exiting with error
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := subnetPublicSG.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Security Group for public Hosts '%s'", sgName))
+			}
+		}
+	}()
+
 	// Create the subnet
 	logrus.Debugf("Creating subnet '%s' ...", req.Name)
 	as, xerr := svc.CreateSubnet(req)
@@ -197,17 +337,48 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	// Starting from here, delete subnet if exiting with error
 	defer func() {
 		if xerr != nil && as != nil && !req.KeepOnFailure {
-			derr := svc.DeleteSubnet(as.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf("failed to delete subnet: resource not found: %+v", derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf("failed to delete subnet: timeout: %+v", derr)
-				default:
-					logrus.Errorf("failed to delete subnet: %+v", derr)
-				}
-				_ = xerr.AddConsequence(derr)
+			if derr := svc.DeleteSubnet(as.ID); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet"))
+			}
+		}
+	}()
+
+	// Write subnet object metadata
+	if xerr = rs.Carry(task, as); xerr != nil {
+		return xerr
+	}
+
+	// Starting from here, delete subnet metadata if exiting with error
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := rs.core.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet metadata"))
+			}
+		}
+	}()
+
+	xerr = subnetGWSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+	if xerr != nil {
+		return xerr
+	}
+
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := subnetGWSG.UnbindFromSubnet(task, rs); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group for gateway from subnet"))
+			}
+		}
+	}()
+
+	xerr = subnetPublicSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+	if xerr != nil {
+		return xerr
+	}
+
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := subnetPublicSG.UnbindFromSubnet(task, rs); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group for gateway from subnet"))
 			}
 		}
 	}()
@@ -218,7 +389,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		if caps.PrivateVirtualIP {
 			logrus.Info("Provider support private Virtual IP, honoring the failover setup for gateways.")
 		} else {
-			logrus.Warning("Provider doesn't support private Virtual IP, cannot set up high availability of subnet default route.")
+			logrus.Warning("Provider does not support private Virtual IP, cannot set up failover of subnet default route.")
 			failover = false
 		}
 	}
@@ -226,72 +397,18 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	// Creates VIP for gateways if asked for
 	if failover {
 		if as.VIP, xerr = svc.CreateVIP(as.ID, fmt.Sprintf("for gateways of subnet %s", as.Name)); xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound, *fail.ErrTimeout:
-				return xerr
-			default:
-				return xerr
-			}
+			return fail.Wrap(xerr, "failed to create VIP")
 		}
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
-				if as != nil {
-					derr := svc.DeleteVIP(as.VIP)
-					if derr != nil {
-						logrus.Errorf("failed to delete VIP: %+v", derr)
-						_ = xerr.AddConsequence(derr)
-					}
+			if xerr != nil && as != nil && as.VIP != nil && !req.KeepOnFailure {
+				if derr := svc.DeleteVIP(as.VIP); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete VIP"))
 				}
 			}
 		}()
 	}
-
-	// Write subnet object metadata
-	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
-	if xerr = rs.Carry(task, as); xerr != nil {
-		return xerr
-	}
-
-	// Starting from here, delete subnet metadata if exits with error
-	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
-			derr := rs.core.Delete(task)
-			if derr != nil {
-				logrus.Errorf("failed to delete subnet metadata: %+v", derr)
-				_ = xerr.AddConsequence(derr)
-			}
-		}
-	}()
-
-	// Creates default subnet security group
-	sgName := as.Name + "-default-subnet-sg"
-	rules := stacks.DefaultTCPRules()
-	rules = append(rules, stacks.DefaultUDPRules()...)
-	rules = append(rules, stacks.DefaultICMPRules()...)
-	subnetDefaultSG, xerr := NewSecurityGroup(svc)
-	if xerr != nil {
-		return xerr
-	}
-	xerr = subnetDefaultSG.Create(task, rn, sgName, fmt.Sprintf("subnet '%s' default security group", as.Name), rules)
-	if xerr != nil {
-		return xerr
-	}
-	xerr = subnetDefaultSG.BindToSubnet(task, rs, resources.SecurityGroupEnable)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Starting from here, delete the subnet default security group in case of failure
-	defer func() {
-		if xerr != nil {
-			derr := subnetDefaultSG.Delete(task)
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove subnet default security group"))
-			}
-		}
-	}()
 
 	xerr = rs.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
@@ -299,6 +416,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		as.State = subnetstate.GATEWAY_CREATION
+		as.GWSecurityGroupID = subnetGWSG.GetID()
+		as.PublicSecurityGroupID = subnetPublicSG.GetID()
 
 		// Creates the bind between the subnet default security group and the subnet
 		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -311,8 +430,10 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 				Name:     as.Name,
 				Disabled: false,
 			}
-			ssgV1.ByID[subnetDefaultSG.GetID()] = item
-			ssgV1.ByName[subnetDefaultSG.GetName()] = item
+			ssgV1.ByID[subnetGWSG.GetID()] = item
+			ssgV1.ByName[subnetGWSG.GetName()] = item
+			ssgV1.ByID[subnetPublicSG.GetID()] = item
+			ssgV1.ByName[subnetPublicSG.GetName()] = item
 			return nil
 		})
 	})
@@ -321,6 +442,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	var template *abstract.HostTemplate
+	if gwSizing == nil {
+		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
+	}
 	tpls, xerr := svc.SelectTemplatesBySize(*gwSizing, false)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find appropriate template")
@@ -343,22 +467,30 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	} else {
 		return fail.NotFoundError("error creating subnet: no host template matching requirements for gateway")
 	}
-	if req.Image == "" {
+
+	// define image...
+	if gwSizing.Image == "" {
 		// if gwSizing.Image != "" {
-		req.Image = gwSizing.Image
+		gwSizing.Image = req.Image
 		// }
 	}
-	if req.Image == "" {
+	if gwSizing.Image == "" {
 		cfg, xerr := svc.GetConfigurationOptions()
 		if xerr != nil {
 			return xerr
 		}
-		req.Image = cfg.GetString("DefaultImage")
-		gwSizing.Image = req.Image
+		gwSizing.Image = cfg.GetString("DefaultImage")
 	}
-	img, xerr := svc.SearchImage(req.Image)
+	if gwSizing.Image == "" {
+		gwSizing.Image = "Ubuntu 18.04"
+	}
+	if req.Image == "" {
+		req.Image = gwSizing.Image
+	}
+
+	img, xerr := svc.SearchImage(gwSizing.Image)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to create gateway: unable to find image")
+		return fail.Wrap(xerr, "failed to find image '%s'", gwSizing.Image)
 	}
 
 	subnetName := rs.GetName()
@@ -451,16 +583,17 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrTimeout:
-						logrus.Warnf("We should wait") // FIXME: Wait until gateway no longer exists
+						logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
 					default:
 					}
 					_ = xerr.AddConsequence(derr)
 				} else {
-					logrus.Infof("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+					logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 				}
 				if failover {
-					failErr := rs.unbindHostFromVIP(as.VIP, primaryGateway)
-					_ = xerr.AddConsequence(failErr)
+					if derr = rs.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+						_ = xerr.AddConsequence(derr)
+					}
 				}
 			}
 		}()
@@ -484,14 +617,13 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 					if derr != nil {
 						switch derr.(type) {
 						case *fail.ErrTimeout:
-							logrus.Warnf("We should wait") // FIXME Wait until gateway no longer exists
+							logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
 						default:
 						}
 						_ = xerr.AddConsequence(derr)
 					}
-					failErr := rs.unbindHostFromVIP(as.VIP, secondaryGateway)
-					if failErr != nil {
-						_ = xerr.AddConsequence(failErr)
+					if derr = rs.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
+						_ = xerr.AddConsequence(derr)
 					}
 				}
 			}()
@@ -540,12 +672,12 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	// Binds subnet default security group to gateway(s)
-	xerr = primaryGateway.BindSecurityGroup(task, subnetDefaultSG, resources.SecurityGroupEnable)
+	xerr = primaryGateway.BindSecurityGroup(task, subnetGWSG, resources.SecurityGroupEnable)
 	if xerr != nil {
 		return xerr
 	}
 	if failover {
-		xerr = secondaryGateway.BindSecurityGroup(task, subnetDefaultSG, resources.SecurityGroupEnable)
+		xerr = secondaryGateway.BindSecurityGroup(task, subnetGWSG, resources.SecurityGroupEnable)
 		if xerr != nil {
 			return xerr
 		}
@@ -641,17 +773,10 @@ func (rs subnet) deleteGateway(task concurrency.Task, gw resources.Host) (xerr f
 }
 
 func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) fail.Error {
-	name := host.GetName()
 	if xerr := rs.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrTimeout:
-			logrus.Debugf("Cleaning up on failure, failed to remove '%s' gateway bind from VIP: %v", name, xerr)
-		default:
-			logrus.Debugf("Cleaning up on failure, failed to remove '%s' gateway bind from VIP: %v", name, xerr)
-		}
-		return xerr
+		return fail.Wrap(xerr, "cleaning up on failure, failed to unbind gateway '%s' from VIP", host.GetName())
 	}
-	logrus.Infof("Cleaning up on failure, host '%s' bind removed from VIP", name)
+	//logrus.Infof("Cleaning up on failure, host '%s' bind removed from VIP", name)
 	return nil
 }
 
@@ -974,7 +1099,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			}
 		}
 
-		// 3rd delete security group associated to subnet
+		// 3rd delete security groups associated to subnet
 		innerXErr := props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
@@ -1024,7 +1149,33 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 				}
 			}
 		}
-		return innerXErr
+
+		// Delete Subnet's Security Groups
+		rsg, innerXErr := LoadSecurityGroup(task, svc, as.GWSecurityGroupID)
+		if innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				// Security Group not found, consider this as a success
+			default:
+				return innerXErr
+			}
+		} else {
+			if innerXErr = rsg.Delete(task); innerXErr != nil {
+				return innerXErr
+			}
+		}
+
+		rsg, innerXErr = LoadSecurityGroup(task, svc, as.PublicSecurityGroupID)
+		if innerXErr == nil {
+			return rsg.Delete(task)
+		}
+		switch innerXErr.(type) {
+		case *fail.ErrNotFound:
+			// Security group not found, consider this as a success
+		default:
+			return innerXErr
+		}
+		return nil
 	})
 	if xerr != nil {
 		return xerr
@@ -1107,15 +1258,18 @@ func (rs subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.
 		}
 		if as.VIP != nil && as.VIP.PrivateIP != "" {
 			ip = as.VIP.PrivateIP
-		} else {
-			objpgw, innerErr := LoadHost(task, rs.GetService(), as.GatewayIDs[0])
+			return nil
+		}
+		if len(as.GatewayIDs) > 0 {
+			rh, innerErr := LoadHost(task, rs.GetService(), as.GatewayIDs[0])
 			if innerErr != nil {
 				return innerErr
 			}
-			ip = objpgw.(*host).getPrivateIP(task)
+			ip = rh.(*host).getPrivateIP(task)
 			return nil
 		}
-		return nil
+
+		return fail.NotFoundError("failed to find default route IP: no gateway defined")
 	})
 	return ip, xerr
 }
@@ -1360,7 +1514,7 @@ func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Security
 			}
 
 			// Bind the security group to the subnet (does the security group side of things)
-			if innerXErr := sg.BindToSubnet(task, rs, enabled); innerXErr != nil {
+			if innerXErr := sg.BindToSubnet(task, rs, enabled, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -1454,7 +1608,7 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 	}
 
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1473,7 +1627,7 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 			}
 
 			// Do security group stuff to enable it
-			if innerXErr := sg.BindToSubnet(task, rs, resources.SecurityGroupDisable); innerXErr != nil {
+			if innerXErr := sg.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
 					// security group already bound to subnet with the same state, consider as a success
@@ -1511,18 +1665,12 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 
 			sgID := sg.GetID()
 			// First check if the security group is not already registered for the host with the exact same state
-			var found bool
-			for k := range nsgV1.ByID {
-				if k == sgID {
-					found = true
-				}
-			}
-			if !found {
+			if _, ok := nsgV1.ByID[sgID]; !ok {
 				return fail.NotFoundError("security group '%s' is not bound to subnet '%s'", sg.GetName(), rs.GetID())
 			}
 
 			// Do security group stuff to enable it
-			if innerXErr := sg.BindToSubnet(task, rs, true); innerXErr != nil {
+			if innerXErr := sg.BindToSubnet(task, rs, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 				// security group not bound to subnet, consider as a success
@@ -1537,4 +1685,29 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 			return nil
 		})
 	})
+}
+
+// InspectNetwork returns the resources.Network instance of parent Network of the Subnet
+func (rs *subnet) InspectNetwork(task concurrency.Task) (resources.Network, fail.Error) {
+	if rs.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	var networkID string
+	xerr := rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		networkID = as.Network
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+	if networkID == "" {
+		return nil, fail.InconsistentError("metadata of subnet does not reference a parent Network")
+	}
+
+	return LoadNetwork(task, rs.GetService(), networkID)
 }

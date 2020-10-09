@@ -462,7 +462,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 				if innerXErr != nil {
 					derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 					if derr != nil {
-						logrus.Errorf("cleaning up on failure, failed to delete host: %v", derr)
+						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
 					}
 				}
 			}()

@@ -54,6 +54,8 @@ func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interfa
 	}
 
 	switch v := err.(type) {
+	case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
+		// These errors are systematically logged, no need to log them twice
 	case *Error:
 		if *v != nil {
 			logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *v))
@@ -160,19 +162,19 @@ func OnPanic(err interface{}) {
 	if x := recover(); x != nil {
 		switch v := err.(type) {
 		case *Error:
-			if *v != nil {
+			if v != nil {
 				*v = RuntimePanicError("runtime panic occurred:\n%s", callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.FirstOccurence))
 			} else {
-				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", "panic intercepted but '*err' is nil", "", 5))
+				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but '*err' is nil", "", 5))
 			}
 		case *error:
-			if *v != nil {
+			if v != nil {
 				*v = RuntimePanicError("runtime panic occurred: %+v", x)
 			} else {
-				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", "panic intercepted but '*err' is nil", "", 5))
+				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but '*err' is nil", "", 5))
 			}
 		default:
-			logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", "panic intercepted but invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
+			logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but parameter 'err' is invalid", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 		}
 	}
 }

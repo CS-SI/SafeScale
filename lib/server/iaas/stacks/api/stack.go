@@ -130,7 +130,7 @@ type Stack interface {
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to an host
-	BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error
+	BindSecurityGroupToHost(hostParam stacks.HostParameter /*string, */, sgParam stacks.SecurityGroupParameter) fail.Error
 	// UnbindSecurityGroupFromHost detaches a security group from an host
 	UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error
 
