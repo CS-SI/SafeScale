@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ package clusternodetype
 type Enum int
 
 const (
-    // getGateway to represent a gateway node
-    Gateway Enum = iota
-    // Master to represent a master node
-    Master
-    // Node to represent a working node
-    Node
+	// getGateway to represent a gateway node
+	Gateway Enum = iota
+	// Master to represent a master node
+	Master
+	// Node to represent a working node
+	Node
 )

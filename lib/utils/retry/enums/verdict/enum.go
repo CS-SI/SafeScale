@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ package verdict
 type Enum int
 
 const (
-    // Done tells the arbiter decided the last retry succeeded
-    Done Enum = iota
-    // Retry tells the arbiter decided to execute the next retry
-    Retry
-    // Abort tells the arbiter decided something wrong occurred; the Action must stop with error
-    Abort
+	// Done tells the arbiter decided the last retry succeeded
+	Done Enum = iota
+	// Retry tells the arbiter decided to execute the next retry
+	Retry
+	// Abort tells the arbiter decided something wrong occurred; the Action must stop with error
+	Abort
 )

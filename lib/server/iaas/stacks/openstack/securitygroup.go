@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,8 @@ import (
 const defaultSecurityGroupName = "default"
 
 // ListSecurityGroups lists existing security groups
-func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
+// Parameter 'networkRef' is not used in Openstack (they are tenant-wide)
+func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var list []*abstract.SecurityGroup
 
 	opts := secgroups.ListOpts{}
@@ -60,12 +61,16 @@ func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
 }
 
 // CreateSecurityGroup creates a security group
+// Parameter 'networkRef' is not used in Openstack, Security Groups are tenant-wide.
 // Returns nil, *fail.ErrDuplicate if already 1 security group exists with that name
 // Returns nil, *fail.ErrDuplicate(with a cause *fail.ErrDuplicate) if more than 1 security group exist with that name
-func (s Stack) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	// if s == nil {
 	//     return nil, fail.InvalidInstanceError()
 	// }
+	if name == "" {
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
 
 	asg, xerr := s.InspectSecurityGroup(name)
 	if xerr != nil {
@@ -110,7 +115,7 @@ func (s Stack) CreateSecurityGroup(name string, description string, rules []abst
 		if xerr != nil {
 			derr := s.DeleteSecurityGroup(asg)
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Prepend(derr, "cleaning up on failure, failed to delete security group"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
 			}
 		}
 	}()
@@ -124,10 +129,9 @@ func (s Stack) CreateSecurityGroup(name string, description string, rules []abst
 	// now adds security rules
 	asg.Rules = make([]abstract.SecurityGroupRule, 0, len(rules))
 	for _, v := range rules {
-		if _, xerr := s.AddRuleToSecurityGroup(asg, v); xerr != nil {
+		if asg, xerr = s.AddRuleToSecurityGroup(asg, v); xerr != nil {
 			return nil, xerr
 		}
-		asg.Rules = append(asg.Rules, v)
 	}
 	return asg, nil
 }
@@ -138,17 +142,27 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	//     return fail.InvalidInstanceError()
 	// }
 
-	sg, xerr := s.InspectSecurityGroup(sgParam)
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
 
 	// delete security group rules
-	for _, v := range sg.Rules {
+	for _, v := range asg.Rules {
 		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 			func() error {
-				innerErr := secrules.Delete(s.NetworkClient, v.ID).ExtractErr()
-				return NormalizeError(innerErr)
+				for _, id := range v.IDs {
+					if innerErr := secrules.Delete(s.NetworkClient, id).ExtractErr(); innerErr != nil {
+						return NormalizeError(innerErr)
+					}
+				}
+				return nil
 			},
 			temporal.GetCommunicationTimeout(),
 		)
@@ -160,7 +174,7 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	// delete security group
 	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			innerErr := secgroups.Delete(s.NetworkClient, sg.ID).ExtractErr()
+			innerErr := secgroups.Delete(s.NetworkClient, asg.ID).ExtractErr()
 			return NormalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
@@ -178,7 +192,6 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	}
 
 	var r *secgroups.SecGroup
-
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			var innerErr error
@@ -220,20 +233,25 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	// }
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return asg, xerr
+		return nil, xerr
 	}
-
-	asg, xerr = s.InspectSecurityGroup(asg.ID)
-	if xerr != nil {
-		return asg, xerr
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
 	}
 
 	// delete security group rules
 	for _, v := range asg.Rules {
 		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 			func() error {
-				innerErr := secrules.Delete(s.NetworkClient, v.ID).ExtractErr()
-				return NormalizeError(innerErr)
+				for _, id := range v.IDs {
+					if innerErr := secrules.Delete(s.NetworkClient, id).ExtractErr(); innerErr != nil {
+						return NormalizeError(innerErr)
+					}
+				}
+				return nil
 			},
 			temporal.GetCommunicationTimeout(),
 		)
@@ -264,14 +282,14 @@ func convertRulesToAbstract(in []secrules.SecGroupRule) ([]abstract.SecurityGrou
 		}
 
 		n := abstract.SecurityGroupRule{
-			ID:          v.ID,
+			IDs:         []string{v.ID},
 			EtherType:   etherType,
 			Description: v.Description,
 			Direction:   direction,
 			Protocol:    v.Protocol,
 			PortFrom:    uint16(v.PortRangeMin),
 			PortTo:      uint16(v.PortRangeMax),
-			CIDR:        v.RemoteIPPrefix,
+			IPRanges:    []string{v.RemoteIPPrefix},
 		}
 		out = append(out, n)
 	}
@@ -394,12 +412,13 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	// }
 	asg, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return asg, xerr
+		return nil, xerr
 	}
-
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return asg, xerr
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
 	}
 
 	_, xerr = asg.Rules.IndexOfEquivalentRule(rule)
@@ -432,61 +451,75 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if portTo < portFrom {
 		portFrom, portTo = portTo, portFrom
 	}
+
 	createOpts := secrules.CreateOpts{
-		SecGroupID:     asg.ID,
-		EtherType:      etherType,
-		Direction:      direction,
-		Description:    rule.Description,
-		PortRangeMin:   int(portFrom),
-		PortRangeMax:   int(portTo),
-		Protocol:       secrules.RuleProtocol(rule.Protocol),
-		RemoteIPPrefix: rule.CIDR,
+		SecGroupID:   asg.ID,
+		EtherType:    etherType,
+		Direction:    direction,
+		Description:  rule.Description,
+		PortRangeMin: int(portFrom),
+		PortRangeMax: int(portTo),
+		Protocol:     secrules.RuleProtocol(rule.Protocol),
 	}
-	return asg, netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
-			if innerErr != nil {
-				return NormalizeError(innerErr)
-			}
-			rule.ID = r.ID
-			asg.Rules = append(asg.Rules, rule)
-			return nil
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	for _, v := range rule.IPRanges {
+		createOpts.RemoteIPPrefix = v
+		createOpts.Description = rule.Description + " (" + v + ")"
+
+		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
+				if innerErr != nil {
+					return NormalizeError(innerErr)
+				}
+				rule.IDs = append(rule.IDs, r.ID)
+				return nil
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			return asg, xerr
+		}
+	}
+	asg.Rules = append(asg.Rules, rule)
+
+	return asg, nil
 }
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	// if s == nil {
 	//     return fail.InvalidInstanceError()
 	// }
 	asg, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return asg, xerr
+		return nil, xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
 	}
 
-	asg, xerr = s.InspectSecurityGroup(asg)
+	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
 	if xerr != nil {
 		return asg, xerr
 	}
-
-	index, xerr := asg.Rules.IndexOfRuleByID(ruleID)
-	if xerr != nil {
-		return asg, xerr
-	}
+	ruleIDs := asg.Rules[index].IDs
 
 	return asg, netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			innerErr := secrules.Delete(s.NetworkClient, ruleID).ExtractErr()
-			if innerErr != nil {
-				return NormalizeError(innerErr)
+			for k, v := range ruleIDs {
+				innerErr := secrules.Delete(s.NetworkClient, v).ExtractErr()
+				if innerErr != nil {
+					return fail.Wrap(NormalizeError(innerErr), "failed to delete provider rule ID #%d", k)
+				}
 			}
-
-			asg.Rules, innerErr = asg.Rules.RemoveRuleByIndex(index)
-			if innerErr != nil {
-				return innerErr
+			var innerXErr fail.Error
+			asg.Rules, innerXErr = asg.Rules.RemoveRuleByIndex(index)
+			if innerXErr != nil {
+				return innerXErr
 			}
 			return nil
 		},

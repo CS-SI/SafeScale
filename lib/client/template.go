@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,28 +17,28 @@
 package client
 
 import (
-    "time"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/protocol"
-    "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/utils"
 )
 
 // host is the safescale client part handling hosts
 type template struct {
-    // session is not used currently
-    session *Session
+	// session is not used currently
+	session *Session
 }
 
 // List return the list of availble templates on the current tenant
 func (t template) List(all bool, timeout time.Duration) (*protocol.TemplateList, error) {
-    t.session.Connect()
-    defer t.session.Disconnect()
+	t.session.Connect()
+	defer t.session.Disconnect()
 
-    ctx, xerr := utils.GetContext(true)
-    if xerr != nil {
-        return nil, xerr
-    }
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    service := protocol.NewTemplateServiceClient(t.session.connection)
-    return service.List(ctx, &protocol.TemplateListRequest{All: all})
+	service := protocol.NewTemplateServiceClient(t.session.connection)
+	return service.List(ctx, &protocol.TemplateListRequest{All: all})
 }

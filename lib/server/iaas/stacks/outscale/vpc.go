@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,47 +17,42 @@
 package outscale
 
 import (
-	"fmt"
-
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, fail.Error) {
-	tags, xerr := s.getResourceTags(onet.DhcpOptionsSetId)
-	if xerr != nil {
-		return false, xerr
-	}
-	_, ok := tags["name"]
-	return ok, nil
-}
+//func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, fail.Error) {
+//	tags, xerr := s.getResourceTags(onet.DhcpOptionsSetId)
+//	if xerr != nil {
+//		return false, xerr
+//	}
+//	_, ok := tags["name"]
+//	return ok, nil
+//}
 
-func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) fail.Error {
-	// Remove DHCP options
-	namedDHCPOptions, xerr := s.checkDHCPOptionsName(onet)
-	if xerr != nil {
-		return xerr
-	}
-
-	// prevent deleting default dhcp options
-	if checkName && !namedDHCPOptions {
-		return nil
-	}
-
-	deleteDhcpOptionsRequest := osc.DeleteDhcpOptionsRequest{
-		DhcpOptionsSetId: onet.DhcpOptionsSetId,
-	}
-	_, _, err := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &osc.DeleteDhcpOptionsOpts{
-		DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
-	})
-	return normalizeError(err)
-}
+//func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) fail.Error {
+//	// Remove DHCP options
+//	namedDHCPOptions, xerr := s.checkDHCPOptionsName(onet)
+//	if xerr != nil {
+//		return xerr
+//	}
+//
+//	// prevent deleting default dhcp options
+//	if checkName && !namedDHCPOptions {
+//		return nil
+//	}
+//
+//	deleteDhcpOptionsRequest := osc.DeleteDhcpOptionsRequest{
+//		DhcpOptionsSetId: onet.DhcpOptionsSetId,
+//	}
+//	_, _, err := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &osc.DeleteDhcpOptionsOpts{
+//		DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
+//	})
+//	return normalizeError(err)
+//}
 
 func (s *Stack) deleteInternetService(onet *osc.Net) fail.Error {
 	// Unlink and delete internet service
@@ -101,66 +96,66 @@ func (s *Stack) deleteInternetService(onet *osc.Net) fail.Error {
 	return nil
 }
 
-func (s *Stack) getDefaultRouteTable(onet *osc.Net) (*osc.RouteTable, fail.Error) {
-	readRouteTablesRequest := osc.ReadRouteTablesRequest{
-		Filters: osc.FiltersRouteTable{
-			NetIds: []string{onet.NetId},
-		},
-	}
-	res, _, err := s.client.RouteTableApi.ReadRouteTables(s.auth, &osc.ReadRouteTablesOpts{
-		ReadRouteTablesRequest: optional.NewInterface(readRouteTablesRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	if len(res.RouteTables) != 1 {
-		return nil, fail.InconsistentError("inconsistent provider response when trying to default route table")
-	}
-	return &res.RouteTables[0], nil
-}
+//func (s *Stack) getDefaultRouteTable(onet *osc.Net) (*osc.RouteTable, fail.Error) {
+//	readRouteTablesRequest := osc.ReadRouteTablesRequest{
+//		Filters: osc.FiltersRouteTable{
+//			NetIds: []string{onet.NetId},
+//		},
+//	}
+//	res, _, err := s.client.RouteTableApi.ReadRouteTables(s.auth, &osc.ReadRouteTablesOpts{
+//		ReadRouteTablesRequest: optional.NewInterface(readRouteTablesRequest),
+//	})
+//	if err != nil {
+//		return nil, normalizeError(err)
+//	}
+//	if len(res.RouteTables) != 1 {
+//		return nil, fail.InconsistentError("inconsistent provider response when trying to default route table")
+//	}
+//	return &res.RouteTables[0], nil
+//}
 
-func (s *Stack) updateRouteTable(onet *osc.Net, is *osc.InternetService) fail.Error {
-	table, xerr := s.getDefaultRouteTable(onet)
-	if xerr != nil {
-		return xerr
-	}
-	createRouteRequest := osc.CreateRouteRequest{
-		DestinationIpRange: "0.0.0.0/0",
-		GatewayId:          is.InternetServiceId,
-		RouteTableId:       table.RouteTableId,
-	}
-	_, _, err := s.client.RouteApi.CreateRoute(s.auth, &osc.CreateRouteOpts{
-		CreateRouteRequest: optional.NewInterface(createRouteRequest),
-	})
-	return normalizeError(err)
-}
+//func (s *Stack) updateRouteTable(onet *osc.Net, is *osc.InternetService) fail.Error {
+//	table, xerr := s.getDefaultRouteTable(onet)
+//	if xerr != nil {
+//		return xerr
+//	}
+//	createRouteRequest := osc.CreateRouteRequest{
+//		DestinationIpRange: "0.0.0.0/0",
+//		GatewayId:          is.InternetServiceId,
+//		RouteTableId:       table.RouteTableId,
+//	}
+//	_, _, err := s.client.RouteApi.CreateRoute(s.auth, &osc.CreateRouteOpts{
+//		CreateRouteRequest: optional.NewInterface(createRouteRequest),
+//	})
+//	return normalizeError(err)
+//}
 
-func (s *Stack) createInternetService(req abstract.NetworkRequest, onet *osc.Net) fail.Error {
-	// Create internet service to allow internet access from VMs attached to the network
-	isResp, _, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
-	if err != nil {
-		return normalizeError(err)
-	}
-
-	xerr := s.setResourceTags(isResp.InternetService.InternetServiceId, map[string]string{
-		"name": req.Name,
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	linkInternetServiceRequest := osc.LinkInternetServiceRequest{
-		InternetServiceId: isResp.InternetService.InternetServiceId,
-		NetId:             onet.NetId,
-	}
-	_, _, err = s.client.InternetServiceApi.LinkInternetService(s.auth, &osc.LinkInternetServiceOpts{
-		LinkInternetServiceRequest: optional.NewInterface(linkInternetServiceRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
-	}
-	return s.updateRouteTable(onet, &isResp.InternetService)
-}
+//func (s *Stack) createInternetService(req abstract.NetworkRequest, onet *osc.Net) fail.Error {
+//	// Create internet service to allow internet access from VMs attached to the network
+//	isResp, _, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
+//	if err != nil {
+//		return normalizeError(err)
+//	}
+//
+//	xerr := s.setResourceTags(isResp.InternetService.InternetServiceId, map[string]string{
+//		"name": req.Name,
+//	})
+//	if xerr != nil {
+//		return xerr
+//	}
+//
+//	linkInternetServiceRequest := osc.LinkInternetServiceRequest{
+//		InternetServiceId: isResp.InternetService.InternetServiceId,
+//		NetId:             onet.NetId,
+//	}
+//	_, _, err = s.client.InternetServiceApi.LinkInternetService(s.auth, &osc.LinkInternetServiceOpts{
+//		LinkInternetServiceRequest: optional.NewInterface(linkInternetServiceRequest),
+//	})
+//	if err != nil {
+//		return normalizeError(err)
+//	}
+//	return s.updateRouteTable(onet, &isResp.InternetService)
+//}
 
 // open all ports, ingress is controlled by the vm firewall
 func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
@@ -197,28 +192,28 @@ func (s *Stack) createICMPPermissions() []osc.SecurityGroupRule {
 	return rules
 }
 
-func (s *Stack) removeDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
-	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
-		SecurityGroupId: sg.SecurityGroupId,
-		Rules:           sg.InboundRules,
-		Flow:            "Inbound",
-	}
-	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
-	}
-	securityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
-		SecurityGroupId: sg.SecurityGroupId,
-		Rules:           sg.OutboundRules,
-		Flow:            "Outbound",
-	}
-	_, _, err = s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(securityGroupRuleRequest),
-	})
-	return normalizeError(err)
-}
+//func (s *Stack) removeDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
+//	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
+//		SecurityGroupId: sg.SecurityGroupId,
+//		Rules:           sg.InboundRules,
+//		Flow:            "Inbound",
+//	}
+//	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
+//		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
+//	})
+//	if err != nil {
+//		return normalizeError(err)
+//	}
+//	securityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
+//		SecurityGroupId: sg.SecurityGroupId,
+//		Rules:           sg.OutboundRules,
+//		Flow:            "Outbound",
+//	}
+//	_, _, err = s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
+//		DeleteSecurityGroupRuleRequest: optional.NewInterface(securityGroupRuleRequest),
+//	})
+//	return normalizeError(err)
+//}
 
 func (s *Stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
 	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
@@ -264,174 +259,174 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.
 		}
 	}
 	// should never go there, in case this means that the network do not have a default security group
-	return nil, fail.NotFoundError("failed to get security group of network '%s'", netID)
+	return nil, fail.NotFoundError("failed to get security group of Network '%s'", netID)
 }
 
-func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, xerr fail.Error) {
-	createNetRequest := osc.CreateNetRequest{
-		IpRange: cidr,
-		Tenancy: s.Options.Compute.DefaultTenancy,
-	}
-	respNet, _, err := s.client.NetApi.CreateNet(s.auth, &osc.CreateNetOpts{
-		CreateNetRequest: optional.NewInterface(createNetRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	onet := respNet.Net
+//func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, xerr fail.Error) {
+//	createNetRequest := osc.CreateNetRequest{
+//		IpRange: cidr,
+//		Tenancy: s.Options.Compute.DefaultTenancy,
+//	}
+//	respNet, _, err := s.client.NetApi.CreateNet(s.auth, &osc.CreateNetOpts{
+//		CreateNetRequest: optional.NewInterface(createNetRequest),
+//	})
+//	if err != nil {
+//		return nil, normalizeError(err)
+//	}
+//	onet := respNet.Net
+//
+//	defer func() {
+//		if xerr != nil {
+//			derr := s.DeleteSubnet(onet.NetId)
+//			_ = xerr.AddConsequence(derr)
+//		}
+//	}()
+//
+//	xerr = s.setResourceTags(onet.NetId, map[string]string{
+//		"name": name,
+//	})
+//	if xerr != nil {
+//		return nil, xerr
+//	}
+//
+//	req := abstract.NetworkRequest{
+//		IPRanges:       cidr,
+//		DNSServers: s.configurationOptions.DNSList,
+//		Name:       name,
+//	}
+//	// update default security group to allow external traffic
+//	securityGroup, xerr := s.getNetworkSecurityGroup(onet.NetId)
+//	if xerr != nil {
+//		return nil, xerr
+//	}
+//
+//	xerr = s.updateDefaultSecurityRules(securityGroup)
+//	if xerr != nil {
+//		return nil, fail.Wrap(xerr, "failed to update default security group")
+//	}
+//
+//	xerr = s.createDHCPOptionSet(req, &onet)
+//	if xerr != nil {
+//		return nil, fail.Wrap(xerr, "failed to create DHCP options set")
+//	}
+//
+//	xerr = s.createInternetService(req, &onet)
+//	if xerr != nil {
+//		return nil, fail.Wrap(xerr, "failed to create Internet Service")
+//	}
+//
+//	return &onet, nil
+//}
 
-	defer func() {
-		if xerr != nil {
-			derr := s.DeleteNetwork(onet.NetId)
-			_ = xerr.AddConsequence(derr)
-		}
-	}()
+//func (s *Stack) getVpc(id string) (_ *osc.Net, xerr fail.Error) {
+//	if s == nil {
+//		return nil, fail.InvalidInstanceError()
+//	}
+//
+//	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(ùs)", id).WithStopwatch().Entering()
+//	defer tracer.Exiting()
+//	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+//
+//	readNetsRequest := osc.ReadNetsRequest{
+//		Filters: osc.FiltersNet{
+//			NetIds: []string{id},
+//		},
+//	}
+//	resNet, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+//		ReadNetsRequest: optional.NewInterface(readNetsRequest),
+//	})
+//	if err != nil {
+//		return nil, normalizeError(err)
+//	}
+//	if len(resNet.Nets) == 0 {
+//		return nil, fail.NotFoundError("failed to find vpc '%s'", id)
+//	}
+//	return &resNet.Nets[0], nil
+//}
 
-	xerr = s.setResourceTags(onet.NetId, map[string]string{
-		"name": name,
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
+//// getVpcByName returns the network identified by name)
+//func (s *Stack) getVpcByName(name string) (_ *osc.Net, xerr fail.Error) {
+//	if s == nil {
+//		return nil, fail.InvalidInstanceError()
+//	}
+//
+//	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
+//	defer tracer.Exiting()
+//	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+//
+//	readNetsRequest := osc.ReadNetsRequest{
+//		Filters: osc.FiltersNet{
+//			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
+//		},
+//	}
+//	res, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+//		ReadNetsRequest: optional.NewInterface(readNetsRequest),
+//	})
+//	if err != nil {
+//		return nil, normalizeError(err)
+//	}
+//	if len(res.Nets) == 0 {
+//		return nil, fail.NotFoundError("failed to find a vpc with name '%s'", name)
+//	}
+//	return &res.Nets[0], nil
+//}
 
-	req := abstract.NetworkRequest{
-		CIDR:       cidr,
-		DNSServers: s.configurationOptions.DNSList,
-		Name:       name,
-	}
-	// update default security group to allow external traffic
-	securityGroup, xerr := s.getNetworkSecurityGroup(onet.NetId)
-	if xerr != nil {
-		return nil, xerr
-	}
+//func (s *Stack) getDefaultDhcpNtpServers(net *osc.Net) ([]string, fail.Error) {
+//	readDhcpOptionsRequest := osc.ReadDhcpOptionsRequest{
+//		Filters: osc.FiltersDhcpOptions{
+//			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
+//		},
+//	}
+//	res, _, err := s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &osc.ReadDhcpOptionsOpts{
+//		ReadDhcpOptionsRequest: optional.NewInterface(readDhcpOptionsRequest),
+//	})
+//	if err != nil {
+//		return []string{}, normalizeError(err)
+//	}
+//	if len(res.DhcpOptionsSets) != 1 {
+//		return []string{}, fail.InconsistentError("inconsistent provider response")
+//	}
+//	return res.DhcpOptionsSets[0].NtpServers, nil
+//}
 
-	xerr = s.updateDefaultSecurityRules(securityGroup)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to update default security group")
-	}
-
-	xerr = s.createDHCPOptionSet(req, &onet)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to create DHCP options set")
-	}
-
-	xerr = s.createInternetService(req, &onet)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to create Internet Service")
-	}
-
-	return &onet, nil
-}
-
-func (s *Stack) getVpc(id string) (_ *osc.Net, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(ùs)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
-	readNetsRequest := osc.ReadNetsRequest{
-		Filters: osc.FiltersNet{
-			NetIds: []string{id},
-		},
-	}
-	resNet, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(readNetsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	if len(resNet.Nets) == 0 {
-		return nil, fail.NotFoundError("failed to find vpc '%s'", id)
-	}
-	return &resNet.Nets[0], nil
-}
-
-// InspectNetworkByName returns the network identified by name)
-func (s *Stack) getVpcByName(name string) (_ *osc.Net, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
-	readNetsRequest := osc.ReadNetsRequest{
-		Filters: osc.FiltersNet{
-			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
-		},
-	}
-	res, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(readNetsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	if len(res.Nets) == 0 {
-		return nil, fail.NotFoundError("failed to find a vpc with name '%s'", name)
-	}
-	return &res.Nets[0], nil
-}
-
-func (s *Stack) getDefaultDhcpNtpServers(net *osc.Net) ([]string, fail.Error) {
-	readDhcpOptionsRequest := osc.ReadDhcpOptionsRequest{
-		Filters: osc.FiltersDhcpOptions{
-			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
-		},
-	}
-	res, _, err := s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &osc.ReadDhcpOptionsOpts{
-		ReadDhcpOptionsRequest: optional.NewInterface(readDhcpOptionsRequest),
-	})
-	if err != nil {
-		return []string{}, normalizeError(err)
-	}
-	if len(res.DhcpOptionsSets) != 1 {
-		return []string{}, fail.InconsistentError("inconsistent provider response")
-	}
-	return res.DhcpOptionsSets[0].NtpServers, nil
-}
-
-func (s *Stack) createDHCPOptionSet(req abstract.NetworkRequest, net *osc.Net) fail.Error {
-	if len(req.DNSServers) == 0 {
-		return nil
-	}
-	ntpServers, xerr := s.getDefaultDhcpNtpServers(net)
-	if xerr != nil {
-		return xerr
-	}
-	createDhcpOptionsRequest := osc.CreateDhcpOptionsRequest{
-		NtpServers:        ntpServers,
-		DomainNameServers: req.DNSServers,
-	}
-	dhcpOptions, _, err := s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &osc.CreateDhcpOptionsOpts{
-		CreateDhcpOptionsRequest: optional.NewInterface(createDhcpOptionsRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
-	}
-
-	defer func() {
-		if xerr != nil {
-			derr := s.deleteDhcpOptions(net, false)
-			_ = xerr.AddConsequence(derr)
-		}
-	}()
-
-	dhcpOptionID := dhcpOptions.DhcpOptionsSet.DhcpOptionsSetId
-	xerr = s.setResourceTags(dhcpOptionID, map[string]string{
-		"name": req.Name,
-	})
-	if xerr != nil {
-		return xerr
-	}
-	updateNetRequest := osc.UpdateNetRequest{
-		DhcpOptionsSetId: dhcpOptionID,
-	}
-	_, _, err = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(updateNetRequest),
-	})
-	return normalizeError(err)
-}
+//func (s *Stack) createDHCPOptionSet(req abstract.NetworkRequest, net *osc.Net) fail.Error {
+//	if len(req.DNSServers) == 0 {
+//		return nil
+//	}
+//	ntpServers, xerr := s.getDefaultDhcpNtpServers(net)
+//	if xerr != nil {
+//		return xerr
+//	}
+//	createDhcpOptionsRequest := osc.CreateDhcpOptionsRequest{
+//		NtpServers:        ntpServers,
+//		DomainNameServers: req.DNSServers,
+//	}
+//	dhcpOptions, _, err := s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &osc.CreateDhcpOptionsOpts{
+//		CreateDhcpOptionsRequest: optional.NewInterface(createDhcpOptionsRequest),
+//	})
+//	if err != nil {
+//		return normalizeError(err)
+//	}
+//
+//	defer func() {
+//		if xerr != nil {
+//			derr := s.deleteDhcpOptions(net, false)
+//			_ = xerr.AddConsequence(derr)
+//		}
+//	}()
+//
+//	dhcpOptionID := dhcpOptions.DhcpOptionsSet.DhcpOptionsSetId
+//	xerr = s.setResourceTags(dhcpOptionID, map[string]string{
+//		"name": req.Name,
+//	})
+//	if xerr != nil {
+//		return xerr
+//	}
+//	updateNetRequest := osc.UpdateNetRequest{
+//		DhcpOptionsSetId: dhcpOptionID,
+//	}
+//	_, _, err = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+//		ReadNetsRequest: optional.NewInterface(updateNetRequest),
+//	})
+//	return normalizeError(err)
+//}

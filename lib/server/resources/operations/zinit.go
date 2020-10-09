@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,71 +17,71 @@
 package operations
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 )
 
 func init() {
 
-    allEmbeddedFeatures = []*feature{
-        dockerFeature(),
-        ntpServerFeature(),
-        ntpClientFeature(),
-        ansibleFeature(),
-        postgresql4platformFeature(),
-        nVidiaDockerFeature(),
-        // mpichOsPkgFeature(),
-        // mpichBuildFeature(),
-        // ohpcSlurmMasterFeature(),
-        // ohpcSlurmNodeFeature(),
-        remoteDesktopFeature(),
-        postgres4gatewayFeature(),
-        edgeproxy4networkFeature(),
-        keycloak4platformFeature(),
-        kubernetesFeature(),
-        proxycacheServerFeature(),
-        proxycacheClientFeature(),
-        // apacheIgniteFeature(),
-        // elasticsearchFeature(),
-        // logstashFeature(),
-        // metricbeatFeature(),
-        // filebeatFeature(),
-        // kibanaFeature(),
-        k8shelm2Feature(),
-        sparkmaster4platformFeature(),
-        // elassandraFeature(),
-        consul4platformFeature(),
-        monitoring4platformFeature(),
-        // geoserverFeature(),
-    }
+	allEmbeddedFeatures = []*feature{
+		dockerFeature(),
+		ntpServerFeature(),
+		ntpClientFeature(),
+		ansibleFeature(),
+		postgresql4platformFeature(),
+		nVidiaDockerFeature(),
+		// mpichOsPkgFeature(),
+		// mpichBuildFeature(),
+		// ohpcSlurmMasterFeature(),
+		// ohpcSlurmNodeFeature(),
+		remoteDesktopFeature(),
+		postgres4gatewayFeature(),
+		edgeproxy4networkFeature(),
+		keycloak4platformFeature(),
+		kubernetesFeature(),
+		proxycacheServerFeature(),
+		proxycacheClientFeature(),
+		// apacheIgniteFeature(),
+		// elasticsearchFeature(),
+		// logstashFeature(),
+		// metricbeatFeature(),
+		// filebeatFeature(),
+		// kibanaFeature(),
+		k8shelm2Feature(),
+		sparkmaster4platformFeature(),
+		// elassandraFeature(),
+		consul4platformFeature(),
+		monitoring4platformFeature(),
+		// geoserverFeature(),
+	}
 
-    for _, item := range allEmbeddedFeatures {
-        itemName := item.GetName()
+	for _, item := range allEmbeddedFeatures {
+		itemName := item.GetName()
 
-        // allEmbeddedMap[item.BaseFilename()] = item
-        allEmbeddedFeaturesMap[itemName] = item
-        installers := item.specs.GetStringMap("feature.install")
-        for k := range installers {
-            meth, err := installmethod.Parse(k)
-            if err != nil {
-                displayFilename := item.GetDisplayFilename()
-                if displayFilename == "" {
-                    logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
-                } else {
-                    logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s), install method '%s' is unknown", itemName, displayFilename, k))
-                }
-                continue
-            }
-            if _, found := availableEmbeddedFeaturesMap[meth]; !found {
-                availableEmbeddedFeaturesMap[meth] = map[string]*feature{
-                    itemName: item,
-                }
-            } else {
-                availableEmbeddedFeaturesMap[meth][itemName] = item
-            }
-        }
-    }
+		// allEmbeddedMap[item.BaseFilename()] = item
+		allEmbeddedFeaturesMap[itemName] = item
+		installers := item.specs.GetStringMap("feature.install")
+		for k := range installers {
+			meth, err := installmethod.Parse(k)
+			if err != nil {
+				displayFilename := item.GetDisplayFilename()
+				if displayFilename == "" {
+					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file, install method '%s' is unknown", itemName, k))
+				} else {
+					logrus.Errorf(fmt.Sprintf("syntax error in feature '%s' specification file (%s), install method '%s' is unknown", itemName, displayFilename, k))
+				}
+				continue
+			}
+			if _, found := availableEmbeddedFeaturesMap[meth]; !found {
+				availableEmbeddedFeaturesMap[meth] = map[string]*feature{
+					itemName: item,
+				}
+			} else {
+				availableEmbeddedFeaturesMap[meth][itemName] = item
+			}
+		}
+	}
 }

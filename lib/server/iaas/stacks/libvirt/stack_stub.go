@@ -1,7 +1,7 @@
 // +build !libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,12 +94,12 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
 	return &abstract.Network{}, gError
 }
 
-// GetNetwork stub
+// InspectNetwork stub
 func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	return &abstract.Network{}, gError
 }
 
-// GetNetworkByName stub
+// InspectNetworkByName stub
 func (s *Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
 	return &abstract.Network{}, gError
 }
@@ -114,15 +114,30 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 	return gError
 }
 
-// // CreateGateway stub
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-// 	return nil, nil, gError
-// }
-//
-// // DeleteGateway stub
-// func (s *Stack) DeleteGateway(string) error {
-// 	return gError
-// }
+// CreateNetwork stub
+func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error) {
+	return &abstract.Subnet{}, gError
+}
+
+// InspectSubnet stub
+func (s *Stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
+	return &abstract.Subnet{}, gError
+}
+
+// InspectSubnetByName stub
+func (s *Stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, fail.Error) {
+	return &abstract.Subnet{}, gError
+}
+
+// ListSubnets stub
+func (s *Stack) ListSubnets(string) ([]*abstract.Subnet, fail.Error) {
+	return []*abstract.Subnet{}, gError
+}
+
+// DeleteSubnet stub
+func (s *Stack) DeleteSubnet(id string) fail.Error {
+	return gError
+}
 
 // CreateVIP stub
 func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
@@ -164,7 +179,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull,
 	return abstract.NewHostFull(), gError
 }
 
-// GetHostByName stub
+// InspectHostByName stub
 func (s *Stack) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
 	return abstract.NewHostCore(), gError
 }
@@ -224,7 +239,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 	return "", gError
 }
 
-// GetVolumeAttachment stub
+// InspectVolumeAttachment stub
 func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	return &abstract.VolumeAttachment{}, gError
 }
@@ -259,12 +274,12 @@ func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgPa
 	return gError
 }
 
-// BindSecurityGroupToNetwork ...
-func (s *Stack) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// BindSecurityGroupToSubnet ...
+func (s *Stack) BindSecurityGroupToSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
 	return gError
 }
 
-// UnbindSecurityGroupFromNetwork ...
-func (s *Stack) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// UnbindSecurityGroupFromSubnet ...
+func (s *Stack) UnbindSecurityGroupFromSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
 	return gError
 }
