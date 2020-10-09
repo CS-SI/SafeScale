@@ -76,9 +76,9 @@ func NormalizeError(err error) fail.Error {
 	case fail.Error:
 		return e
 	case gophercloud.ErrDefault400: // bad request
-		return fail.InvalidRequestError(string(e.Body))
+		return reduceOpenstackBadRequest(e.Body)
 	case *gophercloud.ErrDefault400: // bad request
-		return fail.InvalidRequestError(string(e.Body))
+		return reduceOpenstackBadRequest(e.Body)
 	case gophercloud.ErrDefault401: // unauthorized
 		return fail.NotAuthenticatedError(string(e.Body))
 	case *gophercloud.ErrDefault401: // unauthorized
@@ -123,12 +123,44 @@ func NormalizeError(err error) fail.Error {
 		return qualifyGophercloudResponseCode(&e)
 	case *gophercloud.ErrUnexpectedResponseCode:
 		return qualifyGophercloudResponseCode(e)
+	case gophercloud.ErrMissingInput:
+		return fail.InvalidRequestError(e.Error())
+	case *gophercloud.ErrMissingInput:
+		return fail.InvalidRequestError(e.Error())
 	case *url.Error:
 		return fail.NewErrorWithCause(e)
 	default:
 		logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
 		return fail.NewError("unhandled error received from provider: %s", err.Error())
 	}
+}
+
+// reduceOpenstackBadRequest ...
+func reduceOpenstackBadRequest(in []byte) (xerr fail.Error) {
+	// FIXME: check if json.Unmarshal() may panic; if not theses 2 defers are superfluous
+	defer func() {
+		switch xerr.(type) {
+		case *fail.ErrRuntimePanic:
+			xerr = fail.InvalidRequestError(string(in))
+		}
+	}()
+	defer fail.OnPanic(&xerr)
+
+	var body map[string]interface{}
+	unjsonedErr := json.Unmarshal(in, &body)
+	if unjsonedErr == nil {
+		if content, ok := body["badRequest"].(map[string]interface{}); ok {
+			if msg, ok := content["message"].(string); ok {
+				return fail.InvalidRequestError(msg)
+			}
+		}
+		if content, ok := body["NeutronError"].(map[string]interface{}); ok {
+			if msg, ok := content["message"].(string); ok {
+				return fail.InvalidRequestError(msg)
+			}
+		}
+	}
+	return fail.InvalidRequestError(string(in))
 }
 
 // qualifyGophercloudResponseCode requalifies the unqualified error with appropriate error based on error code

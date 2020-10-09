@@ -57,16 +57,18 @@ type SubnetRequest struct {
 
 // Subnet represents a subnet
 type Subnet struct {
-	ID         string           `json:"id,omitempty"`          // ID of the subnet (from provider)
-	Name       string           `json:"name,omitempty"`        // Name of the subnet
-	Network    string           `json:"network"`               // parent Network of the subnet
-	CIDR       string           `json:"mask,omitempty"`        // ip network in CIDR notation
-	Domain     string           `json:"domain,omitempty"`      // contains the domain used to define host FQDN
-	DNSServers []string         `json:"dns_servers,omitempty"` // contains the DNSServers used on the subnet
-	GatewayIDs []string         `json:"gateway_id,omitempty"`  // contains the id of the host(s) acting as gateway(s) for the subnet
-	VIP        *VirtualIP       `json:"vip,omitempty"`         // contains the VIP of the network if created with HA
-	IPVersion  ipversion.Enum   `json:"ip_version,omitempty"`  // IPVersion is IPv4 or IPv6 (see IPVersion)
-	State      subnetstate.Enum `json:"status,omitempty"`
+	ID                    string           `json:"id,omitempty"`                       // ID of the subnet (from provider)
+	Name                  string           `json:"name,omitempty"`                     // Name of the subnet
+	Network               string           `json:"network"`                            // parent Network of the subnet
+	CIDR                  string           `json:"mask,omitempty"`                     // ip network in CIDR notation
+	Domain                string           `json:"domain,omitempty"`                   // contains the domain used to define host FQDN
+	DNSServers            []string         `json:"dns_servers,omitempty"`              // contains the DNSServers used on the subnet
+	GatewayIDs            []string         `json:"gateway_id,omitempty"`               // contains the id of the host(s) acting as gateway(s) for the subnet
+	VIP                   *VirtualIP       `json:"vip,omitempty"`                      // contains the VIP of the network if created with HA
+	IPVersion             ipversion.Enum   `json:"ip_version,omitempty"`               // IPVersion is IPv4 or IPv6 (see IPVersion)
+	State                 subnetstate.Enum `json:"status,omitempty"`                   // indicates the current state of the Subnet
+	GWSecurityGroupID     string           `json:"gw_security_group_id,omitempty"`     // Contains the ID of the Security Group for external access of gateways in Subnet
+	PublicSecurityGroupID string           `json:"public_security_group_id,omitempty"` // contains the ID of the security group for external access of hosts with public IP (except gateways) in Subnet
 }
 
 // NewSubnet initializes a new instance of Subnet

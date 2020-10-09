@@ -35,6 +35,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -683,53 +684,36 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	}
 
 	// The Default Network is the first of the provided list, by convention
-	defaultNetwork := request.Subnets[0]
-	defaultNetworkID := defaultNetwork.ID
+	defaultSubnet := request.Subnets[0]
+	defaultSubnetID := defaultSubnet.ID
 
-	var nets []servers.Network
-	// If floating IPs are not used and host is public
-	// then add provider network to host networks
-	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
-		nets = append(nets, servers.Network{
-			UUID: s.ProviderNetworkID,
-		})
-	}
-	// Add private networks
-	for _, n := range request.Subnets {
-		nets = append(nets, servers.Network{
-			UUID: n.ID,
-		})
+	nets, sgs, xerr := s.identifyOpenstackSubnets(request, defaultSubnet)
+	if xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to construct list of Subnets for the host")
 	}
 
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			xerr = fail.Wrap(err, "failed to create host UUID")
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return nullAhf, nullUdc, xerr
+	// Starting from here, delete created ports if exiting with error
+	defer func() {
+		if xerr != nil && !request.KeepOnFailure {
+			for _, v := range nets {
+				if v.Port != "" {
+					if derr := s.deletePort(v.Port); derr != nil {
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", v.Port))
+					}
+				} else if v.UUID != "" {
+				}
+			}
 		}
+	}()
 
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = s.CreateKeyPair(name)
-		if err != nil {
-			xerr = fail.Wrap(err, "failed to create host key pair")
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return nullAhf, nullUdc, xerr
-		}
-	}
-	if request.Password == "" {
-		password, err := utils.GeneratePassword(16)
-		if err != nil {
-			return nullAhf, nullUdc, fail.Wrap(err, "failed to generate password")
-		}
-		request.Password = password
+	if xerr = s.provideCredentialsIfNeeded(&request); xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
-	xerr = userData.Prepare(s.cfgOpts, request, defaultNetwork.CIDR, "")
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
@@ -741,21 +725,21 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get image")
 	}
 
-	// Select usable availability zone, the first one in the list
-	azone, xerr := s.SelectedAvailabilityZone()
-	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select availability zone")
-	}
-
 	// Sets provider parameters to create host
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
 		return nullAhf, nullUdc, xerr
 	}
 
+	// Select usable availability zone, the first one in the list
+	azone, xerr := s.SelectedAvailabilityZone()
+	if xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select availability zone")
+	}
+
 	srvOpts := servers.CreateOpts{
-		Name: request.ResourceName,
-		//SecurityGroups:   securityGroups,
+		Name:             request.ResourceName,
+		SecurityGroups:   sgs,
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
@@ -775,17 +759,31 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// Retry creation until success, for 10 minutes
 	var server *servers.Server
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-		func() (innerErr error) {
-			innerErr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
-				func() error {
-					server, innerErr = servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
+		func() error {
+			server = nil
+			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+				func() (err error) {
+					server, err = servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
 						CreateOptsBuilder: srvOpts,
 					}).Extract()
-					return NormalizeError(innerErr)
+					err = NormalizeError(err)
+					if err != nil {
+						switch err.(type) {
+						case *fail.ErrInvalidRequest: // useless to retry on bad request...
+							return retry.StopRetryError(err)
+						default:
+							return err
+						}
+					}
+					return nil
 				},
 				temporal.GetCommunicationTimeout(),
 			)
-			if innerErr != nil {
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry:
+					innerXErr = fail.ToError(innerXErr.Cause())
+				}
 				if server != nil {
 					derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 						func() error {
@@ -795,19 +793,35 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 						temporal.GetCommunicationTimeout(),
 					)
 					if derr != nil {
-						logrus.Errorf("cleaning up on failure: %s", derr.Error())
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 					}
 				}
-				logrus.Warnf(innerErr.Error())
-				return innerErr
+				logrus.Errorf(innerXErr.Error())
+				return innerXErr
 			}
 			if server == nil {
 				return fail.NewError("failed to create server")
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
-			if zoneErr != nil {
-				logrus.Tracef("Host successfully created but can't confirm AZ: %s", zoneErr)
+			// Starting from here, delete host if exiting with error
+			defer func() {
+				if xerr != nil {
+					derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+						func() error {
+							err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+							return NormalizeError(err)
+						},
+						temporal.GetCommunicationTimeout(),
+					)
+					if derr != nil {
+						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+					}
+				}
+			}()
+
+			creationZone, innerXErr := s.GetAvailabilityZoneOfServer(server.ID)
+			if innerXErr != nil {
+				logrus.Tracef("Host successfully created but cannot confirm AZ: %s", innerXErr)
 			} else {
 				logrus.Tracef("Host successfully created in requested AZ '%s'", creationZone)
 				if creationZone != srvOpts.AvailabilityZone {
@@ -817,27 +831,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 				}
 			}
 
-			// Starting from here, delete host if exiting with error
-			defer func() {
-				if innerErr != nil {
-					derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
-						func() error {
-							err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-							return NormalizeError(err)
-						},
-						temporal.GetCommunicationTimeout(),
-					)
-					if derr != nil {
-						logrus.Errorf("cleaning up on failure: %s", derr.Error())
-					}
-				}
-			}()
-
 			ahc.ID = server.ID
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			var innerXErr fail.Error
 			server, innerXErr = s.WaitHostState(ahc, hoststate.STARTED, temporal.GetHostTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -853,6 +850,13 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	)
 	if retryErr != nil {
 		return nullAhf, nullUdc, retryErr
+	}
+
+	// update Security Group of port on Provider Network
+	if request.IsGateway || request.PublicIP {
+		if xerr = s.updateSecurityGroupOfExternalPort(ahc, sgs); xerr != nil {
+			return nullAhf, nullUdc, fail.Wrap(xerr, "failed to update Security Group of Internet interface used by host")
+		}
 	}
 
 	logrus.Debugf("host resource created.")
@@ -880,7 +884,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if xerr != nil {
 		return nullAhf, nullUdc, xerr
 	}
-	newHost.Subnet.DefaultSubnetID = defaultNetworkID
+	newHost.Subnet.DefaultSubnetID = defaultSubnetID
 	// newHost.Network.DefaultGatewayID = defaultGatewayID
 	// newHost.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	newHost.Subnet.IsGateway = request.IsGateway
@@ -935,6 +939,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			return nullAhf, nullUdc, xerr
 		}
 
+		// FIXME: Apply Security Group for gateway of Subnet to the first NIC of the gateway ?
+
 		if ipversion.IPv4.Is(ip.IP) {
 			newHost.Subnet.PublicIPv4 = ip.IP
 		} else if ipversion.IPv6.Is(ip.IP) {
@@ -945,6 +951,143 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	logrus.Infoln(msgSuccess)
 	return newHost, userData, nil
+}
+
+// identifyOpenstackSubnets ...
+func (s *Stack) identifyOpenstackSubnets(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, sgs []string, xerr fail.Error) {
+	sgs = []string{}
+	nets = []servers.Network{}
+
+	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
+		if request.PublicIP {
+			sgs = []string{defaultSubnet.PublicSecurityGroupID}
+		}
+		// IsGateway state takes precedence over PublicIP
+		if request.IsGateway {
+			sgs = []string{defaultSubnet.GWSecurityGroupID}
+		}
+	}
+
+	// private networks
+	for _, n := range request.Subnets {
+		req := ports.CreateOpts{
+			NetworkID:      n.Network,
+			Name:           fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
+			Description:    fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
+			FixedIPs:       []ports.IP{{SubnetID: n.ID}},
+			SecurityGroups: &sgs,
+		}
+		port, xerr := s.createPort(req)
+		if xerr != nil {
+			return nets, sgs, fail.Wrap(xerr, "failed to create port on subnet '%s'", n.Name)
+		}
+
+		defer func() {
+			if xerr != nil && !request.KeepOnFailure {
+				if derr := s.deletePort(port.ID); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", port.ID))
+				}
+			}
+		}()
+
+		nets = append(nets, servers.Network{Port: port.ID})
+	}
+
+	// If floating IPs are not used and host is public
+	// then add provider external network to host networks
+	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
+		adminState := false
+		req := ports.CreateOpts{
+			NetworkID:   s.ProviderNetworkID,
+			Name:        fmt.Sprintf("nic_%s_external", request.ResourceName),
+			Description: fmt.Sprintf("nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork),
+			//	FixedIPs:       []ports.IP{{SubnetID: n.ID}},
+			SecurityGroups: &sgs,
+			AdminStateUp:   &adminState,
+		}
+		port, xerr := s.createPort(req)
+		if xerr != nil {
+			return nets, sgs, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
+		}
+
+		defer func() {
+			if xerr != nil && !request.KeepOnFailure {
+				if derr := s.deletePort(port.ID); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", port.ID))
+				}
+			}
+		}()
+
+		nets = append(nets, servers.Network{Port: port.ID})
+
+		//nets = append(nets, servers.Network{UUID: s.ProviderNetworkID})
+	}
+
+	return nets, sgs, nil
+}
+
+// provideCredentialsIfNeeded ...
+func (s *Stack) provideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
+	if request == nil {
+		return fail.InvalidParameterError("request", "cannot be nil")
+	}
+
+	// If no key pair is supplied create one
+	if request.KeyPair == nil {
+		id, err := uuid.NewV4()
+		if err != nil {
+			xerr = fail.Wrap(err, "failed to create host UUID")
+			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+			return xerr
+		}
+
+		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
+		request.KeyPair, xerr = s.CreateKeyPair(name)
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to create host key pair")
+			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+			return xerr
+		}
+
+		defer func() {
+			if xerr != nil && !request.KeepOnFailure {
+				if derr := s.DeleteKeyPair(name); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host keypair"))
+				}
+			}
+		}()
+	}
+
+	// If no password is supplied, generate one
+	if request.Password == "" {
+		password, err := utils.GeneratePassword(16)
+		if err != nil {
+			return fail.Wrap(err, "failed to generate operator password")
+		}
+		request.Password = password
+	}
+
+	return nil
+}
+
+// updateSecurityGroupOfExternalPort ...
+func (s *Stack) updateSecurityGroupOfExternalPort(ahc *abstract.HostCore, sgs []string) fail.Error {
+	list, xerr := s.listPorts(ports.ListOpts{
+		DeviceID: ahc.ID,
+	})
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to list ports attached to host")
+	}
+	for _, v := range list {
+		if v.NetworkID == s.ProviderNetworkID {
+			xerr = s.updatePort(v.ID, ports.UpdateOpts{SecurityGroups: &sgs})
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to update Security Groups of port from Network '%s'", s.cfgOpts.ProviderNetwork)
+			}
+			break
+		}
+	}
+	return nil
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
@@ -1267,6 +1410,20 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
+	// list ports to be able to remove them
+	req := ports.ListOpts{
+		DeviceID: ahf.Core.ID,
+	}
+	portList, xerr := s.listPorts(req)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		// continue
+		default:
+			return xerr
+		}
+	}
+
 	// Try to remove host for 3 minutes
 	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
@@ -1344,6 +1501,18 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	// if !resourcePresent {
 	//     return abstract.ResourceNotFoundError("host", hostRef)
 	// }
+
+	// Removes ports freed from host
+	var errors []error
+	for _, v := range portList {
+		derr := s.deletePort(v.ID)
+		if derr != nil {
+			errors = append(errors, fail.Wrap(derr, "failed to delete port %s (%s)", v.ID, v.Description))
+		}
+	}
+	if len(errors) > 0 {
+		return fail.NewErrorList(errors)
+	}
 	return nil
 }
 
@@ -1436,7 +1605,8 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 }
 
 // BindSecurityGroupToHost binds a security group to a host
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+// If Security Group is already bound to Host, returns *fail.ErrDuplicate
+func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter /*ip string, */, sgParam stacks.SecurityGroupParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}

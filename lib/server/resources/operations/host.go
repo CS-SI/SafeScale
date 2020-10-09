@@ -58,6 +58,8 @@ import (
 const (
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
+
+	defaultHostSecurityGroupNamePattern = "host_%s_default_sg"
 )
 
 // host ...
@@ -414,7 +416,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// Check if host exists and is managed bySafeScale
 	if _, xerr = LoadHost(task, svc, hostReq.ResourceName); xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		// continue
+		default:
 			return nil, fail.Wrap(xerr, "failed to check if host '%s' already exists", hostReq.ResourceName)
 		}
 	} else {
@@ -423,7 +428,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// Check if host exists but is not managed by SafeScale
 	if _, xerr = svc.InspectHostByName(hostReq.ResourceName); xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
 			return nil, fail.Wrap(xerr, "failed to check if host resource name '%s' is already used", hostReq.ResourceName)
 		}
 	} else {
@@ -438,6 +446,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}
 
+	// identify default Subnet
 	var rs resources.Subnet
 	if len(hostReq.Subnets) > 0 {
 		// By convention, default subnet is the first of the list
@@ -458,6 +467,27 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 				return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			hostReq.Subnets = append(hostReq.Subnets, as)
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+
+	// Query Subnet's Security Group to use depending of the kind of Host created
+	var subnetSecurityGroupID string
+	if hostReq.IsGateway || hostReq.PublicIP {
+		xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			if hostReq.PublicIP {
+				subnetSecurityGroupID = as.PublicSecurityGroupID
+			}
+			if hostReq.IsGateway {
+				subnetSecurityGroupID = as.GWSecurityGroupID
+			}
 			return nil
 		})
 		if xerr != nil {
@@ -507,6 +537,43 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}()
 
+	// Bind needed security groups, ie the default one of the default Subnet...
+	//rsg, xerr := LoadSecurityGroup(task, svc, subnetSecurityGroupID)
+	//if xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to query Subnet '%s' default Security Group '%s'", rs.GetName())
+	//}
+	//if xerr = rsg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to apply default subnet security group '%s' to host '%s'", rsg.GetName(), hostReq.ResourceName)
+	//}
+
+	//////// ... and a dedicated default one for the host (with no rules by default)
+	//////rn, xerr := rs.InspectNetwork(task)
+	//////if xerr != nil {
+	//////	return nil, fail.Wrap(xerr, "failed to query Network of Subnet '%s'", rs.GetName())
+	//////}
+	//////sgName := fmt.Sprintf(defaultHostSecurityGroupNamePattern, hostReq.ResourceName)
+	//////rsg, xerr = NewSecurityGroup(svc)
+	//////if xerr != nil {
+	//////	return nil, fail.Wrap(xerr, "failed to instantiate a new Security Group")
+	//////}
+	//////if xerr = rsg.Create(task, rn, sgName, fmt.Sprintf("Host %s default Security Group", hostReq.ResourceName), abstract.SecurityGroupRules{}); xerr != nil {
+	//////	return nil, fail.Wrap(xerr, "failed to create Host '%s' default Security Group '%s'", hostReq.ResourceName, sgName)
+	//////}
+	////
+	////// Starting from here, deletes the Security Group created to act as default for Host
+	////defer func() {
+	////	if xerr != nil && !hostReq.KeepOnFailure {
+	////		if derr := rsg.Delete(task); derr != nil {
+	////			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host default Seurity Group '%s'", rsg.GetName()))
+	////		}
+	////	}
+	////}()
+	//
+	//// Bind freshly created Security Group to the host as default
+	//if xerr = rsg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to bind Security Group '%s' to host '%s'", sgName, hostReq.ResourceName)
+	//}
+
 	// Updates properties in metadata
 	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(task, hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
@@ -550,7 +617,8 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 
 		// Updates host property propertiesv1.HostSubnet
-		return props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
+		// FIXME: introduce a NetworkV2 with correctly named fields (Network -> Subnet, ...)
+		innerXErr = props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -560,6 +628,20 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			hostNetworkV1.IsGateway = hostReq.IsGateway // hostReq.getDefaultRouteIP == "" && rs.GetName() != abstract.SingleHostNetworkName
 			return nil
 		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		//// Updates Host's default Security Group
+		//return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		//	sgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+		//	if !ok {
+		//		return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		//	}
+		//	sgV1.DefaultID = rsg.GetID()
+		//	return nil
+		//})
+		return nil
 	})
 	if xerr != nil {
 		return nil, xerr
@@ -576,11 +658,11 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// claiming host is created
 	logrus.Infof("Waiting start of SSH service on remote host '%s' ...", rh.GetName())
 
-	// TODO: configurable timeout here
+	// FIXME: configurable timeout here
 	status, xerr := rh.waitInstallPhase(task, userdata.PHASE1_INIT, time.Duration(0))
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrTimeout); ok {
-			return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
+			return nil, fail.Wrap(xerr, "timeout creating a host")
 		}
 		if abstract.IsProvisioningError(xerr) {
 			logrus.Errorf("%+v", xerr)
@@ -589,9 +671,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return nil, xerr
 	}
 
-	// -- update host property propertiesv1.HostSystem --
-	xerr = rh.Alter(task, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
-		return properties.Alter(task, hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
+	xerr = rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// update host system property
+		return props.Alter(task, hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -605,6 +687,17 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	})
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// Apply Security Group to new Host
+	if subnetSecurityGroupID != "" {
+		rsg, xerr := LoadSecurityGroup(task, svc, subnetSecurityGroupID)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to load Security Group %s", subnetSecurityGroupID)
+		}
+		if xerr = rh.BindSecurityGroup(task, rsg, resources.SecurityGroupEnable); xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to bind Subnet Security Group to Host")
+		}
 	}
 
 	// -- Updates host link with networks --
@@ -648,7 +741,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		// TODO: configurable timeout here
 		if status, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
 			if _, ok := xerr.(*fail.ErrTimeout); ok {
-				return nil, fail.Wrap(xerr, "ErrTimeout creating a host")
+				return nil, fail.Wrap(xerr, "timeout creating a host")
 			}
 			if abstract.IsProvisioningError(xerr) {
 				logrus.Errorf("%+v", xerr)
@@ -770,7 +863,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase, ti
 	status, xerr := sshCfg.WaitServerReady(task, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrTimeout); ok {
-			return status, fail.Wrap(xerr, "ErrTimeout creating a host")
+			return status, fail.Wrap(xerr, "timeout creating a host")
 		}
 		if abstract.IsProvisioningError(xerr) {
 			logrus.Errorf("%+v", xerr)
@@ -2234,11 +2327,9 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 			}
 
 			sgID := sg.GetID()
-			// First check if the security group is not already registered for the host with the exact same state
-			for k, v := range hsgV1.ByID {
-				if k == sgID && v.Disabled == bool(!enable) {
-					return fail.DuplicateError("security group '%s' already bound to host")
-				}
+			// If the Security Group is already bound to the host with the exact same state, consider as a success
+			if v, ok := hsgV1.ByID[sgID]; ok && v.Disabled == !bool(enable) {
+				return nil
 			}
 
 			// Not found, add it
@@ -2251,7 +2342,16 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 			hsgV1.ByName[sg.GetName()] = item
 
 			// If enabled, apply it
-			return sg.BindToHost(task, rh, enable)
+			innerXErr := sg.BindToHost(task, rh, enable, resources.MarkSecurityGroupAsSupplemental)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrDuplicate:
+				// already bound, success
+				default:
+					return innerXErr
+				}
+			}
+			return nil
 		})
 	})
 }

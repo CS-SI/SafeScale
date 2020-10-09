@@ -219,14 +219,14 @@ func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	an.Name = vpc.Name
 	an.CIDR = vpc.CIDR
 
-	subnets, xerr := s.ListSubnets(an.ID)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to list subnets of Network/VPC")
-	}
-	an.Subnets = make([]string, 0, len(subnets))
-	for _, v := range subnets {
-		an.Subnets = append(an.Subnets, v.ID)
-	}
+	//subnets, xerr := s.ListSubnets(an.ID)
+	//if xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to list subnets of Network/VPC")
+	//}
+	//an.Subnets = make([]string, 0, len(subnets))
+	//for _, v := range subnets {
+	//	an.Subnets = append(an.Subnets, v.ID)
+	//}
 	return an, nil
 }
 
@@ -827,7 +827,7 @@ func fromIntIPVersion(v int) ipversion.Enum {
 // If public is set to true,
 func (s Stack) CreateVIP(subnetID string, name string) (*abstract.VirtualIP, fail.Error) {
 	if subnetID == "" {
-
+		return nil, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")

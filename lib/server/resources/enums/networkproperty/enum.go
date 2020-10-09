@@ -20,8 +20,7 @@ package networkproperty
 type Enum string
 
 const (
-	DescriptionV1    = "1" // contains optional additional info describing host (purpose, ...)
-	HostsV1          = "2" // OBSOLETE: moved to subnetproperty: contains list of hosts attached to the network
-	SecurityGroupsV1 = "3" // OBSOLETE: moved to subnetproperty: contains optional additional information about security groups binded to the host
-	SubnetsV1        = "4" // contains the subnets created in the network
+	DescriptionV1 = "1" // contains optional additional info describing Network (purpose, ...)
+	HostsV1       = "2" // OBSOLETE: moved to subnetproperty: contains list of hosts attached to the network
+	SubnetsV1     = "3" // contains the subnets created in the network
 )

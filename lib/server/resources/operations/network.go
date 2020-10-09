@@ -18,6 +18,8 @@ package operations
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"reflect"
 	"time"
 
@@ -163,23 +165,23 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		}
 	}
 
-	// Starting from here, delete subnet if exiting with error
-	defer func() {
-		if xerr != nil && an != nil && !req.KeepOnFailure {
-			derr := svc.DeleteNetwork(an.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf("failed to delete Network: resource not found: %+v", derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf("failed to delete Network: timeout: %+v", derr)
-				default:
-					logrus.Errorf("failed to delete Network: %+v", derr)
-				}
-				_ = xerr.AddConsequence(derr)
-			}
-		}
-	}()
+	//// Starting from here, delete subnet if exiting with error
+	//defer func() {
+	//	if xerr != nil && an != nil && !req.KeepOnFailure {
+	//		derr := svc.DeleteNetwork(an.ID)
+	//		if derr != nil {
+	//			switch derr.(type) {
+	//			case *fail.ErrNotFound:
+	//				logrus.Errorf("failed to delete Network: resource not found: %+v", derr)
+	//			case *fail.ErrTimeout:
+	//				logrus.Errorf("failed to delete Network: timeout: %+v", derr)
+	//			default:
+	//				logrus.Errorf("failed to delete Network: %+v", derr)
+	//			}
+	//			_ = xerr.AddConsequence(derr)
+	//		}
+	//	}
+	//}()
 
 	// Write subnet object metadata
 	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
@@ -421,7 +423,6 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	rn.SafeLock(task)
 	defer rn.SafeUnlock(task)
 
-	// var gwID string
 	xerr = rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
@@ -430,15 +431,54 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 
 		svc := rn.GetService()
 
+		var subnets map[string]string
+		innerXErr := props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			subnets = subnetsV1.ByName
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		subnetsLen := len(subnets)
+		switch subnetsLen {
+		case 0:
+			// no subnet, continue to delete the network
+		case 1:
+			var found bool
+			for k, v := range subnets {
+				if k == rn.GetName() {
+					found = true
+					// the single subnet present is a subnet named like the network, delete it first
+					rs, xerr := LoadSubnet(task, svc, "", v)
+					if xerr != nil {
+						return xerr
+					}
+					if xerr = rs.Delete(task); xerr != nil {
+						return xerr
+					}
+				}
+			}
+			if !found {
+				return fail.InvalidRequestError("failed to delete Network '%s', 1 subnet still inside", rn.GetName())
+			}
+		default:
+			return fail.InvalidRequestError("failed to delete Network '%s', %d subnets still inside", rn.GetName(), subnetsLen)
+		}
+
 		waitMore := false
 		// delete subnet, with tolerance
-		innerErr := svc.DeleteNetwork(an.ID)
-		if innerErr != nil {
-			switch innerErr.(type) {
+		innerXErr = svc.DeleteNetwork(an.ID)
+		if innerXErr != nil {
+			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
-				logrus.Warnf("subnet not found on provider side, cleaning up metadata.")
-				return innerErr
+				logrus.Warnf("network not found on provider side, cleaning up metadata.")
+				return innerXErr
 			case *fail.ErrTimeout:
 				logrus.Error("cannot delete subnet due to a timeout")
 				waitMore = true
@@ -461,10 +501,10 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 				temporal.GetContextTimeout(),
 			)
 			if errWaitMore != nil {
-				_ = innerErr.AddConsequence(errWaitMore)
+				_ = innerXErr.AddConsequence(errWaitMore)
 			}
 		}
-		return innerErr
+		return innerXErr
 	})
 	if xerr != nil {
 		return xerr
@@ -867,5 +907,12 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
 func (rn network) InspectSubnet(task concurrency.Task, ref string) (resources.Subnet, fail.Error) {
-	return nil, fail.NotImplementedError()
+	if rn.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+
+	return LoadSubnet(task, rn.GetService(), rn.GetID(), ref)
 }
