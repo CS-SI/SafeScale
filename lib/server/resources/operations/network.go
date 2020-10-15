@@ -718,11 +718,31 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 
-	pn := &protocol.Network{
-		Id:   rn.GetID(),
-		Name: rn.GetName(),
-		Cidr: rn.CIDR(task),
-	}
+	var pn *protocol.Network
+	xerr = rn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+
+		}
+
+		pn = &protocol.Network{
+			Id:   an.ID,
+			Name: an.Name,
+			Cidr: an.CIDR,
+		}
+
+		return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			for k := range nsV1.ByName {
+				pn.Subnets = append(pn.Subnets, k)
+			}
+			return nil
+		})
+	})
 	return pn, nil
 }
 

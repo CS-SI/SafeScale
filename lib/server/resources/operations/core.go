@@ -374,7 +374,7 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *fail.ErrTimeout:
-			return fail.NotFoundError("failed to find '%s'", ref)
+			return fail.NotFoundError("failed to find %s '%s'", c.kind, ref)
 		default:
 			return xerr
 		}

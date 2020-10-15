@@ -147,9 +147,9 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 	)()
 	defer fail.OnPanic(&xerr)
 
-	//if xerr = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
-	//	return nil, xerr
-	//}
+	if xerr = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
+		return nil, xerr
+	}
 
 	if xerr = objgw.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userData); xerr != nil {
 		return nil, xerr

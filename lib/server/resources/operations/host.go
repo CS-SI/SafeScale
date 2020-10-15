@@ -1107,7 +1107,7 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 	}
 
 	// if host is not a gateway, executes userdata.PHASE4 and 5 script to configure subnet and security
-	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations.subnet.go)
+	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
 	if !req.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
 		if xerr := rh.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userdataContent); xerr != nil {
@@ -1247,16 +1247,299 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	// rh.SafeLock(task)
-	// defer rh.SafeUnlock(task)
+	rh.SafeLock(task)
+	defer rh.SafeUnlock(task)
+
+	xerr := rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// Don't remove a host that is a gateway
+		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			if hostNetworkV2.IsGateway {
+				return fail.NotAvailableError("cannot delete host, it's a gateway that can only be deleted through its subnet")
+			}
+			return nil
+		})
+
+		//// Don't remove a host having shares that are currently remotely mounted
+		//var shares map[string]*propertiesv1.HostShare
+		//innerXErr = properties.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+		//	sharesV1, ok := clonable.(*propertiesv1.HostShares)
+		//	if !ok {
+		//		return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		//	}
+		//	shares = sharesV1.ByID
+		//	shareCount := len(shares)
+		//	for _, hostShare := range shares {
+		//		count := len(hostShare.ClientsByID)
+		//		if count > 0 {
+		//			// clients found, checks if these clients already exists...
+		//			for _, hostID := range hostShare.ClientsByID {
+		//				_, inErr := LoadHost(task, svc, hostID)
+		//				if inErr == nil {
+		//					return fail.NotAvailableError("exports %d share%s and at least one share is mounted", shareCount, strprocess.Plural(uint(shareCount)))
+		//				}
+		//			}
+		//		}
+		//	}
+		//	return nil
+		//})
+		//if innerXErr != nil {
+		//	return innerXErr
+		//}
+
+		//// Don't remove a host with volumes attached
+		//innerXErr = properties.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		//	hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
+		//	if !ok {
+		//		return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		//	}
+		//	nAttached := len(hostVolumesV1.VolumesByID)
+		//	if nAttached > 0 {
+		//		return fail.NotAvailableError("host has %d volume%s attached", nAttached, strprocess.Plural(uint(nAttached)))
+		//	}
+		//	return nil
+		//})
+		//if innerXErr != nil {
+		//	return innerXErr
+		//}
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	return rh.relaxedDeleteHost(task)
+
+	//	// If host mounted shares, unmounts them before anything else
+	//	var mounts []*propertiesv1.HostShare
+	//	innerXErr = properties.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+	//		hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+	//		if !ok {
+	//			return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	//		}
+	//		for _, i := range hostMountsV1.RemoteMountsByPath {
+	//			// Retrieve share data
+	//			objs, loopErr := NewShare(svc)
+	//			if loopErr != nil {
+	//				return loopErr
+	//			}
+	//			loopErr = objs.Read(task, i.ShareID)
+	//			if loopErr != nil {
+	//				return loopErr
+	//			}
+	//
+	//			// Retrieve data about the server serving the share
+	//			objserver, loopErr := objs.GetServer(task)
+	//			if loopErr != nil {
+	//				return loopErr
+	//			}
+	//			// Retrieve data about share from its server
+	//			share, loopErr := objserver.GetShare(task, i.ShareID)
+	//			if loopErr != nil {
+	//				return loopErr
+	//			}
+	//			mounts = append(mounts, share)
+	//		}
+	//		return nil
+	//	})
+	//	if innerXErr != nil {
+	//		return innerXErr
+	//	}
+	//
+	//	// Unmounts tier shares mounted on host (done outside the previous host.properties.Reading() section, because
+	//	// Unmount() have to lock for write, and won't succeed while host.properties.Reading() is running,
+	//	// leading to a deadlock)
+	//	for _, item := range mounts {
+	//		objs, loopErr := LoadShare(task, svc, item.ID)
+	//		if loopErr != nil {
+	//			return loopErr
+	//		}
+	//		loopErr = objs.Unmount(task, rh)
+	//		if loopErr != nil {
+	//			return loopErr
+	//		}
+	//	}
+	//
+	//	// if host exports shares, delete them
+	//	for _, share := range shares {
+	//		objs, loopErr := LoadShare(task, svc, share.Name)
+	//		if loopErr != nil {
+	//			return loopErr
+	//		}
+	//		loopErr = objs.Delete(task)
+	//		if loopErr != nil {
+	//			return loopErr
+	//		}
+	//	}
+	//
+	//	// Update networks property propertiesv1.HostNetwork to remove the reference to the host
+	//	innerXErr = properties.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+	//		hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
+	//		if !ok {
+	//			return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	//		}
+	//		hostID := rh.GetID()
+	//		hostName := rh.GetName()
+	//		var errors []error
+	//		for k := range hostNetworkV2.SubnetsByID {
+	//			rn, loopErr := LoadNetwork(task, svc, k)
+	//			if loopErr != nil {
+	//				logrus.Errorf(loopErr.Error())
+	//				errors = append(errors, loopErr)
+	//				continue
+	//			}
+	//			loopErr = rn.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
+	//				return netprops.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	//					networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
+	//					if !ok {
+	//						return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	//					}
+	//					delete(networkHostsV1.ByID, hostID)
+	//					delete(networkHostsV1.ByName, hostName)
+	//					return nil
+	//				})
+	//			})
+	//			if loopErr != nil {
+	//				logrus.Errorf(loopErr.Error())
+	//				errors = append(errors, loopErr)
+	//			}
+	//		}
+	//		return fail.NewErrorList(errors)
+	//	})
+	//	if innerXErr != nil {
+	//		return innerXErr
+	//	}
+	//
+	//	// Unbind Security Group from host
+	//	innerXErr = properties.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+	//		hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+	//		if !ok {
+	//			return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	//		}
+	//
+	//		// Unbind Security Groups from Host
+	//		var errors []error
+	//		for _, v := range hsgV1.ByID {
+	//			rsg, derr := LoadSecurityGroup(task, svc, v.ID)
+	//			if derr == nil {
+	//				derr = rsg.UnbindFromHost(task, rh)
+	//			}
+	//			if derr != nil {
+	//				switch derr.(type) {
+	//				case *fail.ErrNotFound:
+	//					// Consider that a Security Group that cannot be loaded or is not bound as a success
+	//				default:
+	//					errors = append(errors, derr)
+	//				}
+	//			}
+	//		}
+	//		if len(errors) > 0 {
+	//			return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
+	//		}
+	//
+	//		// Delete default Security Group of Host
+	//		if hsgV1.DefaultID != "" {
+	//			rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
+	//			if derr == nil {
+	//				derr = rsg.Delete(task)
+	//			}
+	//			if derr != nil {
+	//				switch derr.(type) {
+	//				case *fail.ErrNotFound:
+	//					// Consider a Security Group that cannot be found as a success
+	//				default:
+	//					return fail.Wrap(derr, "failed to delete default Security Group of Host")
+	//				}
+	//			}
+	//		}
+	//		return nil
+	//	})
+	//	if innerXErr != nil {
+	//		return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+	//	}
+	//
+	//	// Conditions are met, delete host
+	//	waitForDeletion := true
+	//	delErr := retry.WhileUnsuccessfulDelay1Second(
+	//		func() error {
+	//			// FIXME: need to remove retry from svc.DeleteHost!
+	//			err := svc.DeleteHost(hostID)
+	//			if err != nil {
+	//				if _, ok := err.(*fail.ErrNotFound); !ok {
+	//					return fail.Wrap(err, "cannot delete host")
+	//				}
+	//				// logrus.Warn("host resource not found on provider side, host metadata will be removed for consistency")
+	//				waitForDeletion = false
+	//			}
+	//			return nil
+	//		},
+	//		time.Minute*5,
+	//	)
+	//	if delErr != nil {
+	//		return delErr
+	//	}
+	//
+	//	// wait for effective host deletion
+	//	if waitForDeletion {
+	//		innerXErr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	//			func() error {
+	//				// FIXME: need to remove retry from svc.GetHostState if the issues are not communication issues!
+	//				if state, stateErr := svc.GetHostState(rh.GetID()); stateErr == nil {
+	//					logrus.Warnf("While deleting the status was [%s]", state)
+	//					if state == hoststate.ERROR {
+	//						return fail.NotAvailableError("host is in state ERROR")
+	//					}
+	//				} else {
+	//					return stateErr
+	//				}
+	//				return nil
+	//			},
+	//			time.Minute*2, // FIXME: static duration
+	//		)
+	//		if innerXErr != nil {
+	//			return innerXErr
+	//		}
+	//	}
+	//
+	//	return nil
+	//})
+	//if xerr != nil {
+	//	return xerr
+	//}
+	//
+	//// Deletes metadata from Object Storage
+	//if xerr = rh.core.Delete(task); xerr != nil {
+	//	// If entry not found, considered as success
+	//	if _, ok := xerr.(*fail.ErrNotFound); !ok {
+	//		return xerr
+	//	}
+	//}
+	//
+	//newHost := nullHost()
+	//*rh = *newHost
+	//return nil
+}
+
+// relaxedDeleteHost is the method that really deletes a host, being a gateway or not
+func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
+	if rh.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	rh.SafeLock(task)
+	defer rh.SafeUnlock(task)
 
 	svc := rh.GetService()
 
-	hostID := rh.GetID()
-	xerr := rh.Alter(task, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
+	var shares map[string]*propertiesv1.HostShare
+	xerr := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Don't remove a host having shares that are currently remotely mounted
-		var shares map[string]*propertiesv1.HostShare
-		innerXErr := properties.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1282,7 +1565,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		}
 
 		// Don't remove a host with volumes attached
-		innerXErr = properties.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1293,54 +1576,37 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 			}
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
-		}
+	})
+	if xerr != nil {
+		return xerr
+	}
 
-		// Don't remove a host that is a gateway
-		innerXErr = properties.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if hostNetworkV2.IsGateway {
-				return fail.NotAvailableError("cannot delete host, it's a gateway that can only be deleted through its subnet")
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
+	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// If host mounted shares, unmounts them before anything else
 		var mounts []*propertiesv1.HostShare
-		innerXErr = properties.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			for _, i := range hostMountsV1.RemoteMountsByPath {
-				// Retrieve share data
-				objs, loopErr := NewShare(svc)
-				if loopErr != nil {
-					return loopErr
-				}
-				loopErr = objs.Read(task, i.ShareID)
+				// Retrieve item data
+				rshare, loopErr := LoadShare(task, svc, i.ShareID)
 				if loopErr != nil {
 					return loopErr
 				}
 
-				// Retrieve data about the server serving the share
-				objserver, loopErr := objs.GetServer(task)
+				// Retrieve data about the server serving the item
+				rhServer, loopErr := rshare.GetServer(task)
 				if loopErr != nil {
 					return loopErr
 				}
-				// Retrieve data about share from its server
-				share, loopErr := objserver.GetShare(task, i.ShareID)
+				// Retrieve data about item from its server
+				item, loopErr := rhServer.GetShare(task, i.ShareID)
 				if loopErr != nil {
 					return loopErr
 				}
-				mounts = append(mounts, share)
+				mounts = append(mounts, item)
 			}
 			return nil
 		})
@@ -1363,8 +1629,8 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		}
 
 		// if host exports shares, delete them
-		for _, share := range shares {
-			objs, loopErr := LoadShare(task, svc, share.Name)
+		for _, v := range shares {
+			objs, loopErr := LoadShare(task, svc, v.Name)
 			if loopErr != nil {
 				return loopErr
 			}
@@ -1375,7 +1641,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		}
 
 		// Update networks property propertiesv1.HostNetwork to remove the reference to the host
-		innerXErr = properties.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1384,7 +1650,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 			hostName := rh.GetName()
 			var errors []error
 			for k := range hostNetworkV2.SubnetsByID {
-				rn, loopErr := LoadNetwork(task, svc, k)
+				rn, loopErr := LoadSubnet(task, svc, "", k)
 				if loopErr != nil {
 					logrus.Errorf(loopErr.Error())
 					errors = append(errors, loopErr)
@@ -1413,7 +1679,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		}
 
 		// Unbind Security Group from host
-		innerXErr = properties.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1462,23 +1728,25 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 
 		// Conditions are met, delete host
 		waitForDeletion := true
-		delErr := retry.WhileUnsuccessfulDelay1Second(
+		innerXErr = retry.WhileUnsuccessfulDelay1Second(
 			func() error {
 				// FIXME: need to remove retry from svc.DeleteHost!
-				err := svc.DeleteHost(hostID)
-				if err != nil {
-					if _, ok := err.(*fail.ErrNotFound); !ok {
-						return fail.Wrap(err, "cannot delete host")
+				derr := svc.DeleteHost(rh.GetID())
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// A host not found is considered as a successful deletion
+					default:
+						return fail.Wrap(derr, "cannot delete host")
 					}
-					// logrus.Warn("host resource not found on provider side, host metadata will be removed for consistency")
 					waitForDeletion = false
 				}
 				return nil
 			},
-			time.Minute*5,
+			time.Minute*5, // FIXME: hardcoded timeout
 		)
-		if delErr != nil {
-			return delErr
+		if innerXErr != nil {
+			return innerXErr
 		}
 
 		// wait for effective host deletion
@@ -1496,7 +1764,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 					}
 					return nil
 				},
-				time.Minute*2, // FIXME: static duration
+				time.Minute*2, // FIXME: hardcoded duration
 			)
 			if innerXErr != nil {
 				return innerXErr

@@ -640,8 +640,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		defer func() {
 			if xerr != nil && !req.KeepOnFailure {
 				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-				derr := rs.deleteGateway(task, primaryGateway)
-				if derr != nil {
+				if derr := primaryGateway.relaxedDeleteHost(task); xerr != nil {
 					switch derr.(type) {
 					case *fail.ErrTimeout:
 						logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
@@ -652,8 +651,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 					logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 				}
 				if failover {
-					if derr = rs.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
-						_ = xerr.AddConsequence(derr)
+					if derr := rs.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind VIP from gateway"))
 					}
 				}
 			}
@@ -674,8 +673,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if xerr != nil && !req.KeepOnFailure {
-					derr := rs.deleteGateway(task, secondaryGateway)
-					if derr != nil {
+					if derr := secondaryGateway.relaxedDeleteHost(task); xerr != nil {
 						switch derr.(type) {
 						case *fail.ErrTimeout:
 							logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
@@ -683,8 +681,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 						}
 						_ = xerr.AddConsequence(derr)
 					}
-					if derr = rs.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
-						_ = xerr.AddConsequence(derr)
+					if derr := rs.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind VIP from gateway"))
 					}
 				}
 			}()
@@ -953,39 +951,6 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 	}
 
 	return sg, cancelFunc, nil
-}
-
-// deleteGateway eases a gateway deletion
-// Note: doesn't use gw.Remove() because by rule a Delete on a gateway is not permitted
-func (rs subnet) deleteGateway(task concurrency.Task, gw resources.Host) (xerr fail.Error) {
-	name := gw.GetName()
-	fail.OnExitLogError(&xerr, "failed to delete gateway '%s'", name)
-
-	var errors []error
-	if xerr = rs.GetService().DeleteHost(gw.GetID()); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound: // host resource not found, considered as a success.
-			break
-		case *fail.ErrTimeout:
-			errors = append(errors, fail.Wrap(xerr, "failed to delete host '%s', timeout", name))
-		default:
-			errors = append(errors, fail.Wrap(xerr, "failed to delete host '%s'", name))
-		}
-	}
-	if xerr = gw.(*host).core.Delete(task); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound: // host metadata not found, considered as a success.
-			break
-		case *fail.ErrTimeout:
-			errors = append(errors, fail.Wrap(xerr, "timeout trying to delete gateway metadata", name))
-		default:
-			errors = append(errors, fail.Wrap(xerr, "failed to delete gateway '%s' metadata", name))
-		}
-	}
-	if len(errors) > 0 {
-		return fail.NewErrorList(errors)
-	}
-	return nil
 }
 
 func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) fail.Error {
@@ -1423,8 +1388,7 @@ func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet)
 				}
 			} else {
 				logrus.Debugf("Deleting gateway '%s'...", rh.GetName())
-				xerr = rs.deleteGateway(task, rh)
-				if xerr != nil {
+				if xerr := rh.(*host).relaxedDeleteHost(task); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						logrus.Infof("Gateway seems already deleted")
