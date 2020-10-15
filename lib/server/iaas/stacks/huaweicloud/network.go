@@ -613,6 +613,8 @@ func (s Stack) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
 					item := abstract.NewSubnet()
 					item.ID = v.ID
 					item.Name = v.Name
+					item.CIDR = v.CIDR
+					item.Network = networkRef
 					item.IPVersion = ipversion.Enum(v.IPVersion)
 					item.DNSServers = v.DNSNameservers
 					subnetList = append(subnetList, item)
