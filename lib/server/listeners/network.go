@@ -255,7 +255,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer job.Close()
 	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, true /*tracing.SjouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
