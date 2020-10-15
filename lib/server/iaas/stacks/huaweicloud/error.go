@@ -62,6 +62,8 @@ func reduceHuaweicloudError(in []byte) (xerr fail.Error) {
 			switch code {
 			case "VPC.0101":
 				return fail.NotFoundError("failed to find VPC")
+			case "VPC.0209":
+				return fail.NotAvailableError("subnet still in use")
 			}
 		}
 	}
