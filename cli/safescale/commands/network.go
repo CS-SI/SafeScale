@@ -140,42 +140,105 @@ var networkInspect = &cli.Command{
 		jsoned, _ := json.Marshal(network)
 		_ = json.Unmarshal(jsoned, &mapped)
 
-		// Get gateway(s) information (needs the name(s) in the output map)
-		var pgw, sgw *protocol.Host
-		pgwID := network.GetGatewayId()
-		sgwID := network.GetSecondaryGatewayId()
+		if len(network.Subnets) == 1 {
+			if network.Subnets[0] == network.Name {
+				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.GetExecutionTimeout())
+				if err != nil {
+					err = fail.FromGRPCStatus(err)
+					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
+				}
 
-		// Added operation status
-		opState := network.State
-		mapped["state"] = opState.String()
+				subnetMapped := map[string]interface{}{}
+				jsoned, _ := json.Marshal(subnet)
+				_ = json.Unmarshal(jsoned, &subnetMapped)
 
-		pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+				mapped["network_id"] = mapped["id"]
+				mapped["network_cidr"] = mapped["cidr"]
+				delete(mapped, "cidr")
+				for k, v := range subnetMapped {
+					mapped[k] = v
+				}
+
+				if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+					return err
+				}
+				//// Get gateway(s) information (needs the name(s) in the output map)
+				//var pgw, sgw *protocol.Host
+				//gwIDs := subnet.GetGatewayIds()
+				//if len(gwIDs) > 0 {
+				//	pgw, err = clientSession.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
+				//	if err != nil {
+				//		err = fail.FromGRPCStatus(err)
+				//		var what string
+				//		if len(gwIDs) > 1 {
+				//			what = "primary "
+				//		}
+				//		casted := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
+				//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+				//	}
+				//	mapped["gateway_name"] = pgw.Name
+				//}
+				//if len(gwIDs) > 1 {
+				//	sgw, err = clientSession.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
+				//	if err != nil {
+				//		err = fail.FromGRPCStatus(err)
+				//		casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
+				//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+				//	}
+				//	mapped["secondary_gateway_name"] = sgw.Name
+				//}
+				//
+				//// Added operation status
+				//st := subnet.State
+				//mapped["state"] = st.String()
+				//
+				//// Remove entry 'virtual_ip' if empty
+				//if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+				//	delete(mapped, "virtual_ip")
+				//}
+
+				// Remove entry 'subnets'
+				delete(mapped, "subnets")
+			}
+		}
+
+		return clitools.SuccessResponse(mapped)
+	},
+}
+
+// Get gateway(s) information
+func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}) (err error) {
+	var pgw, sgw *protocol.Host
+	gwIDs := subnet.GetGatewayIds()
+	if len(gwIDs) > 0 {
+		pgw, err = session.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			var what string
-			if network.GetSecondaryGatewayId() != "" {
+			if len(gwIDs) > 1 {
 				what = "primary "
 			}
 			casted := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 		}
 		mapped["gateway_name"] = pgw.Name
-		if network.GetSecondaryGatewayId() != "" {
-			sgw, err = clientSession.Host.Inspect(sgwID, temporal.GetExecutionTimeout())
-			if err != nil {
-				err = fail.FromGRPCStatus(err)
-				casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
-			}
-			mapped["secondary_gateway_name"] = sgw.Name
+	}
+	if len(gwIDs) > 1 {
+		sgw, err = session.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 		}
-		// Removed entry 'virtual_ip' if empty
-		if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
-			delete(mapped, "virtual_ip")
-		}
+		mapped["secondary_gateway_name"] = sgw.Name
+	}
 
-		return clitools.SuccessResponse(mapped)
-	},
+	// Remove entry 'virtual_ip' if empty
+	if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+		delete(mapped, "virtual_ip")
+	}
+
+	return nil
 }
 
 var networkCreate = &cli.Command{
@@ -188,7 +251,7 @@ var networkCreate = &cli.Command{
 			Name:    "cidr",
 			Aliases: []string{"N"},
 			Value:   "",
-			Usage:   "CIDR of the Network",
+			Usage:   "CIDR of the Network (default: 192.168.0.0/23)",
 		},
 		&cli.BoolFlag{
 			Name:    "empty",
@@ -215,7 +278,6 @@ var networkCreate = &cli.Command{
 			Name:  "failover",
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
 		},
-
 		&cli.StringFlag{
 			Name:    "sizing",
 			Aliases: []string{"S"},
@@ -379,7 +441,7 @@ var networkSecurityGroupInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.SecurityGroup.Inspect(networkRef, temporal.GetExecutionTimeout())
+		resp, err := clientSession.SecurityGroup.Inspect(c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -956,49 +1018,53 @@ var subnetInspect = &cli.Command{
 		jsoned, _ := json.Marshal(subnet)
 		_ = json.Unmarshal(jsoned, &mapped)
 
-		// Get gateway(s) information (needs the name(s) in the output map)
-		var (
-			pgwID, sgwID string
-			pgw, sgw     *protocol.Host
-		)
-		gwIDs := subnet.GetGatewayIds()
-		if len(gwIDs) > 0 {
-			pgwID = gwIDs[0]
-		}
-		if len(gwIDs) > 1 {
-			sgwID = gwIDs[1]
+		if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+			return err
 		}
 
-		// Added operation status
-		opState := subnet.State
-		mapped["state"] = opState.String()
-
-		if pgwID != "" {
-			pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
-			if err != nil {
-				err = fail.FromGRPCStatus(err)
-				var what string
-				if sgwID != "" {
-					what = "primary "
-				}
-				casted := fail.Wrap(err, fmt.Sprintf("failed to inspect subnet: cannot inspect %sgateway", what))
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
-			}
-			mapped["gateway_name"] = pgw.Name
-		}
-		if sgwID != "" {
-			sgw, err = clientSession.Host.Inspect(sgwID, temporal.GetExecutionTimeout())
-			if err != nil {
-				err = fail.FromGRPCStatus(err)
-				casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
-			}
-			mapped["secondary_gateway_name"] = sgw.Name
-		}
-		// Remove entry 'virtual_ip' if empty
-		if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
-			delete(mapped, "virtual_ip")
-		}
+		//// Get gateway(s) information (needs the name(s) in the output map)
+		//var (
+		//	pgwID, sgwID string
+		//	pgw, sgw     *protocol.Host
+		//)
+		//gwIDs := subnet.GetGatewayIds()
+		//if len(gwIDs) > 0 {
+		//	pgwID = gwIDs[0]
+		//}
+		//if len(gwIDs) > 1 {
+		//	sgwID = gwIDs[1]
+		//}
+		//
+		//// Added operation status
+		//opState := subnet.State
+		//mapped["state"] = opState.String()
+		//
+		//if pgwID != "" {
+		//	pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+		//	if err != nil {
+		//		err = fail.FromGRPCStatus(err)
+		//		var what string
+		//		if sgwID != "" {
+		//			what = "primary "
+		//		}
+		//		casted := fail.Wrap(err, fmt.Sprintf("failed to inspect subnet: cannot inspect %sgateway", what))
+		//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+		//	}
+		//	mapped["gateway_name"] = pgw.Name
+		//}
+		//if sgwID != "" {
+		//	sgw, err = clientSession.Host.Inspect(sgwID, temporal.GetExecutionTimeout())
+		//	if err != nil {
+		//		err = fail.FromGRPCStatus(err)
+		//		casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
+		//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+		//	}
+		//	mapped["secondary_gateway_name"] = sgw.Name
+		//}
+		//// Remove entry 'virtual_ip' if empty
+		//if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+		//	delete(mapped, "virtual_ip")
+		//}
 
 		return clitools.SuccessResponse(mapped)
 	},
