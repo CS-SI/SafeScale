@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,16 +57,14 @@ type Router struct {
 	NetworkID string `json:"network_id,omitempty"`
 }
 
-// Subnet define a sub network
-type Subnet struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
-	// IPVersion is IPv4 or IPv6 (see IPVersion)
-	IPVersion ipversion.Enum `json:"ip_version,omitempty"`
-	// Mask mask in CIDR notation
-	Mask string `json:"mask,omitempty"`
-	// NetworkID id of the parent network
-	NetworkID string `json:"network_id,omitempty"`
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s *Stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, fail.NotFoundError("no default network in Stack")
 }
 
 // CreateNetwork creates a network named name
@@ -78,16 +76,16 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// Checks if CIDR is valid...
+	// Checks if IPRanges is valid...
 	if req.CIDR != "" {
 		_, _, err := net.ParseCIDR(req.CIDR)
 		if err != nil {
 			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 		}
-	} else { // CIDR is empty, choose the first Class C one possible
-		tracer.Trace("CIDR is empty, choosing one...")
+	} else { // IPRanges is empty, choose the first Class C one possible
+		tracer.Trace("IPRanges is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+		tracer.Trace("IPRanges chosen for network is '%s'", req.CIDR)
 	}
 
 	// We specify a name and that it should forward packets
@@ -107,7 +105,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, fail.Prepend(xerr, "failed to create network '%s'", req.Name)
+		return nil, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
 	}
 
 	// Starting from here, delete network if exit with error
@@ -135,33 +133,32 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Net
 	//}
 	//
 	//// Bind the network default security group to network
-	//xerr = s.BindSecurityGroupToNetwork(network.ID, asg)
+	//xerr = s.BindSecurityGroupToSubnet(network.ID, asg)
 	//if xerr != nil {
 	//	return nil, xerr
 	//}
-
-	// creates the subnet
-	subnet, xerr := s.createSubnet(req.Name, network.ID, req.CIDR, req.IPVersion, req.DNSServers)
-	if xerr != nil {
-		return nil, fail.Prepend(xerr, "failed to create subnet '%s'", req.Name)
-	}
-
-	// Starting from here, delete subnet if exit with error
-	defer func() {
-		if xerr != nil {
-			derr := s.deleteSubnet(subnet.ID)
-			if derr != nil {
-				logrus.Errorf("failed to delete subnet '%s': %+v", subnet.ID, derr)
-				_ = xerr.AddConsequence(derr)
-			}
-		}
-	}()
+	//
+	//// creates the subnet
+	//subnet, xerr := s.createSubnet(req.Name, network.ID, req.IPRanges, req.IPVersion, req.DNSServers)
+	//if xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
+	//}
+	//
+	//// Starting from here, delete subnet if exit with error
+	//defer func() {
+	//	if xerr != nil {
+	//		derr := s.deleteSubnet(subnet.ID)
+	//		if derr != nil {
+	//			logrus.Errorf("failed to delete subnet '%s': %+v", subnet.ID, derr)
+	//			_ = xerr.AddConsequence(derr)
+	//		}
+	//	}
+	//}()
 
 	newNet = abstract.NewNetwork()
 	newNet.ID = network.ID
 	newNet.Name = network.Name
-	newNet.CIDR = subnet.Mask
-	newNet.IPVersion = subnet.IPVersion
+	newNet.CIDR = req.CIDR
 	return newNet, nil
 }
 
@@ -241,24 +238,9 @@ func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		}
 	}
 	if network != nil && network.ID != "" {
-		sns, xerr := s.listSubnets(id)
-		if xerr != nil {
-			return nil, xerr
-		}
-		if len(sns) != 1 {
-			return nil, fail.DuplicateError("found a network '%s' without corresponding subnet, cannot continue; cleanup is needed or choose another name", network.Name)
-		}
-		sn := sns[0]
-		// gwID, _ := client.getGateway(id)
-		// if err != nil {
-		// 	return nil, fail.InconsistentError("bad configuration, no gateway associated to this network")
-		// }
 		newNet := abstract.NewNetwork()
 		newNet.ID = network.ID
 		newNet.Name = network.Name
-		newNet.CIDR = sn.Mask
-		newNet.IPVersion = sn.IPVersion
-		// net.GatewayID = network.GatewayId
 		return newNet, nil
 	}
 
@@ -288,24 +270,15 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 					}
 
 					for _, n := range networkList {
-						sns, xerr := s.listSubnets(n.ID)
-						if xerr != nil {
-							return false, fail.Wrap(xerr, "error getting list of subnets")
-						}
-						if len(sns) != 1 {
-							continue
-						}
 						if n.ID == s.ProviderNetworkID {
 							continue
 						}
-						sn := sns[0]
 
 						newNet := abstract.NewNetwork()
 						newNet.ID = n.ID
 						newNet.Name = n.Name
-						newNet.CIDR = sn.Mask
-						newNet.IPVersion = sn.IPVersion
-						// GatewayID: gwID,
+						//newNet.Subnets = n.Subnets
+
 						netList = append(netList, newNet)
 					}
 					return true, nil
@@ -349,19 +322,14 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 		return xerr
 	}
 
-	sns, xerr := s.listSubnets(id)
+	sns, xerr := s.ListSubnets(id)
 	if xerr != nil {
-		xerr = fail.Prepend(xerr, "failed to list subnets of network '%s'", network.Name)
+		xerr = fail.Wrap(xerr, "failed to list subnets of network '%s'", network.Name)
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
-	for _, sn := range sns {
-		xerr := s.deleteSubnet(sn.ID)
-		if xerr != nil {
-			xerr = fail.Prepend(xerr, "failed to delete subnet '%s' of network '%s'", sn.Name, network.Name)
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return xerr
-		}
+	if len(sns) > 0 {
+		return fail.InvalidRequestError("cannot delete a Network with Subnets in it")
 	}
 
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -372,7 +340,7 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		xerr = fail.Prepend(xerr, "failed to delete network '%s'", network.Name)
+		xerr = fail.Wrap(xerr, "failed to delete network '%s'", network.Name)
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
@@ -380,46 +348,83 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 	return nil
 }
 
-// ToGopherIPversion ...
-func ToGopherIPversion(v ipversion.Enum) gophercloud.IPVersion {
-	if v == ipversion.IPv4 {
+// ToGopherIPVersion converts ipversion.Enum (corresponding to SafeScale abstract) to gophercloud.IPVersion
+// if v is invalid, returns gophercloud.IPv4
+func ToGopherIPVersion(v ipversion.Enum) gophercloud.IPVersion {
+	//if v == ipversion.IPv4 {
+	//	return gophercloud.IPv4
+	//}
+	//if v == ipversion.IPv6 {
+	//	return gophercloud.IPv6
+	//}
+	//return -1
+	switch v {
+	case ipversion.IPv6:
+		return gophercloud.IPv6
+	case ipversion.IPv4:
+		fallthrough
+	default:
 		return gophercloud.IPv4
 	}
-	if v == ipversion.IPv6 {
-		return gophercloud.IPv6
-	}
-	return -1
 }
 
-// FromIntIPversion ...
-func FromIntIPversion(v int) ipversion.Enum {
-	if v == 4 {
+// ToAbstractIPVersion converts an int representation of IPVersion to an ipversion.Enum
+// if v is invalid, returns ipversion.sIPv4
+func ToAbstractIPVersion(v int) ipversion.Enum {
+	switch v {
+	case 6:
+		return ipversion.IPv6
+	case 4:
+		fallthrough
+	default:
 		return ipversion.IPv4
 	}
-	if v == 6 {
-		return ipversion.IPv6
-	}
-	return -1
 }
 
-// createSubnet creates a sub network
-// - networkID is the ID of the parent network
-// - name is the name of the sub network
-// - cidr is a network in CIDR notation
-func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersion ipversion.Enum, dnsServers []string) (subn *Subnet, xerr fail.Error) {
-	// You must associate a new subnet with an existing network - to do this you
-	// need its UUID. You must also provide a well-formed CIDR value.
-	dhcp := true
-	opts := subnets.CreateOpts{
-		NetworkID:  networkID,
-		CIDR:       cidr,
-		IPVersion:  ToGopherIPversion(ipVersion),
-		Name:       name,
-		EnableDHCP: &dhcp,
+// CreateSubnet creates a subnet
+func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, xerr fail.Error) {
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
 	}
 
-	if len(dnsServers) > 0 {
-		opts.DNSNameservers = dnsServers
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	// Checks if IPRanges is valid...
+	if req.CIDR != "" {
+		_, _, err := net.ParseCIDR(req.CIDR)
+		if err != nil {
+			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
+		}
+	} else { // IPRanges is empty, choose the first Class C possible
+		tracer.Trace("IPRanges is empty, choosing one...")
+		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("IPRanges chosen for subnet is '%s'", req.CIDR)
+	}
+
+	// If req.IPVersion contains invalid value, force to IPv4
+	var ipVersion gophercloud.IPVersion
+	switch ToGopherIPVersion(req.IPVersion) {
+	case gophercloud.IPv6:
+		ipVersion = gophercloud.IPv6
+	case gophercloud.IPv4:
+		fallthrough
+	default:
+		ipVersion = gophercloud.IPv4
+	}
+
+	// You must associate a new subnet with an existing network - to do this you
+	// need its UUID. You must also provide a well-formed IPRanges value.
+	dhcp := true
+	opts := subnets.CreateOpts{
+		NetworkID:  req.Network,
+		CIDR:       req.CIDR,
+		IPVersion:  ipVersion,
+		Name:       req.Name,
+		EnableDHCP: &dhcp,
+	}
+	if len(req.DNSServers) > 0 {
+		opts.DNSNameservers = req.DNSServers
 	}
 
 	if !s.cfgOpts.UseLayer3Networking {
@@ -467,10 +472,10 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 	// Starting from here, delete subnet if exit with error
 	defer func() {
 		if xerr != nil {
-			derr := s.deleteSubnet(subnet.ID)
+			derr := s.DeleteSubnet(subnet.ID)
 			if derr != nil {
 				logrus.Warnf("Error deleting subnet: %v", derr)
-				_ = xerr.AddConsequence(fail.Prepend(derr, "failed to delete subnet '%s'", subnet.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to delete subnet '%s'", subnet.Name))
 			}
 		}
 	}()
@@ -481,7 +486,7 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 			NetworkID: s.ProviderNetworkID,
 		})
 		if xerr != nil {
-			return nil, fail.Prepend(xerr, "failed to create router '%s'", subnet.ID)
+			return nil, fail.Wrap(xerr, "failed to create router '%s'", subnet.ID)
 		}
 
 		// Starting from here, delete router if exit with error
@@ -490,33 +495,134 @@ func (s *Stack) createSubnet(name string, networkID string, cidr string, ipVersi
 				derr := s.deleteRouter(router.ID)
 				if derr != nil {
 					logrus.Warnf("Error deleting router: %v", derr)
-					_ = xerr.AddConsequence(fail.Prepend(derr, "failed to delete route '%s'", router.Name))
+					_ = xerr.AddConsequence(fail.Wrap(derr, "failed to delete route '%s'", router.Name))
 				}
 			}
 		}()
 
 		xerr = s.addSubnetToRouter(router.ID, subnet.ID)
 		if xerr != nil {
-			return nil, fail.Prepend(xerr, "failed to add subnet '%s' to router '%s'", subnet.Name, router.Name)
+			return nil, fail.Wrap(xerr, "failed to add subnet '%s' to router '%s'", subnet.Name, router.Name)
 		}
 	}
 
-	return &Subnet{
+	out := &abstract.Subnet{
 		ID:        subnet.ID,
 		Name:      subnet.Name,
-		IPVersion: FromIntIPversion(subnet.IPVersion),
-		Mask:      subnet.CIDR,
-		NetworkID: subnet.NetworkID,
-	}, nil
+		IPVersion: ToAbstractIPVersion(subnet.IPVersion),
+		CIDR:      subnet.CIDR,
+		Network:   subnet.NetworkID,
+		Domain:    req.Domain,
+	}
+	return out, nil
 }
 
-// listSubnets lists available sub networks of network net
-func (s *Stack) listSubnets(netID string) (_ []Subnet, xerr fail.Error) {
-	listOpts := subnets.ListOpts{
-		NetworkID: netID,
+// InspectSubnet returns the subnet identified by id
+func (s *Stack) InspectSubnet(id string) (subnet *abstract.Subnet, xerr fail.Error) {
+	subnet = abstract.NewSubnet()
+	if s == nil {
+		return subnet, fail.InvalidInstanceError()
 	}
-	var subnetList []Subnet
+	if id == "" {
+		return subnet, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			sn, innerErr := subnets.Get(s.NetworkClient, id).Extract()
+			if innerErr != nil {
+				return NormalizeError(innerErr)
+			}
+			subnet.ID = sn.ID
+			subnet.Name = sn.Name
+			subnet.Network = sn.NetworkID
+			subnet.IPVersion = ToAbstractIPVersion(sn.IPVersion)
+			subnet.CIDR = sn.CIDR
+			subnet.DNSServers = sn.DNSNameservers
+			return nil
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return subnet, nil
+}
+
+// InspectSubnetByName ...
+func (s *Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, xerr fail.Error) {
+	nullSubnet := abstract.NewSubnet()
+	if s == nil {
+		return nullSubnet, fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return nullSubnet, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
+
+	listOpts := subnets.ListOpts{
+		Name: name,
+	}
+	var an *abstract.Network
+	if networkRef != "" {
+		an, xerr = s.InspectNetwork(networkRef)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				an, xerr = s.InspectNetworkByName(networkRef)
+			}
+		}
+		if xerr != nil {
+			return nullSubnet, xerr
+		}
+		listOpts.NetworkID = an.ID
+	}
+
+	allPages, err := subnets.List(s.NetworkClient, listOpts).AllPages()
+	if err != nil {
+		return nullSubnet, NormalizeError(err)
+	}
+	resp, err := subnets.ExtractSubnets(allPages)
+	if err != nil {
+		return nullSubnet, NormalizeError(err)
+	}
+	switch len(resp) {
+	case 0:
+		return nullSubnet, fail.NotFoundError("failed to find a Subnet named '%s'", name)
+	case 1:
+		// continue
+	default:
+		return nullSubnet, fail.InconsistentError("more than one Subnet named '%s' found in Network '%s'", name, an.Name)
+	}
+
+	item := resp[0]
+	subnet = abstract.NewSubnet()
+	subnet.ID = item.ID
+	subnet.Network = item.NetworkID
+	subnet.Name = name
+	subnet.CIDR = item.CIDR
+	subnet.DNSServers = item.DNSNameservers
+	subnet.IPVersion = ToAbstractIPVersion(item.IPVersion)
+	return subnet, nil
+}
+
+// ListSubnets lists available subnets in a network
+func (s *Stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
+
+	listOpts := subnets.ListOpts{}
+	if networkID != "" {
+		listOpts.NetworkID = networkID
+	}
+	var subnetList []*abstract.Subnet
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			innerErr := subnets.List(s.NetworkClient, listOpts).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := subnets.ExtractSubnets(page)
@@ -525,13 +631,12 @@ func (s *Stack) listSubnets(netID string) (_ []Subnet, xerr fail.Error) {
 				}
 
 				for _, subnet := range list {
-					subnetList = append(subnetList, Subnet{
-						ID:        subnet.ID,
-						Name:      subnet.Name,
-						IPVersion: FromIntIPversion(subnet.IPVersion),
-						Mask:      subnet.CIDR,
-						NetworkID: subnet.NetworkID,
-					})
+					item := abstract.NewSubnet()
+					item.ID = subnet.ID
+					item.Name = subnet.Name
+					item.Network = subnet.ID
+					item.IPVersion = ToAbstractIPVersion(subnet.IPVersion)
+					subnetList = append(subnetList, item)
 				}
 				return true, nil
 			})
@@ -540,19 +645,22 @@ func (s *Stack) listSubnets(netID string) (_ []Subnet, xerr fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return []Subnet{}, xerr
+		return []*abstract.Subnet{}, xerr
 	}
-
 	// VPL: empty subnet list is not an abnormal situation, do not log
 	return subnetList, nil
 }
 
-// deleteSubnet deletes the sub network identified by id
-func (s *Stack) deleteSubnet(id string) (xerr fail.Error) {
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+// DeleteSubnet deletes the network identified by id
+func (s *Stack) DeleteSubnet(id string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
 
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
@@ -562,11 +670,11 @@ func (s *Stack) deleteSubnet(id string) (xerr fail.Error) {
 		}
 	}
 	if router != nil {
-		if xerr = s.removeSubnetFromRouter(router.ID, id); xerr != nil {
-			return fail.Prepend(xerr, "failed to delete subnet '%s'", id)
+		if xerr := s.removeSubnetFromRouter(router.ID, id); xerr != nil {
+			return fail.Wrap(xerr, "failed to remove subnet '%s' from its router", id)
 		}
-		if xerr = s.deleteRouter(router.ID); xerr != nil {
-			return fail.Prepend(xerr, "failed to delete subnet '%s'", id)
+		if xerr := s.deleteRouter(router.ID); xerr != nil {
+			return fail.Wrap(xerr, "failed to delete router associated with Subnet '%s'", id)
 		}
 	}
 
@@ -723,51 +831,100 @@ func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Er
 	)
 }
 
-// listPorts lists all ports available
-func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
-	var allPages pagination.Page
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
+// BindSecurityGroupToSubnet binds a security group to a subnet
+func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+	//if s == nil {
+	//	return fail.InvalidInstanceError()
+	//}
+	if subnetID != "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
+
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			// FIXME: bind security group to port associated to subnet
+			//innerErr = secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 			return NormalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
-	if xerr != nil {
-		return nil, xerr
+}
+
+// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
+func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+	//if s == nil {
+	//	return fail.InvalidInstanceError()
+	//}
+	if subnetID == "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-	r, err := ports.ExtractPorts(allPages)
-	return r, NormalizeError(err)
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			// FIXME: unbind security group from port associated to subnet
+			//innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if networkID = strings.TrimSpace(networkID); networkID == "" {
 		return nil, fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
+	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
+		return nil, fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	asg, xerr := s.InspectSecurityGroup(stacks.DefaultSecurityGroupName)
-	if xerr != nil {
-		return nil, xerr
-	}
+	//sgName := name + abstract.VIPDefaultSecurityGroupNameSuffix
+	//asg, xerr := s.InspectSecurityGroup(sgName)
+	//if xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to get Security Group '%s' for VIP '%s'; must be created first", sgName, name)
+	//}
 
 	var port *ports.Port
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			asu := true
-			sg := []string{asg.ID}
+			//sg := []string{asg.ID}
 			options := ports.CreateOpts{
 				NetworkID:      networkID,
 				AdminStateUp:   &asu,
 				Name:           name,
-				SecurityGroups: &sg,
+				SecurityGroups: &securityGroups,
+				FixedIPs:       []ports.IP{{SubnetID: subnetID}},
 			}
 			port, innerErr = ports.Create(s.NetworkClient, options).Extract()
 			return NormalizeError(innerErr)
@@ -790,7 +947,7 @@ func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME Technical debt
+	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
@@ -916,4 +1073,108 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 		},
 		temporal.GetCommunicationTimeout(),
 	)
+}
+
+// createPort creates a port
+func (s *Stack) createPort(req ports.CreateOpts) (port *ports.Port, xerr fail.Error) {
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return port, nil
+}
+
+func (s *Stack) deletePort(id string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	if _, xerr := s.inspectPort(id); xerr != nil {
+		return fail.NotFoundError("failed to query port %s", id)
+	}
+
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			innerErr = ports.Delete(s.NetworkClient, id).ExtractErr()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+// listPorts lists all ports available
+func (s *Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
+	var allPages pagination.Page
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	r, err := ports.ExtractPorts(allPages)
+	return r, NormalizeError(err)
+}
+
+// updatePort updates the settings of a port
+func (s *Stack) updatePort(id string, options ports.UpdateOpts) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
+			_ = resp
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+}
+
+// inspectPort returns port from its ID
+func (s *Stack) inspectPort(id string) (port *ports.Port, xerr fail.Error) {
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return port, nil
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@ import "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 // GetConfigurationOptions ...
 func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-    return s.cfgOpts
+	return s.cfgOpts
 }
 
 // GetAuthenticationOptions ...
 func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-    return s.authOpts
+	return s.authOpts
 }

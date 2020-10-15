@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,32 +17,32 @@
 package cli
 
 import (
-    "github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2"
 
-    "github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 )
 
 // ExitOnErrorWithMessage informs cli to exit with message and error code
 func ExitOnErrorWithMessage(exitcode exitcode.Enum, msg string) error {
-    return cli.NewExitError(msg, int(exitcode))
+	return cli.NewExitError(msg, int(exitcode))
 }
 
 // ExitOnInvalidArgument ...
 func ExitOnInvalidArgument(msg string) error {
-    return ExitOnErrorWithMessage(exitcode.InvalidArgument, msg)
+	return ExitOnErrorWithMessage(exitcode.InvalidArgument, msg)
 }
 
 // ExitOnInvalidOption ...
 func ExitOnInvalidOption(msg string) error {
-    return ExitOnErrorWithMessage(exitcode.InvalidOption, msg)
+	return ExitOnErrorWithMessage(exitcode.InvalidOption, msg)
 }
 
 // ExitOnRPC ...
 func ExitOnRPC(msg string) error {
-    return ExitOnErrorWithMessage(exitcode.RPC, msg)
+	return ExitOnErrorWithMessage(exitcode.RPC, msg)
 }
 
 // ExitOnNotFound ...
 func ExitOnNotFound(msg string) error {
-    return ExitOnErrorWithMessage(exitcode.NotFound, msg)
+	return ExitOnErrorWithMessage(exitcode.NotFound, msg)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,12 +22,12 @@ package securityflavor
 type Enum int
 
 const (
-    // Sys indicates the default no-cryptographic security
-    Sys Enum = iota
-    // Krb5 indicates Kerberos5 authentication only
-    Krb5
-    // Krb5i indicates Kerberos5 with integrity protection
-    Krb5i
-    // Krb5p indicates Kerberos5 with privacy protection
-    Krb5p
+	// Sys indicates the default no-cryptographic security
+	Sys Enum = iota
+	// Krb5 indicates Kerberos5 authentication only
+	Krb5
+	// Krb5i indicates Kerberos5 with integrity protection
+	Krb5i
+	// Krb5p indicates Kerberos5 with privacy protection
+	Krb5p
 )

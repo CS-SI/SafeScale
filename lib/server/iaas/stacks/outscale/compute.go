@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -317,7 +317,7 @@ func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Er
 	return templates, nil
 }
 
-// GetImage returns the Image referenced by id
+// InspectImage returns the Image referenced by id
 func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -360,7 +360,7 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 	}, nil
 }
 
-// GetTemplate returns the Template referenced by id
+// InspectTemplate returns the Template referenced by id
 func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -407,10 +407,10 @@ func (s *Stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.
 
 func (s *Stack) prepareUserData(request abstract.HostRequest, ud *userdata.Content) fail.Error {
 	cidr := func() string {
-		if len(request.Networks) == 0 {
+		if len(request.Subnets) == 0 {
 			return ""
 		}
-		return request.Networks[0].CIDR
+		return request.Subnets[0].CIDR
 	}()
 	if xerr := ud.Prepare(*s.configurationOptions, request, cidr, ""); xerr != nil {
 		msg := "failed to prepare user data content"
@@ -420,15 +420,16 @@ func (s *Stack) prepareUserData(request abstract.HostRequest, ud *userdata.Conte
 	return nil
 }
 
-func (s *Stack) createNIC(request *abstract.HostRequest, net *abstract.Network) (*osc.Nic, fail.Error) {
-	group, xerr := s.getNetworkSecurityGroup(s.Options.Network.VPCID)
-	if xerr != nil {
-		return nil, xerr
-	}
+func (s *Stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet) (*osc.Nic, fail.Error) {
+	//groups, xerr := s.listSecurityGroupIDs(subnet.Network)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+
 	nicRequest := osc.CreateNicRequest{
-		Description:      request.ResourceName,
-		SubnetId:         net.ID,
-		SecurityGroupIds: []string{group.SecurityGroupId},
+		Description: request.ResourceName,
+		SubnetId:    subnet.ID,
+		//SecurityGroupIds: groups,
 	}
 	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
 		CreateNicRequest: optional.NewInterface(nicRequest),
@@ -440,24 +441,24 @@ func (s *Stack) createNIC(request *abstract.HostRequest, net *abstract.Network) 
 	return &res.Nic, nil
 }
 
-func (s *Stack) createNICS(request *abstract.HostRequest) (nics []osc.Nic, xerr fail.Error) {
+func (s *Stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr fail.Error) {
 	nics = []osc.Nic{}
 
 	// first network is the default network
 	nics, xerr = s.tryCreateNICS(request, nics)
 	if xerr != nil { // if error delete created NICS
-		for _, ni := range nics {
-			xerr := s.deleteNic(&ni)
+		for _, v := range nics {
+			xerr := s.deleteNIC(v)
 			if xerr != nil {
-				logrus.Errorf("impossible to delete NIC '%v': %v", ni.NicId, xerr)
+				logrus.Errorf("impossible to delete NIC '%s': %v", v.NicId, xerr)
 			}
 		}
 	}
 	return nics, xerr
 }
 
-func (s *Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]osc.Nic, fail.Error) {
-	for _, n := range request.Networks[1:] {
+func (s Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]osc.Nic, fail.Error) {
+	for _, n := range request.Subnets[1:] {
 		nic, xerr := s.createNIC(request, n)
 		if xerr != nil {
 			return nics, xerr
@@ -467,9 +468,9 @@ func (s *Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]
 	return nics, nil
 }
 
-func (s *Stack) deleteNics(nics []osc.Nic) fail.Error {
+func (s Stack) deleteNICs(nics []osc.Nic) fail.Error {
 	for _, nic := range nics {
-		xerr := s.deleteNic(&nic)
+		xerr := s.deleteNIC(nic)
 		if xerr != nil {
 			return xerr
 		}
@@ -477,7 +478,7 @@ func (s *Stack) deleteNics(nics []osc.Nic) fail.Error {
 	return nil
 }
 
-func (s *Stack) deleteNic(nic *osc.Nic) fail.Error {
+func (s Stack) deleteNIC(nic osc.Nic) fail.Error {
 	request := osc.DeleteNicRequest{
 		NicId: nic.NicId,
 	}
@@ -509,7 +510,7 @@ func hostState(state string) hoststate.Enum {
 	return hoststate.UNKNOWN
 }
 
-func (s *Stack) hostState(id string) (hoststate.Enum, fail.Error) {
+func (s Stack) hostState(id string) (hoststate.Enum, fail.Error) {
 	vm, xerr := s.getVM(id)
 	if xerr != nil {
 		return hoststate.ERROR, xerr
@@ -522,10 +523,10 @@ func (s *Stack) hostState(id string) (hoststate.Enum, fail.Error) {
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	if s == nil {
-		return abstract.NewHostCore(), fail.InvalidInstanceError()
-	}
+func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	//if s == nil {
+	//	return abstract.NewHostCore(), fail.InvalidInstanceError()
+	//}
 
 	return s.WaitHostState(hostParam, hoststate.STARTED, timeout)
 }
@@ -535,11 +536,11 @@ func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durat
 // - *retry.ErrTimeout: when the timeout is reached
 // - *retry.ErrStopRetry: when a breaking error arises; xerr.Cause() contains the real error encountered
 // - fail.Error: any other errors
-func (s *Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
+func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAhc := abstract.NewHostCore()
-	if s == nil {
-		return nullAhc, fail.InvalidInstanceError()
-	}
+	//if s == nil {
+	//	return nullAhc, fail.InvalidInstanceError()
+	//}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
@@ -584,9 +585,9 @@ func outscaleTemplateID(id string) (string, fail.Error) {
 	return fmt.Sprintf("%s.%s", tokens[0], tokens[1]), nil
 }
 
-func (s *Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
-	if len(request.Networks) > 1 {
-		nics, xerr := s.createNICS(request)
+func (s Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
+	if len(request.Subnets) > 1 {
+		nics, xerr := s.createNICs(request)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -609,7 +610,7 @@ func (s *Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, 
 	return nil, nil
 }
 
-func (s *Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
+func (s Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
 	tpl, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
 		return xerr
@@ -665,7 +666,7 @@ func (s *Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
 	return createErr
 }
 
-func (s *Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.Error) {
+func (s Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.Error) {
 	if request.DiskSize == 0 {
 		return nil
 	}
@@ -699,7 +700,7 @@ func (s *Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail
 	return xerr
 }
 
-func (s *Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
+func (s Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
 	request := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{vmID},
@@ -712,7 +713,7 @@ func (s *Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
 	return res.Nics, nil
 }
 
-func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, fail.Error) {
+func (s Stack) addPublicIP(nic osc.Nic) (*osc.PublicIp, fail.Error) {
 	resIP, _, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
 	if err != nil {
 		return nil, normalizeError(err)
@@ -739,7 +740,7 @@ func (s *Stack) addPublicIP(nic *osc.Nic) (*osc.PublicIp, fail.Error) {
 	return &resIP.PublicIp, nil
 }
 
-func (s *Stack) setHostProperties(host *abstract.HostFull, networks []*abstract.Network, vm *osc.Vm, nics []osc.Nic) fail.Error {
+func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Subnet, vm *osc.Vm, nics []osc.Nic) fail.Error {
 	vmType, xerr := s.InspectTemplate(vm.VmType)
 	if xerr != nil {
 		return xerr
@@ -757,18 +758,18 @@ func (s *Stack) setHostProperties(host *abstract.HostFull, networks []*abstract.
 	host.Sizing.GPUType = vmType.GPUType
 	host.Sizing.RAMSize = vmType.RAMSize
 
-	// Updates Host Property propsv1.HostNetwork
-	// networks contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
+	// Updates Host Property propsv1.HostSubnet
+	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
 	// between network ID and network Name in Host definition
-	networksByID := map[string]string{}
-	networksByName := map[string]string{}
+	subnetsByID := map[string]string{}
+	subnetsByName := map[string]string{}
 	ipv4Addresses := map[string]string{}
 	ipv6Addresses := map[string]string{}
-	for i, net := range networks {
+	for i, net := range subnets {
 		nic := nics[i]
-		networksByID[net.ID] = net.Name
-		networksByName[net.Name] = net.ID
+		subnetsByID[net.ID] = net.Name
+		subnetsByName[net.Name] = net.ID
 		ipv4Addresses[net.ID] = func() string {
 			for _, addr := range nic.PrivateIps {
 				if addr.IsPrimary {
@@ -778,22 +779,23 @@ func (s *Stack) setHostProperties(host *abstract.HostFull, networks []*abstract.
 			return ""
 		}()
 	}
-	host.Network.NetworksByID = networksByID
-	host.Network.NetworksByName = networksByName
+	host.Subnet.SubnetsByID = subnetsByID
+	host.Subnet.SubnetsByName = subnetsByName
 	// IPvxAddresses are here indexed by names... At least we have them...
-	host.Network.IPv4Addresses = ipv4Addresses
-	host.Network.IPv6Addresses = ipv6Addresses
+	host.Subnet.IPv4Addresses = ipv4Addresses
+	host.Subnet.IPv6Addresses = ipv6Addresses
 	return nil
 }
 
-func (s *Stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull) fail.Error {
-	defaultNet := func() *abstract.Network {
-		if len(request.Networks) == 0 {
+func (s Stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull) fail.Error {
+	defaultSubnet := func() *abstract.Subnet {
+		if len(request.Subnets) == 0 {
 			return nil
 		}
-		return request.Networks[0]
+		return request.Subnets[0]
 	}()
-	isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
+
+	isGateway := request.IsGateway // && defaultSubnet != nil && defaultSubnet.Name != abstract.SingleHostNetworkName
 	// defaultGatewayID := func() string {
 	//	if request.DefaultGateway != nil {
 	//		return request.DefaultGateway.ID
@@ -811,15 +813,15 @@ func (s *Stack) initHostProperties(request *abstract.HostRequest, host *abstract
 	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Core.Password = request.Password
 
-	host.Network.DefaultNetworkID = func() string {
-		if defaultNet == nil {
+	host.Subnet.DefaultSubnetID = func() string {
+		if defaultSubnet == nil {
 			return ""
 		}
-		return defaultNet.ID
+		return defaultSubnet.ID
 	}()
 	// host.Network.DefaultGatewayID = defaultGatewayID
 	// host.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
-	host.Network.IsGateway = isGateway
+	host.Subnet.IsGateway = isGateway
 
 	// Adds Host property SizingV1
 	host.Sizing.Cores = template.Cores
@@ -831,14 +833,14 @@ func (s *Stack) initHostProperties(request *abstract.HostRequest, host *abstract
 	return nil
 }
 
-func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, fail.Error) {
+func (s Stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, fail.Error) {
 	ip, xerr := s.addPublicIP(primaryNIC)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	for _, nic := range otherNICs {
-		_, xerr = s.addPublicIP(&nic)
+		_, xerr = s.addPublicIP(nic)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -847,20 +849,21 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 }
 
 // CreateHost creates an host that fulfils the request
-func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, xerr fail.Error) {
+func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
-	if s == nil {
-		return nullAHF, nullUDC, fail.InvalidInstanceError()
-	}
+
+	//if s == nil {
+	//	return nullAHF, nullUDC, fail.InvalidInstanceError()
+	//}
 	if request.KeyPair == nil {
-		return nullAHF, nullUDC, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+		return nullAHF, nullUDC, fail.InvalidRequestError("request.KeyPair", "cannot be nil")
 	}
-	if len(request.Networks) == 0 && !request.PublicIP {
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
+	if len(request.Subnets) == 0 && !request.PublicIP {
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached subnet")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
 
@@ -870,7 +873,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	}
 	request.Password = password
 
-	subnetID, xerr := s.getSubnetID(request)
+	subnetID, xerr := s.getDefaultSubnetID(request)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -963,7 +966,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 		return nullAHF, nullUDC, xerr
 	}
 	if request.PublicIP {
-		ip, xerr := s.addPublicIPs(&defaultNic, nics)
+		ip, xerr := s.addPublicIPs(defaultNic, nics)
 		if xerr != nil {
 			return nullAHF, nullUDC, xerr
 		}
@@ -994,32 +997,34 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 		return nullAHF, nullUDC, xerr
 	}
 
+	ahf = abstract.NewHostFull()
 	ahf.Core.ID = vm.VmId
 	ahf.Core.Name = request.ResourceName
 	ahf.Core.Password = request.Password
 	ahf.Core.PrivateKey = request.KeyPair.PrivateKey
 	ahf.Core.LastState = hoststate.STARTED
 	nics = append(nics, defaultNic)
-	xerr = s.setHostProperties(ahf, request.Networks, &vm, nics)
+	xerr = s.setHostProperties(ahf, request.Subnets, &vm, nics)
 	return ahf, udc, xerr
 }
 
-func (s *Stack) getSubnetID(request abstract.HostRequest) (string, fail.Error) {
+func (s *Stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Error) {
 	if s == nil {
 		return "", fail.InvalidInstanceError()
 	}
-	if len(request.Networks) == 0 {
+	if len(request.Subnets) == 0 {
 		return "", nil
 	}
-	defautNet := request.Networks[0]
-	subnet, err := s.getSubnet(defautNet.ID)
-	if err != nil {
-		return "", err
-	}
-	if subnet == nil {
-		return "", abstract.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
-	}
-	return subnet.SubnetId, nil
+	defaultSubnet := request.Subnets[0]
+	return defaultSubnet.ID, nil
+	//subnet, err := s.InspectSubnet(defaultSubet.Network, defaultSubnet.ID)
+	//if err != nil {
+	//	return "", err
+	//}
+	//if subnet == nil {
+	//	return "", abstract.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
+	//}
+	//return subnet.SubnetId, nil
 }
 
 func (s *Stack) getVM(vmID string) (*osc.Vm, fail.Error) {
@@ -1077,7 +1082,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	readPublicIpsRequest := osc.ReadPublicIpsRequest{
 		Filters: osc.FiltersPublicIp{VmIds: []string{ahf.Core.ID}},
 	}
-	res, _, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
+	resp, _, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
 		ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
 	})
 	if err != nil {
@@ -1091,11 +1096,11 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	if len(res.PublicIps) == 0 {
+	if len(resp.PublicIps) == 0 {
 		return nil
 	}
 	var lastErr fail.Error
-	for _, ip := range res.PublicIps {
+	for _, ip := range resp.PublicIps {
 		deletePublicIpRequest := osc.DeletePublicIpRequest{
 			PublicIpId: ip.PublicIpId,
 		}
@@ -1160,18 +1165,18 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 			ahf.Core.Name = tag
 		}
 	}
-	nets, nics, err := s.listNetworksByHost(vm.VmId)
+	subnets, nics, err := s.listSubnetsByHost(vm.VmId)
 	if err != nil {
 		return nil, err
 	}
 	ahf.Core.ID = vm.VmId
 	ahf.Core.LastState = hostState(vm.State)
-	xerr = s.setHostProperties(ahf, nets, vm, nics)
+	xerr = s.setHostProperties(ahf, subnets, vm, nics)
 	return ahf, xerr
 
 }
 
-// GetHostByName returns the host identified by name
+// InspectHostByName returns the host identified by name
 func (s *Stack) InspectHostByName(name string) (ahc *abstract.HostCore, xerr fail.Error) {
 	nullAhc := abstract.NewHostCore()
 	if s == nil {
@@ -1384,11 +1389,11 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }

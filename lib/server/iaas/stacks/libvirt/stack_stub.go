@@ -1,7 +1,7 @@
 // +build !libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,16 @@ var gError = fail.NewError("libvirt Driver is not enabled, use the libvirt optio
 
 // Stack is the implementation of the local driver regarding to the api.ClientAPI
 type Stack struct {
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s *Stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, gError
 }
 
 // WaitHostReady ...
@@ -94,12 +104,12 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
 	return &abstract.Network{}, gError
 }
 
-// GetNetwork stub
+// InspectNetwork stub
 func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	return &abstract.Network{}, gError
 }
 
-// GetNetworkByName stub
+// InspectNetworkByName stub
 func (s *Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
 	return &abstract.Network{}, gError
 }
@@ -114,18 +124,33 @@ func (s *Stack) DeleteNetwork(id string) fail.Error {
 	return gError
 }
 
-// // CreateGateway stub
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *userdata.Content, error) {
-// 	return nil, nil, gError
-// }
-//
-// // DeleteGateway stub
-// func (s *Stack) DeleteGateway(string) error {
-// 	return gError
-// }
+// CreateNetwork stub
+func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error) {
+	return &abstract.Subnet{}, gError
+}
+
+// InspectSubnet stub
+func (s *Stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
+	return &abstract.Subnet{}, gError
+}
+
+// InspectSubnetByName stub
+func (s *Stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, fail.Error) {
+	return &abstract.Subnet{}, gError
+}
+
+// ListSubnets stub
+func (s *Stack) ListSubnets(string) ([]*abstract.Subnet, fail.Error) {
+	return []*abstract.Subnet{}, gError
+}
+
+// DeleteSubnet stub
+func (s *Stack) DeleteSubnet(id string) fail.Error {
+	return gError
+}
 
 // CreateVIP stub
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return &abstract.VirtualIP{}, gError
 }
 
@@ -164,7 +189,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull,
 	return abstract.NewHostFull(), gError
 }
 
-// GetHostByName stub
+// InspectHostByName stub
 func (s *Stack) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
 	return abstract.NewHostCore(), gError
 }
@@ -224,7 +249,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 	return "", gError
 }
 
-// GetVolumeAttachment stub
+// InspectVolumeAttachment stub
 func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	return &abstract.VolumeAttachment{}, gError
 }
@@ -250,21 +275,26 @@ func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
-// BindSecurityGroupToNetwork ...
-func (s *Stack) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// BindSecurityGroupToSubnet ...
+func (s *Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	return gError
 }
 
-// UnbindSecurityGroupFromNetwork ...
-func (s *Stack) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// UnbindSecurityGroupFromSubnet ...
+func (s *Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	return gError
+}
+
+// GetDefaultSecurityGroupName ...
+func (s *Stack) GetDefaultSecurityGroupName() string {
+	return ""
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,10 +82,10 @@ type AuthenticationOptions struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
-	// Name of the VPC (Virtual Private Cloud)
-	VPCName string
-	// CIDR if the VPC
-	VPCCIDR string
+	//// Name of the VPC (Virtual Private Cloud)
+	//VPCName string
+	//// IPRanges if the VPC
+	//VPCCIDR string
 }
 
 // ConfigurationOptions are the stack configuration options
@@ -105,8 +105,8 @@ type ConfigurationOptions struct {
 
 	UseNATService bool
 
-	ProviderName     string
-	BuildSubnetworks bool
+	ProviderName string
+	BuildSubnets bool
 
 	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
@@ -125,6 +125,9 @@ type ConfigurationOptions struct {
 
 	// DefaultSecurityGroupName contains the name of the default security group
 	DefaultSecurityGroupName string
+
+	DefaultNetworkName string // contains the name of the Network/VPC that is used by default (corresponds to keywords 'VPCName' or 'NetworkName' in tenant section 'compute')
+	DefaultNetworkCIDR string // contains the CIDR of the default Network/VPC
 
 	// Customizations map[string]string
 

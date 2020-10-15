@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,10 +30,11 @@ import (
 
 // Stack contains the needs to operate on stack OpenStack
 type Stack struct {
-	ComputeClient *gophercloud.ServiceClient
-	NetworkClient *gophercloud.ServiceClient
-	VolumeClient  *gophercloud.ServiceClient
-	Driver        *gophercloud.ProviderClient
+	ComputeClient  *gophercloud.ServiceClient
+	NetworkClient  *gophercloud.ServiceClient
+	VolumeClient   *gophercloud.ServiceClient
+	IdentityClient *gophercloud.ServiceClient
+	Driver         *gophercloud.ProviderClient
 
 	authOpts stacks.AuthenticationOptions
 	cfgOpts  stacks.ConfigurationOptions
@@ -106,8 +107,22 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		return nil, xerr
 	}
 
-	// Compute API
+	// Identity API
 	endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
+	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			var innerErr error
+			s.IdentityClient, innerErr = openstack.NewIdentityV2(s.Driver, endpointOpts)
+			return NormalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// Compute API
+	//endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
 	switch s.versions["compute"] {
 	case "v2":
 		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(

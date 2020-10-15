@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,37 +17,37 @@
 package utils
 
 import (
-    "log"
-    "strings"
+	"log"
+	"strings"
 
-    "google.golang.org/grpc"
+	"google.golang.org/grpc"
 
-    "github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/protocol"
 )
 
 // GetConnection returns a connection to GRPC server
 func GetConnection(server string) *grpc.ClientConn {
-    // Set up a connection to the server.
-    conn, err := grpc.Dial(server, grpc.WithInsecure())
-    if err != nil {
-        log.Fatalf("failed to connect to safescaled (%s): %v", server, err)
-    }
-    return conn
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("failed to connect to safescaled (%s): %v", server, err)
+	}
+	return conn
 }
 
 // GetReference return a reference from the name or id given in the protocol.Reference
 // returns value and its display representation (without '' if id, with '' if name)
 func GetReference(in *protocol.Reference) (string, string) {
-    var ref, refLabel string
-    name := in.GetName()
-    if strings.TrimSpace(name) != "" {
-        ref = name
-        refLabel = "'"+ref+"'"
-    }
-    id := in.GetId()
-    if strings.TrimSpace(id) != "" {
-        ref = id
-        refLabel = id
-    }
-    return ref, refLabel
+	var ref, refLabel string
+	name := in.GetName()
+	if strings.TrimSpace(name) != "" {
+		ref = name
+		refLabel = "'" + ref + "'"
+	}
+	id := in.GetId()
+	if strings.TrimSpace(id) != "" {
+		ref = id
+		refLabel = id
+	}
+	return ref, refLabel
 }

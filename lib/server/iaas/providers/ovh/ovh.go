@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,9 +159,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"classic":    volumespeed.COLD,
 			"high-speed": volumespeed.HDD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:           metadataBucketName,
+		OperatorUsername:         operatorUsername,
+		ProviderName:             providerName,
+		DefaultSecurityGroupName: "default",
 	}
 
 	serviceVersions := map[string]string{"volume": "v1"}

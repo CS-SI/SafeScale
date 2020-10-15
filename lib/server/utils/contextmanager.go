@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,14 @@
 package utils
 
 import (
-    "context"
-    "sync"
-    "time"
+	"context"
+	"sync"
+	"time"
 
-    uuid "github.com/satori/go.uuid"
-    "google.golang.org/grpc/metadata"
+	uuid "github.com/satori/go.uuid"
+	"google.golang.org/grpc/metadata"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var clientRPCUUID uuid.UUID
@@ -35,49 +35,49 @@ var mutexContextManager sync.Mutex
 
 // GetContext ...
 func GetContext(storeUUID bool) (context.Context, fail.Error) {
-    clientContext := context.Background()
-    aUUID, xerr := generateUUID(storeUUID)
-    if xerr != nil {
-        return nil, xerr
-    }
-    clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", aUUID)
-    return clientContext, nil
+	clientContext := context.Background()
+	aUUID, xerr := generateUUID(storeUUID)
+	if xerr != nil {
+		return nil, xerr
+	}
+	clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", aUUID)
+	return clientContext, nil
 }
 
 // GetTimeoutContext return a context for gRPC commands
 func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, fail.Error) {
-    if parentCtx != context.TODO() {
-        ctx, cancel := context.WithTimeout(parentCtx, timeout)
-        return ctx, cancel, nil
-    }
+	if parentCtx != context.TODO() {
+		ctx, cancel := context.WithTimeout(parentCtx, timeout)
+		return ctx, cancel, nil
+	}
 
-    aContext, xerr := GetContext(true)
-    if xerr != nil {
-        return nil, nil, xerr
-    }
+	aContext, xerr := GetContext(true)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 
-    ctx, cancel := context.WithTimeout(aContext, timeout)
-    return ctx, cancel, nil
+	ctx, cancel := context.WithTimeout(aContext, timeout)
+	return ctx, cancel, nil
 }
 
 // GetUUID ...
 func GetUUID() string {
-    mutexContextManager.Lock()
-    defer mutexContextManager.Unlock()
-    return clientRPCUUID.String()
+	mutexContextManager.Lock()
+	defer mutexContextManager.Unlock()
+	return clientRPCUUID.String()
 }
 
 // generateUUID ...
 func generateUUID(store bool) (string, fail.Error) {
-    mutexContextManager.Lock()
-    defer mutexContextManager.Unlock()
-    newUUID, err := uuid.NewV4()
-    if err != nil {
-        return "", fail.ToError(err)
-    }
-    if store {
-        uuidSet = true
-        clientRPCUUID = newUUID
-    }
-    return newUUID.String(), nil
+	mutexContextManager.Lock()
+	defer mutexContextManager.Unlock()
+	newUUID, err := uuid.NewV4()
+	if err != nil {
+		return "", fail.ToError(err)
+	}
+	if store {
+		uuidSet = true
+		clientRPCUUID = newUUID
+	}
+	return newUUID.String(), nil
 }

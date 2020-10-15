@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,24 +17,24 @@
 package template
 
 import (
-    txttmpl "text/template"
+	txttmpl "text/template"
 
-    "github.com/Masterminds/sprig"
+	"github.com/Masterminds/sprig"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Parse returns a text template with default funcs declared
 func Parse(title, content string) (*txttmpl.Template, fail.Error) {
-    if title == "" {
-        return nil, fail.InvalidParameterError("title", "cannot be empty string")
-    }
-    if content == "" {
-        return nil, fail.InvalidParameterError("content", "cannot be empty string")
-    }
-    r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Parse(content)
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
-    return r, nil
+	if title == "" {
+		return nil, fail.InvalidParameterError("title", "cannot be empty string")
+	}
+	if content == "" {
+		return nil, fail.InvalidParameterError("content", "cannot be empty string")
+	}
+	r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Parse(content)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return r, nil
 }

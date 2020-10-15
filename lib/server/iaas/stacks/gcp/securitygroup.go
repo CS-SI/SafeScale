@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 )
 
 // ListSecurityGroups lists existing security groups
-func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
+func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	// if s == nil {
 	//     return nil, fail.InvalidInstanceError()
 	// }
@@ -37,7 +37,7 @@ func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
 }
 
 // CreateSecurityGroup creates a security group
-func (s Stack) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	// if s == nil {
 	//     return nil, fail.InvalidInstanceError()
 	// }
@@ -60,6 +60,12 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	if xerr != nil {
 		return xerr
 	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -74,7 +80,13 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	// }
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return asg, xerr
+		return nil, xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -90,7 +102,13 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	// }
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return asg, xerr
+		return nil, xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -106,7 +124,13 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	// }
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return asg, xerr
+		return nil, xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -117,7 +141,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	// if s == nil {
 	//     return false, fail.InvalidInstanceError()
 	// }
@@ -125,9 +149,20 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	if xerr != nil {
 		return nil, xerr
 	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return asg, xerr
+		}
+	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", asg.ID, ruleID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", asg.ID, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError()
+}
+
+// GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
+func (s Stack) GetDefaultSecurityGroupName() string {
+	return s.GetConfigurationOptions().DefaultSecurityGroupName
 }

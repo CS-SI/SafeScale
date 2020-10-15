@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ package volumeproperty
 type Enum string
 
 const (
-    // DescriptionV1 specifies optional additional info describing volume (purpose, ...)
-    DescriptionV1 = "1"
-    // AttachedV1 contains additional information about hosts attaching the volume
-    AttachedV1 = "2"
+	// DescriptionV1 specifies optional additional info describing volume (purpose, ...)
+	DescriptionV1 = "1"
+	// AttachedV1 contains additional information about hosts attaching the volume
+	AttachedV1 = "2"
 )

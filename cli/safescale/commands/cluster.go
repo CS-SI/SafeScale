@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -321,7 +321,7 @@ var clusterCreateCommand = &cli.Command{
 			Name:    "cidr",
 			Aliases: []string{"N"},
 			Value:   "192.168.0.0/16",
-			Usage:   "Defines the CIDR of the network to use with cluster",
+			Usage:   "Defines the IPRanges of the network to use with cluster",
 		},
 		&cli.StringFlag{
 			Name:  "domain",
@@ -478,7 +478,7 @@ var clusterCreateCommand = &cli.Command{
 		// clusterInstance, err := cluster.Create(concurrency.RootTask(), resources.ClusterRequest{
 		// 	Name:                    clusterName,
 		// 	Complexity:              comp,
-		// 	CIDR:                    cidr,
+		// 	IPRanges:                    cidr,
 		// 	Flavor:                  fla,
 		// 	KeepOnFailure:           keep,
 		// 	GatewaysDef:             gatewaysDef,
