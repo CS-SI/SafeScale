@@ -759,7 +759,7 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := sg.GetService().BindSecurityGroupToHost(hostID /*ip, */, sg.GetID())
+				xerr := sg.GetService().BindSecurityGroupToHost(sg.GetID(), hostID)
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// continue
@@ -768,7 +768,7 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				innerXErr := sg.GetService().UnbindSecurityGroupFromHost(hostID, sg.GetID())
+				innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID)
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// continue
@@ -799,7 +799,7 @@ func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host
 
 			// Unbind security group on provider side; if not found, consider as a success
 			hostID := rh.GetID()
-			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(hostID, sg.GetID()); innerXErr != nil {
+			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					return nil

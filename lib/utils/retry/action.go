@@ -80,7 +80,6 @@ func Action(
 		Run:     run,
 		Notify:  notify,
 	}.loopWithSoftTimeout()
-
 }
 
 // WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'

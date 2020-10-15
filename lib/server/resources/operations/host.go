@@ -895,7 +895,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 				default:
 					return innerXErr
 				}
-			} else if innerXErr = svc.UnbindSecurityGroupFromHost(rh.GetID(), rsg.GetID()); innerXErr != nil {
+			} else if innerXErr = svc.UnbindSecurityGroupFromHost(rsg.GetID(), rh.GetID()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// Consider a security group not found as a successful unbind
@@ -2776,7 +2776,7 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 			}
 
 			// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
-			if innerXErr := sg.GetService().BindSecurityGroupToHost(rh.GetID(), sgID); innerXErr != nil {
+			if innerXErr := sg.GetService().BindSecurityGroupToHost(sgID, rh.GetID()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
 					return nil
@@ -2824,7 +2824,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 			}
 
 			// Bind the security group on provider side; if security group not binded, consider as a success
-			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(rh.GetID(), sgID); innerXErr != nil {
+			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					return nil
