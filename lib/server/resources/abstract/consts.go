@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,29 @@
 
 package abstract
 
+// Default values
 const (
-    // DefaultUser Default Host user
-    DefaultUser = "safescale"
+	// DefaultUser Default Host user
+	DefaultUser = "safescale"
 
-    // DefaultVolumeMountPoint Default mount point for volumes
-    DefaultVolumeMountPoint = "/data/"
+	// DefaultVolumeMountPoint Default mount point for volumes
+	DefaultVolumeMountPoint = "/data/"
 
-    // DefaultBucketMountPoint Default mount point for containers
-    DefaultBucketMountPoint = "/buckets/"
+	// DefaultBucketMountPoint Default mount point for containers
+	DefaultBucketMountPoint = "/buckets/"
 
-    // DefaultShareExportedPath Default path to be exported by nfs server
-    DefaultShareExportedPath = "/shared/data"
+	// DefaultShareExportedPath Default path to be exported by nfs server
+	DefaultShareExportedPath = "/shared/data"
 
-    // DefaultShareMountPath Default path to be mounted to access a nfs directory
-    DefaultShareMountPath = "/shared"
+	// DefaultShareMountPath Default path to be mounted to access a nfs directory
+	DefaultShareMountPath = "/shared"
+)
 
-    // SingleHostNetworkName is the name to use to create the network owning single hosts (not attached to a named network)
-    SingleHostNetworkName = "net-safescale"
+// Single host constants
+const (
+	// SingleHostNetworkName is the name to use to create the network owning single hosts (not attached to a named network)
+	SingleHostNetworkName = "net-safescale"
+
+	// SingleHostSubnetName is the name to use to create the subnet owning single hosts (not attached to a named network)
+	SingleHostSubnetName = "subnet-safescale"
 )

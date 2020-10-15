@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,6 @@ import "github.com/CS-SI/SafeScale/lib/utils/fail"
 // Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
 // and reverse operation (Unserialize()
 type Serializable interface {
-    Serialize() ([]byte, fail.Error)
-    Deserialize([]byte) fail.Error
+	Serialize() ([]byte, fail.Error)
+	Deserialize([]byte) fail.Error
 }

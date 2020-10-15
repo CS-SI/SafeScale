@@ -1,7 +1,7 @@
 // +build libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -572,8 +572,8 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 
 	return hostSizing, nil
 }
-func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.HostNetwork, fail.Error) {
-	hostNetwork := propertiesv1.NewHostNetwork()
+func (s *Stack) getNetworkV2FromDomain(domain *libvirt.Domain) (*propertiesv2.HostNetwork, fail.Error) {
+	hostNetwork := propertiesv2.NewHostNetwork()
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
@@ -694,17 +694,17 @@ func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, xer
 			return nil, fail.Wrap(err, "failed to update hostproperty.SizingV1")
 		}
 
-		return props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) error {
-			hostNetworkV1, err := s.getNetworkV1FromDomain(domain)
+		return props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) error {
+			hostNetworkV2, err := s.getNetworkV2FromDomain(domain)
 			if err != nil {
 				return fail.Wrap(err, "failed to get domain network")
 			}
-			clonable.(*propertiesv1.HostNetwork).Replace(hostNetworkV1)
+			clonable.(*propertiesv2.HostNetwork).Replace(hostNetworkV2)
 			return nil
 		})
 	})
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to update hostproperty.NetworkV1")
+		return nil, fail.Wrap(err, "failed to update hostproperty.NetworkV2")
 	}
 
 	return host, nil
@@ -753,18 +753,18 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, newHost *abstract.Ho
 
 	// FIXME: this code should have been moved to operations, check this
 	return hostCore.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		innerErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-			newHostNetworkV1 := propertiesv1.NewHostNetwork()
-			readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) fail.Error {
-				newHostNetworkV1 = clonable.(*propertiesv1.HostNetwork)
+		innerErr := props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			newHostNetworkV2 := propertiesv2.NewHostNetwork()
+			readlockErr := newHost.Properties.LockForRead(hostproperty.NetworkV2).ThenUse(func(clonable data.Clonable) fail.Error {
+				newHostNetworkV2 = clonable.(*propertiesv2.HostNetwork)
 				return nil
 			})
 			if readlockErr != nil {
-				return fail.Wrap(err, "failed to update hostproperty.NetworkV1")
+				return fail.Wrap(err, "failed to update hostproperty.NetworkV2")
 			}
-			hostNetworkV1 := clonable.(*propertiesv1.HostNetwork)
-			hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
-			hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
+			hostNetworkV2 := clonable.(*propertiesv2.HostNetwork)
+			hostNetworkV2.IPv4Addresses = newHostNetworkV1.IPv4Addresses
+			hostNetworkV2.IPv6Addresses = newHostNetworkV1.IPv6Addresses
 			hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
 			hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
 			return nil
@@ -1030,7 +1030,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostCore.PrivateKey = keyPair.PrivateKey
 	hostCore.Password = request.Password
 
-	hostNetwork := abstract.NewHostNetwork()
+	hostNetwork := abstract.NewHostSubnet()
 	if bridgedVMs {
 		var vmInfo VMInfo
 		if publicIP {
@@ -1040,7 +1040,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		}
 	}
 
-	hostNetwork.DefaultNetworkID = request.Networks[0].ID
+	hostNetwork.DefaultSubnetID = request.Networks[0].ID
 	hostNetwork.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
 	if request.DefaultGateway != nil {
 		hostNetwork.DefaultGatewayID = request.DefaultGateway.ID
@@ -1291,11 +1291,11 @@ func (s *Stack) ListRegions() ([]string, fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter, enabled bool) fail.Error {
+func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -154,13 +154,13 @@ disable_cloudinit_network_autoconf() {
 disable_services() {
 	case $LINUX_KIND in
 		debian|ubuntu)
-		  if [[ -n $(command -v systemctl) ]]; then
-		    systemctl stop apt-daily.service &>/dev/null
-			  systemctl kill --kill-who=all apt-daily.service &>/dev/null
-		  fi
-		  if [[ -n $(command -v system) ]]; then
-        which system && service stop apt-daily.service &>/dev/null
-		  fi
+            if [[ -n $(command -v systemctl) ]]; then
+		        systemctl stop apt-daily.service &>/dev/null
+			    systemctl kill --kill-who=all apt-daily.service &>/dev/null
+		    fi
+		    if [[ -n $(command -v system) ]]; then
+                which system && service stop apt-daily.service &>/dev/null
+		    fi
 			;;
 	esac
 }

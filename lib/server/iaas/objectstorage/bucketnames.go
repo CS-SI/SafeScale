@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,47 +17,47 @@
 package objectstorage
 
 import (
-    "encoding/hex"
-    "fmt"
-    "hash/fnv"
-    "os"
-    "strings"
+	"encoding/hex"
+	"fmt"
+	"hash/fnv"
+	"os"
+	"strings"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 const (
-    maxBucketNameLength = 63
-    // bucketNamePrefix is the beginning of the name of the bucket for Metadata
-    bucketNamePrefix = "0.safescale"
-    suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
+	maxBucketNameLength = 63
+	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
+	bucketNamePrefix = "0.safescale"
+	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
 // BuildMetadataBucketName builds the name of the bucket/stowContainer that will store metadata
 func BuildMetadataBucketName(driver, region, domain, project string) (name string, xerr fail.Error) {
-    hash := fnv.New128a()
-    sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
-    _, herr := hash.Write([]byte(sig))
-    if herr != nil {
-        return "", fail.ToError(herr)
-    }
-    hashed := hex.EncodeToString(hash.Sum(nil))
-    name = bucketNamePrefix + "-" + hashed
+	hash := fnv.New128a()
+	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
+	_, herr := hash.Write([]byte(sig))
+	if herr != nil {
+		return "", fail.ToError(herr)
+	}
+	hashed := hex.EncodeToString(hash.Sum(nil))
+	name = bucketNamePrefix + "-" + hashed
 
-    nameLen := len(name)
-    if suffix, ok := os.LookupEnv(suffixEnvName); ok {
-        name += "." + suffix
-        if len(name) > maxBucketNameLength {
-            return "", fail.OverflowError(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
-        }
-    }
+	nameLen := len(name)
+	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
+		name += "." + suffix
+		if len(name) > maxBucketNameLength {
+			return "", fail.OverflowError(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+		}
+	}
 
-    // FIXME GCP, Remove specific driver code
-    if driver == "gcp" {
-        name = strings.Replace(name, ".", "-", -1)
-    }
+	// FIXME GCP, Remove specific driver code
+	if driver == "gcp" {
+		name = strings.Replace(name, ".", "-", -1)
+	}
 
-    name = strings.ToLower(name)
+	name = strings.ToLower(name)
 
-    return name, nil
+	return name, nil
 }

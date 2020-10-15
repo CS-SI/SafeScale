@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,4 +56,9 @@ func (s *Stack) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGr
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
 func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
 	return nil, fail.NotImplementedError()
+}
+
+// GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
+func (s Stack) GetDefaultSecurityGroupName() string {
+	return ""
 }

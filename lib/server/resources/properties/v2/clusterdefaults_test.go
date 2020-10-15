@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,31 +17,32 @@
 package propertiesv2
 
 import (
-    "reflect"
-    "testing"
+	"github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"reflect"
+	"testing"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaults_Clone(t *testing.T) {
-    ct := newClusterDefaults()
-    ct.Image = "something"
-    ct.GatewaySizing = HostSizingRequirements{
-        MinCores: 3,
-        MinGPU:   1,
-    }
+	ct := newClusterDefaults()
+	ct.Image = "something"
+	ct.GatewaySizing = propertiesv1.HostSizingRequirements{
+		MinCores: 3,
+		MinGPU:   1,
+	}
 
-    clonedCt, ok := ct.Clone().(*ClusterDefaults)
-    if !ok {
-        t.Fail()
-    }
+	clonedCt, ok := ct.Clone().(*ClusterDefaults)
+	if !ok {
+		t.Fail()
+	}
 
-    assert.Equal(t, ct, clonedCt)
-    clonedCt.GatewaySizing.MinCores = 7
+	assert.Equal(t, ct, clonedCt)
+	clonedCt.GatewaySizing.MinCores = 7
 
-    areEqual := reflect.DeepEqual(ct, clonedCt)
-    if areEqual {
-        t.Error("It's a shallow clone !")
-        t.Fail()
-    }
+	areEqual := reflect.DeepEqual(ct, clonedCt)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ type Session struct {
 	SecurityGroup securityGroup
 	Share         share
 	SSH           ssh
+	Subnet        subnet
 	Template      template
 	Tenant        tenant
 	Volume        volume
@@ -110,6 +111,7 @@ func New(server string) (_ *Session, xerr fail.Error) {
 	s.Host = host{session: s}
 	s.Image = image{session: s}
 	s.Network = network{session: s}
+	s.Subnet = subnet{session: s}
 	s.JobManager = jobManager{session: s}
 	s.SecurityGroup = securityGroup{session: s}
 	s.Share = share{session: s}

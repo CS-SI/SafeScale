@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,62 +17,62 @@
 package aws
 
 import (
-    "reflect"
+	"reflect"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // OpContext ...
 type OpContext struct {
-    ProjectID    string
-    DesiredState string
+	ProjectID    string
+	DesiredState string
 }
 
 // Result ...
 type Result struct {
-    State string
-    Error error
-    Done  bool
+	State string
+	Error error
+	Done  bool
 }
 
 // IPInSubnet ...
 type IPInSubnet struct {
-    Subnet   string
-    Name     string
-    ID       string
-    IP       string
-    PublicIP string
+	Subnet   string
+	Name     string
+	ID       string
+	IP       string
+	PublicIP string
 }
 
 func IsOperation(op interface{}, name string, fieldType reflect.Type) bool {
-    val := reflect.Indirect(reflect.ValueOf(op))
+	val := reflect.Indirect(reflect.ValueOf(op))
 
-    result := false
+	result := false
 
-    for i := 0; i < val.Type().NumField(); i++ {
+	for i := 0; i < val.Type().NumField(); i++ {
 
-        if val.Type().Field(i).Name == name {
-            if val.Type().Field(i).Type == fieldType {
-                result = true
-                break
-            }
-        }
-    }
+		if val.Type().Field(i).Name == name {
+			if val.Type().Field(i).Type == fieldType {
+				result = true
+				break
+			}
+		}
+	}
 
-    return result
+	return result
 }
 
 func GetOperationStatus(op interface{}, name string, fieldType reflect.Type) (reflect.Value, error) {
-    val := reflect.Indirect(reflect.ValueOf(op))
+	val := reflect.Indirect(reflect.ValueOf(op))
 
-    for i := 0; i < val.Type().NumField(); i++ {
+	for i := 0; i < val.Type().NumField(); i++ {
 
-        if val.Type().Field(i).Name == name {
-            if val.Type().Field(i).Type == fieldType {
-                return reflect.ValueOf(val.Field(i)), nil
-            }
-        }
-    }
+		if val.Type().Field(i).Name == name {
+			if val.Type().Field(i).Type == fieldType {
+				return reflect.ValueOf(val.Field(i)), nil
+			}
+		}
+	}
 
-    return reflect.Value{}, fail.NotFoundError()
+	return reflect.Value{}, fail.NotFoundError()
 }

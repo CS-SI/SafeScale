@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,17 @@
 package operations
 
 var (
-    // Trace contains what to trace during debug log
-    Trace = struct {
-        Cluster bool
-        Host    bool
-        Network bool
-        Share   bool
-        Tenant  bool
-        Volume  bool
-        Feature struct {
-            Action bool
-            Step   bool
-        }
-    }{}
+	// Trace contains what to trace during debug log
+	Trace = struct {
+		Cluster bool
+		Host    bool
+		Network bool
+		Share   bool
+		Tenant  bool
+		Volume  bool
+		Feature struct {
+			Action bool
+			Step   bool
+		}
+	}{}
 )

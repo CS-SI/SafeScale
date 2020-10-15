@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,26 @@
  * limitations under the License.
  */
 
-package share
+package subnetstate
 
-import (
-    "sync"
+//go:generate stringer -type=Enum
 
-    "github.com/CS-SI/SafeScale/lib/utils"
+// Enum represents the state of a network
+type Enum int
+
+const (
+	// UNKNOWN
+	UNKNOWN Enum = iota
+
+	// GATEWAY_CREATION when gateway(s) is(are) created
+	GATEWAY_CREATION
+
+	// PHASE2 when gateway(s) is(are) configured
+	GATEWAY_CONFIGURATION
+
+	// READY when ready
+	READY
+
+	// ERROR when error
+	ERROR
 )
-
-var shareCache struct {
-    lock   sync.Mutex
-    ByID   utils.Cache
-    ByName utils.Cache
-}
-
-func init() {
-    shareCache.ByID = utils.NewMapCache()
-    shareCache.ByName = utils.NewMapCache()
-}

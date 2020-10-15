@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package resources
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"time"
@@ -37,17 +38,17 @@ type Host interface {
 	Targetable
 	data.NullValue
 
-	BindSecurityGroup(task concurrency.Task, sg SecurityGroup, disabled bool) fail.Error                                                           // Binds a security group to host
+	BindSecurityGroup(task concurrency.Task, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                          // Binds a security group to host
 	Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) fail.Error                                                         // ...
 	Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (*userdata.Content, fail.Error)           // creates a new host and its metadata
 	DisableSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                                                       // disables a binded security group on host
 	EnableSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                                                        // enables a binded security group on host
 	ForceGetState(task concurrency.Task) (hoststate.Enum, fail.Error)                                                                              // returns the real current state of the host, with error handling
 	GetAccessIP(task concurrency.Task) (string, fail.Error)                                                                                        // returns the IP to reach the host, with error handling
-	GetDefaultNetwork(task concurrency.Task) (Network, fail.Error)                                                                                 // returns the resources.Network object corresponding to the default network of the host, with error handling
+	GetDefaultSubnet(task concurrency.Task) (Subnet, fail.Error)                                                                                   // returns the resources.Subnet instance corresponding to the default subnet of the host, with error handling
 	GetMounts(task concurrency.Task) (*propertiesv1.HostMounts, fail.Error)                                                                        // returns the mounts on the host
-	GetPrivateIP(task concurrency.Task) (ip string, err fail.Error)                                                                                // returns the IP address of the host on the default local network, with error handling
-	GetPrivateIPOnNetwork(task concurrency.Task, networkID string) (ip string, err fail.Error)                                                     // returns the IP address of the host on the local network requested, with error handling
+	GetPrivateIP(task concurrency.Task) (ip string, err fail.Error)                                                                                // returns the IP address of the host on the default subnet, with error handling
+	GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip string, err fail.Error)                                                       // returns the IP address of the host on the requested subnet, with error handling
 	GetPublicIP(task concurrency.Task) (ip string, err fail.Error)                                                                                 // returns the public IP address of the host, with error handling
 	GetShare(task concurrency.Task, shareRef string) (*propertiesv1.HostShare, fail.Error)                                                         // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares(task concurrency.Task) (*propertiesv1.HostShares, fail.Error)                                                                        // returns the shares hosted on the host
@@ -55,7 +56,8 @@ type Host interface {
 	GetState(task concurrency.Task) hoststate.Enum                                                                                                 // returns the current state of the host, with error handling
 	GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error)                                                                      // returns the volumes attached to the host
 	IsClusterMember(task concurrency.Task) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
-	ListSecurityGroups(task concurrency.Task, kind string) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                         // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
+	IsGateway(task concurrency.Task) (bool, fail.Error)                                                                                            // tells of  the host acts as a gateway
+	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                       // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
 	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
 	PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                                        // creates a file 'filename' on remote 'host' with the content 'content'
