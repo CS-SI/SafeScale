@@ -18,10 +18,7 @@ package operations
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"reflect"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -29,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -79,16 +78,19 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	objn, xerr := NewNetwork(svc)
+	rn, xerr := NewNetwork(svc)
 	if xerr != nil {
 		return nullNetwork(), xerr
 	}
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return objn.Read(task, ref)
-		},
-		10*time.Second, // FIXME: parameterize
-	)
+	// VPL: writes are now considered successful only if the remote content is read and checked, so now need to wait on read.
+	//xerr = retry.WhileUnsuccessfulDelay1Second(
+	//	func() error {
+	//		return rn.Read(task, ref)
+	//	},
+	//	10*time.Second, // FIXME: parameterize
+	//)
+	// FIXME: object storage comms may fail, Read operation does not retry on this currently (cf. roadmap to replace stow with rclone)
+	xerr = rn.Read(task, ref)
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := xerr.(*retry.ErrTimeout); ok {
@@ -98,7 +100,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		return nullNetwork(), xerr
 	}
 
-	if xerr = upgradeProperties(task, objn); xerr != nil {
+	if xerr = upgradeProperties(task, rn); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
 			// ignore
@@ -106,7 +108,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 			return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
 		}
 	}
-	return objn, nil
+	return rn, nil
 }
 
 // upgradeProperties upgrades properties to most recent version
