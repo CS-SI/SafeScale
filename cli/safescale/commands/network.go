@@ -957,25 +957,35 @@ var subnetInspect = &cli.Command{
 		_ = json.Unmarshal(jsoned, &mapped)
 
 		// Get gateway(s) information (needs the name(s) in the output map)
-		var pgw, sgw *protocol.Host
-		pgwID := subnet.GetGatewayIds()[0]
-		sgwID := subnet.GetGatewayIds()[1]
+		var (
+			pgwID, sgwID string
+			pgw, sgw     *protocol.Host
+		)
+		gwIDs := subnet.GetGatewayIds()
+		if len(gwIDs) > 0 {
+			pgwID = gwIDs[0]
+		}
+		if len(gwIDs) > 1 {
+			sgwID = gwIDs[1]
+		}
 
 		// Added operation status
 		opState := subnet.State
 		mapped["state"] = opState.String()
 
-		pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			var what string
-			if sgwID != "" {
-				what = "primary "
+		if pgwID != "" {
+			pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+			if err != nil {
+				err = fail.FromGRPCStatus(err)
+				var what string
+				if sgwID != "" {
+					what = "primary "
+				}
+				casted := fail.Wrap(err, fmt.Sprintf("failed to inspect subnet: cannot inspect %sgateway", what))
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 			}
-			casted := fail.Wrap(err, fmt.Sprintf("failed to inspect subnet: cannot inspect %sgateway", what))
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+			mapped["gateway_name"] = pgw.Name
 		}
-		mapped["gateway_name"] = pgw.Name
 		if sgwID != "" {
 			sgw, err = clientSession.Host.Inspect(sgwID, temporal.GetExecutionTimeout())
 			if err != nil {
@@ -985,7 +995,7 @@ var subnetInspect = &cli.Command{
 			}
 			mapped["secondary_gateway_name"] = sgw.Name
 		}
-		// Removed entry 'virtual_ip' if empty
+		// Remove entry 'virtual_ip' if empty
 		if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
 			delete(mapped, "virtual_ip")
 		}
