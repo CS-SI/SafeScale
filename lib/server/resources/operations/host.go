@@ -19,6 +19,7 @@ package operations
 import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"os"
 	"os/user"
 	"reflect"
@@ -1657,13 +1658,13 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 					continue
 				}
 				loopErr = rn.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
-					return netprops.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-						networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
+					return netprops.Alter(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+						subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 						if !ok {
-							return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
-						delete(networkHostsV1.ByID, hostID)
-						delete(networkHostsV1.ByName, hostName)
+						delete(subnetHostsV1.ByID, hostID)
+						delete(subnetHostsV1.ByName, hostName)
 						return nil
 					})
 				})
@@ -1672,7 +1673,10 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 					errors = append(errors, loopErr)
 				}
 			}
-			return fail.NewErrorList(errors)
+			if len(errors) > 0 {
+				return fail.Wrap(fail.NewErrorList(errors), "failed to update Host's Subnets metadata")
+			}
+			return nil
 		})
 		if innerXErr != nil {
 			return innerXErr

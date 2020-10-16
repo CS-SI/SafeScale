@@ -143,7 +143,7 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
-		fmt.Sprintf("Ending configuration phase 3 on the gateway '%s'", gwname),
+		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 	defer fail.OnPanic(&xerr)
 

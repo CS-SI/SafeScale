@@ -1218,7 +1218,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	defer fail.OnPanic(&xerr)
 
 	rs.SafeLock(task)
@@ -1292,19 +1292,20 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		}
 
 		// finally delete subnet
+		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
 		waitMore := false
 		innerXErr = svc.DeleteSubnet(as.ID)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
-				logrus.Warnf("subnet not found on provider side, cleaning up metadata.")
+				logrus.Warnf("Subnet not found on provider side, cleaning up metadata.")
 				return innerXErr
 			case *fail.ErrTimeout:
-				logrus.Error("cannot delete subnet due to a timeout")
+				logrus.Error("Cannot delete subnet due to a timeout")
 				waitMore = true
 			default:
-				logrus.Error("cannot delete subnet, other reason")
+				logrus.Error("Cannot delete subnet, other reason: %s", innerXErr.Error())
 			}
 		}
 		if waitMore {
@@ -1329,6 +1330,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 				}
 			}
 		}
+		logrus.Debugf("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups
 		if as.GWSecurityGroupID != "" {
@@ -1341,9 +1343,12 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 					return innerXErr
 				}
 			} else {
+				sgName := rsg.GetName()
+				logrus.Debugf("Deleting Security Group %s...", sgName)
 				if innerXErr = rsg.Delete(task); innerXErr != nil {
 					return innerXErr
 				}
+				logrus.Debugf("Security Group %s successfully deleted.", sgName)
 			}
 		}
 		if as.InternalSecurityGroupID != "" {
@@ -1356,9 +1361,12 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 					return innerXErr
 				}
 			} else {
+				sgName := rsg.GetName()
+				logrus.Debugf("Deleting Security Group %s...", sgName)
 				if innerXErr = rsg.Delete(task); innerXErr != nil {
 					return innerXErr
 				}
+				logrus.Debugf("Security Group %s successfully deleted.", sgName)
 			}
 		}
 		return nil
@@ -1396,6 +1404,7 @@ func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet)
 						return xerr
 					}
 				}
+				logrus.Debugf("Gateway '%s' successfully deleted.", rh.GetName())
 			}
 
 			// Remove current entry from gateways to delete
