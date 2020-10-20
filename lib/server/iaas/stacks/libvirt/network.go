@@ -313,7 +313,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //
 // 	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 //
-// 	network := req.Network
+// 	network := req.Networking
 // 	templateID := req.TemplateID
 // 	imageID := req.ImageID
 // 	keyPair := req.KeyPair
@@ -336,7 +336,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 // 		KeyPair:      keyPair,
 // 		ResourceName: gwName,
 // 		TemplateID:   templateID,
-// 		Networks:     []*abstract.Network{network},
+// 		Networks:     []*abstract.Networking{network},
 // 		PublicIP:     true,
 // 	}
 //

@@ -19,14 +19,12 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
-	"path"
-	"reflect"
-	"strings"
-	"time"
-
 	"github.com/google/martian/log"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+	"path"
+	"reflect"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -37,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -138,19 +135,15 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.S
 		return rs, xerr
 	}
 
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return rs.Read(task, ref)
-		},
-		10*time.Second,
-	)
-	if xerr != nil {
-		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(*retry.ErrTimeout); ok {
-			logrus.Debugf("timeout reading metadata of Share '%s'", ref)
-			xerr = fail.NotFoundError("failed to load metadata of Share '%s': timeout", ref)
+	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if xerr = rs.Read(task, ref); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// rewrite NotFoundError, user does not bother about metadata stuff
+			return nullShare(), fail.NotFoundError("failed to find a Share '%s'", ref)
+		default:
+			return nullShare(), xerr
 		}
-		return nullShare(), xerr
 	}
 	return rs, nil
 }

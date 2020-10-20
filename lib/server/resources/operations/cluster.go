@@ -116,7 +116,13 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 	instance := anon.(*cluster)
 
 	if xerr = instance.Read(task, name); xerr != nil {
-		return nullCluster(), xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// rewrite NotFoundError, user does not bother about metadata stuff
+			return nullCluster(), fail.NotFoundError("failed to find Cluster '%s'", name)
+		default:
+			return nullCluster(), xerr
+		}
 	}
 
 	// From here, we can deal with legacy
@@ -1124,7 +1130,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 			return props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
-					return fail.InconsistentError("'*propertiesv2.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				config = networkV2
 				return nil

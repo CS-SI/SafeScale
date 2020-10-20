@@ -202,12 +202,12 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 		State:      HostStateFromAbstractToProtocol(state),
 		PrivateKey: in.Core.PrivateKey,
 	}
-	if in.Subnet != nil {
-		ph.PublicIp = in.Subnet.PublicIPv4
-		if ip, ok := in.Subnet.IPv4Addresses[in.Subnet.DefaultSubnetID]; ok {
+	if in.Networking != nil {
+		ph.PublicIp = in.Networking.PublicIPv4
+		if ip, ok := in.Networking.IPv4Addresses[in.Networking.DefaultSubnetID]; ok {
 			ph.PrivateIp = ip
 		}
-		ph.GatewayId = in.Subnet.DefaultGatewayID
+		ph.GatewayId = in.Networking.DefaultGatewayID
 	}
 	return ph
 }
@@ -229,8 +229,8 @@ func HostDescriptionFromAbstractToPropertyV1(src abstract.HostDescription) *prop
 }
 
 //// HostNetworkFromAbstractToPropertyV1 ... DEPRECATED
-//func HostNetworkFromAbstractToPropertyV1(src abstract.HostSubnet) *propertiesv1.HostNetwork {
-//	return &propertiesv1.HostNetwork{
+//func HostNetworkFromAbstractToPropertyV1(src abstract.HostNetworking) *propertiesv1.HostNetworking {
+//	return &propertiesv1.HostNetworking{
 //		IsGateway:               src.IsGateway,
 //		DefaultGatewayID:        src.DefaultGatewayID,
 //		DefaultGatewayPrivateIP: src.DefaultGatewayPrivateIP,
@@ -244,9 +244,9 @@ func HostDescriptionFromAbstractToPropertyV1(src abstract.HostDescription) *prop
 //	}
 //}
 
-// HostNetworkFromAbstractToPropertyV2 ...
-func HostNetworkFromAbstractToPropertyV2(src abstract.HostSubnet) *propertiesv2.HostNetwork {
-	return &propertiesv2.HostNetwork{
+// HostNetworkingFromAbstractToPropertyV2 ...
+func HostNetworkingFromAbstractToPropertyV2(src abstract.HostNetworking) *propertiesv2.HostNetworking {
+	return &propertiesv2.HostNetworking{
 		IsGateway:       src.IsGateway,
 		DefaultSubnetID: src.DefaultSubnetID,
 		SubnetsByID:     src.SubnetsByID,

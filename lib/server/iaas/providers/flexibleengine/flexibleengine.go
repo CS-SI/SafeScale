@@ -87,8 +87,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	password, _ := identity["Password"].(string)
 	domainName, _ := identity["DomainName"].(string)
 	projectID, _ := compute["ProjectID"].(string)
-	vpcName, _ := network["VPCName"].(string)
-	vpcCIDR, _ := network["VPCCIDR"].(string)
+	vpcName, _ := network["DefaultNetworkName"].(string)
+	if vpcName == "" {
+		vpcName, _ := network["VPCName"].(string)
+	}
+	vpcCIDR, _ := network["DefaultNetworkCIDR"].(string)
+	if vpcCIDR == "" {
+		vpcCIDR, _ := network["VPCCIDR"].(string)
+	}
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
 	operatorUsername := abstract.DefaultUser
@@ -109,8 +115,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		//VPCName:          vpcName,
-		//VPCCIDR:          vpcCIDR,
+		//DefaultNetworkName:          vpcName,
+		//DefaultNetworkCIDR:          vpcCIDR,
 	}
 
 	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
@@ -272,7 +278,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
-	//cfg.Set("VPCName", opts.VPCName)
+	//cfg.Set("DefaultNetworkName", opts.DefaultNetworkName)
 
 	return cfg, nil
 }

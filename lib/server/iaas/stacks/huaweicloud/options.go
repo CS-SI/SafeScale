@@ -30,7 +30,7 @@ func (s *Stack) GetAuthOpts() (providers.Config, error) {
 	cfg.Set("Password", s.authOpts.Password)
 	cfg.Set("AuthUrl", s.authOpts.IdentityEndpoint)
 	cfg.Set("Region", s.authOpts.Region)
-	//cfg.Set("VPCName", s.authOpts.VPCName)
+	//cfg.Set("DefaultNetworkName", s.authOpts.DefaultNetworkName)
 
 	return cfg, nil
 }

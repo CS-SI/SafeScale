@@ -433,7 +433,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttac
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", serverID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	volumes, err := s.ListVolumes()
 	if err != nil {
@@ -463,7 +463,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Err
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	unlinkVolumeRequest := osc.UnlinkVolumeRequest{
 		VolumeId: volumeID,

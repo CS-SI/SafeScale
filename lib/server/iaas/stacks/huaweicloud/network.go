@@ -133,25 +133,6 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		return nil, normalizeError(err)
 	}
 
-	// Searching for the OpenStack Router corresponding to the VPC (router.id == vpc.id)
-	//var router *routers.Router
-	//commRetryErr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
-	//	func() (innerErr error) {
-	//		router, innerErr = routers.Get(s.Stack.NetworkClient, vpc.ID).Extract()
-	//		return normalizeError(innerErr)
-	//	},
-	//	temporal.GetCommunicationTimeout(),
-	//)
-	//if commRetryErr != nil {
-	//	derr := s.DeleteNetwork(vpc.ID)
-	//	if derr != nil {
-	//		logrus.Warnf("Error deleting VPC: %v", derr)
-	//		_ = commRetryErr.AddConsequence(derr)
-	//	}
-	//	return nil, fail.Wrap(commRetryErr, "failed to find OpenStack router of VPC")
-	//}
-	//vpc.Router = router
-
 	// Searching for the Openstack Network bound to the VPC
 	network, xerr := s.findOpenStackNetworkBoundToVPC(vpc.Name)
 	if xerr != nil {
@@ -234,14 +215,6 @@ func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		return nil, commRetryErr
 	}
 
-	//subnets, xerr := s.ListSubnets(an.ID)
-	//if xerr != nil {
-	//	return nil, fail.Wrap(xerr, "failed to list subnets of Network/VPC")
-	//}
-	//an.Subnets = make([]string, 0, len(subnets))
-	//for _, v := range subnets {
-	//	an.Subnets = append(an.Subnets, v.ID)
-	//}
 	return convertVPCToNetwork(*vpc), nil
 }
 
@@ -279,14 +252,6 @@ func (s *Stack) InspectNetworkByName(name string) (an *abstract.Network, xerr fa
 		return nil, fail.NotFoundError("failed to find VPC named '%s'", name)
 	}
 
-	//subnets, xerr := s.ListSubnets(an.ID)
-	//if xerr != nil {
-	//	return nil, fail.Wrap(xerr, "failed to list subnets of Network/VPC")
-	//}
-	//an.Subnets = make([]string, 0, len(subnets))
-	//for _, v := range subnets {
-	//	an.Subnets = append(an.Subnets, v.ID)
-	//}
 	return an, nil
 }
 
@@ -361,7 +326,7 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subne
 	tracer := debug.NewTracer(nil, true, "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	as, xerr := s.InspectSubnetByName(req.Network, req.Name)
+	as, xerr := s.InspectSubnetByName(req.NetworkID, req.Name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
@@ -371,22 +336,22 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subne
 		return nil, fail.DuplicateError("subnet '%s' already exists", req.Name)
 	}
 
-	if ok, xerr := validateNetworkName(req.Network); !ok {
+	if ok, xerr := validateNetworkName(req.NetworkID); !ok {
 		return nil, fail.Wrap(xerr, "network name '%s' invalid", req.Name)
 	}
 
-	an, xerr := s.InspectNetwork(req.Network)
+	an, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			an, xerr = s.InspectNetworkByName(req.Network)
+			an, xerr = s.InspectNetworkByName(req.NetworkID)
 		}
 	}
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// Checks if CIDR is valid...
+	// Checks if CIDR is valid for huaweicloud
 	xerr = s.validateCIDR(&req, an)
 	if xerr != nil {
 		return nil, xerr
@@ -421,57 +386,13 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subne
 
 func (s *Stack) validateCIDR(req *abstract.SubnetRequest, network *abstract.Network) fail.Error {
 	_, networkDesc, _ := net.ParseCIDR(network.CIDR)
-	if req.CIDR != "" {
-		_, subnetDesc, err := net.ParseCIDR(req.CIDR)
-		if err != nil {
-			return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
-		}
-		// ... and if CIDR is inside VPC's one
-		if !netretry.CIDROverlap(*networkDesc, *subnetDesc) {
-			return fail.InvalidRequestError("failed to validate CIDR '%s' for Subnet '%s': not inside VPC CIDR '%s'", req.CIDR, req.Name, s.vpc.CIDR)
-		}
-		if networkDesc.IP.Equal(subnetDesc.IP) && networkDesc.Mask.String() == subnetDesc.Mask.String() {
-			return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to VPC one", req.CIDR)
-		}
-		return nil
+	_, subnetDesc, err := net.ParseCIDR(req.CIDR)
+	if err != nil {
+		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
-
-	// CIDR is empty, choose the first Class C available one
-	logrus.Debugf("CIDR is empty, choosing one...")
-
-	subnets, xerr := s.ListSubnets(req.Network)
-	if xerr != nil {
-		return xerr
+	if networkDesc.IP.Equal(subnetDesc.IP) && networkDesc.Mask.String() == subnetDesc.Mask.String() {
+		return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to VPC one", req.CIDR)
 	}
-
-	var (
-		bitShift uint8
-		i, limit uint
-		newIPNet net.IPNet
-	)
-	mask, _ := networkDesc.Mask.Size()
-	if mask >= 24 {
-		bitShift = 1
-	} else {
-		bitShift = 24 - uint8(mask)
-	}
-	limit = 1 << bitShift
-
-	for i = uint(1); i < limit; i++ {
-		newIPNet, xerr = netretry.NthIncludedSubnet(*networkDesc, bitShift, i)
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to choose a CIDR for the subnet")
-		}
-		if wouldOverlap(subnets, newIPNet) == nil {
-			break
-		}
-	}
-	if i >= limit {
-		return fail.OverflowError(nil, limit-1, "failed to find a free available CIDR ")
-	}
-
-	req.CIDR = newIPNet.String()
-	logrus.Debugf("CIDR chosen for Subnet '%s' is '%s'", req.Name, req.CIDR)
 	return nil
 }
 
@@ -497,18 +418,6 @@ func validateNetworkName(name string) (bool, fail.Error) {
 		return false, fail.NewError(strings.Join(errs, "; "))
 	}
 	return true, nil
-}
-
-// wouldOverlap returns fail.ErrOverloadError if subnet overlaps one of the subnets in allSubnets
-// TODO: there is room for optimization here, 'allSubnets' is walked through at each call...
-func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
-	for _, s := range allSubnets {
-		_, sDesc, _ := net.ParseCIDR(s.CIDR)
-		if netretry.CIDROverlap(subnet, *sDesc) {
-			return fail.OverloadError("would intersect with '%s (%s)'", s.Name, s.CIDR)
-		}
-	}
-	return nil
 }
 
 // InspectSubnetByName ...
@@ -753,22 +662,22 @@ type subnetDeleteResult struct {
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s Stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.Error) {
-	network, networkDesc, _ := net.ParseCIDR(req.CIDR)
+	network, _ /*networkDesc*/, _ := net.ParseCIDR(req.CIDR)
 
-	// Validates IPRanges regarding the existing subnets
-	subnetworks, xerr := s.ListSubnets(req.Network)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if xerr = wouldOverlap(subnetworks, *networkDesc); xerr != nil {
-		return nil, xerr
-	}
-	// for _, s := range subnetworks {
-	// 	_, sDesc, _ := net.ParseCIDR(s.IPRanges)
-	// 	if utils.CIDROverlap(*networkDesc, *sDesc) {
-	// 		return nil, fail.Wrap(err, "would intersect with '%s (%s)'", s.Name, s.IPRanges)
-	// 	}
-	// }
+	//// Validates IPRanges regarding the existing subnets
+	//subnetworks, xerr := s.ListSubnets(req.NetworkID)
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+	//if xerr = wouldOverlap(subnetworks, *networkDesc); xerr != nil {
+	//	return nil, xerr
+	//}
+	//// for _, s := range subnetworks {
+	//// 	_, sDesc, _ := net.ParseCIDR(s.IPRanges)
+	//// 	if utils.CIDROverlap(*networkDesc, *sDesc) {
+	//// 		return nil, fail.Wrap(err, "would intersect with '%s (%s)'", s.Name, s.IPRanges)
+	//// 	}
+	//// }
 
 	// Calculate IP address for gateway
 	n := netretry.IPv4ToUInt32(network)
@@ -792,7 +701,7 @@ func (s Stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	request := subnetRequest{
 		Name:         req.Name,
 		CIDR:         req.CIDR,
-		VPCID:        req.Network,
+		VPCID:        req.NetworkID,
 		DHCPEnable:   &bYes,
 		GatewayIP:    gw.String(),
 		PrimaryDNS:   primaryDNS,

@@ -69,7 +69,7 @@ func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interfa
 			}
 		}
 	default:
-		logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel()", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
+		logrus.Errorf(callstack.DecorateWith("fail.OnExitLogErrorWithLevel(): ", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 5))
 	}
 }
 

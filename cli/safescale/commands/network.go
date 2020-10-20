@@ -1249,7 +1249,7 @@ var subnetVIPInspectCommand = &cli.Command{
 			networkRef = ""
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
+		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
 		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network VIP", false).Error()))
@@ -1291,7 +1291,7 @@ var subnetVIPDeleteCommand = &cli.Command{
 			networkRef = ""
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
+		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
 		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network VIP", false).Error()))
@@ -1335,7 +1335,7 @@ var subnetVIPBindCommand = &cli.Command{
 			networkRef = ""
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
+		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
 		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Error()))
@@ -1379,7 +1379,7 @@ var subnetVIPUnbindCommand = &cli.Command{
 			networkRef = ""
 		}
 
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
+		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
 		// if err != nil {
 		// 	err = fail.FromGRPCStatus(err)
 		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))

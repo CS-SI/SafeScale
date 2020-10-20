@@ -259,7 +259,7 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.
 		}
 	}
 	// should never go there, in case this means that the network do not have a default security group
-	return nil, fail.NotFoundError("failed to get security group of Network '%s'", netID)
+	return nil, fail.NotFoundError("failed to get security group of Networking '%s'", netID)
 }
 
 //func (s *Stack) createVpc(name, cidr string) (_ *osc.Net, xerr fail.Error) {

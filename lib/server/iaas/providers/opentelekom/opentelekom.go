@@ -61,8 +61,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectID, _ := compute["ProjectID"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	vpcName, _ := network["VPCName"].(string)
-	vpcCIDR, _ := network["VPCCIDR"].(string)
+	vpcName, _ := network["DefaultNetworkName"].(string)
+	vpcCIDR, _ := network["DefaultNetworkCIDR"].(string)
 
 	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
 	if identityEndpoint == "" {
@@ -87,8 +87,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		//VPCName:          vpcName,
-		//VPCCIDR:          vpcCIDR,
+		//DefaultNetworkName:          vpcName,
+		//DefaultNetworkCIDR:          vpcCIDR,
 	}
 
 	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {

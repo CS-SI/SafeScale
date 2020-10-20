@@ -35,28 +35,7 @@ func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) (
 		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
 	}
 
-	if all {
-		return svc.ListSubnets(networkID)
-	}
-
-	rs, xerr := New(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// recover subnets from metadata
-	var list []*abstract.Subnet
-	xerr = rs.Browse(task, func(as *abstract.Subnet) fail.Error {
-		if networkID == "" || as.Network == networkID {
-			list = append(list, as)
-		}
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return list, nil
+	return operations.ListSubnets(svc, networkID, all)
 }
 
 // New creates an instance of resources.Subnet

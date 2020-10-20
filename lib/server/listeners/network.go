@@ -133,7 +133,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if err != nil && !in.GetKeepOnFailure() {
 			derr := rn.Delete(task)
 			if derr != nil {
-				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete NetworkID '%s'", in.GetName()))
 			}
 		}
 	}()
@@ -142,17 +142,17 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		_, networkNet, _ := net.ParseCIDR(cidr)
 		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", in.GetCidr())
+			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from NetworkID CIDR '%s'", in.GetCidr())
 		}
 
-		logrus.Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", req.Name, subnetNet.String())
+		logrus.Debugf("Creating default Subnet of NetworkID '%s' with CIDR '%s'", req.Name, subnetNet.String())
 
 		rs, xerr := subnetfactory.New(svc)
 		if xerr != nil {
 			return nil, xerr
 		}
 		req := abstract.SubnetRequest{
-			Network:       rn.GetID(),
+			NetworkID:     rn.GetID(),
 			Name:          in.GetName(),
 			CIDR:          subnetNet.String(),
 			KeepOnFailure: in.GetKeepOnFailure(),
@@ -163,7 +163,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		}
 	}
 
-	tracer.Trace("Network '%s' successfully created.", networkName)
+	tracer.Trace("NetworkID '%s' successfully created.", networkName)
 	return rn.ToProtocol(task)
 }
 
@@ -212,7 +212,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 		return nil, xerr
 	}
 
-	// Build response mapping abstract.Network to protocol.Network
+	// Build response mapping abstract.NetworkID to protocol.NetworkID
 	var pbnetworks []*protocol.Network
 	for _, network := range networks {
 		pbnetworks = append(pbnetworks, converters.NetworkFromAbstractToProtocol(network))
@@ -336,7 +336,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 
 			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil {
 				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == an.Name {
-					return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
+					return empty, fail.InvalidRequestError("cannot delete default NetworkID %s because its existence is not controlled by SafeScale", refLabel)
 				}
 			}
 			return empty, fail.InvalidRequestError("%s is not managed by SafeScale", refLabel)
@@ -348,6 +348,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, xerr
 	}
 
-	tracer.Trace("Network %s successfully deleted.", refLabel)
+	tracer.Trace("NetworkID %s successfully deleted.", refLabel)
 	return empty, nil
 }

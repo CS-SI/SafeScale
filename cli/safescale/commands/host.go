@@ -241,8 +241,9 @@ var hostCreate = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:  "subnet",
 			Value: &cli.StringSlice{},
-			Usage: `subnet name ('--network' should be used also in this case) or subnet id.
-			May be used multiple times, the first occurrence becoming the default subnet by design`,
+			Usage: `subnet name or id.
+If subnet id is used, '--network' is superfluous.
+May be used multiple times, the first occurrence becoming the default subnet by design`,
 		},
 		&cli.StringFlag{
 			Name:  "os",

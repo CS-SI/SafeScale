@@ -19,6 +19,7 @@ package outscale
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
@@ -80,7 +81,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 	return out
 }
 
-//// listSecurityGroupIDs lists the ids of the security group bound to Network
+//// listSecurityGroupIDs lists the ids of the security group bound to Networking
 //func (s Stack) listSecurityGroupIDs(networkID string) (list []string, xerr fail.Error) {
 //    list = []string{}
 //
@@ -105,8 +106,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 //}
 
 // CreateSecurityGroup creates a security group
-// Note: parameter 'networkRef' is not used in Outscale, Security Groups scope is tenant-wide.
-func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s Stack) CreateSecurityGroup(networkID, name, description string, rules []abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	// if s == nil {
 	//     return nil, fail.InvalidInstanceError()
 	// }
@@ -118,6 +118,7 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	defer tracer.Exiting()
 
 	createSecurityGroupRequest := osc.CreateSecurityGroupRequest{
+		NetId:             networkID,
 		Description:       description,
 		SecurityGroupName: name,
 	}
@@ -129,12 +130,12 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	}
 
 	asg = toAbstractSecurityGroup(resp.SecurityGroup)
-
+	sgID := asg.ID
+	sgName := asg.Name
 	defer func() {
 		if xerr != nil {
-			derr := s.DeleteSecurityGroup(asg.ID)
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", asg.Name))
+			if derr := s.DeleteSecurityGroup(sgID); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 			}
 		}
 	}()
@@ -185,12 +186,6 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -283,9 +278,14 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	if rule.EtherType == ipversion.IPv6 {
+		// No IPv6 at Outscale (?)
+		return asg, nil
+	}
+
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
-		return nil, xerr
+		return asg, xerr
 	}
 	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
 		SecurityGroupId: asg.ID,
@@ -296,13 +296,17 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
 	})
 	if err != nil {
-		return nil, normalizeError(err)
+		return asg, normalizeError(err)
 	}
 	return s.InspectSecurityGroup(asg.ID)
 }
 
 func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.SecurityGroupRule, fail.Error) {
 	rule := osc.SecurityGroupRule{}
+	if in.EtherType == ipversion.IPv6 {
+		// No IPv6 at Outscale (?)
+		return "", rule, fail.InvalidRequestError("IPv6 is not supported")
+	}
 
 	flow := ""
 	switch in.Direction {
@@ -315,11 +319,20 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.S
 	}
 
 	rule.IpProtocol = in.Protocol
-	if in.PortFrom <= 0 && in.PortTo <= 0 {
-		rule.FromPortRange, rule.ToPortRange = -1, -1
+	rule.FromPortRange = int32(in.PortFrom)
+	rule.ToPortRange = int32(in.PortTo)
+	if rule.FromPortRange == 0 && rule.ToPortRange == 0 {
+		if in.Protocol == "icmp" {
+			rule.FromPortRange, rule.ToPortRange = -1, -1
+		} else {
+			rule.FromPortRange, rule.ToPortRange = 1, 65535
+		}
 	} else {
-		if in.PortFrom > in.PortTo {
-			in.PortFrom, in.PortTo = in.PortTo, in.PortFrom
+		if rule.ToPortRange == 0 && rule.FromPortRange > 0 {
+			rule.ToPortRange = rule.FromPortRange
+		}
+		if rule.FromPortRange > rule.ToPortRange {
+			rule.FromPortRange, rule.ToPortRange = rule.ToPortRange, rule.FromPortRange
 		}
 	}
 	rule.IpRanges = in.IPRanges
@@ -346,6 +359,11 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s, %s)", asg.ID, rule.Description).WithStopwatch().Entering()
 	defer tracer.Exiting()
+
+	// IPv6 not supported at Outscale (?)
+	if rule.EtherType == ipversion.IPv6 {
+		return asg, nil
+	}
 
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {

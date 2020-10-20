@@ -529,7 +529,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 	}
 	sn, err := s.EC2Service.CreateSubnet(&ec2.CreateSubnetInput{
 		CidrBlock:        aws.String(req.CIDR),
-		VpcId:            aws.String(req.Network),
+		VpcId:            aws.String(req.NetworkID),
 		AvailabilityZone: aws.String(s.AwsConfig.Zone),
 	})
 	if err != nil {
@@ -592,7 +592,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("vpc-id"),
-				Values: []*string{aws.String(req.Network)},
+				Values: []*string{aws.String(req.NetworkID)},
 			},
 		},
 	})
@@ -612,7 +612,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 	subnet := abstract.NewSubnet()
 	subnet.ID = aws.StringValue(sn.Subnet.SubnetId)
 	subnet.Name = req.Name
-	subnet.Network = req.Network
+	subnet.Network = req.NetworkID
 	subnet.CIDR = req.CIDR
 	subnet.Domain = req.Domain
 	subnet.IPVersion = ipversion.IPv4

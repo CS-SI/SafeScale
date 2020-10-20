@@ -245,7 +245,7 @@ func (s *Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	}
 
 	// At this point, no network has been found with given reference
-	errNotFound := abstract.ResourceNotFoundError("network(InspectNetwork)", id)
+	errNotFound := abstract.ResourceNotFoundError("network", id)
 	logrus.Debug(errNotFound)
 	return nil, errNotFound
 }
@@ -417,7 +417,7 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subne
 	// need its UUID. You must also provide a well-formed IPRanges value.
 	dhcp := true
 	opts := subnets.CreateOpts{
-		NetworkID:  req.Network,
+		NetworkID:  req.NetworkID,
 		CIDR:       req.CIDR,
 		IPVersion:  ipVersion,
 		Name:       req.Name,

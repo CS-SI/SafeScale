@@ -359,7 +359,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	net, err := vdc.FindVDCNetwork(request.Networks[0].Name)
 	if err != nil {
-		return nil, userData, fail.Wrap(normalizeError(err), "failed to find OrgVCD Network")
+		return nil, userData, fail.Wrap(normalizeError(err), "failed to find OrgVCD Networking")
 	}
 	nets := []*types.OrgVDCNetwork{net.OrgVDCNetwork}
 
@@ -560,16 +560,16 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	hostIsAGateway := false
 
-	// TODO: adapt in abstract.HostFull.HostSubnet
-	hostFull.Network.DefaultNetworkID = defaultNetwork.ID
-	hostFull.Network.IsGateway = request.IsGateway
-	if hostFull.Network.IsGateway {
-		hostFull.Network.PublicIPv4 = selectedIP
+	// TODO: adapt in abstract.HostFull.HostNetworking
+	hostFull.Networking.DefaultNetworkID = defaultNetwork.ID
+	hostFull.Networking.IsGateway = request.IsGateway
+	if hostFull.Networking.IsGateway {
+		hostFull.Networking.PublicIPv4 = selectedIP
 	} else {
-		hostFull.Network.PublicIPv4 = capturedIP
+		hostFull.Networking.PublicIPv4 = capturedIP
 	}
 	// retryErr = hostFull.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-	//	hostNetworkV1 := clonable.(*propsv1.HostSubnet)
+	//	hostNetworkV1 := clonable.(*propsv1.HostNetworking)
 	//	hostNetworkV1.DefaultSubnetID = defaultNetwork.ID
 	//
 	//	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
@@ -704,10 +704,10 @@ func (s *Stack) complementHost(host *abstract.HostFull, newHost *abstract.HostFu
 	}
 	host.Core.LastState = newHost.Core.LastState
 
-	// TODO: adapt to abstract.HostFull.HostSubnet
+	// TODO: adapt to abstract.HostFull.HostNetworking
 	// err := host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
 	//	newHostNetworkV1 := propsv1.NewHostSubnet()
-	//	hostNetworkV1 := clonable.(*propsv1.HostSubnet)
+	//	hostNetworkV1 := clonable.(*propsv1.HostNetworking)
 	//	hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
 	//	hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
 	//	hostNetworkV1.SubnetsByID = newHostNetworkV1.SubnetsByID

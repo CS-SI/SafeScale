@@ -23,7 +23,10 @@ import (
 )
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
-const AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
+const (
+	DefaultNetworkCIDR                          = "192.168.0.0/16" // Contains the CIDR to use when none is provided
+	AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
+)
 
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
 // to be able to carry different but necessary information to stack implementations
@@ -83,9 +86,9 @@ type AuthenticationOptions struct {
 	FloatingIPPool string
 
 	//// Name of the VPC (Virtual Private Cloud)
-	//VPCName string
+	//DefaultNetworkName string
 	//// IPRanges if the VPC
-	//VPCCIDR string
+	//DefaultNetworkCIDR string
 }
 
 // ConfigurationOptions are the stack configuration options
@@ -126,8 +129,8 @@ type ConfigurationOptions struct {
 	// DefaultSecurityGroupName contains the name of the default security group
 	DefaultSecurityGroupName string
 
-	DefaultNetworkName string // contains the name of the Network/VPC that is used by default (corresponds to keywords 'VPCName' or 'NetworkName' in tenant section 'compute')
-	DefaultNetworkCIDR string // contains the CIDR of the default Network/VPC
+	DefaultNetworkName string // contains the name of the Networking/VPC that is used by default (corresponds to keywords 'DefaultNetworkName' or 'NetworkName' in tenant section 'compute')
+	DefaultNetworkCIDR string // contains the CIDR of the default Networking/VPC
 
 	// Customizations map[string]string
 

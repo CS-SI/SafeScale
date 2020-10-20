@@ -756,12 +756,12 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //		return nil, nil, fail.InvalidInstanceError()
 //	}
 //
-//	if req.Network == nil {
-//		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
+//	if req.Networking == nil {
+//		return nil, nil, fail.InvalidParameterError("req.Networking", "cannot be nil")
 //	}
 //	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
 //	if gwname == "" {
-//		gwname = "gw-" + req.Network.Name
+//		gwname = "gw-" + req.Networking.Name
 //	}
 //
 //	hostReq := abstract.HostRequest{
@@ -770,7 +770,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //		HostName:     req.Name,
 //		ResourceName: gwname,
 //		TemplateID:   req.TemplateID,
-//		Networks:     []*abstract.Network{req.Network},
+//		Networks:     []*abstract.Networking{req.Networking},
 //		PublicIP:     true,
 //	}
 //	if sizing != nil && sizing.MinDiskSize > 0 {
