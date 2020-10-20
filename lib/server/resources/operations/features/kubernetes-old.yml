@@ -1,4 +1,4 @@
-# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,19 +50,18 @@ feature:
         - AllowPodsOnMasters=false
         - AllowPodsOnGateways=false
         - CNI=calico
-        - CalicoNetworking=vxlan
-        - ControlplaneEndpointIP
         - Dashboard=true
-        - DisableHelm=false
-        - EnableAudit=false
-        - ExternalLoadBalancerHostname=
         - Hardening=true
+        - KubeVersion=1.14.10
+        - HelmVersion=2.15.2
+        - DisableHelm=false
         - HelmDefaultNamespace=default
-        - KubeVersion=1.18.5
+        - ExternalLoadBalancerHostname=
+        - OIDCRealm=
         - OIDCClientName=default
         - OIDCGroupName=user_groups
-        - OIDCRealm=
         - OIDCUserName=username
+        - ControlplaneEndpointIP
 
     install:
         bash:
@@ -174,43 +173,41 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
                             {{ if eq .Hardening "true" }}
-                                {{ if eq .EnableAudit "true" }}
-                                case $(sfGetFact "linux_kind") in
-                                    debian|ubuntu)
-                                        sfApt update
-                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y auditd quota quotatool || sfFail 195
-                                        ;;
-
-                                    centos|fedora|redhat|rhel)
-                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum -y install audit audit-libs quota || sfFail 195
-                                        ;;
-
-                                    *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
-                                    sfFail 196
+                            case $(sfGetFact "linux_kind") in
+                                debian|ubuntu)
+                                    sfApt update
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
-                                esac
 
-                                ## Configures ulimit - not compatible with a host on which a user graphical system is used - like remote desktop...
-                                # cat >> /etc/security/limits.conf <<EOF
-                                # *      soft      nproc      100
-                                # *      hard      nproc      200
-                                # *      soft      nofile      1024
-                                # *      hard      nofile      2048
-                                # EOF
+                                centos|fedora|redhat|rhel)
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum -y install audit audit-libs quota || sfFail 195
+                                    ;;
 
-                                ## Configures audit rules
-                                cat >/etc/audit/rules.d/docker.rules <<EOF
-                                -w /usr/bin/docker -p awx -k docker_binary
-                                -w /var/lib/docker -p aw -k docker_data
-                                -w /etc/docker -p aw -k docker_configuration
-                                -w /etc/docker/daemon.json -p aw -k docker_daemon
-                                -w /etc/default/docker -p aw -k docker_default
-                                -w /usr/bin/containerd -p awx -k docker_containerd
-                                -w /usr/bin/runc -p awx -k docker_runc
-                                EOF
-                                sfService restart auditd
+                                *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
+                                   sfFail 196
+                                   ;;
+                            esac
 
-                                {{ end }}
+                            ## Configures ulimit - not compatible with a host on which a user graphical system is used - like remote desktop...
+                            # cat >> /etc/security/limits.conf <<EOF
+                            # *      soft      nproc      100
+                            # *      hard      nproc      200
+                            # *      soft      nofile      1024
+                            # *      hard      nofile      2048
+                            # EOF
+
+                            ## Configures audit rules
+                            cat >/etc/audit/rules.d/docker.rules <<EOF
+                            -w /usr/bin/docker -p awx -k docker_binary
+                            -w /var/lib/docker -p aw -k docker_data
+                            -w /etc/docker -p aw -k docker_configuration
+                            -w /etc/docker/daemon.json -p aw -k docker_daemon
+                            -w /etc/default/docker -p aw -k docker_default
+                            -w /usr/bin/containerd -p awx -k docker_containerd
+                            -w /usr/bin/runc -p awx -k docker_runc
+                            EOF
+                            sfService restart auditd
+
                             # Disable docker swarm
                             cat /etc/docker/daemon.json | jq '. + { "swarm-default-advertise-addr": "" }' >/etc/docker/daemon.json.new && \
                             mv /etc/docker/daemon.json.new /etc/docker/daemon.json && \
@@ -449,7 +446,7 @@ feature:
 
                             cat >/etc/kubernetes/kubeadm/kubeadm-config.yaml <<-EOF
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta2
+                            apiVersion: kubeadm.k8s.io/v1beta1
                             kind: ClusterConfiguration
                             controlPlaneEndpoint: "${CP_ENDPOINT_IP}:6443"
                             kubernetesVersion: ${KUBE_VERSION}
@@ -481,18 +478,20 @@ feature:
                                     audit-log-maxage: "30"
                                     audit-log-maxbackup: "10"
                                     audit-log-maxsize: "100"
+                                    service-account-lookup: "true"
                                     #? crash during init phase, to be investigated ...
                                     ## encryption-provider-config: aescbc
                                     profiling: "false"
                             controllerManager:
                                 extraArgs:
+                                    terminated-pod-gc-threshold: "12500"
                                     profiling: "false"
                                     use-service-account-credentials: "true"
                                     feature-gates: RotateKubeletServerCertificate=true
                                     cluster-signing-cert-file: /etc/kubernetes/pki/ca.crt
                                     cluster-signing-key-file: /etc/kubernetes/pki/ca.key
                             ---
-                            apiVersion: kubeadm.k8s.io/v1beta2
+                            apiVersion: kubeadm.k8s.io/v1beta1
                             kind: InitConfiguration
                             localAPIEndpoint:
                                 bindPort: ${LOCAL_PORT}
@@ -522,7 +521,7 @@ feature:
                             sfRetry {{.TemplatePullImagesTimeout}} {{.TemplateOperationDelay}} kubeadm config images pull || sfFail 202
                             sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 204
-                            cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -n 1) || sfFail 205
+                            cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 205
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
                             mkdir -p ~{{.ClusterAdminUsername}}/.kube
@@ -544,7 +543,7 @@ feature:
                             # Push control-plane join command to all the other masters
                             cat >${SF_TMPDIR}/cp_join_cmd.sh <<-EOF
                             kubeadm reset --force
-                            $cp_join_cmd --control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT
+                            $cp_join_cmd --experimental-control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT
                             EOF
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 207
                             sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 208
@@ -558,7 +557,7 @@ feature:
                             {{ if eq .Hardening "true" }}
                             # define and apply Pod Security Polices (PSP)
                             cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
-                            apiVersion: policy/v1beta1
+                            apiVersion: extensions/v1beta1
                             kind: PodSecurityPolicy
                             metadata:
                               name: default
@@ -617,7 +616,7 @@ feature:
                             EOF
 
                             cat >/etc/kubernetes/kubeadm/psp-privileged.yaml <<-'EOF'
-                            apiVersion: policy/v1beta1
+                            apiVersion: extensions/v1beta1
                             kind: PodSecurityPolicy
                             metadata:
                               name: privileged
@@ -701,28 +700,82 @@ feature:
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
                             case {{ .CNI }} in
-                                flannel)
-                                    # Apply Flannel yaml
-                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/v0.12.0/Documentation/kube-flannel.yml || sfFail 215
+                                flannel) # To be removed
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml || sfFail 215
+
+                                    sfFirewallAdd --zone=trusted --add-interface=flannel.1
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 216 "Firewall problem"
                                     ;;
                                 calico)
-                                    # Download Calico yaml
-                                    wget https://docs.projectcalico.org/archive/v3.15/manifests/calico.yaml -P ${SF_TMPDIR} || sfFail 220
+                                    # Should already exist...
+                                    mkdir -p /etc/kubernetes/kubeadm/
 
-                                    # Configure Pods subnet
-                                    sed -i 's/# - name: CALICO_IPV4POOL_CIDR/- name: CALICO_IPV4POOL_CIDR/g' ${SF_TMPDIR}/calico.yaml
-                                    sed -i 's/#   value: "192.168.0.0\/16"/  value: "10.244.0.0\/16"/g' ${SF_TMPDIR}/calico.yaml
+                                    # Applies RBAC Calico
+                                    wget https://docs.projectcalico.org/v3.10/manifests/rbac/rbac-kdd-calico.yaml -P /etc/kubernetes/kubeadm/
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/rbac-kdd-calico.yaml || sfFail 219
 
-                                    {{ if eq .CalicoNetworking "vxlan" }}
-                                    # Disable IP in IP
-                                    sed -i '3554s/Always/Never/' ${SF_TMPDIR}/calico.yaml
-                                    # Enable VXLAN
-                                    sed -i '3557s/Never/Always/' ${SF_TMPDIR}/calico.yaml
-                                    {{ end }}
+                                    # Downloads default calico
+                                    wget https://docs.projectcalico.org/v3.10/manifests/calico.yaml -P /etc/kubernetes/kubeadm/ || sfFail 220
 
-                                    # Apply Calico yaml
-                                    sfKubectl apply -f ${SF_TMPDIR}/calico.yaml || sfFail 224
-                                    rm ${SF_TMPDIR}/calico.yaml
+                                    # Creates our patch file
+                                    cat >/etc/kubernetes/kubeadm/calico.yaml.patch <<-'EOF'
+                            --- calico.yaml	2019-11-21 17:06:25.590230285 +0100
+                            +++ calico.yaml.new	2019-11-21 17:02:11.885017690 +0100
+                            @@ -24,7 +24,7 @@
+                                  "plugins": [
+                                    {
+                                      "type": "calico",
+                            -          "log_level": "info",
+                            +          "log_level": "debug",
+                                      "datastore_type": "kubernetes",
+                                      "nodename": "__KUBERNETES_NODE_NAME__",
+                                      "mtu": __CNI_MTU__,
+                            @@ -606,6 +606,10 @@
+                                          value: "autodetect"
+                                        # Enable IPIP
+                                        - name: CALICO_IPV4POOL_IPIP
+                            +              value: "Never"
+                            +            - name: FELIX_VXLANVNI
+                            +              value: "4095"
+                            +            - name: CALICO_IPV4POOL_VXLAN
+                                          value: "Always"
+                                        # Set MTU for tunnel device used if ipip is enabled
+                                        - name: FELIX_IPINIPMTU
+                            @@ -619,7 +621,7 @@
+                                        # chosen from this range. Changing this value after installation will have
+                                        # no effect. This should fall within `--cluster-cidr`.
+                                        - name: CALICO_IPV4POOL_CIDR
+                            -              value: "192.168.0.0/16"
+                            +              value: "10.244.0.0/16"
+                                        # Disable file logging so `kubectl logs` works.
+                                        - name: CALICO_DISABLE_FILE_LOGGING
+                                          value: "true"
+                            EOF
+
+                                    # Installs the 'patch' command
+                                    case $(sfGetFact "linux_kind") in
+                                        debian|ubuntu)
+                                            sfApt update && sfApt install -y patch || sfFail 221
+                                            ;;
+
+                                        centos|fedora|redhat|rhel)
+                                            yum -y install patch || sfFail 222
+                                            ;;
+
+                                        *) echo "unsupported linux distribution ''"
+                                           sfFail 223
+                                           ;;
+                                    esac
+
+                                    # Patches calico file
+                                    patch -l /etc/kubernetes/kubeadm/calico.yaml /etc/kubernetes/kubeadm/calico.yaml.patch
+
+                                    # Applies patched file
+                                    sfKubectl apply -f /etc/kubernetes/kubeadm/calico.yaml || sfFail 224
+
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 225 "Firewall problem"
                                     ;;
                             esac
 
@@ -751,6 +804,19 @@ feature:
                             sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
                             sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
                             sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
+
+                            # Configure firewall
+                            case {{.CNI}} in
+                                flannel)
+                                    sfFirewallAdd --zone=trusted --add-interface=flannel.1
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 231 "Firewall problem"
+                                    ;;
+                                calico)
+                                    sfFirewallAdd --zone=trusted --add-interface=cni0
+                                    sfFirewallReload || sfFail 235 "Firewall problem"
+                                    ;;
+                            esac
 
                             touch /etc/kubernetes/.joined
                             echo "cpx init done"
