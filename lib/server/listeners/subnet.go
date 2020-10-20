@@ -22,11 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"reflect"
-
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -81,8 +77,9 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 	defer job.Close()
-
 	task := job.GetTask()
+	svc := job.GetService()
+
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -106,33 +103,15 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
-	rn, xerr := networkfactory.Load(task, job.GetService(), networkRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-	var dnsServers []string
-	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		an, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, %s' provided", reflect.TypeOf(clonable).String())
-		}
-		dnsServers = an.DNSServers
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	req := abstract.SubnetRequest{
-		Network:       networkRef,
+		NetworkID:     networkRef,
 		Name:          in.GetName(),
 		CIDR:          in.GetCidr(),
-		DNSServers:    dnsServers,
 		Domain:        in.GetDomain(),
 		HA:            in.GetFailOver(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}
-	rs, xerr := subnetfactory.New(job.GetService())
+	rs, xerr := subnetfactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -202,10 +181,10 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		return nil, xerr
 	}
 
-	// Build response mapping abstract.Network to protocol.Network
+	// Build response mapping abstract.Networking to protocol.Networking
 	var pbList []*protocol.Subnet
 	for _, subnet := range list {
-		//if networkID == "" || subnet.Network == networkID {
+		//if networkID == "" || subnet.Networking == networkID {
 		pbList = append(pbList, converters.SubnetFromAbstractToProtocol(subnet))
 		//}
 	}
@@ -262,7 +241,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 // Delete a/many subnet/s
 func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete network")
+	defer fail.OnExitWrapError(&err, "cannot delete Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -317,8 +296,12 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		return empty, xerr
 	}
 	if xerr = rs.Delete(task); xerr != nil {
-
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return empty, fail.NotFoundError("failed to find Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		default:
+			return empty, xerr
+		}
 	}
 
 	//tracer.Trace("Subnet '%s' successfully deleted.", subnetRefLabel)
@@ -416,7 +399,7 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Network")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Networking")
 	}
 
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())

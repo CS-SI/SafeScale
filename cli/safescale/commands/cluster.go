@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -320,7 +321,7 @@ var clusterCreateCommand = &cli.Command{
 		&cli.StringFlag{
 			Name:    "cidr",
 			Aliases: []string{"N"},
-			Value:   "192.168.0.0/16",
+			Value:   stacks.DefaultNetworkCIDR,
 			Usage:   "Defines the IPRanges of the network to use with cluster",
 		},
 		&cli.StringFlag{

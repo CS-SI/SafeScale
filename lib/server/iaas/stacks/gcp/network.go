@@ -580,15 +580,15 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.
 	//    }
 	//}
 
-	an, xerr := s.InspectNetwork(req.Network)
+	an, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			an, xerr = s.InspectNetworkByName(req.Network)
+			an, xerr = s.InspectNetworkByName(req.NetworkID)
 		}
 	}
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to find network '%s'", req.Network)
+		return nil, fail.Wrap(xerr, "failed to find network '%s'", req.NetworkID)
 	}
 
 	// Checks if IPRanges is valid...

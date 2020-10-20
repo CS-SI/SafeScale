@@ -131,9 +131,9 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			WhitelistTemplateRegexp: regexp.MustCompile(get(compute, "WhitelistTemplateRegexp")),
 		},
 		Network: outscale.NetworkConfiguration{
-			VPCCIDR: get(network, "VPCCIDR", "192.168.0.0/16"),
-			VPCID:   get(network, "VPCID"),
-			VPCName: get(network, "VPCName", "net-safescale"),
+			DefaultNetworkCIDR: get(network, "DefaultNetworkCIDR", get(network, "VPCCIDR")),
+			//VPCID:              get(network, "VPCID"),
+			DefaultNetworkName: get(network, "DefaultNetworkName", get(network, "VPCName")),
 		},
 		ObjectStorage: outscale.StorageConfiguration{
 			AccessKey: get(objstorage, "AccessKey", get(identity, "AccessKey")),

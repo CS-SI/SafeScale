@@ -560,7 +560,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 		request.Password = password
 	}
 
-	// The Default Network is the first of the provided list, by convention
+	// The default Subnet is the first of the provided list, by convention
 	defaultSubnet, defaultSubnetID := func() (*abstract.Subnet, string) {
 		if len(request.Subnets) == 0 {
 			return nil, ""
@@ -590,8 +590,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	// defaultGatewayPrivateIP := ""
 	// if defaultGateway != nil {
 	//	xerr = defaultGateway.Properties.Inspect(hostproperty.NetworkV1, func(v data.Clonable) fail.Error {
-	//		hostNetworkV1 := v.(*propertiesv1.HostSubnet)
-	//		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetworkID]
+	//		hostNetworkV1 := v.(*propertiesv1.HostNetworking)
+	//		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetwork]
 	//		defaultGatewayID = defaultGateway.ID
 	//		return nil
 	//	})
@@ -646,9 +646,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	ahf.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
 	ahf.Core.Password = request.Password
 
-	// TODO: adapt to abstract.HostFull.HostSubnet
-	ahf.Subnet.DefaultSubnetID = defaultSubnetID
-	ahf.Subnet.IsGateway = isGateway
+	ahf.Networking.DefaultSubnetID = defaultSubnetID
+	ahf.Networking.IsGateway = isGateway
 
 	// Adds Host property SizingV1
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
@@ -1189,12 +1188,12 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 		}
 	}
 
-	ahf.Subnet.IPv4Addresses = ip4bynetid
-	ahf.Subnet.IPv6Addresses = make(map[string]string)
-	ahf.Subnet.SubnetsByID = subnetnamebyid
-	ahf.Subnet.SubnetsByName = subnetidbyname
-	if ahf.Subnet.PublicIPv4 == "" {
-		ahf.Subnet.PublicIPv4 = ipv4
+	ahf.Networking.IPv4Addresses = ip4bynetid
+	ahf.Networking.IPv6Addresses = make(map[string]string)
+	ahf.Networking.SubnetsByID = subnetnamebyid
+	ahf.Networking.SubnetsByName = subnetidbyname
+	if ahf.Networking.PublicIPv4 == "" {
+		ahf.Networking.PublicIPv4 = ipv4
 	}
 
 	sizing := fromMachineTypeToHostEffectiveSizing(s, instanceType)

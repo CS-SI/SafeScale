@@ -421,7 +421,7 @@ func (s *Stack) prepareUserData(request abstract.HostRequest, ud *userdata.Conte
 }
 
 func (s *Stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet) (*osc.Nic, fail.Error) {
-	//groups, xerr := s.listSecurityGroupIDs(subnet.Network)
+	//groups, xerr := s.listSecurityGroupIDs(subnet.Networking)
 	//if xerr != nil {
 	//	return nil, xerr
 	//}
@@ -758,7 +758,7 @@ func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Su
 	host.Sizing.GPUType = vmType.GPUType
 	host.Sizing.RAMSize = vmType.RAMSize
 
-	// Updates Host Property propsv1.HostSubnet
+	// Updates Host Property propsv1.HostNetworking
 	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
 	// between network ID and network Name in Host definition
@@ -779,11 +779,11 @@ func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Su
 			return ""
 		}()
 	}
-	host.Subnet.SubnetsByID = subnetsByID
-	host.Subnet.SubnetsByName = subnetsByName
+	host.Networking.SubnetsByID = subnetsByID
+	host.Networking.SubnetsByName = subnetsByName
 	// IPvxAddresses are here indexed by names... At least we have them...
-	host.Subnet.IPv4Addresses = ipv4Addresses
-	host.Subnet.IPv6Addresses = ipv6Addresses
+	host.Networking.IPv4Addresses = ipv4Addresses
+	host.Networking.IPv6Addresses = ipv6Addresses
 	return nil
 }
 
@@ -813,15 +813,15 @@ func (s Stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Core.Password = request.Password
 
-	host.Subnet.DefaultSubnetID = func() string {
+	host.Networking.DefaultSubnetID = func() string {
 		if defaultSubnet == nil {
 			return ""
 		}
 		return defaultSubnet.ID
 	}()
-	// host.Network.DefaultGatewayID = defaultGatewayID
-	// host.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
-	host.Subnet.IsGateway = isGateway
+	// host.Networking.DefaultGatewayID = defaultGatewayID
+	// host.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
+	host.Networking.IsGateway = isGateway
 
 	// Adds Host property SizingV1
 	host.Sizing.Cores = template.Cores
@@ -865,7 +865,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	password, xerr := s.getOrCreatePassword(request)
 	if xerr != nil {
@@ -1017,7 +1017,7 @@ func (s *Stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.E
 	}
 	defaultSubnet := request.Subnets[0]
 	return defaultSubnet.ID, nil
-	//subnet, err := s.InspectSubnet(defaultSubet.Network, defaultSubnet.ID)
+	//subnet, err := s.InspectSubnet(defaultSubet.Networking, defaultSubnet.ID)
 	//if err != nil {
 	//	return "", err
 	//}
@@ -1077,7 +1077,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%vs)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	readPublicIpsRequest := osc.ReadPublicIpsRequest{
 		Filters: osc.FiltersPublicIp{VmIds: []string{ahf.Core.ID}},
@@ -1150,7 +1150,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	vm, xerr := s.getVM(ahf.Core.ID)
 	if xerr != nil {
@@ -1185,7 +1185,7 @@ func (s *Stack) InspectHostByName(name string) (ahc *abstract.HostCore, xerr fai
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	res, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
 		ReadVmsRequest: optional.NewInterface(osc.ReadVmsRequest{
@@ -1218,7 +1218,7 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, 
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
@@ -1237,7 +1237,7 @@ func (s *Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
 	if err != nil {
@@ -1284,7 +1284,7 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	stopVmsRequest := osc.StopVmsRequest{
 		VmIds:     []string{ahf.Core.ID},
@@ -1308,7 +1308,7 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	startVmsRequest := osc.StartVmsRequest{
 		VmIds: []string{ahf.Core.ID},
@@ -1331,7 +1331,7 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	rebootVmsRequest := osc.RebootVmsRequest{
 		VmIds: []string{ahf.Core.ID},
@@ -1369,7 +1369,7 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %v)", hostRef, request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	perf := s.perfFromFreq(request.MinCPUFreq)
 	t := gpuTemplateName(0, request.MaxCores, int(request.MaxRAMSize), perf, 0, "")

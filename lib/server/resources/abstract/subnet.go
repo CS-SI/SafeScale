@@ -38,7 +38,7 @@ const (
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type SubnetRequest struct {
-	Network       string         // contains the ID of the parent Network
+	NetworkID     string         // contains the ID of the parent Network
 	Name          string         // contains the name of the subnet (must be unique in a network)
 	IPVersion     ipversion.Enum // must be IPv4 or IPv6 (see IPVersion)
 	CIDR          string         // CIDR mask
@@ -105,7 +105,7 @@ func (s *Subnet) OK() bool {
 	}
 	result = result && (s.Network != "")
 	if s.Name == "" {
-		logrus.Debug("Subnet without parent Network")
+		logrus.Debug("Subnet without parent Networking")
 	}
 	result = result && (s.CIDR != "")
 	if s.CIDR == "" {

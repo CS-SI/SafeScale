@@ -421,8 +421,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	newHost := abstract.NewHostFull()
 	newHost.Core = hostCore
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
-	newHost.Subnet.IsGateway = isGateway
-	newHost.Subnet.DefaultSubnetID = defaultSubnetID
+	newHost.Networking.IsGateway = isGateway
+	newHost.Networking.DefaultSubnetID = defaultSubnetID
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
@@ -696,10 +696,10 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.Host
 		}
 	}
 
-	hostComplete.Subnet.IPv4Addresses = ip4BySubnetID
-	hostComplete.Subnet.SubnetsByID = subnetNameByID
-	hostComplete.Subnet.SubnetsByName = subnetIDByName
-	hostComplete.Subnet.PublicIPv4 = ipv4
+	hostComplete.Networking.IPv4Addresses = ip4BySubnetID
+	hostComplete.Networking.SubnetsByID = subnetNameByID
+	hostComplete.Networking.SubnetsByName = subnetIDByName
+	hostComplete.Networking.PublicIPv4 = ipv4
 
 	hostComplete.Sizing = fromMachineTypeToAllocatedSize(gcpHost.MachineType)
 

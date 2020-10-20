@@ -252,7 +252,7 @@ func (e errorCore) RootCause() error {
 // defaultAnnotationFormatter ...
 func defaultAnnotationFormatter(a data.Annotations) string {
 	if a == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid parameter:", "'a'", "cannot be nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid parameter: ", "'a'", "cannot be nil", 0))
 		return ""
 	}
 	j, err := json.Marshal(a)
@@ -934,7 +934,7 @@ type ErrInvalidParameter struct {
 
 // InvalidParameterError creates a ErrInvalidParameter error
 func InvalidParameterError(what, why string) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter:", what, why, 0))
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, why, 0))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())

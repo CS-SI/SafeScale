@@ -40,9 +40,9 @@ type Network struct {
 	Name       string   `json:"name,omitempty"`        // name of the network
 	CIDR       string   `json:"mask,omitempty"`        // network in CIDR notation (if it has a meaning...)
 	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
-	//Subnets    []string `json:"subnets,omitempty"`     // contains the list of subnet IDs created in Network
+	//Subnets    []string `json:"subnets,omitempty"`     // contains the list of subnet IDs created in Networking
 
-	//SubnetState networkstate_obsolete.Enum `json:"status,omitempty"`  // state of the Network
+	//SubnetState networkstate_obsolete.Enum `json:"status,omitempty"`  // state of the Networking
 }
 
 // NewNetwork initializes a new instance of Network
@@ -76,15 +76,15 @@ func (n *Network) OK() bool {
 
 	result = result && (n.ID != "")
 	if n.ID == "" {
-		logrus.Debug("Network without ID")
+		logrus.Debug("Networking without ID")
 	}
 	result = result && (n.Name != "")
 	if n.Name == "" {
-		logrus.Debug("Network without name")
+		logrus.Debug("Networking without name")
 	}
 	result = result && (n.CIDR != "")
 	if n.CIDR == "" {
-		logrus.Debug("Network without IPRanges")
+		logrus.Debug("Networking without IPRanges")
 	}
 
 	return result

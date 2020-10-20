@@ -605,7 +605,7 @@ func (s *Stack) getNetworkV2FromDomain(domain *libvirt.Domain) (*propertiesv2.Ho
 								if dhcpLease.Mac == iface.MAC.Address {
 									net, err := s.InspectNetwork(iface.Source.Network.Network)
 									if err != nil {
-										return fail.NotFoundError("unknown Network %s", iface.Source.Network.Network)
+										return fail.NotFoundError("unknown Networking %s", iface.Source.Network.Network)
 									}
 									if len(strings.Split(dhcpLease.IPaddr, ".")) == 4 {
 										if name == "default" {
@@ -765,8 +765,8 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, newHost *abstract.Ho
 			hostNetworkV2 := clonable.(*propertiesv2.HostNetwork)
 			hostNetworkV2.IPv4Addresses = newHostNetworkV1.IPv4Addresses
 			hostNetworkV2.IPv6Addresses = newHostNetworkV1.IPv6Addresses
-			hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
-			hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
+			hostNetworkV2.SubnetsByID = newHostNetworkV1.NetworksByID
+			hostNetworkV2.SubnetsByName = newHostNetworkV1.NetworksByName
 			return nil
 		})
 		if innerErr != nil {
@@ -1055,7 +1055,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	host = abstract.NewHostFull()
 	host.Core = hostCore
-	host.Network = hostNetwork
+	host.Networking = hostNetwork
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 	return host, userData, nil
 }

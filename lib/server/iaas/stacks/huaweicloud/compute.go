@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
@@ -278,7 +279,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, userData, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error())
 	}
 
-	// The Default Network is the first of the provided list, by convention
+	// The default Network is the first of the provided list, by convention
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
 	isGateway := request.IsGateway // || defaultSubnet.Name == abstract.SingleHostNetworkName
@@ -495,10 +496,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if xerr != nil {
 		return nil, nil, xerr
 	}
-	host.Subnet.DefaultSubnetID = defaultSubnetID
-	// host.Network.DefaultGatewayID = defaultGatewayID
-	// host.Network.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
-	host.Subnet.IsGateway = isGateway
+	host.Networking.DefaultSubnetID = defaultSubnetID
+	// host.Networking.DefaultGatewayID = defaultGatewayID
+	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
+	host.Networking.IsGateway = isGateway
 	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
@@ -522,10 +523,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			}
 		}()
 
-		if ipversion.IPv4.Is(fip.PublicIPAddress) {
-			host.Subnet.PublicIPv4 = fip.PublicIPAddress
-		} else if ipversion.IPv6.Is(fip.PublicIPAddress) {
-			host.Subnet.PublicIPv6 = fip.PublicIPAddress
+		if govalidator.IsIPv4(fip.PublicIPAddress) {
+			host.Networking.PublicIPv4 = fip.PublicIPAddress
+		} else if govalidator.IsIPv6(fip.PublicIPAddress) {
+			host.Networking.PublicIPv6 = fip.PublicIPAddress
 		}
 		userData.PublicIP = fip.PublicIPAddress
 
@@ -620,16 +621,16 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
 	completedHost.Description.Created = server.Created
 	completedHost.Description.Updated = server.Updated
 
-	if completedHost.Subnet.PublicIPv4 == "" {
-		completedHost.Subnet.PublicIPv4 = ipv4
+	if completedHost.Networking.PublicIPv4 == "" {
+		completedHost.Networking.PublicIPv4 = ipv4
 	}
-	if completedHost.Subnet.PublicIPv6 == "" {
-		completedHost.Subnet.PublicIPv6 = ipv6
+	if completedHost.Networking.PublicIPv6 == "" {
+		completedHost.Networking.PublicIPv6 = ipv6
 	}
-	if len(completedHost.Subnet.SubnetsByID) > 0 {
+	if len(completedHost.Networking.SubnetsByID) > 0 {
 		ipv4Addresses := map[string]string{}
 		ipv6Addresses := map[string]string{}
-		for netid, netname := range completedHost.Subnet.SubnetsByID {
+		for netid, netname := range completedHost.Networking.SubnetsByID {
 			if ip, ok := addresses[ipversion.IPv4][netid]; ok {
 				ipv4Addresses[netid] = ip
 			} else if ip, ok := addresses[ipversion.IPv4][netname]; ok {
@@ -646,8 +647,8 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
 				ipv6Addresses[netid] = ""
 			}
 		}
-		completedHost.Subnet.IPv4Addresses = ipv4Addresses
-		completedHost.Subnet.IPv6Addresses = ipv6Addresses
+		completedHost.Networking.IPv4Addresses = ipv4Addresses
+		completedHost.Networking.IPv6Addresses = ipv6Addresses
 	} else {
 		subnetsByID := map[string]string{}
 		ipv4Addresses := map[string]string{}
@@ -667,15 +668,15 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
 				ipv6Addresses[netid] = ""
 			}
 		}
-		completedHost.Subnet.SubnetsByID = subnetsByID
+		completedHost.Networking.SubnetsByID = subnetsByID
 		// IPvxAddresses are here indexed by names... At least we have them...
-		completedHost.Subnet.IPv4Addresses = ipv4Addresses
-		completedHost.Subnet.IPv6Addresses = ipv6Addresses
+		completedHost.Networking.IPv4Addresses = ipv4Addresses
+		completedHost.Networking.IPv6Addresses = ipv6Addresses
 	}
 
 	// Updates network name and relationships if needed
 	var errors []error
-	for subnetID, subnetName := range completedHost.Subnet.SubnetsByID {
+	for subnetID, subnetName := range completedHost.Networking.SubnetsByID {
 		if subnetName == "" {
 			subnet, xerr := s.InspectSubnet(subnetID)
 			if xerr != nil {
@@ -683,8 +684,8 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
 				errors = append(errors, xerr)
 				continue
 			}
-			completedHost.Subnet.SubnetsByID[subnetID] = subnet.Name
-			completedHost.Subnet.SubnetsByName[subnet.Name] = subnetID
+			completedHost.Networking.SubnetsByID[subnetID] = subnet.Name
+			completedHost.Networking.SubnetsByName[subnet.Name] = subnetID
 		}
 	}
 	if len(errors) > 0 {
@@ -1059,7 +1060,7 @@ func (s *Stack) listInterfaces(hostID string) pagination.Pager {
 // getOpenstackPortID returns the port ID corresponding to the first private IP address of the host
 // returns nil,nil if not found
 func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error) {
-	ip := host.Subnet.IPv4Addresses[host.Subnet.DefaultSubnetID]
+	ip := host.Networking.IPv4Addresses[host.Networking.DefaultSubnetID]
 	found := false
 	nic := nics.Interface{}
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(

@@ -22,11 +22,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// HostNetwork contains network information related to Host
+// HostNetworking contains network information related to Host
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
-type HostNetwork struct {
+type HostNetworking struct {
 	IsGateway       bool              `json:"is_gateway,omitempty"`        // Tells if host is a gateway of a network
 	DefaultSubnetID string            `json:"default_subnet_id,omitempty"` // contains the ID of the default subnet
 	SubnetsByID     map[string]string `json:"subnet_by_id,omitempty"`      // contains the name of each subnet bound to the host (indexed by ID)
@@ -34,12 +34,12 @@ type HostNetwork struct {
 	PublicIPv4      string            `json:"public_ip_v4,omitempty"`
 	PublicIPv6      string            `json:"public_ip_v6,omitempty"`
 	IPv4Addresses   map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
-	IPv6Addresses   map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Network ID) allocated to the host
+	IPv6Addresses   map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Networking ID) allocated to the host
 }
 
-// NewHostNetwork ...
-func NewHostNetwork() *HostNetwork {
-	return &HostNetwork{
+// NewHostNetworking ...
+func NewHostNetworking() *HostNetworking {
+	return &HostNetworking{
 		SubnetsByID:   map[string]string{},
 		SubnetsByName: map[string]string{},
 		IPv4Addresses: map[string]string{},
@@ -48,8 +48,8 @@ func NewHostNetwork() *HostNetwork {
 }
 
 // Reset resets the content of the property
-func (hn *HostNetwork) Reset() {
-	*hn = HostNetwork{
+func (hn *HostNetworking) Reset() {
+	*hn = HostNetworking{
 		SubnetsByID:   map[string]string{},
 		SubnetsByName: map[string]string{},
 		IPv4Addresses: map[string]string{},
@@ -59,14 +59,14 @@ func (hn *HostNetwork) Reset() {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hn *HostNetwork) Clone() data.Clonable {
-	return NewHostNetwork().Replace(hn)
+func (hn *HostNetworking) Clone() data.Clonable {
+	return NewHostNetworking().Replace(hn)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
-func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
-	src := p.(*HostNetwork)
+func (hn *HostNetworking) Replace(p data.Clonable) data.Clonable {
+	src := p.(*HostNetworking)
 	*hn = *src
 	hn.SubnetsByID = make(map[string]string, len(src.SubnetsByID))
 	for k, v := range src.SubnetsByID {
@@ -88,5 +88,5 @@ func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.NetworkV2, NewHostNetwork())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.NetworkV2, NewHostNetworking())
 }

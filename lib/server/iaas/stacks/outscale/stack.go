@@ -56,9 +56,8 @@ type ComputeConfiguration struct {
 
 // NetworkConfiguration Outscale network configuration
 type NetworkConfiguration struct {
-	VPCName string
-	VPCCIDR string
-	VPCID   string
+	DefaultNetworkName string
+	DefaultNetworkCIDR string
 }
 
 // StorageConfiguration Outscale storage configuration
@@ -97,6 +96,8 @@ type Stack struct {
 	VolumeSpeedsMap      map[string]volumespeed.Enum
 	configurationOptions *stacks.ConfigurationOptions
 	deviceNames          []string
+
+	vpc *abstract.Network
 
 	// // DefaultSecurityGroupName is the name of the default security groups
 	// DefaultSecurityGroupName string
@@ -159,47 +160,40 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
 	return &s, s.initDefaultNetwork()
 }
 
-// initDefaultNetwork creates the default Network/VPC if a VPC is defined in Options.
+// initDefaultNetwork() initializes the instance of the Network/VPC if one is defined in tenant
 func (s *Stack) initDefaultNetwork() fail.Error {
-	if s.Options.Network.VPCID != "" {
-		return nil
-	}
-	if s.Options.Network.VPCName == "" {
-		//s.Options.Network.VPCName = "safescale-vpc"
-		return nil
-	}
-	if s.Options.Network.VPCCIDR == "" {
-		s.Options.Network.VPCCIDR = "192.168.0.0/16"
-	}
-
-	an, xerr := s.InspectNetworkByName(s.Options.Network.VPCName)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			req := abstract.NetworkRequest{
-				Name: s.Options.Network.VPCName,
-				CIDR: s.Options.Network.VPCCIDR,
+	if s.vpc == nil && s.Options.Network.DefaultNetworkName != "" {
+		an, xerr := s.InspectNetworkByName(s.Options.Network.DefaultNetworkName)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// VPC not found, create it
+				if s.Options.Network.DefaultNetworkCIDR == "" {
+					s.Options.Network.DefaultNetworkCIDR = stacks.DefaultNetworkCIDR
+				}
+				req := abstract.NetworkRequest{
+					Name: s.Options.Network.DefaultNetworkName,
+					CIDR: s.Options.Network.DefaultNetworkCIDR,
+				}
+				an, xerr = s.CreateNetwork(req)
+			default:
+				return xerr
 			}
-			an, xerr = s.CreateNetwork(req)
-		default:
-			return xerr
 		}
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
+		}
+		s.vpc = an
 	}
-	if xerr != nil {
-		return xerr
-	}
-
-	s.Options.Network.VPCID = an.ID
-
 	return nil
 }
 
 func deviceNames() []string {
-	var deviceNames []string
+	var list []string
 	for i := int('d'); i <= int('z'); i++ {
-		deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", string(i)))
+		list = append(list, fmt.Sprintf("xvd%s", string(i)))
 	}
-	return deviceNames
+	return list
 }
 
 // ListRegions list available regions
