@@ -27,6 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateKeyPair creates and import a key pair
@@ -63,14 +65,19 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	createKeypairRequest := osc.CreateKeypairRequest{
-		KeypairName: keypair.Name,
-		PublicKey:   base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)),
+	createKeypairOpts := osc.CreateKeypairOpts{
+		CreateKeypairRequest: optional.NewInterface(osc.CreateKeypairRequest{
+			KeypairName: keypair.Name,
+			PublicKey:   base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)),
+		}),
 	}
-	_, _, err := s.client.KeypairApi.CreateKeypair(s.auth, &osc.CreateKeypairOpts{
-		CreateKeypairRequest: optional.NewInterface(createKeypairRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.KeypairApi.CreateKeypair(s.auth, &createKeypairOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // InspectKeyPair returns the key pair identified by id
@@ -87,14 +94,23 @@ func (s *Stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Erro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readKeypairsRequest := osc.ReadKeypairsRequest{Filters: osc.FiltersKeypair{
-		KeypairNames: []string{id},
-	}}
-	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, &osc.ReadKeypairsOpts{
-		ReadKeypairsRequest: optional.NewInterface(readKeypairsRequest),
-	})
-	if err != nil {
-		return nullAkp, normalizeError(err)
+	readKeypairsOpts := osc.ReadKeypairsOpts{
+		ReadKeypairsRequest: optional.NewInterface(osc.ReadKeypairsRequest{
+			Filters: osc.FiltersKeypair{
+				KeypairNames: []string{id},
+			},
+		}),
+	}
+	var resp osc.ReadKeypairsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.KeypairApi.ReadKeypairs(s.auth, &readKeypairsOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullAkp, xerr
 	}
 	if len(resp.Keypairs) > 1 {
 		return nullAkp, fail.InconsistentError("Inconsistent provider response")
@@ -120,10 +136,18 @@ func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
-	if err != nil {
-		return nullList, normalizeError(err)
+	var resp osc.ReadKeypairsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.KeypairApi.ReadKeypairs(s.auth, nil)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullList, xerr
 	}
+
 	var kps []abstract.KeyPair
 	for _, kp := range resp.Keypairs {
 		kps = append(kps, abstract.KeyPair{
@@ -148,11 +172,16 @@ func (s *Stack) DeleteKeyPair(name string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	deleteKeypairRequest := osc.DeleteKeypairRequest{
-		KeypairName: name,
+	deleteKeypairOpts := osc.DeleteKeypairOpts{
+		DeleteKeypairRequest: optional.NewInterface(osc.DeleteKeypairRequest{
+			KeypairName: name,
+		}),
 	}
-	_, _, err := s.client.KeypairApi.DeleteKeypair(s.auth, &osc.DeleteKeypairOpts{
-		DeleteKeypairRequest: optional.NewInterface(deleteKeypairRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.KeypairApi.DeleteKeypair(s.auth, &deleteKeypairOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }

@@ -17,6 +17,10 @@
 package outscale
 
 import (
+	"github.com/antihax/optional"
+
+	"github.com/outscale/osc-sdk-go/osc"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
@@ -24,26 +28,30 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // ListSecurityGroups lists existing security groups
 func (s Stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGroup, xerr fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
 	list = []*abstract.SecurityGroup{}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{}
-	resp, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	readSecurityGroupsOpts := osc.ReadSecurityGroupsOpts{
+		ReadSecurityGroupsRequest: optional.NewInterface(osc.ReadSecurityGroupsRequest{}),
+	}
+	var resp osc.ReadSecurityGroupsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &readSecurityGroupsOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	list = make([]*abstract.SecurityGroup, 0, len(resp.SecurityGroups))
@@ -81,30 +89,6 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 	return out
 }
 
-//// listSecurityGroupIDs lists the ids of the security group bound to Networking
-//func (s Stack) listSecurityGroupIDs(networkID string) (list []string, xerr fail.Error) {
-//    list = []string{}
-//
-//    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
-//    defer tracer.Exiting()
-//
-//    readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{}
-//    resp, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-//        ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-//    })
-//    if err != nil {
-//        return nil, normalizeError(err)
-//    }
-//
-//    list = make([]string, 0, len(resp.SecurityGroups))
-//    for _, v := range resp.SecurityGroups {
-//        if networkID == "" || v.NetId == networkID {
-//            list = append(list, v.SecurityGroupId)
-//        }
-//    }
-//    return list, nil
-//}
-
 // CreateSecurityGroup creates a security group
 func (s Stack) CreateSecurityGroup(networkID, name, description string, rules []abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	// if s == nil {
@@ -117,21 +101,29 @@ func (s Stack) CreateSecurityGroup(networkID, name, description string, rules []
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	createSecurityGroupRequest := osc.CreateSecurityGroupRequest{
-		NetId:             networkID,
-		Description:       description,
-		SecurityGroupName: name,
+	createSecurityGroupOpts := osc.CreateSecurityGroupOpts{
+		CreateSecurityGroupRequest: optional.NewInterface(osc.CreateSecurityGroupRequest{
+			NetId:             networkID,
+			Description:       description,
+			SecurityGroupName: name,
+		}),
 	}
-	resp, _, err := s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &osc.CreateSecurityGroupOpts{
-		CreateSecurityGroupRequest: optional.NewInterface(createSecurityGroupRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.CreateSecurityGroupResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &createSecurityGroupOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	asg = toAbstractSecurityGroup(resp.SecurityGroup)
 	sgID := asg.ID
 	sgName := asg.Name
+
 	defer func() {
 		if xerr != nil {
 			if derr := s.DeleteSecurityGroup(sgID); derr != nil {
@@ -169,13 +161,18 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	deleteSecurityGroupRequest := osc.DeleteSecurityGroupRequest{
-		SecurityGroupId: asg.ID,
+	deleteSecurityGroupOpts := osc.DeleteSecurityGroupOpts{
+		DeleteSecurityGroupRequest: optional.NewInterface(osc.DeleteSecurityGroupRequest{
+			SecurityGroupId: asg.ID,
+		}),
 	}
-	_, _, err := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &osc.DeleteSecurityGroupOpts{
-		DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &deleteSecurityGroupOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // InspectSecurityGroup returns information about a security group
@@ -191,18 +188,25 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
-		Filters: osc.FiltersSecurityGroup{
-			SecurityGroupIds: []string{asg.ID},
+	readSecurityGroupsOpts := osc.ReadSecurityGroupsOpts{
+		ReadSecurityGroupsRequest: optional.NewInterface(osc.ReadSecurityGroupsRequest{
+			Filters: osc.FiltersSecurityGroup{
+				SecurityGroupIds: []string{asg.ID},
+			},
+		}),
+	}
+	var resp osc.ReadSecurityGroupsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &readSecurityGroupsOpts)
+			return normalizeError(innerErr)
 		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	sgs := res.SecurityGroups
+	sgs := resp.SecurityGroups
 	if len(sgs) == 0 {
 		return nil, fail.NotFoundError("failed to find a Security Group with ID '%s'", asg.ID)
 	}
@@ -210,7 +214,7 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return nil, fail.InconsistentError("found more than one Security Group with ID '%s'", asg.ID)
 	}
 
-	sg := res.SecurityGroups[0]
+	sg := resp.SecurityGroups[0]
 	out := abstract.NewSecurityGroup(sg.SecurityGroupName)
 	out.ID = asg.ID
 	out.Description = sg.Description
@@ -236,25 +240,42 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
-		SecurityGroupId: asg.ID,
-		//Rules:           sg.InboundRules,
-		Flow: "Inbound",
+	deleteSecurityGroupRuleOpts := osc.DeleteSecurityGroupRuleOpts{
+		DeleteSecurityGroupRuleRequest: optional.NewInterface(osc.DeleteSecurityGroupRuleRequest{
+			SecurityGroupId: asg.ID,
+			//Rules:           sg.InboundRules,
+			Flow: "Inbound",
+		}),
 	}
-	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &deleteSecurityGroupRuleOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	deleteSecurityGroupRuleRequest.Flow = "Outbound"
-	_, _, err = s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	deleteSecurityGroupRuleOpts = osc.DeleteSecurityGroupRuleOpts{
+		DeleteSecurityGroupRuleRequest: optional.NewInterface(osc.DeleteSecurityGroupRuleRequest{
+			SecurityGroupId: asg.ID,
+			//Rules:           sg.InboundRules,
+			Flow: "Outbound",
+		}),
 	}
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &deleteSecurityGroupRuleOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	asg.Rules = abstract.SecurityGroupRules{}
 	return asg, nil
 }
@@ -287,16 +308,23 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if xerr != nil {
 		return asg, xerr
 	}
-	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
-		SecurityGroupId: asg.ID,
-		Rules:           []osc.SecurityGroupRule{oscRule},
-		Flow:            flow,
+
+	createSecurityGroupRuleOpts := osc.CreateSecurityGroupRuleOpts{
+		CreateSecurityGroupRuleRequest: optional.NewInterface(osc.CreateSecurityGroupRuleRequest{
+			SecurityGroupId: asg.ID,
+			Rules:           []osc.SecurityGroupRule{oscRule},
+			Flow:            flow,
+		}),
 	}
-	_, _, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
-		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return asg, normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &createSecurityGroupRuleOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return asg, xerr
 	}
 	return s.InspectSecurityGroup(asg.ID)
 }
@@ -370,16 +398,22 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return nil, xerr
 	}
 
-	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
-		SecurityGroupId: asg.ID,
-		Rules:           []osc.SecurityGroupRule{oscRule},
-		Flow:            flow,
+	deleteSecurityGroupRuleOpts := osc.DeleteSecurityGroupRuleOpts{
+		DeleteSecurityGroupRuleRequest: optional.NewInterface(osc.DeleteSecurityGroupRuleRequest{
+			SecurityGroupId: asg.ID,
+			Rules:           []osc.SecurityGroupRule{oscRule},
+			Flow:            flow,
+		}),
 	}
-	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return asg, normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &deleteSecurityGroupRuleOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return s.InspectSecurityGroup(asg.ID)

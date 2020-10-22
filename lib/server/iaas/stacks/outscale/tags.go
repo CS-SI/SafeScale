@@ -21,18 +21,27 @@ import (
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 func (s *Stack) getResourceTags(id string) (map[string]string, fail.Error) {
-	readTagsRequest := osc.ReadTagsRequest{
-		Filters: osc.FiltersTag{ResourceIds: []string{id}},
-	}
-	resp, _, err := s.client.TagApi.ReadTags(s.auth, &osc.ReadTagsOpts{
-		ReadTagsRequest: optional.NewInterface(readTagsRequest),
-	})
 	tags := make(map[string]string)
-	if err != nil {
-		return tags, normalizeError(err)
+	readTagsOpts := osc.ReadTagsOpts{
+		ReadTagsRequest: optional.NewInterface(osc.ReadTagsRequest{
+			Filters: osc.FiltersTag{ResourceIds: []string{id}},
+		}),
+	}
+	var resp osc.ReadTagsResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.TagApi.ReadTags(s.auth, &readTagsOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return tags, xerr
 	}
 	for _, tag := range resp.Tags {
 		tags[tag.Key] = tag.Value
@@ -49,7 +58,7 @@ func getResourceTag(tags []osc.ResourceTag, key, defaultValue string) string {
 	return defaultValue
 }
 
-func (s *Stack) setResourceTags(id string, tags map[string]string) fail.Error {
+func (s *Stack) setResourceTags(id string, tags map[string]string) ([]osc.ResourceTag, fail.Error) {
 	var tagList []osc.ResourceTag
 	for k, v := range tags {
 		tagList = append(tagList, osc.ResourceTag{
@@ -57,14 +66,20 @@ func (s *Stack) setResourceTags(id string, tags map[string]string) fail.Error {
 			Value: v,
 		})
 	}
-	createTagsRequest := osc.CreateTagsRequest{
-		ResourceIds: []string{id},
-		Tags:        tagList,
+	createTagsOpts := osc.CreateTagsOpts{
+		CreateTagsRequest: optional.NewInterface(osc.CreateTagsRequest{
+			ResourceIds: []string{id},
+			Tags:        tagList,
+		}),
 	}
-	_, _, err := s.client.TagApi.CreateTags(s.auth, &osc.CreateTagsOpts{
-		CreateTagsRequest: optional.NewInterface(createTagsRequest),
-	})
-	return normalizeError(err)
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.TagApi.CreateTags(s.auth, &createTagsOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	return tagList, xerr
 }
 
 func unwrapTags(tags []osc.ResourceTag) map[string]string {

@@ -18,17 +18,19 @@ package outscale
 
 import (
 	"fmt"
+
 	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
 	"github.com/sirupsen/logrus"
+
+	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
@@ -50,54 +52,6 @@ func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 	return s.vpc, nil
 }
 
-//func (s *Stack) createSubnet(req abstract.NetworkRequest, vpcID string) (_ *osc.Subnet, xerr fail.Error) {
-//	// Create a subnet with the same IPRanges than the network
-//	createSubnetRequest := osc.CreateSubnetRequest{
-//		IpRange:       req.IPRanges,
-//		NetId:         vpcID,
-//		SubregionName: s.Options.Compute.Subregion,
-//	}
-//	resSubnet, _, err := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-//		CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
-//	})
-//	if err != nil {
-//		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to create network with IPRanges '%s'", req.IPRanges))
-//	}
-//
-//	defer func() {
-//		if xerr != nil {
-//			deleteSubnetRequest := osc.DeleteSubnetRequest{
-//				SubnetId: resSubnet.Subnet.SubnetId,
-//			}
-//			_, _, derr := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-//				CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
-//			})
-//			if derr != nil {
-//				_ = xerr.AddConsequence(normalizeError(derr))
-//			}
-//		}
-//	}()
-//
-//	xerr = s.setResourceTags(resSubnet.Subnet.SubnetId, map[string]string{
-//		"name": req.Name,
-//	})
-//	if xerr != nil {
-//		return nil, xerr
-//	}
-//	// Prevent automatic assignment of public ip to VM created in the subnet
-//	updateSubnetRequest := osc.UpdateSubnetRequest{
-//		MapPublicIpOnLaunch: false,
-//		SubnetId:            resSubnet.Subnet.SubnetId,
-//	}
-//	_, _, err = s.client.SubnetApi.UpdateSubnet(s.auth, &osc.UpdateSubnetOpts{
-//		UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
-//	})
-//	if err != nil {
-//		return nil, normalizeError(err)
-//	}
-//	return &resSubnet.Subnet, nil
-//}
-
 // CreateNetwork creates a network named name (in OutScale terminology, a Network corresponds to a VPC)
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, xerr fail.Error) {
 	if s == nil {
@@ -106,19 +60,26 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network
 	if req.CIDR == "" {
 		req.CIDR = stacks.DefaultNetworkCIDR
 	}
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%v)", req).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	createNetRequest := osc.CreateNetRequest{
 		IpRange: req.CIDR,
 		Tenancy: s.Options.Compute.DefaultTenancy,
 	}
-	respNet, _, err := s.client.NetApi.CreateNet(s.auth, &osc.CreateNetOpts{
-		CreateNetRequest: optional.NewInterface(createNetRequest),
-	})
-	if err != nil {
-		return abstract.NewNetwork(), normalizeError(err)
+	var respNet osc.CreateNetResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			respNet, _, innerErr = s.client.NetApi.CreateNet(s.auth, &osc.CreateNetOpts{
+				CreateNetRequest: optional.NewInterface(createNetRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return abstract.NewNetwork(), xerr
 	}
 	onet := respNet.Net
 
@@ -130,18 +91,13 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network
 		}
 	}()
 
-	xerr = s.setResourceTags(onet.NetId, map[string]string{
+	tags, xerr := s.setResourceTags(onet.NetId, map[string]string{
 		"name": req.Name,
 	})
 	if xerr != nil {
 		return abstract.NewNetwork(), xerr
 	}
-
-	//req := abstract.NetworkRequest{
-	//	IPRanges:       cidr,
-	//	DNSServers: s.configurationOptions.DNSList,
-	//	Name:       name,
-	//}
+	onet.Tags = tags
 
 	// update default security group to allow external traffic
 	securityGroup, xerr := s.getNetworkSecurityGroup(onet.NetId)
@@ -179,11 +135,18 @@ func (s Stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 		NtpServers:        ntpServers,
 		DomainNameServers: req.DNSServers,
 	}
-	dhcpOptions, _, err := s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &osc.CreateDhcpOptionsOpts{
-		CreateDhcpOptionsRequest: optional.NewInterface(createDhcpOptionsRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
+	var resp osc.CreateDhcpOptionsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &osc.CreateDhcpOptionsOpts{
+				CreateDhcpOptionsRequest: optional.NewInterface(createDhcpOptionsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
 	defer func() {
@@ -193,20 +156,26 @@ func (s Stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 		}
 	}()
 
-	dhcpOptionID := dhcpOptions.DhcpOptionsSet.DhcpOptionsSetId
-	xerr = s.setResourceTags(dhcpOptionID, map[string]string{
+	dhcpOptionID := resp.DhcpOptionsSet.DhcpOptionsSetId
+	_, xerr = s.setResourceTags(dhcpOptionID, map[string]string{
 		"name": req.Name,
 	})
 	if xerr != nil {
 		return xerr
 	}
+
 	updateNetRequest := osc.UpdateNetRequest{
 		DhcpOptionsSetId: dhcpOptionID,
 	}
-	_, _, err = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(updateNetRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+				ReadNetsRequest: optional.NewInterface(updateNetRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 func (s Stack) getDefaultDhcpNtpServers(net osc.Net) ([]string, fail.Error) {
@@ -215,16 +184,23 @@ func (s Stack) getDefaultDhcpNtpServers(net osc.Net) ([]string, fail.Error) {
 			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
 		},
 	}
-	res, _, err := s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &osc.ReadDhcpOptionsOpts{
-		ReadDhcpOptionsRequest: optional.NewInterface(readDhcpOptionsRequest),
-	})
-	if err != nil {
-		return []string{}, normalizeError(err)
+	var resp osc.ReadDhcpOptionsResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &osc.ReadDhcpOptionsOpts{
+				ReadDhcpOptionsRequest: optional.NewInterface(readDhcpOptionsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return []string{}, xerr
 	}
-	if len(res.DhcpOptionsSets) != 1 {
+	if len(resp.DhcpOptionsSets) != 1 {
 		return []string{}, fail.InconsistentError("inconsistent provider response")
 	}
-	return res.DhcpOptionsSets[0].NtpServers, nil
+	return resp.DhcpOptionsSets[0].NtpServers, nil
 }
 
 func (s Stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
@@ -242,10 +218,15 @@ func (s Stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
 	deleteDhcpOptionsRequest := osc.DeleteDhcpOptionsRequest{
 		DhcpOptionsSetId: onet.DhcpOptionsSetId,
 	}
-	_, _, err := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &osc.DeleteDhcpOptionsOpts{
-		DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &osc.DeleteDhcpOptionsOpts{
+				DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 func (s Stack) checkDHCPOptionsName(onet osc.Net) (bool, fail.Error) {
@@ -259,12 +240,19 @@ func (s Stack) checkDHCPOptionsName(onet osc.Net) (bool, fail.Error) {
 
 func (s Stack) createInternetService(req abstract.NetworkRequest, onet osc.Net) fail.Error {
 	// Create internet service to allow internet access from VMs attached to the network
-	isResp, _, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
-	if err != nil {
-		return normalizeError(err)
+	var resp osc.CreateInternetServiceResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
-	xerr := s.setResourceTags(isResp.InternetService.InternetServiceId, map[string]string{
+	_, xerr = s.setResourceTags(resp.InternetService.InternetServiceId, map[string]string{
 		"name": req.Name,
 	})
 	if xerr != nil {
@@ -272,16 +260,84 @@ func (s Stack) createInternetService(req abstract.NetworkRequest, onet osc.Net) 
 	}
 
 	linkInternetServiceRequest := osc.LinkInternetServiceRequest{
-		InternetServiceId: isResp.InternetService.InternetServiceId,
+		InternetServiceId: resp.InternetService.InternetServiceId,
 		NetId:             onet.NetId,
 	}
-	_, _, err = s.client.InternetServiceApi.LinkInternetService(s.auth, &osc.LinkInternetServiceOpts{
-		LinkInternetServiceRequest: optional.NewInterface(linkInternetServiceRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.InternetServiceApi.LinkInternetService(s.auth, &osc.LinkInternetServiceOpts{
+				LinkInternetServiceRequest: optional.NewInterface(linkInternetServiceRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
-	return s.updateRouteTable(onet, isResp.InternetService)
+	return s.updateRouteTable(onet, resp.InternetService)
+}
+
+func (s *Stack) deleteInternetService(netID string) fail.Error {
+	// Unlink and delete internet service
+	var resp osc.ReadInternetServicesResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.InternetServiceApi.ReadInternetServices(s.auth, nil)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil || len(resp.InternetServices) <= 0 {
+		// internet service not found
+		logrus.Warnf("no internet service linked to network '%s': %v", netID, xerr)
+		return nil
+	}
+
+	// internet service found
+	for _, ois := range resp.InternetServices {
+		tags := unwrapTags(ois.Tags)
+		if _, ok := tags["name"]; ois.NetId != netID || !ok {
+			continue
+		}
+		unlinkInternetServiceOpts := osc.UnlinkInternetServiceOpts{
+			UnlinkInternetServiceRequest: optional.NewInterface(osc.UnlinkInternetServiceRequest{
+				InternetServiceId: ois.InternetServiceId,
+				NetId:             netID,
+			}),
+		}
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, _, innerErr := s.client.InternetServiceApi.UnlinkInternetService(s.auth, &unlinkInternetServiceOpts)
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			logrus.Errorf("cannot unlink internet service '%s' from network '%s': %v", ois.InternetServiceId, netID, xerr)
+			return xerr
+		}
+
+		deleteInternetServiceOpts := osc.DeleteInternetServiceOpts{
+			DeleteInternetServiceRequest: optional.NewInterface(osc.DeleteInternetServiceRequest{
+				InternetServiceId: ois.InternetServiceId,
+			}),
+		}
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, _, innerErr := s.client.InternetServiceApi.DeleteInternetService(s.auth, &deleteInternetServiceOpts)
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			logrus.Errorf("internet service '%s' linked to network '%s' cannot be deleted: %v", ois.InternetServiceId, netID, xerr)
+			return normalizeError(xerr)
+		}
+		break
+	}
+
+	return nil
 }
 
 func (s Stack) updateRouteTable(onet osc.Net, is osc.InternetService) fail.Error {
@@ -294,10 +350,15 @@ func (s Stack) updateRouteTable(onet osc.Net, is osc.InternetService) fail.Error
 		GatewayId:          is.InternetServiceId,
 		RouteTableId:       table.RouteTableId,
 	}
-	_, _, err := s.client.RouteApi.CreateRoute(s.auth, &osc.CreateRouteOpts{
-		CreateRouteRequest: optional.NewInterface(createRouteRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.RouteApi.CreateRoute(s.auth, &osc.CreateRouteOpts{
+				CreateRouteRequest: optional.NewInterface(createRouteRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 func (s Stack) getDefaultRouteTable(onet osc.Net) (*osc.RouteTable, fail.Error) {
@@ -306,39 +367,24 @@ func (s Stack) getDefaultRouteTable(onet osc.Net) (*osc.RouteTable, fail.Error) 
 			NetIds: []string{onet.NetId},
 		},
 	}
-	res, _, err := s.client.RouteTableApi.ReadRouteTables(s.auth, &osc.ReadRouteTablesOpts{
-		ReadRouteTablesRequest: optional.NewInterface(readRouteTablesRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.ReadRouteTablesResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.RouteTableApi.ReadRouteTables(s.auth, &osc.ReadRouteTablesOpts{
+				ReadRouteTablesRequest: optional.NewInterface(readRouteTablesRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if len(res.RouteTables) != 1 {
+	if len(resp.RouteTables) != 1 {
 		return nil, fail.InconsistentError("inconsistent provider response when trying to default route table")
 	}
-	return &res.RouteTables[0], nil
+	return &resp.RouteTables[0], nil
 }
-
-//func (s *Stack) getSubnet(id string) (*osc.Subnet, fail.Error) {
-//	readSubnetsRequest := osc.ReadSubnetsRequest{
-//		Filters: osc.FiltersSubnet{
-//			SubnetIds: []string{id},
-//		},
-//	}
-//	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-//		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
-//	})
-//	if err != nil {
-//		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to get subnet '%s'", id))
-//	}
-//	if len(res.Subnets) > 1 {
-//		return nil, fail.InconsistentError("Inconstent provider response")
-//	}
-//	if len(res.Subnets) == 0 {
-//		return nil, nil
-//	}
-//	return &res.Subnets[0], nil
-//
-//}
 
 func toNetwork(in osc.Net) *abstract.Network {
 	out := abstract.NewNetwork()
@@ -358,7 +404,7 @@ func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error)
 		return emptyNetwork, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -367,17 +413,24 @@ func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error)
 			NetIds: []string{id},
 		},
 	}
-	resNet, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(readNetsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.ReadNetsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+				ReadNetsRequest: optional.NewInterface(readNetsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if len(resNet.Nets) == 0 {
-		return nil, fail.NotFoundError("failed to find Network/VPC '%s'", id)
+	if len(resp.Nets) == 0 {
+		return nil, fail.NotFoundError("failed to find Network/VPC %s", id)
 	}
 
-	return toNetwork(resNet.Nets[0]), nil
+	return toNetwork(resp.Nets[0]), nil
 }
 
 // InspectNetworkByName returns the network identified by name)
@@ -387,26 +440,33 @@ func (s *Stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fai
 		return emptyNetwork, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	readNetsRequest := osc.ReadNetsRequest{
 		Filters: osc.FiltersNet{
 			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
 		},
 	}
-	res, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(readNetsRequest),
-	})
-	if err != nil {
-		return emptyNetwork, normalizeError(err)
+	var resp osc.ReadNetsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+				ReadNetsRequest: optional.NewInterface(readNetsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return emptyNetwork, xerr
 	}
-	if len(res.Nets) == 0 {
+	if len(resp.Nets) == 0 {
 		return emptyNetwork, fail.NotFoundError("failed to find a Network/VPC with name '%s'", name)
 	}
 
-	return toNetwork(res.Nets[0]), nil
+	return toNetwork(resp.Nets[0]), nil
 }
 
 // ListNetworks lists all networks
@@ -416,25 +476,32 @@ func (s *Stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	readNetsRequest := osc.ReadNetsRequest{
 		Filters: osc.FiltersNet{},
 	}
-	resNet, _, err := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-		ReadNetsRequest: optional.NewInterface(readNetsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.ReadNetsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
+				ReadNetsRequest: optional.NewInterface(readNetsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if len(resNet.Nets) == 0 {
+	if len(resp.Nets) == 0 {
 		return nil, fail.NotFoundError("no Network/VPC found")
 	}
 
 	var nets []*abstract.Network
-	for _, v := range resNet.Nets {
+	for _, v := range resp.Nets {
 		nets = append(nets, toNetwork(v))
 	}
 
@@ -446,42 +513,46 @@ func (s *Stack) deleteSecurityGroup(onet *osc.Net) fail.Error {
 		DryRun:  false,
 		Filters: osc.FiltersSecurityGroup{},
 	}
-	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
+	var resp osc.ReadSecurityGroupsResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
+				ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
-	if len(res.SecurityGroups) == 0 {
+	if len(resp.SecurityGroups) == 0 {
 		logrus.Warnf("No security group in network %s", onet.NetId)
 		return nil
 	}
-	for _, sg := range res.SecurityGroups {
+
+	for _, sg := range resp.SecurityGroups {
 		if sg.NetId != onet.NetId {
-			break
+			continue
 		}
 		deleteSecurityGroupRequest := osc.DeleteSecurityGroupRequest{
 			SecurityGroupId: sg.SecurityGroupId,
 		}
-		_, _, err = s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &osc.DeleteSecurityGroupOpts{
-			DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
-		})
-		if err != nil {
-			return normalizeError(err)
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, _, innerErr := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &osc.DeleteSecurityGroupOpts{
+					DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
+				})
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			return xerr
 		}
 	}
 	return nil
 }
-
-//func (s *Stack) deleteSubnet(id string) fail.Error {
-//	deleteSubnetRequest := osc.DeleteSubnetRequest{
-//		SubnetId: id,
-//	}
-//	_, _, err := s.client.SubnetApi.DeleteSubnet(s.auth, &osc.DeleteSubnetOpts{
-//		DeleteSubnetRequest: optional.NewInterface(deleteSubnetRequest),
-//	})
-//	return normalizeError(err)
-//}
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
@@ -489,7 +560,7 @@ func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -499,22 +570,40 @@ func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
 			SubnetIds: []string{id},
 		},
 	}
-	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-		ReadNicsRequest: optional.NewInterface(readNicsRequest),
-	})
-	if err != nil {
-		logrus.Debugf("Error reading NICS: %v", normalizeError(err))
+	var resp osc.ReadNicsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+				ReadNicsRequest: optional.NewInterface(readNicsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to read nics")
 	}
 
-	if len(res.Nics) > 0 {
-		// Remove should succeed only when something goes wrong when deleting VMs
-		xerr = s.deleteNICs(res.Nics)
-		if xerr == nil {
-			logrus.Debugf("Check if nothing goes wrong deleting a VM")
+	// Remove should succeed only when something goes wrong when deleting VMs
+	if len(resp.Nics) > 0 {
+		if xerr = s.deleteNICs(resp.Nics); xerr == nil {
+			return fail.Wrap(xerr, "failed to delete nic")
 		}
 	}
 
-	return nil
+	// delete VPC
+	deleteNetRequest := osc.DeleteNetRequest{
+		NetId: id,
+	}
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.NetApi.DeleteNet(s.auth, &osc.DeleteNetOpts{
+				DeleteNetRequest: optional.NewInterface(deleteNetRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // CreateSubnet creates a Subnet
@@ -524,7 +613,7 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, x
 		return emptySubnet, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%v)", req).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -552,28 +641,41 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, x
 		NetId:         vpc.ID,
 		SubregionName: s.Options.Compute.Subregion,
 	}
-	resSubnet, _, err := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-		CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
-	})
-	if err != nil {
-		return nil, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to create network with IPRanges '%s'", req.CIDR))
+	var resp osc.CreateSubnetResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
+				CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	defer func() {
 		if xerr != nil {
 			deleteSubnetRequest := osc.DeleteSubnetRequest{
-				SubnetId: resSubnet.Subnet.SubnetId,
+				SubnetId: resp.Subnet.SubnetId,
 			}
-			_, _, derr := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-				CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
-			})
+			derr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+				func() error {
+					_, _, innerErr := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
+						CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
+					})
+					return normalizeError(innerErr)
+				},
+				temporal.GetCommunicationTimeout(),
+			)
 			if derr != nil {
 				_ = xerr.AddConsequence(normalizeError(derr))
 			}
 		}
 	}()
 
-	xerr = s.setResourceTags(resSubnet.Subnet.SubnetId, map[string]string{
+	_, xerr = s.setResourceTags(resp.Subnet.SubnetId, map[string]string{
 		"name": req.Name,
 	})
 	if xerr != nil {
@@ -583,22 +685,27 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, x
 	// Prevent automatic assignment of public ip to VM created in the subnet
 	updateSubnetRequest := osc.UpdateSubnetRequest{
 		MapPublicIpOnLaunch: false,
-		SubnetId:            resSubnet.Subnet.SubnetId,
+		SubnetId:            resp.Subnet.SubnetId,
 	}
-	_, _, err = s.client.SubnetApi.UpdateSubnet(s.auth, &osc.UpdateSubnetOpts{
-		UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SubnetApi.UpdateSubnet(s.auth, &osc.UpdateSubnetOpts{
+				UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	_ = osc.Subnet{}
 	as = abstract.NewSubnet()
-	as.ID = resSubnet.Subnet.SubnetId
-	as.CIDR = resSubnet.Subnet.IpRange
+	as.ID = resp.Subnet.SubnetId
+	as.CIDR = resp.Subnet.IpRange
 	as.IPVersion = ipversion.IPv4
 	as.Name = req.Name
-	as.Network = resSubnet.Subnet.NetId
+	as.Network = resp.Subnet.NetId
 
 	return as, nil
 }
@@ -613,7 +720,7 @@ func (s *Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 		return emptySubnet, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -622,20 +729,27 @@ func (s *Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 			SubnetIds: []string{id},
 		},
 	}
-	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.ReadSubnetsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
+				ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if len(res.Subnets) > 1 {
+	if len(resp.Subnets) > 1 {
 		return nil, fail.InconsistentError("inconsistent provider response")
 	}
-	if len(res.Subnets) == 0 {
+	if len(resp.Subnets) == 0 {
 		return nil, fail.NotFoundError("failed to find subnet %s", id)
 	}
 
-	return toSubnet(res.Subnets[0]), nil
+	return toSubnet(resp.Subnets[0]), nil
 }
 
 // InspectSubnetByName returns the Subnet identified by id
@@ -648,7 +762,7 @@ func (s *Stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.
 		return emptySubnet, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -677,23 +791,30 @@ func (s *Stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.
 	}
 
 	// FIXME: embed in a retry.WhileCommunicationUnsuccessful...
-	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-		ReadSubnetsRequest: optional.NewInterface(osc.ReadSubnetsRequest{Filters: filters}),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.ReadSubnetsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
+				ReadSubnetsRequest: optional.NewInterface(osc.ReadSubnetsRequest{Filters: filters}),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if len(res.Subnets) > 1 {
-		return nil, fail.InconsistentError("inconsistent provider response")
+	if len(resp.Subnets) > 1 {
+		return nil, fail.InconsistentError("inconsistent provider response, returned multiple Subnets")
 	}
-	if len(res.Subnets) == 0 {
+	if len(resp.Subnets) == 0 {
 		if an != nil {
 			return nil, fail.NotFoundError("failed to find subnet '%s' in Network/VPC '%s'", subnetName, an.Name)
 		}
 		return nil, fail.NotFoundError("failed to find subnet '%s'", subnetName)
 	}
 	//
-	return toSubnet(res.Subnets[0]), nil
+	return toSubnet(resp.Subnets[0]), nil
 }
 
 func toSubnet(subnet osc.Subnet) *abstract.Subnet {
@@ -716,7 +837,7 @@ func (s *Stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.
 		return emptyList, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -744,50 +865,61 @@ func (s *Stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.
 			NetIds: []string{an.ID},
 		},
 	}
-	res, _, err := s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-		ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
-	})
-	if err != nil {
-		return emptyList, normalizeError(err)
+	var resp osc.ReadSubnetsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
+				ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return emptyList, xerr
 	}
 	var subnets []*abstract.Subnet
-	for _, v := range res.Subnets {
+	for _, v := range resp.Subnets {
 		subnets = append(subnets, toSubnet(v))
 	}
 
 	return subnets, nil
 }
 
-func (s *Stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
+func (s Stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
 	var (
 		emptySubnetSlice []*abstract.Subnet
 		emptyNicSlice    []osc.Nic
 	)
 
-	if s == nil {
-		return emptySubnetSlice, emptyNicSlice, fail.InvalidInstanceError()
-	}
 	readNicsRequest := osc.ReadNicsRequest{
 		Filters: osc.FiltersNic{
 			LinkNicVmIds: []string{hostID},
 		},
 	}
-	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-		ReadNicsRequest: optional.NewInterface(readNicsRequest),
-	})
-	if err != nil {
-		return emptySubnetSlice, emptyNicSlice, normalizeError(err)
+	var resp osc.ReadNicsResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+				ReadNicsRequest: optional.NewInterface(readNicsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return emptySubnetSlice, emptyNicSlice, xerr
 	}
 
 	var subnets []*abstract.Subnet
-	for _, nic := range res.Nics {
+	for _, nic := range resp.Nics {
 		subnet, xerr := s.InspectSubnet(nic.SubnetId)
 		if xerr != nil {
 			return emptySubnetSlice, emptyNicSlice, xerr
 		}
 		subnets = append(subnets, subnet)
 	}
-	return subnets, res.Nics, nil
+	return subnets, resp.Nics, nil
 }
 
 // DeleteSubnet deletes the subnet identified by id
@@ -796,7 +928,7 @@ func (s *Stack) DeleteSubnet(id string) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -806,17 +938,23 @@ func (s *Stack) DeleteSubnet(id string) (xerr fail.Error) {
 			SubnetIds: []string{id},
 		},
 	}
-	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-		ReadNicsRequest: optional.NewInterface(readNicsRequest),
-	})
-	if err != nil {
-		logrus.Debugf("Error reading NICS: %v", normalizeError(err))
+	var resp osc.ReadNicsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
+				ReadNicsRequest: optional.NewInterface(readNicsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to read nics")
 	}
 
-	if len(res.Nics) > 0 {
+	if len(resp.Nics) > 0 {
 		// Remove should succeed only when something goes wrong when deleting VMs
-		xerr = s.deleteNICs(res.Nics)
-		if xerr == nil {
+		if xerr = s.deleteNICs(resp.Nics); xerr == nil {
 			logrus.Debugf("Check if nothing goes wrong deleting a VM")
 		}
 	}
@@ -824,50 +962,136 @@ func (s *Stack) DeleteSubnet(id string) (xerr fail.Error) {
 	deleteSubnetRequest := osc.DeleteSubnetRequest{
 		SubnetId: id,
 	}
-	_, _, err = s.client.SubnetApi.DeleteSubnet(s.auth, &osc.DeleteSubnetOpts{
-		DeleteSubnetRequest: optional.NewInterface(deleteSubnetRequest),
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.SubnetApi.DeleteSubnet(s.auth, &osc.DeleteSubnetOpts{
+				DeleteSubnetRequest: optional.NewInterface(deleteSubnetRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+}
+
+// BindSecurityGroupToSubnet binds a Security Group to a Subnet
+// Does nothing in outscale stack
+func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+	if subnetID != "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
+
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
+}
+
+// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
+// Does nothing in outscale stack
+func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+	if subnetID == "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
+}
+
+func (s *Stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
+	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
+	rules = append(rules, s.createICMPPermissions()...)
+	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
+		SecurityGroupId: sg.SecurityGroupId,
+		Rules:           rules,
+		Flow:            "Inbound",
+	}
+	_, _, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
+		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
+	})
+	if err != nil {
+		return normalizeError(err)
+	}
+	createSecurityGroupRuleRequest = osc.CreateSecurityGroupRuleRequest{
+		SecurityGroupId: sg.SecurityGroupId,
+		Rules:           rules,
+		Flow:            "Outbound",
+	}
+	_, _, err = s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
+		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
 	})
 	return normalizeError(err)
 }
 
-// BindSecurityGroupToSubnet binds a security group to a network
-func (s *Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
+func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
+	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
+		Filters: osc.FiltersSecurityGroup{
+			SecurityGroupNames: []string{"default"},
+		},
 	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
+	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
+		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
+	})
+	if err != nil {
+		return nil, normalizeError(err)
 	}
 
-	return fail.NotImplementedError()
+	for _, sg := range res.SecurityGroups {
+		if sg.NetId == netID {
+			return &sg, nil
+		}
+	}
+	// should never go there, in case this means that the network do not have a default security group
+	return nil, fail.NotFoundError("failed to get security group of Networking '%s'", netID)
 }
 
-// UnbindSecurityGroupFromSubnet unbinds a security group from a host
-func (s *Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
+// open all ports, ingress is controlled by the vm firewall
+func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
+	rule := osc.SecurityGroupRule{
+		FromPortRange: 1,
+		ToPortRange:   65535,
+		IpRanges:      []string{"0.0.0.0/0"},
+		IpProtocol:    "tcp",
 	}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
+	return []osc.SecurityGroupRule{rule}
+}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
+// open all ports, ingress is controlled by the vm firewall
+func (s *Stack) createUDPPermissions() []osc.SecurityGroupRule {
+	rule := osc.SecurityGroupRule{
+		FromPortRange: 1,
+		ToPortRange:   65535,
+		IpRanges:      []string{"0.0.0.0/0"},
+		IpProtocol:    "udp",
 	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
-	}
+	return []osc.SecurityGroupRule{rule}
+}
 
-	return fail.NotImplementedError()
+// ingress is controlled by the vm firewall
+func (s *Stack) createICMPPermissions() []osc.SecurityGroupRule {
+	var rules []osc.SecurityGroupRule
+	// Echo reply
+	rules = append(rules, osc.SecurityGroupRule{
+		FromPortRange: -1,
+		ToPortRange:   -1,
+		IpRanges:      []string{"0.0.0.0/0"},
+		IpProtocol:    "icmp",
+	})
+	return rules
 }
