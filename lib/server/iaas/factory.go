@@ -179,7 +179,6 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 
 		// Initializes Metadata Object Storage (may be different than the Object Storage)
 		var (
-			//			metadataBucket   objectstorage.GetBucket
 			metadataBucket   abstract.ObjectStorageBucket
 			metadataCryptKey *crypt.Key
 		)
@@ -225,6 +224,7 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 					metadataCryptKey = ek
 				}
 			}
+			logrus.Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
 		} else {
 			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}

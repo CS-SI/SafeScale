@@ -473,6 +473,10 @@ func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements,
 			logrus.Debugf(msg, "not enough disk")
 			continue
 		}
+		if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
+			logrus.Debugf(msg, "too many GPU")
+			continue
+		}
 
 		if _, ok := scannerTpls[t.ID]; ok || !askedForSpecificScannerInfo {
 			newT := t
