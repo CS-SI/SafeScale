@@ -25,22 +25,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-
 	"github.com/antihax/optional"
 	"github.com/sirupsen/logrus"
 
 	"github.com/outscale/osc-sdk-go/osc"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 func normalizeImageName(name string) string {
@@ -69,16 +69,23 @@ func (s *Stack) ListImages(all bool) (_ []abstract.Image, xerr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
-	if err != nil {
-		return nil, fail.Wrap(normalizeError(err), "failed to list images")
+	var resp osc.ReadImagesResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.ImageApi.ReadImages(s.auth, nil)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 	var images []abstract.Image
-	for _, omi := range res.Images {
+	for _, omi := range resp.Images {
 		images = append(images, abstract.Image{
 			Description: omi.Description,
 			ID:          omi.ImageId,
@@ -198,7 +205,7 @@ func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Er
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -230,7 +237,7 @@ func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Er
 
 		}
 	}
-	// instances wit gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
+	// instances with gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
 	// with nvidia-k2 GPU
 	gpus := intRange(1, 8, 2)
 	for _, gpu := range gpus {
@@ -326,7 +333,7 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -336,21 +343,29 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 		}
 	}()
 
-	res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
-		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
-			DryRun: false,
-			Filters: osc.FiltersImage{
-				ImageIds: []string{id},
-			},
-		}),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	readImagesRequest := osc.ReadImagesRequest{
+		DryRun: false,
+		Filters: osc.FiltersImage{
+			ImageIds: []string{id},
+		},
 	}
-	if len(res.Images) != 1 {
+	var resp osc.ReadImagesResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
+				ReadImagesRequest: optional.NewInterface(readImagesRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if len(resp.Images) != 1 {
 		return nil, fail.InconsistentError("more than one image with the same id")
 	}
-	img := res.Images[0]
+	img := resp.Images[0]
 	return &abstract.Image{
 		Description: img.Description,
 		ID:          img.ImageId,
@@ -366,7 +381,7 @@ func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -431,14 +446,21 @@ func (s *Stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet
 		SubnetId:    subnet.ID,
 		//SecurityGroupIds: groups,
 	}
-	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
-		CreateNicRequest: optional.NewInterface(nicRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.CreateNicResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
+				CreateNicRequest: optional.NewInterface(nicRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 	// primary := deviceNumber == 0
-	return &res.Nic, nil
+	return &resp.Nic, nil
 }
 
 func (s *Stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr fail.Error) {
@@ -482,10 +504,15 @@ func (s Stack) deleteNIC(nic osc.Nic) fail.Error {
 	request := osc.DeleteNicRequest{
 		NicId: nic.NicId,
 	}
-	_, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
-		DeleteNicRequest: optional.NewInterface(request),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
+				DeleteNicRequest: optional.NewInterface(request),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 func hostState(state string) hoststate.Enum {
@@ -547,7 +574,7 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		return nullAhc, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -585,24 +612,31 @@ func outscaleTemplateID(id string) (string, fail.Error) {
 	return fmt.Sprintf("%s.%s", tokens[0], tokens[1]), nil
 }
 
-func (s Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
+func (s Stack) addNICs(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
 	if len(request.Subnets) > 1 {
 		nics, xerr := s.createNICs(request)
 		if xerr != nil {
 			return nil, xerr
 		}
+		nicRequest := osc.LinkNicRequest{
+			VmId: vmID,
+		}
 		for i, nic := range nics {
-			nicRequest := osc.LinkNicRequest{
-				VmId:         vmID,
-				NicId:        nic.NicId,
-				DeviceNumber: int32(i + 1),
-			}
-			_, _, err := s.client.NicApi.LinkNic(s.auth, &osc.LinkNicOpts{
-				LinkNicRequest: optional.NewInterface(nicRequest),
-			})
-			if err != nil {
-				logrus.Errorf("Error attaching NIC %s to VM %s: %v", nic.NicId, vmID, err)
-				return nil, normalizeError(err)
+			nicRequest.NicId = nic.NicId
+			nicRequest.DeviceNumber = int32(i + 1)
+
+			xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+				func() error {
+					_, _, innerErr := s.client.NicApi.LinkNic(s.auth, &osc.LinkNicOpts{
+						LinkNicRequest: optional.NewInterface(nicRequest),
+					})
+					return normalizeError(innerErr)
+				},
+				temporal.GetCommunicationTimeout(),
+			)
+			if xerr != nil {
+				logrus.Errorf("Error attaching NIC %s to VM %s: %v", nic.NicId, vmID, xerr)
+				return nil, xerr
 			}
 		}
 		return nics, nil
@@ -626,41 +660,65 @@ func (s Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
 		flexibleGpus []osc.FlexibleGpu
 		createErr    fail.Error
 	)
+	createFlexibleGpuRequest := osc.CreateFlexibleGpuRequest{
+		DeleteOnVmDeletion: true,
+		Generation:         "",
+		ModelName:          tpl.GPUType,
+		SubregionName:      s.Options.Compute.Subregion,
+	}
+	linkFlexibleGpuRequest := osc.LinkFlexibleGpuRequest{
+		DryRun: false,
+		VmId:   vmID,
+	}
+	var resp osc.CreateFlexibleGpuResponse
 	for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
-		resCreate, _, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
-			CreateFlexibleGpuRequest: optional.NewInterface(osc.CreateFlexibleGpuRequest{
-				DeleteOnVmDeletion: true,
-				Generation:         "",
-				ModelName:          tpl.GPUType,
-				SubregionName:      s.Options.Compute.Subregion,
-			}),
-		})
-		if err != nil {
-			createErr = normalizeError(err)
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() (innerErr error) {
+				resp, _, innerErr = s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
+					CreateFlexibleGpuRequest: optional.NewInterface(createFlexibleGpuRequest),
+				})
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			createErr = xerr
 			break
 		}
-		flexibleGpus = append(flexibleGpus, resCreate.FlexibleGpu)
-		_, _, err = s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &osc.LinkFlexibleGpuOpts{
-			LinkFlexibleGpuRequest: optional.NewInterface(osc.LinkFlexibleGpuRequest{
-				DryRun:        false,
-				FlexibleGpuId: resCreate.FlexibleGpu.FlexibleGpuId,
-				VmId:          vmID,
-			}),
-		})
-		if err != nil {
-			createErr = normalizeError(err)
+		flexibleGpus = append(flexibleGpus, resp.FlexibleGpu)
+
+		linkFlexibleGpuRequest.FlexibleGpuId = resp.FlexibleGpu.FlexibleGpuId
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, _, innerErr := s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &osc.LinkFlexibleGpuOpts{
+					LinkFlexibleGpuRequest: optional.NewInterface(linkFlexibleGpuRequest),
+				})
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
 			break
 		}
 	}
-	if createErr != nil {
+	if xerr != nil {
 		for _, gpu := range flexibleGpus {
-			// FIXME: handle error
-			_, _, _ = s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &osc.DeleteFlexibleGpuOpts{
+			deleteFlexibleGpuOpts := osc.DeleteFlexibleGpuOpts{
 				DeleteFlexibleGpuRequest: optional.NewInterface(osc.DeleteFlexibleGpuRequest{
 					DryRun:        false,
 					FlexibleGpuId: gpu.FlexibleGpuId,
 				}),
-			})
+			}
+			derr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+				func() error {
+					_, _, innerErr := s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &deleteFlexibleGpuOpts)
+					return normalizeError(innerErr)
+				},
+				temporal.GetCommunicationTimeout(),
+			)
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Flexible GPU"))
+			}
 		}
 	}
 	return createErr
@@ -687,12 +745,13 @@ func (s Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 		}
 	}()
 
-	xerr = s.setResourceTags(v.ID, map[string]string{
+	_, xerr = s.setResourceTags(v.ID, map[string]string{
 		"DeleteWithVM": "true",
 	})
 	if xerr != nil {
 		return xerr
 	}
+
 	_, xerr = s.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		HostID:   vmID,
 		VolumeID: v.ID,
@@ -700,44 +759,79 @@ func (s Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 	return xerr
 }
 
-func (s Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
-	request := osc.ReadNicsRequest{
-		Filters: osc.FiltersNic{
-			LinkNicVmIds: []string{vmID},
+func (s Stack) getNICs(vmID string) ([]osc.Nic, fail.Error) {
+	readNicsOpts := osc.ReadNicsOpts{
+		ReadNicsRequest: optional.NewInterface(osc.ReadNicsRequest{
+			Filters: osc.FiltersNic{
+				LinkNicVmIds: []string{vmID},
+			},
+		}),
+	}
+	var resp osc.ReadNicsResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &readNicsOpts)
+			return normalizeError(innerErr)
 		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
-	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{ReadNicsRequest: optional.NewInterface(request)})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	return res.Nics, nil
+	return resp.Nics, nil
 }
 
 func (s Stack) addPublicIP(nic osc.Nic) (*osc.PublicIp, fail.Error) {
-	resIP, _, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
-	if err != nil {
-		return nil, normalizeError(err)
+	// Allocate Public IP
+	var resp osc.CreatePublicIpResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
+	defer func() {
+		if xerr != nil {
+			deletePublicIpRequest := osc.DeletePublicIpRequest{
+				PublicIpId: resp.PublicIp.PublicIpId,
+			}
+			derr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+				func() error {
+					_, _, innerErr := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+						DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
+					})
+					return normalizeError(innerErr)
+				},
+				temporal.GetCommunicationTimeout(),
+			)
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete public ip %s", resp.PublicIp.PublicIpId))
+			}
+		}
+	}()
+
+	// Attach public ip
 	linkPublicIpRequest := osc.LinkPublicIpRequest{
 		NicId:      nic.NicId,
-		PublicIpId: resIP.PublicIp.PublicIpId,
+		PublicIpId: resp.PublicIp.PublicIpId,
 	}
-	_, _, err = s.client.PublicIpApi.LinkPublicIp(s.auth, &osc.LinkPublicIpOpts{
-		LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest)},
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.PublicIpApi.LinkPublicIp(s.auth, &osc.LinkPublicIpOpts{
+				LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest)},
+			)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
 	)
-	if err != nil {
-		deletePublicIpRequest := osc.DeletePublicIpRequest{
-			PublicIpId: resIP.PublicIp.PublicIpId,
-		}
-		_, _, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-		})
-		if err != nil {
-			logrus.Warnf(fmt.Sprintf("Cannot delete public ip '%s': %v", resIP.PublicIp.PublicIpId, err))
-			return nil, normalizeError(err)
-		}
+	if xerr != nil {
+		return nil, xerr
 	}
-	return &resIP.PublicIp, nil
+	return &resp.PublicIp, nil
 }
 
 func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Subnet, vm *osc.Vm, nics []osc.Nic) fail.Error {
@@ -853,9 +947,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
 
-	//if s == nil {
-	//	return nullAHF, nullUDC, fail.InvalidInstanceError()
-	//}
 	if request.KeyPair == nil {
 		return nullAHF, nullUDC, fail.InvalidRequestError("request.KeyPair", "cannot be nil")
 	}
@@ -863,41 +954,22 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached subnet")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.outscale"), "(%v)", request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
+	// Get or create password
 	password, xerr := s.getOrCreatePassword(request)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 	request.Password = password
 
+	// gather default subnet ID
 	subnetID, xerr := s.getDefaultSubnetID(request)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
-
-	xerr = s.prepareUserData(request, udc)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	if xerr = s.initHostProperties(&request, ahf); xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-
-	userDataPhase1, xerr := udc.Generate("phase1")
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	vmType, xerr := outscaleTemplateID(request.TemplateID)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	op := s.Options.Compute.OperatorUsername
-	patchSSH := fmt.Sprintf("\nchown -R %s:%s /home/%s", op, op, op)
-	buf := bytes.NewBuffer(userDataPhase1)
-	buf.WriteString(patchSSH)
 
 	// Import keypair to create host
 	creationKeyPair, xerr := abstract.NewKeyPair(request.ResourceName + "_install")
@@ -914,7 +986,34 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			logrus.Errorf("failed to delete creation keypair: %v", derr)
 		}
 	}()
+	request.KeyPair = creationKeyPair
 
+	// Configure userdata content
+	udc = userdata.NewContent()
+	xerr = s.prepareUserData(request, udc)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+	ahf = abstract.NewHostFull()
+	if xerr = s.initHostProperties(&request, ahf); xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
+	// prepare userdata phase1 execution
+	userDataPhase1, xerr := udc.Generate(userdata.PHASE1_INIT)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+	vmType, xerr := outscaleTemplateID(request.TemplateID)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+	op := s.Options.Compute.OperatorUsername
+	patchSSH := fmt.Sprintf("\nchown -R %s:%s /home/%s", op, op, op)
+	buf := bytes.NewBuffer(userDataPhase1)
+	buf.WriteString(patchSSH)
+
+	// create host
 	vmsRequest := osc.CreateVmsRequest{
 		ImageId:  request.ImageID,
 		UserData: base64.StdEncoding.EncodeToString(buf.Bytes()),
@@ -926,33 +1025,66 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		},
 		KeypairName: creationKeyPair.Name,
 	}
-	resVM, _, err := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
-		CreateVmsRequest: optional.NewInterface(vmsRequest),
-	})
-	if err != nil {
-		return nullAHF, nullUDC, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to create host '%s'", request.ResourceName))
+
+	tpl, xerr := s.InspectTemplate(request.TemplateID)
+	if xerr != nil {
+		return nil, nil, xerr
 	}
 
-	if len(resVM.Vms) == 0 {
-		return nullAHF, nullUDC, fail.InconsistentError("virtual machine list empty")
+	var diskSize int = tpl.DiskSize
+	if request.DiskSize > diskSize {
+		diskSize = request.DiskSize
+	}
+	if diskSize < 10 {
+		diskSize = 10
 	}
 
-	vm := resVM.Vms[0]
+	vmsRequest.BlockDeviceMappings = []osc.BlockDeviceMappingVmCreation{
+		{
+			Bsu: osc.BsuToCreate{
+				DeleteOnVmDeletion: true,
+				SnapshotId:         "",
+				VolumeSize:         int32(diskSize),
+				VolumeType:         s.volumeType(s.Options.Compute.DefaultVolumeSpeed),
+			},
+			NoDevice:   "true",
+			DeviceName: "/dev/sda1",
+		},
+	}
+
+	var resp osc.CreateVmsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
+				CreateVmsRequest: optional.NewInterface(vmsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
+	if len(resp.Vms) == 0 {
+		return nullAHF, nullUDC, fail.InconsistentError("after creation submission, virtual machine list is empty")
+	}
+	vm := resp.Vms[0]
+
 	defer func() {
 		if xerr != nil {
-			derr := s.DeleteHost(vm.VmId)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+			if derr := s.DeleteHost(vm.VmId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 			}
 		}
 	}()
 
-	_, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, time.Duration(0))
-	if xerr != nil {
+	if _, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout()); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
+
 	// Retrieve default Nic use to create public ip
-	nics, xerr := s.getNICS(vm.VmId)
+	nics, xerr := s.getNICs(vm.VmId)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -961,7 +1093,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 	defaultNic := nics[0]
 
-	nics, xerr = s.addNICS(&request, vm.VmId)
+	nics, xerr = s.addNICs(&request, vm.VmId)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -976,23 +1108,18 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 	}
 
-	xerr = s.addVolume(&request, vm.VmId)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-
 	xerr = s.addGPUs(&request, vm.VmId)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
-	xerr = s.setResourceTags(vm.VmId, map[string]string{
+	_, xerr = s.setResourceTags(vm.VmId, map[string]string{
 		"name": request.ResourceName,
 	})
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
-	_, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, time.Duration(0))
+	_, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout())
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -1027,41 +1154,49 @@ func (s *Stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.E
 	//return subnet.SubnetId, nil
 }
 
+// getVM gets VM information from provider
 func (s *Stack) getVM(vmID string) (*osc.Vm, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
 	readVmsRequest := osc.ReadVmsRequest{
 		Filters: osc.FiltersVm{
 			VmIds: []string{vmID},
 		},
 	}
-	vm, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
-		ReadVmsRequest: optional.NewInterface(readVmsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var vm osc.ReadVmsResponse
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			vm, _, innerErr = s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
+				ReadVmsRequest: optional.NewInterface(readVmsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 	if len(vm.Vms) == 0 {
-		return nil, nil
+		return nil, fail.NotFoundError("failed to find VM %s", vmID)
 	}
 	return &vm.Vms[0], nil
 }
 
 func (s *Stack) deleteHost(id string) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
 	request := osc.DeleteVmsRequest{
 		VmIds: []string{id},
 	}
-	_, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
-		DeleteVmsRequest: optional.NewInterface(request),
-	})
-	if err != nil {
-		return normalizeError(err)
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
+				DeleteVmsRequest: optional.NewInterface(request),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
-	_, xerr := s.WaitHostState(id, hoststate.TERMINATED, time.Duration(0))
+	_, xerr = s.WaitHostState(id, hoststate.TERMINATED, time.Duration(0))
 	return xerr
 }
 
@@ -1075,19 +1210,27 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%vs)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%vs)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	readPublicIpsRequest := osc.ReadPublicIpsRequest{
 		Filters: osc.FiltersPublicIp{VmIds: []string{ahf.Core.ID}},
 	}
-	resp, _, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
-		ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
-	})
-	if err != nil {
-		logrus.Errorf("Unable to read public IPs of vm %s", ahf.Core.ID)
+	var resp osc.ReadPublicIpsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
+				ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to read public IPs of Host %s", ahf.Core.ID)
 	}
+
 	volumes, xerr := s.ListVolumeAttachments(ahf.Core.ID)
 	if xerr != nil {
 		volumes = []abstract.VolumeAttachment{}
@@ -1096,20 +1239,28 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
+
 	if len(resp.PublicIps) == 0 {
 		return nil
 	}
+
 	var lastErr fail.Error
 	for _, ip := range resp.PublicIps {
 		deletePublicIpRequest := osc.DeletePublicIpRequest{
 			PublicIpId: ip.PublicIpId,
 		}
-		_, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-		})
-		if err != nil { // continue to delete even if error
-			lastErr = normalizeError(err)
-			logrus.Errorf("Unable to delete public IP %s of vm %s", ip.PublicIpId, ahf.Core.ID)
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, _, innerErr := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
+					DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
+				})
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil { // continue to delete even if error
+			lastErr = xerr
+			logrus.Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
 		}
 	}
 
@@ -1125,41 +1276,37 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			return "false"
 		}()
 		if del == "true" {
-			xerr = s.DeleteVolume(v.VolumeID)
-			if xerr != nil { // continue to delete even if error
+			if xerr = s.DeleteVolume(v.VolumeID); xerr != nil { // continue to delete even if error
 				logrus.Errorf("Unable to delete volume %s of vm %s", v.VolumeID, ahf.Core.ID)
 			}
 		}
-
 	}
 
 	return lastErr
 }
 
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
-	ahf = abstract.NewHostFull()
-	if s == nil {
-		return ahf, fail.InvalidInstanceError()
-	}
+func (s Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+
 	var hostRef string
 	ahf, hostRef, xerr = stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return ahf, xerr
+		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	vm, xerr := s.getVM(ahf.Core.ID)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
 	if ahf.Core.Name == "" {
 		tags, xerr := s.getResourceTags(vm.VmId)
 		if xerr != nil {
-			return ahf, xerr
+			return nullAHF, xerr
 		}
 		if tag, ok := tags["name"]; ok {
 			ahf.Core.Name = tag
@@ -1167,56 +1314,58 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 	}
 	subnets, nics, err := s.listSubnetsByHost(vm.VmId)
 	if err != nil {
-		return nil, err
+		return nullAHF, err
 	}
+
+	ahf = abstract.NewHostFull()
 	ahf.Core.ID = vm.VmId
 	ahf.Core.LastState = hostState(vm.State)
 	xerr = s.setHostProperties(ahf, subnets, vm, nics)
 	return ahf, xerr
-
 }
 
 // InspectHostByName returns the host identified by name
-func (s *Stack) InspectHostByName(name string) (ahc *abstract.HostCore, xerr fail.Error) {
-	nullAhc := abstract.NewHostCore()
-	if s == nil {
-		return nullAhc, fail.InvalidInstanceError()
-	}
+func (s Stack) InspectHostByName(name string) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	res, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
-		ReadVmsRequest: optional.NewInterface(osc.ReadVmsRequest{
-			DryRun: false,
-			Filters: osc.FiltersVm{
-				Tags: []string{fmt.Sprintf("name=%s", name)},
-			},
-		}),
-	})
-	if err != nil {
-		return nullAhc, normalizeError(err)
+	readVmsOpts := osc.ReadVmsRequest{
+		DryRun: false,
+		Filters: osc.FiltersVm{
+			Tags: []string{fmt.Sprintf("name=%s", name)},
+		},
 	}
-	if len(res.Vms) == 0 {
-		return nullAhc, fail.NotFoundError("failed to find a host named '%s'", name)
+	var resp osc.ReadVmsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
+				ReadVmsRequest: optional.NewInterface(readVmsOpts),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullAHF, xerr
+	}
+	if len(resp.Vms) == 0 {
+		return nullAHF, fail.NotFoundError("failed to find a Host named '%s'", name)
 	}
 
-	vm := res.Vms[0]
-	ahc = abstract.NewHostCore()
-	ahc.ID = vm.VmId
-	ahc.Name = name
-	ahc.LastState = hostState(vm.State)
-	return ahc, nil
+	vm := resp.Vms[0]
+	ahf = abstract.NewHostFull()
+	ahf.Core.ID = vm.VmId
+	ahf.Core.Name = name
+	ahf.Core.LastState = hostState(vm.State)
+	return ahf, nil
 }
 
 // GetHostState returns the current state of the host identified by id
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
-	if s == nil {
-		return hoststate.UNKNOWN, fail.InvalidInstanceError()
-	}
-
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+func (s Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -1229,23 +1378,27 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, 
 }
 
 // ListHosts lists all hosts
-func (s *Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
+func (s Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 	emptyList := abstract.HostList{}
-	if s == nil {
-		return emptyList, fail.InvalidInstanceError()
-	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
-	if err != nil {
-		return emptyList, normalizeError(err)
+	var resp osc.ReadVmsResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VmApi.ReadVms(s.auth, nil)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return emptyList, xerr
 	}
 
 	var hosts abstract.HostList
-	for _, vm := range res.Vms {
+	for _, vm := range resp.Vms {
 		if hostState(vm.State) == hoststate.TERMINATED {
 			continue
 		}
@@ -1273,16 +1426,13 @@ func (s *Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
+func (s Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -1290,59 +1440,68 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		VmIds:     []string{ahf.Core.ID},
 		ForceStop: true,
 	}
-	_, _, err := s.client.VmApi.StopVms(s.auth, &osc.StopVmsOpts{
-		StopVmsRequest: optional.NewInterface(stopVmsRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.StopVms(s.auth, &osc.StopVmsOpts{
+				StopVmsRequest: optional.NewInterface(stopVmsRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
+func (s Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	startVmsRequest := osc.StartVmsRequest{
-		VmIds: []string{ahf.Core.ID},
+	startVmsOpts := osc.StartVmsOpts{
+		StartVmsRequest: optional.NewInterface(osc.StartVmsRequest{
+			VmIds: []string{ahf.Core.ID},
+		}),
 	}
-	_, _, err := s.client.VmApi.StartVms(s.auth, &osc.StartVmsOpts{
-		StartVmsRequest: optional.NewInterface(startVmsRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.StartVms(s.auth, &startVmsOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // RebootHost Reboot host
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
+func (s Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	rebootVmsRequest := osc.RebootVmsRequest{
-		VmIds: []string{ahf.Core.ID},
+	rebootVmsOpts := osc.RebootVmsOpts{
+		RebootVmsRequest: optional.NewInterface(osc.RebootVmsRequest{
+			VmIds: []string{ahf.Core.ID},
+		}),
 	}
-	_, _, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
-		RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.RebootVms(s.auth, &rebootVmsOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
-func (s *Stack) perfFromFreq(freq float32) int {
+func (s Stack) perfFromFreq(freq float32) int {
 	var perfList sort.IntSlice
 	for k := range s.CPUPerformanceMap {
 		perfList = append(perfList, k)
@@ -1357,17 +1516,15 @@ func (s *Stack) perfFromFreq(freq float32) int {
 }
 
 // ResizeHost Resize host
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (ahf *abstract.HostFull, xerr fail.Error) {
-	nullAhf := abstract.NewHostFull()
-	if s == nil {
-		return ahf, fail.InvalidInstanceError()
-	}
+func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAhf, xerr
+		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %v)", hostRef, request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)", hostRef, request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -1376,24 +1533,120 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 	updateVmRequest := osc.UpdateVmRequest{
 		VmId:   ahf.Core.ID,
 		VmType: t,
-		// VmType: request.,
 	}
-	_, _, err := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
-		UpdateVmRequest: optional.NewInterface(updateVmRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
+				UpdateVmRequest: optional.NewInterface(updateVmRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return s.InspectHost(ahf.Core.ID)
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	return fail.NotImplementedError("not yet implemented")
+func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	vm, xerr := s.getVM(ahf.Core.ID)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
+	}
+
+	found := false
+	sgs := make([]string, 0, len(vm.SecurityGroups)+1)
+	for _, v := range vm.SecurityGroups {
+		if v.SecurityGroupId == asg.ID {
+			found = true
+			break
+		}
+		sgs = append(sgs, v.SecurityGroupId)
+	}
+	if found {
+		// Security Group already bound to Host
+		return nil
+	}
+
+	// Add new SG to Host
+	sgs = append(sgs, asg.ID)
+	updateVmRequest := osc.UpdateVmRequest{
+		VmId:             ahf.Core.ID,
+		SecurityGroupIds: sgs,
+	}
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
+				UpdateVmRequest: optional.NewInterface(updateVmRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	return fail.NotImplementedError("not yet implemented")
+func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	vm, xerr := s.getVM(ahf.Core.ID)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
+	}
+
+	found := false
+	sgs := make([]string, 0, len(vm.SecurityGroups))
+	for _, v := range vm.SecurityGroups {
+		if v.SecurityGroupId != asg.ID {
+			sgs = append(sgs, v.SecurityGroupId)
+		} else {
+			found = true
+		}
+	}
+	if !found {
+		// Security Group not bound to Host, exit gracefully
+		return nil
+	}
+
+	// Update Security Groups of Host
+	updateVmRequest := osc.UpdateVmRequest{
+		VmId:             ahf.Core.ID,
+		SecurityGroupIds: sgs,
+	}
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
+				UpdateVmRequest: optional.NewInterface(updateVmRequest),
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }

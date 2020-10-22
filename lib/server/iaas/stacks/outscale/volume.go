@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -56,31 +57,39 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 			IOPS = 13000
 		}
 	}
-	createVolumeRequest := osc.CreateVolumeRequest{
-		DryRun:        false,
-		Iops:          int32(IOPS),
-		Size:          int32(request.Size),
-		SnapshotId:    "",
-		SubregionName: s.Options.Compute.Subregion,
-		VolumeType:    s.volumeType(request.Speed),
+	createVolumeOpts := osc.CreateVolumeOpts{
+		CreateVolumeRequest: optional.NewInterface(osc.CreateVolumeRequest{
+			DryRun:        false,
+			Iops:          int32(IOPS),
+			Size:          int32(request.Size),
+			SnapshotId:    "",
+			SubregionName: s.Options.Compute.Subregion,
+			VolumeType:    s.volumeType(request.Speed),
+		}),
 	}
-	res, _, err := s.client.VolumeApi.CreateVolume(s.auth, &osc.CreateVolumeOpts{
-		CreateVolumeRequest: optional.NewInterface(createVolumeRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	var resp osc.CreateVolumeResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VolumeApi.CreateVolume(s.auth, &createVolumeOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	ov := res.Volume
+	ov := resp.Volume
 
 	defer func() {
 		if xerr != nil {
-			derr := s.DeleteVolume(ov.VolumeId)
-			_ = xerr.AddConsequence(derr)
+			if derr := s.DeleteVolume(ov.VolumeId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume"))
+			}
 		}
 	}()
 
-	xerr = s.setResourceTags(res.Volume.VolumeId, map[string]string{
+	_, xerr = s.setResourceTags(ov.VolumeId, map[string]string{
 		"name": request.Name,
 	})
 	if xerr != nil {
@@ -90,6 +99,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	volume := abstract.NewVolume()
 	volume.ID = ov.VolumeId
 	volume.Speed = s.volumeSpeed(ov.VolumeType)
@@ -173,25 +183,32 @@ func (s *Stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readVolumesRequest := osc.ReadVolumesRequest{
-		Filters: osc.FiltersVolume{
-			VolumeIds: []string{id},
+	readVolumesOpts := osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
+			Filters: osc.FiltersVolume{
+				VolumeIds: []string{id},
+			},
+		}),
+	}
+	var resp osc.ReadVolumesResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
+			return normalizeError(innerErr)
 		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullAv, xerr
 	}
-	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-	})
-	if err != nil {
-		return nullAv, normalizeError(err)
-	}
-	if len(res.Volumes) > 1 {
+	if len(resp.Volumes) > 1 {
 		return nil, fail.InconsistentError("Invalid provider response")
 	}
-	if len(res.Volumes) == 0 {
+	if len(resp.Volumes) == 0 {
 		return nullAv, fail.NotFoundError("failed to find a volume '%s'", id)
 	}
 
-	ov := res.Volumes[0]
+	ov := resp.Volumes[0]
 	av = abstract.NewVolume()
 	av.ID = ov.VolumeId
 	av.Speed = s.volumeSpeed(ov.VolumeType)
@@ -216,26 +233,33 @@ func (s *Stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	subregion := s.Options.Compute.Subregion
-	readVolumesRequest := osc.ReadVolumesRequest{
-		Filters: osc.FiltersVolume{
-			Tags:           []string{fmt.Sprintf("name=%s", name)},
-			SubregionNames: []string{subregion},
+	readVolumesOpts := osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
+			Filters: osc.FiltersVolume{
+				Tags:           []string{fmt.Sprintf("name=%s", name)},
+				SubregionNames: []string{subregion},
+			},
+		}),
+	}
+	var resp osc.ReadVolumesResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
+			return normalizeError(innerErr)
 		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullAv, xerr
 	}
-	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-	})
-	if err != nil {
-		return nullAv, normalizeError(err)
-	}
-	if len(res.Volumes) == 0 {
+	if len(resp.Volumes) == 0 {
 		return nullAv, fail.NotFoundError("failed to find volume '%s'", name)
 	}
 
-	if len(res.Volumes) > 1 {
+	if len(resp.Volumes) > 1 {
 		return nullAv, fail.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
 	}
-	ov := res.Volumes[0]
+	ov := resp.Volumes[0]
 	av = abstract.NewVolume()
 	av.ID = ov.VolumeId
 	av.Speed = s.volumeSpeed(ov.VolumeType)
@@ -257,20 +281,27 @@ func (s *Stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	subregion := s.Options.Compute.Subregion
-	readVolumesRequest := osc.ReadVolumesRequest{
-		Filters: osc.FiltersVolume{
-			SubregionNames: []string{subregion},
-		},
+	readVolumesOpts := osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
+			Filters: osc.FiltersVolume{
+				SubregionNames: []string{subregion},
+			},
+		}),
 	}
-	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-	})
-	if err != nil {
-		return emptySlice, normalizeError(err)
+	var resp osc.ReadVolumesResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return emptySlice, xerr
 	}
 
-	volumes := make([]abstract.Volume, 0, len(res.Volumes))
-	for _, ov := range res.Volumes {
+	volumes := make([]abstract.Volume, 0, len(resp.Volumes))
+	for _, ov := range resp.Volumes {
 		volume := abstract.NewVolume()
 		volume.ID = ov.VolumeId
 		volume.Speed = s.volumeSpeed(ov.VolumeType)
@@ -295,13 +326,18 @@ func (s *Stack) DeleteVolume(id string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	deleteVolumeRequest := osc.DeleteVolumeRequest{
-		VolumeId: id,
+	deleteVolumeOpts := osc.DeleteVolumeOpts{
+		DeleteVolumeRequest: optional.NewInterface(osc.DeleteVolumeRequest{
+			VolumeId: id,
+		}),
 	}
-	_, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &osc.DeleteVolumeOpts{
-		DeleteVolumeRequest: optional.NewInterface(deleteVolumeRequest),
-	})
-	return normalizeError(err)
+	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &deleteVolumeOpts)
+			return normalizeError(err)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 }
 
 func freeDevice(usedDevices []string, device string) bool {
@@ -354,21 +390,27 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 		return "", xerr
 	}
 
-	linkVolumeRequest := osc.LinkVolumeRequest{
-		DeviceName: firstDeviceName,
-		VmId:       request.HostID,
-		VolumeId:   request.VolumeID,
+	linkVolumeOpts := osc.LinkVolumeOpts{
+		LinkVolumeRequest: optional.NewInterface(osc.LinkVolumeRequest{
+			DeviceName: firstDeviceName,
+			VmId:       request.HostID,
+			VolumeId:   request.VolumeID,
+		}),
 	}
-	_, _, err := s.client.VolumeApi.LinkVolume(s.auth, &osc.LinkVolumeOpts{
-		LinkVolumeRequest: optional.NewInterface(linkVolumeRequest),
-	})
-	if err != nil {
-		return "", normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VolumeApi.LinkVolume(s.auth, &linkVolumeOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return "", xerr
 	}
 	return request.VolumeID, nil
 }
 
-// GetVolumeAttachment returns the volume attachment identified by volumeID
+// InspectVolumeAttachment returns the volume attachment identified by volumeID
 func (s *Stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
 	nullVa := abstract.NewVolumeAttachment()
 	if s == nil {
@@ -385,25 +427,32 @@ func (s *Stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readVolumesRequest := osc.ReadVolumesRequest{
-		Filters: osc.FiltersVolume{
-			VolumeIds: []string{volumeID},
+	readVolumesOpts := osc.ReadVolumesOpts{
+		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
+			Filters: osc.FiltersVolume{
+				VolumeIds: []string{volumeID},
+			},
+		}),
+	}
+	var resp osc.ReadVolumesResponse
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
+			return normalizeError(innerErr)
 		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullVa, xerr
 	}
-	res, _, err := s.client.VolumeApi.ReadVolumes(s.auth, &osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(readVolumesRequest),
-	})
-	if err != nil {
-		return nullVa, normalizeError(err)
-	}
-	if len(res.Volumes) > 1 {
+	if len(resp.Volumes) > 1 {
 		return nullVa, fail.InconsistentError("Invalid provider response")
 	}
-	if len(res.Volumes) == 0 {
+	if len(resp.Volumes) == 0 {
 		return nullVa, nil
 	}
 
-	ov := res.Volumes[0]
+	ov := resp.Volumes[0]
 	for _, lv := range ov.LinkedVolumes {
 		if lv.VmId == serverID {
 			return &abstract.VolumeAttachment{
@@ -465,27 +514,20 @@ func (s *Stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Err
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	unlinkVolumeRequest := osc.UnlinkVolumeRequest{
-		VolumeId: volumeID,
+	unlinkVolumeOpts := osc.UnlinkVolumeOpts{
+		UnlinkVolumeRequest: optional.NewInterface(osc.UnlinkVolumeRequest{
+			VolumeId: volumeID,
+		}),
 	}
-	_, _, err := s.client.VolumeApi.UnlinkVolume(s.auth, &osc.UnlinkVolumeOpts{
-		UnlinkVolumeRequest: optional.NewInterface(unlinkVolumeRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, _, innerErr := s.client.VolumeApi.UnlinkVolume(s.auth, &unlinkVolumeOpts)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 	return s.WaitForVolumeState(volumeID, volumestate.AVAILABLE)
 }
-
-// func toVolumeSpeed(s string) volumespeed.Enum {
-//	if s == "COLD" {
-//		return volumespeed.COLD
-//	}
-//	if s == "HDD" {
-//		return volumespeed.HDD
-//	}
-//	if s == "SSD" {
-//		return volumespeed.SSD
-//	}
-//	return volumespeed.HDD
-// }
