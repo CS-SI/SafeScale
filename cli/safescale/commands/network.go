@@ -194,7 +194,7 @@ var networkCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a network",
-	ArgsUsage: "<network_name>",
+	ArgsUsage: "NETWORKNAME",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "cidr",

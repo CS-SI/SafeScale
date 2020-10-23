@@ -17,22 +17,20 @@
 package iaas
 
 import (
-	"encoding/json"
-	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
+    "encoding/json"
+    "fmt"
+    "regexp"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+    "github.com/sirupsen/logrus"
+    "github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+    "github.com/CS-SI/SafeScale/lib/utils/crypt"
+    "github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var (
@@ -259,7 +257,7 @@ func UseService(tenantName string) (newService Service, err error) {
 	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
-// validatRegexps validates regexp values from tenants file
+// validateRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) error {
 	compute, ok := tenant["compute"].(map[string]interface{})
 	if !ok {
@@ -363,7 +361,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	config.Endpoint, _ = ostorage["Endpoint"].(string)
 
 	if config.User, ok = ostorage["AccessKey"].(string); !ok {
-		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
+		if config.User, ok = ostorage["OpenstackID"].(string); !ok {
 			if config.User, ok = ostorage["Username"].(string); !ok {
 				if config.User, ok = identity["OpenstackID"].(string); !ok {
 					config.User, _ = identity["Username"].(string)
@@ -390,9 +388,6 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
-		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
-		}
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
@@ -434,24 +429,6 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		config.Credentials = string(d1)
 	}
 	return config, nil
-}
-
-func validateOVHObjectStorageRegionNaming(context, region, authURL string) error {
-	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
-	// Object Storage regions don't contain anymore an index like compute regions
-	if strings.Contains(authURL, "ovh.") {
-		rLen := len(region)
-		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
-			region = region[:rLen-1]
-			return fail.InvalidRequestError(
-				fmt.Sprintf(
-					`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`,
-					context, region,
-				),
-			)
-		}
-	}
-	return nil
 }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
@@ -577,9 +554,6 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	if config.Region, ok = metadata["Region"].(string); !ok {
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
-		}
-		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
 		}
 	}
 
