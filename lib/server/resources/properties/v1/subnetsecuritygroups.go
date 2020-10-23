@@ -29,14 +29,14 @@ import (
 type SubnetSecurityGroups struct {
 	DefaultID string                        `json:"default_id,omitempty"` // Contains the ID of the default security group
 	ByID      map[string]*SecurityGroupBond `json:"by_id,omitempty"`      // map of security groups by IDs; if value is true, security group is currently applied
-	ByName    map[string]*SecurityGroupBond `json:"by_name,omitempty"`    // map of security groups by Names; if value is true, security group is currently applied
+	ByName    map[string]string             `json:"by_name,omitempty"`    // map of security group IDs by Names
 }
 
 // NewSubnetSecurityGroups ...
 func NewSubnetSecurityGroups() *SubnetSecurityGroups {
 	return &SubnetSecurityGroups{
 		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]*SecurityGroupBond{},
+		ByName: map[string]string{},
 	}
 }
 
@@ -44,7 +44,7 @@ func NewSubnetSecurityGroups() *SubnetSecurityGroups {
 func (ssg *SubnetSecurityGroups) Reset() {
 	*ssg = SubnetSecurityGroups{
 		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]*SecurityGroupBond{},
+		ByName: map[string]string{},
 	}
 }
 
@@ -61,9 +61,9 @@ func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByID {
 		ssg.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	ssg.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
+	ssg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
-		ssg.ByName[k] = v.Clone().(*SecurityGroupBond)
+		ssg.ByName[k] = v
 	}
 	return ssg
 }

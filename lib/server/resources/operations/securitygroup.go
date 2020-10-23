@@ -138,7 +138,7 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 		case *fail.ErrAlteredNothing: // This error means nothing has been change, so no need to update cache
 			return nullSg, nil
 		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
-			return nullSg, fail.NotFoundError("metadata of securityGroup '%s' not found", ref)
+			return nullSg, fail.NotFoundError("metadata of Security Group '%s' not found", ref)
 		default:
 			return nullSg, xerr
 		}
@@ -285,11 +285,11 @@ func (sg *securityGroup) Create(task concurrency.Task, rn resources.Network, nam
 	}()
 
 	// VPL: not sure yet if this is wanted... If no rules are provided, Cloud Provider may put default rules in Security Group...
-	//if len(rules) == 0 {
-	//	if xerr = sg.Clear(task); xerr != nil {
-	//		return xerr
-	//	}
-	//}
+	if len(rules) == 0 {
+		if xerr = sg.Clear(task); xerr != nil {
+			return xerr
+		}
+	}
 
 	logrus.Infof("Security Group '%s' created successfully", name)
 	return nil
@@ -336,9 +336,9 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 				}
 
 				// Do not remove a securityGroup used on hosts
-				hostCount := len(hostsV1.ByID)
+				hostCount := len(hostsV1.ByName)
 				if hostCount > 0 {
-					return fail.NotAvailableError("security group is currently binded to %d host%s", hostCount, strprocess.Plural(uint(hostCount)))
+					return fail.NotAvailableError("security group '%s' is currently bound to %d host%s", sg.GetName(), hostCount, strprocess.Plural(uint(hostCount)))
 				}
 
 				// Do not remove a Security Group marked as default for a host
@@ -450,7 +450,7 @@ func (sg *securityGroup) unbindFromHosts(task concurrency.Task, in *propertiesv1
 	// iterate on hosts bound to the security group and start a go routine to unbind
 	svc := sg.GetService()
 	for _, v := range in.ByID {
-		if v.FromNetwork {
+		if v.FromSubnet {
 			return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 		}
 		rh, xerr := LoadHost(task, svc, v.ID)
@@ -759,7 +759,7 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := sg.GetService().BindSecurityGroupToHost(hostID /*ip, */, sg.GetID())
+				xerr := sg.GetService().BindSecurityGroupToHost(sg.GetID(), hostID)
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// continue
@@ -768,7 +768,7 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				innerXErr := sg.GetService().UnbindSecurityGroupFromHost(hostID, sg.GetID())
+				innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID)
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// continue
@@ -799,7 +799,7 @@ func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host
 
 			// Unbind security group on provider side; if not found, consider as a success
 			hostID := rh.GetID()
-			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(hostID, sg.GetID()); innerXErr != nil {
+			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					return nil

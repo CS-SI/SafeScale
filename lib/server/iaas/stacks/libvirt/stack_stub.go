@@ -34,6 +34,16 @@ var gError = fail.NewError("libvirt Driver is not enabled, use the libvirt optio
 type Stack struct {
 }
 
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s *Stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, gError
+}
+
 // WaitHostReady ...
 func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	return abstract.NewHostCore(), gError
@@ -140,7 +150,7 @@ func (s *Stack) DeleteSubnet(id string) fail.Error {
 }
 
 // CreateVIP stub
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return &abstract.VirtualIP{}, gError
 }
 
@@ -265,21 +275,26 @@ func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return gError
 }
 
 // BindSecurityGroupToSubnet ...
-func (s *Stack) BindSecurityGroupToSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	return gError
 }
 
 // UnbindSecurityGroupFromSubnet ...
-func (s *Stack) UnbindSecurityGroupFromSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	return gError
+}
+
+// GetDefaultSecurityGroupName ...
+func (s *Stack) GetDefaultSecurityGroupName() string {
+	return ""
 }

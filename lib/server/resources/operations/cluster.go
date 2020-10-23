@@ -392,9 +392,9 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
-			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
-			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
+			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.GatewaysDef)
+			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.MastersDef)
+			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.NodesDef)
 			defaultsV2.Image = req.NodesDef.Image
 			return nil
 		})
@@ -521,9 +521,9 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*gatewaysDef)
-			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*mastersDef)
-			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*nodesDef)
+			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*gatewaysDef)
+			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*mastersDef)
+			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*nodesDef)
 			defaultsV2.Image = imageID
 			return nil
 		})
@@ -1594,7 +1594,7 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 		return nil, xerr
 	}
 
-	var nodeDef *propertiesv2.HostSizingRequirements
+	var nodeDef *propertiesv1.HostSizingRequirements
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
@@ -1675,12 +1675,12 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 }
 
 // complementHostDefinition complements req with default values if needed
-func complementHostDefinition(req *abstract.HostSizingRequirements, def propertiesv2.HostSizingRequirements) *propertiesv2.HostSizingRequirements {
-	var finalDef propertiesv2.HostSizingRequirements
+func complementHostDefinition(req *abstract.HostSizingRequirements, def propertiesv1.HostSizingRequirements) *propertiesv1.HostSizingRequirements {
+	var finalDef propertiesv1.HostSizingRequirements
 	if req == nil {
 		finalDef = def
 	} else {
-		finalDef = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*req)
+		finalDef = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*req)
 
 		if def.MinCores > 0 && finalDef.MinCores == 0 {
 			finalDef.MinCores = def.MinCores
@@ -1729,7 +1729,7 @@ func complementHostDefinition(req *abstract.HostSizingRequirements, def properti
 
 func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
 	defaultsV2.Image = defaultsV1.Image
-	defaultsV2.GatewaySizing = propertiesv2.HostSizingRequirements{
+	defaultsV2.GatewaySizing = propertiesv1.HostSizingRequirements{
 		MinCores:    defaultsV1.GatewaySizing.Cores,
 		MinCPUFreq:  defaultsV1.GatewaySizing.CPUFreq,
 		MinGPU:      defaultsV1.GatewaySizing.GPUNumber,
@@ -1737,7 +1737,7 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, def
 		MinDiskSize: defaultsV1.GatewaySizing.DiskSize,
 		Replaceable: defaultsV1.GatewaySizing.Replaceable,
 	}
-	defaultsV2.MasterSizing = propertiesv2.HostSizingRequirements{
+	defaultsV2.MasterSizing = propertiesv1.HostSizingRequirements{
 		MinCores:    defaultsV1.MasterSizing.Cores,
 		MinCPUFreq:  defaultsV1.MasterSizing.CPUFreq,
 		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
@@ -1745,7 +1745,7 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, def
 		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
 		Replaceable: defaultsV1.MasterSizing.Replaceable,
 	}
-	defaultsV2.NodeSizing = propertiesv2.HostSizingRequirements{
+	defaultsV2.NodeSizing = propertiesv1.HostSizingRequirements{
 		MinCores:    defaultsV1.NodeSizing.Cores,
 		MinCPUFreq:  defaultsV1.NodeSizing.CPUFreq,
 		MinGPU:      defaultsV1.NodeSizing.GPUNumber,

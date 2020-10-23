@@ -20,10 +20,37 @@ package network
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
+
+// List returns a slice of *abstract.Network corresponding to managed networks
+func List(task concurrency.Task, svc iaas.Service) ([]*abstract.Network, fail.Error) {
+	rn, xerr := New(svc)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var list []*abstract.Network
+
+	// Default network has no metadata, so we need to "simulate" them.
+	if svc.HasDefaultNetwork() {
+		an, xerr := svc.GetDefaultNetwork()
+		if xerr != nil {
+			return nil, xerr
+		}
+		list = append(list, an)
+	}
+
+	// Recovers the list with metadata and add them to the list
+	xerr = rn.Browse(task, func(an *abstract.Network) fail.Error {
+		list = append(list, an)
+		return nil
+	})
+	return list, nil
+}
 
 // New creates an instance of resources.Network
 func New(svc iaas.Service) (resources.Network, fail.Error) {

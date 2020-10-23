@@ -147,8 +147,8 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.S
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := xerr.(*retry.ErrTimeout); ok {
-			logrus.Debugf("timeout reading metadata of rs '%s'", ref)
-			xerr = fail.NotFoundError("failed to load metadata of rs '%s': timeout", ref)
+			logrus.Debugf("timeout reading metadata of Share '%s'", ref)
+			xerr = fail.NotFoundError("failed to load metadata of Share '%s': timeout", ref)
 		}
 		return nullShare(), xerr
 	}
@@ -484,7 +484,7 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 	// serverID = objserver.GetID()
 	// serverName = objserver.GetName()
 	serverPrivateIP := objserver.(*host).getPrivateIP(task)
-	serverAccessIP := objserver.(*host).getAccessIP(task)
+	//serverAccessIP := objserver.(*host).getAccessIP(task)
 
 	xerr = objserver.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -539,18 +539,23 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 			return innerXErr
 		}
 
-		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if hostNetworkV1.DefaultGatewayPrivateIP == serverPrivateIP {
-				export = serverPrivateIP + ":" + hostShare.Path
-			} else {
-				export = serverAccessIP + ":" + hostShare.Path
-			}
-			return nil
-		})
+		// VPL: why this ?
+		//return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		//	hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
+		//	if !ok {
+		//		return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		//	}
+		//	if hostNetworkV2.DefaultGatewayPrivateIP == serverPrivateIP {
+		//		export = serverPrivateIP + ":" + hostShare.Path
+		//	} else {
+		//		export = serverAccessIP + ":" + hostShare.Path
+		//	}
+		//	return nil
+		//})
+
+		export = serverPrivateIP + ":" + hostShare.Path
+
+		return nil
 	})
 	if xerr != nil {
 		return nil, xerr

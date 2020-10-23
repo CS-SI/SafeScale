@@ -17,6 +17,7 @@
 package propertiesv2
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"reflect"
 	"testing"
 
@@ -26,7 +27,7 @@ import (
 func TestDefaults_Clone(t *testing.T) {
 	ct := newClusterDefaults()
 	ct.Image = "something"
-	ct.GatewaySizing = HostSizingRequirements{
+	ct.GatewaySizing = propertiesv1.HostSizingRequirements{
 		MinCores: 3,
 		MinGPU:   1,
 	}

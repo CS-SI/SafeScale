@@ -103,7 +103,13 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 }
 
 // Create calls the gRPC server to create a network
-func (n network) Create(name, cidr string, noSubnet, keepOnFailure bool, timeout time.Duration) (*protocol.Network, error) {
+func (n network) Create(
+	name, cidr string,
+	noSubnet bool,
+	gwname, os, sizing string,
+	keepOnFailure bool,
+	timeout time.Duration,
+) (*protocol.Network, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)

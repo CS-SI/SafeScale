@@ -39,7 +39,7 @@ var (
 // Makers ...
 type Makers struct {
 	MinimumRequiredServers    func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error)  // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // sizing of getGateway(s)
+	DefaultGatewaySizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // sizing of gateway(s)
 	DefaultMasterSizing       func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of master(s)
 	DefaultNodeSizing         func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of node(s)
 	DefaultImage              func(task concurrency.Task, c resources.Cluster) string                          // default image of server(s)

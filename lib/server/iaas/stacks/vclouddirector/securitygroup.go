@@ -57,3 +57,8 @@ func (s *Stack) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGr
 func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
 	return nil, fail.NotImplementedError()
 }
+
+// GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
+func (s Stack) GetDefaultSecurityGroupName() string {
+	return ""
+}

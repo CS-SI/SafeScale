@@ -76,9 +76,9 @@ func NormalizeError(err error) fail.Error {
 	case fail.Error:
 		return e
 	case gophercloud.ErrDefault400: // bad request
-		return reduceOpenstackBadRequest(e.Body)
+		return reduceOpenstackError("BadRequest", e.Body)
 	case *gophercloud.ErrDefault400: // bad request
-		return reduceOpenstackBadRequest(e.Body)
+		return reduceOpenstackError("BadRequest", e.Body)
 	case gophercloud.ErrDefault401: // unauthorized
 		return fail.NotAuthenticatedError(string(e.Body))
 	case *gophercloud.ErrDefault401: // unauthorized
@@ -88,9 +88,9 @@ func NormalizeError(err error) fail.Error {
 	case *gophercloud.ErrDefault403: // forbidden
 		return fail.ForbiddenError(string(e.Body))
 	case gophercloud.ErrDefault404: // not found
-		return fail.NotFoundError(string(e.Body))
+		return reduceOpenstackError("NotFound", e.Body)
 	case *gophercloud.ErrDefault404: // not found
-		return fail.NotFoundError(string(e.Body))
+		return reduceOpenstackError("NotFound", e.Body)
 	case gophercloud.ErrDefault408: // request timeout
 		return fail.OverflowError(nil, 0, string(e.Body))
 	case *gophercloud.ErrDefault408: // request timeout
@@ -135,8 +135,44 @@ func NormalizeError(err error) fail.Error {
 	}
 }
 
-// reduceOpenstackBadRequest ...
-func reduceOpenstackBadRequest(in []byte) (xerr fail.Error) {
+//// reduceOpenstackBadRequest ...
+//func reduceOpenstackBadRequest(in []byte) (xerr fail.Error) {
+//	// FIXME: check if json.Unmarshal() may panic; if not theses 2 defers are superfluous
+//	defer func() {
+//		switch xerr.(type) {
+//		case *fail.ErrRuntimePanic:
+//			xerr = fail.InvalidRequestError(string(in))
+//		}
+//	}()
+//	defer fail.OnPanic(&xerr)
+//
+//	var body map[string]interface{}
+//	unjsonedErr := json.Unmarshal(in, &body)
+//	if unjsonedErr == nil {
+//		if content, ok := body["badRequest"].(map[string]interface{}); ok {
+//			if msg, ok := content["message"].(string); ok {
+//				return fail.InvalidRequestError(msg)
+//			}
+//		}
+//		if content, ok := body["NeutronError"].(map[string]interface{}); ok {
+//			if msg, ok := content["message"].(string); ok {
+//				return fail.InvalidRequestError(msg)
+//			}
+//		}
+//		if content, ok := body["message"].(string); ok {
+//			return fail.InvalidRequestError(content)
+//		}
+//	}
+//	return fail.InvalidRequestError(string(in))
+//}
+
+var errorFuncMap = map[string]func(string) fail.Error{
+	"NotFound":   func(msg string) fail.Error { return fail.NotFoundError(msg) },
+	"BadRequest": func(msg string) fail.Error { return fail.InvalidRequestError(msg) },
+}
+
+// reduceOpenstackNotFound ...
+func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	// FIXME: check if json.Unmarshal() may panic; if not theses 2 defers are superfluous
 	defer func() {
 		switch xerr.(type) {
@@ -146,21 +182,29 @@ func reduceOpenstackBadRequest(in []byte) (xerr fail.Error) {
 	}()
 	defer fail.OnPanic(&xerr)
 
+	fn, ok := errorFuncMap[errorName]
+	if !ok {
+		return fail.InvalidParameterError("errorName", fmt.Sprintf("value '%s' not supported", errorName))
+	}
+
 	var body map[string]interface{}
+	msg := string(in)
 	unjsonedErr := json.Unmarshal(in, &body)
 	if unjsonedErr == nil {
-		if content, ok := body["badRequest"].(map[string]interface{}); ok {
-			if msg, ok := content["message"].(string); ok {
-				return fail.InvalidRequestError(msg)
+		if lvl1, ok := body["badRequest"].(map[string]interface{}); ok {
+			if lvl2, ok := lvl1["message"].(string); ok {
+				msg = lvl2
 			}
-		}
-		if content, ok := body["NeutronError"].(map[string]interface{}); ok {
-			if msg, ok := content["message"].(string); ok {
-				return fail.InvalidRequestError(msg)
+		} else if lvl1, ok := body["NeutronError"].(map[string]interface{}); ok {
+			if lvl2, ok := lvl1["message"].(string); ok {
+				msg = lvl2
 			}
+		} else if lvl1, ok := body["message"].(string); ok {
+			msg = lvl1
 		}
 	}
-	return fail.InvalidRequestError(string(in))
+
+	return fn(msg)
 }
 
 // qualifyGophercloudResponseCode requalifies the unqualified error with appropriate error based on error code

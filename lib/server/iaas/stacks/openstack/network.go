@@ -57,6 +57,16 @@ type Router struct {
 	NetworkID string `json:"network_id,omitempty"`
 }
 
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s *Stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, fail.NotFoundError("no default network in Stack")
+}
+
 // CreateNetwork creates a network named name
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, xerr fail.Error) {
 	if s == nil {
@@ -822,7 +832,7 @@ func (s *Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Er
 }
 
 // BindSecurityGroupToSubnet binds a security group to a subnet
-func (s Stack) BindSecurityGroupToSubnet(subnetID string, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	//if s == nil {
 	//	return fail.InvalidInstanceError()
 	//}
@@ -853,7 +863,7 @@ func (s Stack) BindSecurityGroupToSubnet(subnetID string, sgParam stacks.Securit
 }
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-func (s Stack) UnbindSecurityGroupFromSubnet(subnetID string, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	//if s == nil {
 	//	return fail.InvalidInstanceError()
 	//}
@@ -945,33 +955,37 @@ func (s Stack) UnbindSecurityGroupFromSubnet(subnetID string, sgParam stacks.Sec
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, name string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if networkID = strings.TrimSpace(networkID); networkID == "" {
 		return nil, fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
+	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
+		return nil, fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	sgName := name + abstract.VIPDefaultSecurityGroupNameSuffix
-	asg, xerr := s.InspectSecurityGroup(sgName)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to get Security Group '%s' for VIP '%s'; must be created first", sgName, name)
-	}
+	//sgName := name + abstract.VIPDefaultSecurityGroupNameSuffix
+	//asg, xerr := s.InspectSecurityGroup(sgName)
+	//if xerr != nil {
+	//	return nil, fail.Wrap(xerr, "failed to get Security Group '%s' for VIP '%s'; must be created first", sgName, name)
+	//}
 
 	var port *ports.Port
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			asu := true
-			sg := []string{asg.ID}
+			//sg := []string{asg.ID}
 			options := ports.CreateOpts{
 				NetworkID:      networkID,
 				AdminStateUp:   &asu,
 				Name:           name,
-				SecurityGroups: &sg,
+				SecurityGroups: &securityGroups,
+				FixedIPs:       []ports.IP{{SubnetID: subnetID}},
 			}
 			port, innerErr = ports.Create(s.NetworkClient, options).Extract()
 			return NormalizeError(innerErr)

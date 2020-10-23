@@ -76,14 +76,14 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("network create '%s'", networkRef))
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("subnet create '%s'", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
 	task := job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s)", networkLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -132,7 +132,6 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		HA:            in.GetFailOver(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}
-
 	rs, xerr := subnetfactory.New(job.GetService())
 	if xerr != nil {
 		return nil, xerr
@@ -140,6 +139,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	if xerr = rs.Create(task, req, gwName, sizing); xerr != nil {
 		return nil, xerr
 	}
+
 	tracer.Trace("Subnet '%s' successfully created.", req.Name)
 	return rs.ToProtocol(task)
 }
@@ -178,22 +178,26 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewNetworkHandler(job)
-	//subnets, err := handler.List(in.GetNetwork().GetName(), in.GetAll())
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	var networkID string
+	var (
+		an        *abstract.Network
+		networkID string
+	)
+	if svc.HasDefaultNetwork() {
+		if an, xerr = svc.GetDefaultNetwork(); xerr != nil {
+			return nil, xerr
+		}
+	}
 	networkRef, _ := srvutils.GetReference(in.Network)
-	if networkRef != "" {
+	if networkRef == "" || (an != nil && an.Name == networkRef) {
+		networkID = an.ID
+	} else {
 		rn, xerr := networkfactory.Load(task, svc, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
 		networkID = rn.GetID()
 	}
-	list, xerr := subnetfactory.List(task, svc, in.GetAll())
+	list, xerr := subnetfactory.List(task, svc, networkID, in.GetAll())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -201,12 +205,12 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	// Build response mapping abstract.Network to protocol.Network
 	var pbList []*protocol.Subnet
 	for _, subnet := range list {
-		if networkID == "" || subnet.Network == networkID {
-			pbList = append(pbList, converters.SubnetFromAbstractToProtocol(subnet))
-		}
+		//if networkID == "" || subnet.Network == networkID {
+		pbList = append(pbList, converters.SubnetFromAbstractToProtocol(subnet))
+		//}
 	}
-	rv := &protocol.SubnetList{Subnets: pbList}
-	return rv, nil
+	resp := &protocol.SubnetList{Subnets: pbList}
+	return resp, nil
 }
 
 // Inspect returns infos on a subnet

@@ -24,7 +24,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
@@ -109,7 +108,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			vol, innerErr = volumes.Create(s.Stack.VolumeClient, opts).Extract()
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -141,7 +140,7 @@ func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			vol, innerErr = volumes.Get(s.Stack.VolumeClient, id).Extract()
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -191,7 +190,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 				}
 				return true, nil
 			})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)

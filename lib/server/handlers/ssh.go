@@ -32,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -145,14 +144,14 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil
 			})
 		}
-		return props.Inspect(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-			hostNetworkV1, ok := clonable.(*propertiesv1.HostNetwork)
+		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			if hostNetworkV1.DefaultNetworkID != "" {
+			if hostNetworkV2.DefaultSubnetID != "" {
 				var innerXErr fail.Error
-				rs, innerXErr = subnetfactory.Load(task, svc, "", hostNetworkV1.DefaultNetworkID)
+				rs, innerXErr = subnetfactory.Load(task, svc, "", hostNetworkV2.DefaultSubnetID)
 				if innerXErr != nil {
 					return innerXErr
 				}

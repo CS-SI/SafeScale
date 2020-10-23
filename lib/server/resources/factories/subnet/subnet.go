@@ -27,7 +27,7 @@ import (
 )
 
 // List returns a list of available subnets
-func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.Subnet, fail.Error) {
+func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
 	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
@@ -36,20 +36,27 @@ func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.Subnet
 	}
 
 	if all {
-		return svc.ListSubnets("")
+		return svc.ListSubnets(networkID)
 	}
 
-	rs, err := New(svc)
-	if err != nil {
-		return nil, err
+	rs, xerr := New(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
 
+	// recover subnets from metadata
 	var list []*abstract.Subnet
-	err = rs.Browse(task, func(as *abstract.Subnet) fail.Error {
-		list = append(list, as)
+	xerr = rs.Browse(task, func(as *abstract.Subnet) fail.Error {
+		if networkID == "" || as.Network == networkID {
+			list = append(list, as)
+		}
 		return nil
 	})
-	return list, err
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return list, nil
 }
 
 // New creates an instance of resources.Subnet

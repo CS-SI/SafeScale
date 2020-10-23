@@ -213,14 +213,19 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return nil, fail.NotFoundError("failed to query Security Group %s", asg.ID)
+		default:
+			return nil, xerr
+		}
 	}
 
-	asg = abstract.NewSecurityGroup(r.Name)
+	//asg = abstract.NewSecurityGroup(r.Name)
 	asg.ID = r.ID
+	asg.Name = r.Name
 	asg.Description = r.Description
-	asg.Rules, xerr = convertRulesToAbstract(r.Rules)
-	if xerr != nil {
+	if asg.Rules, xerr = convertRulesToAbstract(r.Rules); xerr != nil {
 		return nil, xerr
 	}
 	return asg, nil
@@ -559,3 +564,8 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 //
 //	return nil
 //}
+
+// GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
+func (s Stack) GetDefaultSecurityGroupName() string {
+	return s.GetConfigurationOptions().DefaultSecurityGroupName
+}

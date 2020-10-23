@@ -35,7 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-var networkCmdLabel = "network"
+const networkCmdLabel = "network"
 
 // NetworkCommand command
 var NetworkCommand = &cli.Command{
@@ -140,42 +140,105 @@ var networkInspect = &cli.Command{
 		jsoned, _ := json.Marshal(network)
 		_ = json.Unmarshal(jsoned, &mapped)
 
-		// Get gateway(s) information (needs the name(s) in the output map)
-		var pgw, sgw *protocol.Host
-		pgwID := network.GetGatewayId()
-		sgwID := network.GetSecondaryGatewayId()
+		if len(network.Subnets) == 1 {
+			if network.Subnets[0] == network.Name {
+				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.GetExecutionTimeout())
+				if err != nil {
+					err = fail.FromGRPCStatus(err)
+					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
+				}
 
-		// Added operation status
-		opState := network.State
-		mapped["state"] = opState.String()
+				subnetMapped := map[string]interface{}{}
+				jsoned, _ := json.Marshal(subnet)
+				_ = json.Unmarshal(jsoned, &subnetMapped)
 
-		pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+				mapped["network_id"] = mapped["id"]
+				mapped["network_cidr"] = mapped["cidr"]
+				delete(mapped, "cidr")
+				for k, v := range subnetMapped {
+					mapped[k] = v
+				}
+
+				if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+					return err
+				}
+				//// Get gateway(s) information (needs the name(s) in the output map)
+				//var pgw, sgw *protocol.Host
+				//gwIDs := subnet.GetGatewayIds()
+				//if len(gwIDs) > 0 {
+				//	pgw, err = clientSession.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
+				//	if err != nil {
+				//		err = fail.FromGRPCStatus(err)
+				//		var what string
+				//		if len(gwIDs) > 1 {
+				//			what = "primary "
+				//		}
+				//		casted := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
+				//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+				//	}
+				//	mapped["gateway_name"] = pgw.Name
+				//}
+				//if len(gwIDs) > 1 {
+				//	sgw, err = clientSession.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
+				//	if err != nil {
+				//		err = fail.FromGRPCStatus(err)
+				//		casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
+				//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+				//	}
+				//	mapped["secondary_gateway_name"] = sgw.Name
+				//}
+				//
+				//// Added operation status
+				//st := subnet.State
+				//mapped["state"] = st.String()
+				//
+				//// Remove entry 'virtual_ip' if empty
+				//if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+				//	delete(mapped, "virtual_ip")
+				//}
+
+				// Remove entry 'subnets'
+				delete(mapped, "subnets")
+			}
+		}
+
+		return clitools.SuccessResponse(mapped)
+	},
+}
+
+// Get gateway(s) information
+func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}) (err error) {
+	var pgw, sgw *protocol.Host
+	gwIDs := subnet.GetGatewayIds()
+	if len(gwIDs) > 0 {
+		pgw, err = session.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			var what string
-			if network.GetSecondaryGatewayId() != "" {
+			if len(gwIDs) > 1 {
 				what = "primary "
 			}
 			casted := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 		}
 		mapped["gateway_name"] = pgw.Name
-		if network.GetSecondaryGatewayId() != "" {
-			sgw, err = clientSession.Host.Inspect(sgwID, temporal.GetExecutionTimeout())
-			if err != nil {
-				err = fail.FromGRPCStatus(err)
-				casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
-			}
-			mapped["secondary_gateway_name"] = sgw.Name
+	}
+	if len(gwIDs) > 1 {
+		sgw, err = session.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
 		}
-		// Removed entry 'virtual_ip' if empty
-		if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
-			delete(mapped, "virtual_ip")
-		}
+		mapped["secondary_gateway_name"] = sgw.Name
+	}
 
-		return clitools.SuccessResponse(mapped)
-	},
+	// Remove entry 'virtual_ip' if empty
+	if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+		delete(mapped, "virtual_ip")
+	}
+
+	return nil
 }
 
 var networkCreate = &cli.Command{
@@ -183,6 +246,835 @@ var networkCreate = &cli.Command{
 	Aliases:   []string{"new"},
 	Usage:     "Create a network",
 	ArgsUsage: "NETWORKNAME",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "cidr",
+			Aliases: []string{"N"},
+			Value:   "",
+			Usage:   "CIDR of the Network (default: 192.168.0.0/23)",
+		},
+		&cli.BoolFlag{
+			Name:    "empty",
+			Aliases: []string{"no-default-subnet"},
+			Value:   false,
+			Usage:   "Do not create a default Subnet with the same name than the Network",
+		},
+		&cli.BoolFlag{
+			Name:    "keep-on-failure",
+			Aliases: []string{"k"},
+			Usage:   "If used, the resource(s) is(are) not deleted on failure (default: not set)",
+		},
+		&cli.StringFlag{
+			Name:  "os",
+			Value: "Ubuntu 18.04",
+			Usage: "Image name for the gateway",
+		},
+		&cli.StringFlag{
+			Name:  "gwname",
+			Value: "",
+			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
+		},
+		&cli.BoolFlag{
+			Name:  "failover",
+			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
+		},
+		&cli.StringFlag{
+			Name:    "sizing",
+			Aliases: []string{"S"},
+			Usage: `Describe sizing of network gateway in format "<component><operator><value>[,...]" where:
+					<component> can be cpu, cpufreq, gpu, ram, disk
+					<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
+						- = means exactly <value>
+						- ~ means between <value> and 2*<value>
+						- < means strictly lower than <value>
+						- <= means lower or equal to <value>
+						- > means strictly greater than <value>
+						- >= means greater or equal to <value>
+					<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]:"
+						- <cpu> is expecting an int as number of cpu cores, or an interval with minimum and maximum number of cpu cores
+						- <cpufreq> is expecting an int as minimum cpu frequency in MHz
+						- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
+						- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum mmory size
+						- <disk> is expecting an int as system disk size in GB
+					examples:
+						--sizing "cpu <= 4, ram <= 10, disk >= 100"
+						--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
+						--sizing "cpu <= 8, ram ~ 16"
+		`,
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		}
+
+		var (
+			sizing string
+			err    error
+		)
+		if !c.Bool("empty") {
+			sizing, err = constructHostDefinitionStringFromCLI(c, "sizing")
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			}
+		}
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		network, err := clientSession.Network.Create(
+			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
+			c.String("gwname"), c.String("os"), sizing,
+			c.Bool("keep-on-failure"),
+			temporal.GetExecutionTimeout(),
+		)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network", true).Error())))
+		}
+		return clitools.SuccessResponse(network)
+	},
+}
+
+// networkSecurityGroupCommand command
+var networkSecurityCommands = &cli.Command{
+	Name:  securityCmdLabel,
+	Usage: "manages security of networks",
+	Subcommands: []*cli.Command{
+		networkSecurityGroupCommands,
+	},
+}
+
+// networkSecurityGroupCommand command
+var networkSecurityGroupCommands = &cli.Command{
+	Name:    groupCmdLabel,
+	Aliases: []string{"sg"},
+	Usage:   groupCmdLabel + " COMMAND",
+	Subcommands: []*cli.Command{
+		networkSecurityGroupList,
+		networkSecurityGroupCreate,
+		networkSecurityGroupDelete,
+		networkSecurityGroupInspect,
+		networkSecurityGroupBonds,
+		networkSecurityGroupRuleCommand,
+	},
+}
+
+var networkSecurityGroupList = &cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "List available Security Groups (created by SafeScale)",
+	ArgsUsage: "[NETWORKNAME]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all Security Groups on tenant (not only those created by SafeScale)",
+		}},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		var networkRef string
+		switch c.NArg() {
+		case 0:
+			networkRef = ""
+		case 1:
+			networkRef = c.Args().First()
+			if networkRef == "-" {
+				networkRef = ""
+			}
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		list, err := clientSession.SecurityGroup.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+		}
+		if len(list.SecurityGroups) > 0 {
+			var resp []interface{}
+			for _, v := range list.SecurityGroups {
+				item, xerr := reformatSecurityGroup(v, false)
+				if xerr != nil {
+					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+				}
+				resp = append(resp, item)
+			}
+			return clitools.SuccessResponse(resp)
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var networkSecurityGroupInspect = &cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Shows details of Security Group",
+	ArgsUsage: "NETWORKNAME GROUPNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		resp, err := clientSession.SecurityGroup.Inspect(c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		formatted, err := reformatSecurityGroup(resp, false)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+		return clitools.SuccessResponse(formatted)
+	},
+}
+
+func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (map[string]interface{}, error) {
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	jsoned, err := json.Marshal(in)
+	if err != nil {
+		return nil, err
+	}
+
+	out := map[string]interface{}{}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, err
+	}
+
+	switch showRules {
+	case false:
+		delete(out, "rules")
+	case true:
+		if rules, ok := out["rules"].([]interface{}); ok {
+			for _, v := range rules {
+				item := v.(map[string]interface{})
+				direction := item["direction"].(float64)
+				etherType := item["ether_type"].(float64)
+				item["direction_label"] = strings.ToLower(securitygroupruledirection.Enum(direction).String())
+				item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
+			}
+		} else {
+			out["rules"] = nil
+		}
+	}
+
+	return out, nil
+}
+
+var networkSecurityGroupCreate = &cli.Command{
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "create a new Security Group",
+	ArgsUsage: "NETWORKNAME GROUPNAME",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "description",
+			Aliases: []string{"comment,d"},
+			Usage:   "Describe the group",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		req := abstract.SecurityGroup{
+			Name:        c.Args().Get(1),
+			Description: c.String("description"),
+		}
+		resp, err := clientSession.SecurityGroup.Create(c.Args().First(), req, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of security-group", true).Error())))
+		}
+		return clitools.SuccessResponse(resp)
+	},
+}
+
+// networkSecurityGroupClear ...
+var networkSecurityGroupClear = &cli.Command{
+	Name:      "clear",
+	Aliases:   []string{"reset"},
+	Usage:     "deletes all rules of a Security Group",
+	ArgsUsage: "NETWORKNAME GROUPNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var networkSecurityGroupDelete = &cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
+	Usage:     "Remove Security Group",
+	ArgsUsage: "NETWORKNAME GROUPNAME [GROUPNAME ...]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "force",
+			Usage: "Force deletion, removing from hosts and networks if needed",
+			Value: false,
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%v'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var networkSecurityGroupBonds = &cli.Command{
+	Name:      "bonds",
+	Aliases:   []string{"links", "attachments"},
+	Usage:     "List resources Security Group is bound to",
+	ArgsUsage: "NETWORKNAME GROUPNAME",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "kind",
+			Value: "all",
+			Usage: "Narrow to the kind of resource specified; can be 'hosts', 'subnets' or 'all' (default: 'all')",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		kind := strings.ToLower(c.String("kind"))
+
+		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+		}
+		result := map[string]interface{}{}
+		if len(list.Hosts) > 0 {
+			hosts := make([]map[string]interface{}, len(list.Hosts))
+			jsoned, _ := json.Marshal(list.Hosts)
+			err = json.Unmarshal([]byte(jsoned), &hosts)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+			}
+			result["hosts"] = hosts
+		}
+		if len(list.Subnets) > 0 {
+			networks := make([]map[string]interface{}, len(list.Subnets))
+			jsoned, _ := json.Marshal(list.Subnets)
+			err = json.Unmarshal([]byte(jsoned), &networks)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+			}
+			result["networks"] = networks
+		}
+		if len(result) > 0 {
+			return clitools.SuccessResponse(result)
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+const ruleCmdLabel = "rule"
+
+// networkSecurityGroupRuleCommand command
+var networkSecurityGroupRuleCommand = &cli.Command{
+	Name:      ruleCmdLabel,
+	Usage:     "manages rules in Security Groups of Networks",
+	ArgsUsage: "NETWORKNAME|- GROUPNAME",
+	Subcommands: []*cli.Command{
+		networkSecurityGroupRuleAdd,
+		networkSecurityGroupRuleDelete,
+	},
+}
+
+// networkSecurityGroupRuleAdd ...
+// NETWORKNAME is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
+var networkSecurityGroupRuleAdd = &cli.Command{
+	Name:      "add",
+	Aliases:   []string{"new"},
+	Usage:     "add a new rule to a Security Group",
+	ArgsUsage: "NETWORKNAME|- GROUPNAME",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "description",
+			Value: "",
+		},
+		&cli.StringFlag{
+			Name:    "direction",
+			Aliases: []string{"D"},
+			Value:   "",
+			Usage:   "ingress or egress",
+		},
+		&cli.StringFlag{
+			Name:  "protocol",
+			Value: "tcp",
+			Usage: "Protocol",
+		},
+		&cli.StringFlag{
+			Name:    "type",
+			Aliases: []string{"T"},
+			Value:   "ipv4",
+			Usage:   "ipv4 or ipv6",
+		},
+		&cli.IntFlag{
+			Name:  "port-from",
+			Value: 0,
+			Usage: "first port of the rule",
+		},
+		&cli.IntFlag{
+			Name:  "port-to",
+			Value: 0,
+			Usage: "last port of the rule",
+		},
+		&cli.StringSliceFlag{
+			Name:  "cidr",
+			Usage: "source/target of the rule; may be used multiple times",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+		//networkRef := c.Args().First()
+		//if networkRef == "-" {
+		//	networkRef = ""
+		//}
+
+		etherType, xerr := ipversion.Parse(c.String("type"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+		}
+
+		direction, xerr := securitygroupruledirection.Parse(c.String("direction"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		rule := abstract.SecurityGroupRule{
+			Description: c.String("description"),
+			EtherType:   etherType,
+			Direction:   direction,
+			Protocol:    c.String("protocol"),
+			PortFrom:    uint16(c.Int("port-from")),
+			PortTo:      uint16(c.Int("port-to")),
+			IPRanges:    c.StringSlice("cidr"),
+		}
+
+		err := clientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+// networkSecurityGroupRuleDelete ...
+// NETWORKNAME is not really used (Security Group Name are unique across the tenant by design), but kept for command consistency
+var networkSecurityGroupRuleDelete = &cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove", "destroy"},
+	Usage:     "delete a rule identified by id from a Security Group",
+	ArgsUsage: "NETWORKNAME|- GROUPNAME",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "direction",
+			Aliases: []string{"D"},
+			Value:   "",
+			Usage:   "ingress or egress",
+		},
+		&cli.StringFlag{
+			Name:  "protocol",
+			Value: "tcp",
+			Usage: "Protocol",
+		},
+		&cli.StringFlag{
+			Name:    "type",
+			Aliases: []string{"T"},
+			Value:   "ipv4",
+			Usage:   "ipv4 or ipv6",
+		},
+		&cli.IntFlag{
+			Name:  "port-from",
+			Value: 0,
+			Usage: "first port of the rule",
+		},
+		&cli.IntFlag{
+			Name:  "port-to",
+			Value: 0,
+			Usage: "last port of the rule",
+		},
+		&cli.StringSliceFlag{
+			Name:  "cidr",
+			Usage: "source/target of the rule",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		etherType, xerr := ipversion.Parse(c.String("type"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+		}
+
+		direction, xerr := securitygroupruledirection.Parse(c.String("direction"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidOption, xerr.Error()))
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		rule := abstract.SecurityGroupRule{
+			EtherType: etherType,
+			Direction: direction,
+			Protocol:  c.String("protocol"),
+			PortFrom:  uint16(c.Int("port-from")),
+			PortTo:    uint16(c.Int("port-to")),
+			IPRanges:  c.StringSlice("cidr"),
+		}
+		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+const subnetCmdLabel = "subnet"
+
+// SubnetCommands command
+var subnetCommands = &cli.Command{
+	Name:  subnetCmdLabel,
+	Usage: "manages Subnets of Networks",
+	Subcommands: []*cli.Command{
+		subnetCreate,
+		subnetDelete,
+		subnetInspect,
+		subnetList,
+		subnetVIPCommands,
+		subnetSecurityCommands,
+	},
+}
+
+var subnetList = &cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "List existing Subnets (created by SafeScale)",
+	ArgsUsage: "NETWORKNAME",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all Subnets on tenant (not only those created by SafeScale)",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args %q", subnetCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		subnets, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+		}
+		jsoned, err := json.Marshal(subnets)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+		}
+		var result map[string][]map[string]interface{}
+		if err != json.Unmarshal([]byte(jsoned), &result) {
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+		}
+		for _, v := range result["subnets"] {
+			delete(v, "gateway_ids")
+			delete(v, "state")
+		}
+		return clitools.SuccessResponse(result)
+	},
+}
+
+var subnetDelete = &cli.Command{
+	Name:      "delete",
+	Aliases:   []string{"rm", "remove"},
+	Usage:     "delete SUBNETNAME",
+	ArgsUsage: "NETWORKNAME SUBNETNAME [SUBNETNAME ...]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name: "network",
+			//Aliases: []string{"N"},
+			Value: "",
+			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		var subnetList []string
+		subnetList = append(subnetList, c.Args().Tail()...)
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err := clientSession.Subnet.Delete(networkRef, subnetList, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+var subnetInspect = &cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Show details of a subnet",
+	ArgsUsage: "NETWORKNAME SUBNETNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", subnetCmdLabel, c.Command.Name, c.Args())
+
+		switch c.NArg() {
+		case 0:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKNAME."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETNAME."))
+		}
+		networkRef := c.Args().First()
+		if networkRef == "-" {
+			networkRef = ""
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
+		}
+
+		// Convert struct to map using struct to json then json to map
+		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
+		mapped := map[string]interface{}{}
+		jsoned, _ := json.Marshal(subnet)
+		_ = json.Unmarshal(jsoned, &mapped)
+
+		if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+			return err
+		}
+
+		//// Get gateway(s) information (needs the name(s) in the output map)
+		//var (
+		//	pgwID, sgwID string
+		//	pgw, sgw     *protocol.Host
+		//)
+		//gwIDs := subnet.GetGatewayIds()
+		//if len(gwIDs) > 0 {
+		//	pgwID = gwIDs[0]
+		//}
+		//if len(gwIDs) > 1 {
+		//	sgwID = gwIDs[1]
+		//}
+		//
+		//// Added operation status
+		//opState := subnet.State
+		//mapped["state"] = opState.String()
+		//
+		//if pgwID != "" {
+		//	pgw, err = clientSession.Host.Inspect(pgwID, temporal.GetExecutionTimeout())
+		//	if err != nil {
+		//		err = fail.FromGRPCStatus(err)
+		//		var what string
+		//		if sgwID != "" {
+		//			what = "primary "
+		//		}
+		//		casted := fail.Wrap(err, fmt.Sprintf("failed to inspect subnet: cannot inspect %sgateway", what))
+		//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+		//	}
+		//	mapped["gateway_name"] = pgw.Name
+		//}
+		//if sgwID != "" {
+		//	sgw, err = clientSession.Host.Inspect(sgwID, temporal.GetExecutionTimeout())
+		//	if err != nil {
+		//		err = fail.FromGRPCStatus(err)
+		//		casted := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
+		//		return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(casted.Error())))
+		//	}
+		//	mapped["secondary_gateway_name"] = sgw.Name
+		//}
+		//// Remove entry 'virtual_ip' if empty
+		//if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
+		//	delete(mapped, "virtual_ip")
+		//}
+
+		return clitools.SuccessResponse(mapped)
+	},
+}
+
+var subnetCreate = &cli.Command{
+	Name:      "create",
+	Aliases:   []string{"new"},
+	Usage:     "Create a subnet",
+	ArgsUsage: "NETWORKNAME SUBNETNAME",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:    "cidr",
@@ -1821,7 +2713,7 @@ var subnetCreate = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", subnetCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
 		case 0:
@@ -1840,25 +2732,18 @@ var subnetCreate = &cli.Command{
 		if err != nil {
 			return err
 		}
-		subnetDef := protocol.SubnetCreateRequest{
-			Name:     c.Args().First(),
-			Cidr:     c.String("cidr"),
-			Network:  &protocol.Reference{Name: networkRef},
-			FailOver: c.Bool("failover"),
-			Gateway: &protocol.GatewayDefinition{
-				ImageId:        c.String("os"),
-				Name:           c.String("gwname"),
-				SizingAsString: sizing,
-			},
-			KeepOnFailure: c.Bool("keep-on-failure"),
-		}
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		network, err := clientSession.Subnet.Create(&subnetDef, temporal.GetExecutionTimeout())
+		network, err := clientSession.Subnet.Create(
+			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
+			c.String("gwname"), c.String("os"), sizing,
+			c.Bool("keep-on-failure"),
+			temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of subnet", true).Error())))

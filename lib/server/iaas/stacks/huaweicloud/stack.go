@@ -40,7 +40,7 @@ type Stack struct {
 	authOpts stacks.AuthenticationOptions
 	// CfgOpts ...
 	cfgOpts stacks.ConfigurationOptions
-	// Instance of the VPC
+	// Instance of the default Network/VPC
 	vpc *abstract.Network
 }
 
@@ -68,7 +68,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			identity, innerErr = gcos.NewIdentityV3(stack.Driver, gophercloud.EndpointOpts{})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -86,10 +86,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 		func() error {
 			allPages, innerErr := projects.List(identity, listOpts).AllPages()
 			if innerErr != nil {
-				return openstack.NormalizeError(innerErr)
+				return normalizeError(innerErr)
 			}
 			allProjects, innerErr = projects.ExtractProjects(allPages)
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -119,49 +119,49 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	return &s, nil
 }
 
-// initVPC initializes the VPC if one is defined and it doesn't exist
+// initVPC initializes the instance of the Network/VPC if one is defined in tenant
 func (s *Stack) initVPC() fail.Error {
-	if s.authOpts.VPCName != "" {
-		an, xerr := s.InspectNetworkByName(s.authOpts.VPCName)
+	if s.cfgOpts.DefaultNetworkName != "" {
+		an, xerr := s.InspectNetworkByName(s.cfgOpts.DefaultNetworkName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				//// VPC not found, create it
+				//req := abstract.NetworkRequest{
+				//	Name: s.authOpts.VPCName,
+				//	CIDR: s.authOpts.VPCCIDR,
+				//}
+				//an, xerr = s.CreateNetwork(req)
+				//if xerr != nil {
+				//	return fail.NewError("failed to initialize VPC '%s'", s.authOpts.VPCName)
+				//}
+				//s.vpc = an
 			default:
 				return xerr
 			}
-		}
-
-		// VPC not found, create it
-		req := abstract.NetworkRequest{
-			Name: s.authOpts.VPCName,
-			CIDR: s.authOpts.VPCCIDR,
-		}
-		an, xerr = s.CreateNetwork(req)
-		if xerr != nil {
-			return fail.NewError("failed to initialize VPC '%s'", s.authOpts.VPCName)
 		}
 		s.vpc = an
 	}
 	return nil
 }
 
-// findVPC returns the ID about the VPC
-func (s *Stack) findVPCID() (*string, fail.Error) {
-	var router *openstack.Router
-	found := false
-	routers, xerr := s.Stack.ListRouters()
-	if xerr != nil {
-		return nil, xerr
-	}
-	for _, r := range routers {
-		if r.Name == s.authOpts.VPCName {
-			found = true
-			router = &r
-			break
-		}
-	}
-	if found && router != nil {
-		return &router.ID, nil
-	}
-	return nil, nil
-}
+//// findVPC returns the ID about the VPC
+//func (s *Stack) findVPCID() (*string, fail.Error) {
+//	var router *openstack.Router
+//	found := false
+//	routers, xerr := s.Stack.ListRouters()
+//	if xerr != nil {
+//		return nil, xerr
+//	}
+//	for _, r := range routers {
+//		if r.Name == s.cfgOpts.DefaultNetworkName {
+//			found = true
+//			router = &r
+//			break
+//		}
+//	}
+//	if found && router != nil {
+//		return &router.ID, nil
+//	}
+//	return nil, nil
+//}

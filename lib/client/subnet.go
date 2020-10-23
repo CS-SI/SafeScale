@@ -116,7 +116,13 @@ func (s subnet) Inspect(networkRef, name string, timeout time.Duration) (*protoc
 // Create calls the gRPC server to create a network
 // FIXME: do not use protocol as parameter to client method
 // FIXME: do not use protocol as response
-func (s subnet) Create(def *protocol.SubnetCreateRequest, timeout time.Duration) (*protocol.Subnet, error) {
+func (s subnet) Create(
+	networkRef, name, cidr string, failover bool,
+	gwname, os, sizing string,
+	keepOnFailure bool,
+	timeout time.Duration,
+) (*protocol.Subnet, error) {
+
 	s.session.Connect()
 	defer s.session.Disconnect()
 	service := protocol.NewSubnetServiceClient(s.session.connection)
@@ -125,6 +131,18 @@ func (s subnet) Create(def *protocol.SubnetCreateRequest, timeout time.Duration)
 		return nil, xerr
 	}
 
+	def := &protocol.SubnetCreateRequest{
+		Name:     name,
+		Cidr:     cidr,
+		Network:  &protocol.Reference{Name: networkRef},
+		FailOver: failover,
+		Gateway: &protocol.GatewayDefinition{
+			ImageId:        os,
+			Name:           gwname,
+			SizingAsString: sizing,
+		},
+		KeepOnFailure: keepOnFailure,
+	}
 	return service.Create(ctx, def)
 }
 

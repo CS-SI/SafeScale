@@ -28,15 +28,15 @@ import (
 //       Create a new version instead with needed supplemental fields
 type HostSecurityGroups struct {
 	DefaultID string                        `json:"default_id,omitempty"` // contains the ID of the Security Group considered as default
-	ByID      map[string]*SecurityGroupBond `json:"by_id,omitempty"`      // map of security groups by IDs; if value is true, security group is currently applied
-	ByName    map[string]*SecurityGroupBond `json:"by_name,omitempty"`    // map of security groups by Names; if value is true, security group is currently applied
+	ByID      map[string]*SecurityGroupBond `json:"by_id,omitempty"`      // map of security groups by IDs
+	ByName    map[string]string             `json:"by_name,omitempty"`    // map of security group IDs by Names
 }
 
 // NewHostSecurityGroups ...
 func NewHostSecurityGroups() *HostSecurityGroups {
 	return &HostSecurityGroups{
 		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]*SecurityGroupBond{},
+		ByName: map[string]string{},
 	}
 }
 
@@ -44,7 +44,7 @@ func NewHostSecurityGroups() *HostSecurityGroups {
 func (hsg *HostSecurityGroups) Reset() {
 	*hsg = HostSecurityGroups{
 		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]*SecurityGroupBond{},
+		ByName: map[string]string{},
 	}
 }
 
@@ -61,7 +61,7 @@ func (hsg *HostSecurityGroups) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByID {
 		hsg.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	hsg.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
+	hsg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		hsg.ByName[k] = v
 	}

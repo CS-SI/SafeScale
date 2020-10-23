@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// HostSizingRequirements represents host sizing requirements to fulfil
+// HostSizingRequirements describes host sizing requirements to fulfil
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
@@ -33,8 +33,8 @@ type HostSizingRequirements struct {
 	MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 	MinGPU      int     `json:"min_gpu,omitempty"`
-	MinFreq     float32 `json:"min_freq,omitempty"`
-	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
+	MinCPUFreq  float32 `json:"min_freq,omitempty"`
+	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept host that could be removed without notice (AWS proposes such kind of server knowned as SPOT)
 }
 
 // NewHostSizingRequirements ...
@@ -60,11 +60,6 @@ func NewHostEffectiveSizing() *HostEffectiveSizing {
 	return &HostEffectiveSizing{}
 }
 
-// Reset ...
-func (hs *HostEffectiveSizing) Reset() {
-	*hs = HostEffectiveSizing{}
-}
-
 // HostSizing contains sizing information about the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -87,6 +82,7 @@ func NewHostSizing() *HostSizing {
 func (hs *HostSizing) Reset() {
 	*hs = HostSizing{
 		RequestedSize: NewHostSizingRequirements(),
+		Template:      "",
 		AllocatedSize: NewHostEffectiveSizing(),
 	}
 }
@@ -108,5 +104,5 @@ func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV1, NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", string(hostproperty.SizingV1), NewHostSizing())
 }
