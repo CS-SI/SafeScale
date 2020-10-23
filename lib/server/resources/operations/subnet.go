@@ -210,8 +210,7 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// A Network can be missing if it's the default Network, so continue
-				rn = nil
+				// Network metadata can be missing if it's the default Network, so continue
 			default:
 				return nil, xerr
 			}
@@ -266,13 +265,15 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		}
 	}
 
-	rs, xerr = NewSubnet(svc)
-	if xerr != nil {
-		return nullSubnet(), xerr
+	if subnetID != "" {
+		if rs, xerr = NewSubnet(svc); xerr == nil {
+			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			xerr = rs.ReadByID(task, subnetID)
+		}
+	} else {
+		xerr = fail.NotFoundError()
 	}
-
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rs.ReadByID(task, subnetID); xerr != nil {
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -310,52 +311,13 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer fail.OnPanic(&xerr)
 
 	// Check if subnet already exists and is managed by SafeScale
-	svc := rs.GetService()
-	if found, xerr := lookupSubnet(task, svc, req.NetworkID, req.Name); xerr == nil && found {
-		return fail.DuplicateError("subnet '%s' already exists", req.Name)
-	}
-
-	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	if _, xerr = svc.InspectSubnetByName(req.NetworkID, req.Name); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-		case *fail.ErrInvalidRequest, *fail.ErrTimeout:
-			return xerr
-		default:
-			return xerr
-		}
-	} else {
-		return fail.DuplicateError("subnet '%s' already exists (not managed by SafeScale)", req.Name)
-	}
-
-	// Verify the network exists and make sure req.NetworkID field is an ID
-	var an *abstract.Network
-	rn, xerr := LoadNetwork(task, svc, req.NetworkID)
-	if xerr == nil {
-		xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			var ok bool
-			an, ok = clonable.(*abstract.Network)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Networking' expected, %s' provided", reflect.TypeOf(clonable).String())
-			}
-			return nil
-		})
-	} else {
-		rn = nil
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			if !svc.HasDefaultNetwork() {
-				return xerr
-			}
-			an, xerr = svc.GetDefaultNetwork()
-		}
-	}
-	if xerr != nil {
+	if xerr = rs.checkUnicity(task, req); xerr != nil {
 		return xerr
 	}
-	req.NetworkID = an.ID
-	if len(req.DNSServers) == 0 {
-		req.DNSServers = an.DNSServers
+
+	rn, an, xerr := rs.validateNetwork(task, &req)
+	if xerr != nil {
+		return xerr
 	}
 
 	// Verify the IPRanges is not routable
@@ -364,21 +326,22 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	var (
-		cancel                       func(*fail.Error)
+		gwSGCancel, internalSGCancel func(*fail.Error)
 		subnetGWSG, subnetInternalSG resources.SecurityGroup
 	)
 
-	if subnetGWSG, cancel, xerr = rs.createGWSecurityGroup(task, req, *an); xerr != nil {
+	if subnetGWSG, gwSGCancel, xerr = rs.createGWSecurityGroup(task, req, *an); xerr != nil {
 		return xerr
 	}
-	defer cancel(&xerr)
+	defer gwSGCancel(&xerr)
 
-	if subnetInternalSG, cancel, xerr = rs.createInternalSecurityGroup(task, req, *an); xerr != nil {
+	if subnetInternalSG, internalSGCancel, xerr = rs.createInternalSecurityGroup(task, req, *an); xerr != nil {
 		return xerr
 	}
-	defer cancel(&xerr)
+	defer internalSGCancel(&xerr)
 
 	// Create the subnet
+	svc := rs.GetService()
 	as, xerr := svc.CreateSubnet(req)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -412,8 +375,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}()
 
-	xerr = subnetGWSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
-	if xerr != nil {
+	if xerr = subnetGWSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
 		return xerr
 	}
 
@@ -425,8 +387,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}()
 
-	xerr = subnetInternalSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault)
-	if xerr != nil {
+	if xerr = subnetInternalSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); xerr != nil {
 		return xerr
 	}
 
@@ -535,7 +496,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 					})
 				})
 				if derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to detach Subnet from NetworkID"))
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to detach Subnet from Network"))
 				}
 			}
 		}()
@@ -734,14 +695,14 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
 	}
 
-	// Update metadata of subnet object
+	// Update metadata of Subnet object
 	xerr = rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		// as.GatewayID = primaryGateway.GetID()
+		// Updates userdatas to use later
 		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.getPrivateIP(task)
 		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.getPublicIP(task)
 		primaryUserdata.IsPrimaryGateway = true
@@ -763,13 +724,19 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			secondaryUserdata.IsPrimaryGateway = false
 		}
 
+		// update gateway ID(s) of Subnet
+		as.GatewayIDs = append(as.GatewayIDs, primaryUserdata.PrimaryGatewayPrivateIP)
+		if secondaryGateway != nil {
+			as.GatewayIDs = append(as.GatewayIDs, primaryUserdata.SecondaryGatewayPrivateIP)
+		}
+
 		return nil
 	})
 	if xerr != nil {
 		return xerr
 	}
 
-	// As hosts are maked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
+	// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
 	if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
 		return xerr
 	}
@@ -854,31 +821,33 @@ func (rs subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Netw
 	if xerr != nil {
 		return xerr
 	}
-
 	var (
-		bitShift uint8
-		i, limit uint
 		newIPNet net.IPNet
+		found    bool
 	)
 	mask, _ := networkDesc.Mask.Size()
-	if mask >= 24 {
-		bitShift = 1
-	} else {
-		bitShift = 24 - uint8(mask)
-	}
-	limit = 1 << bitShift
+	//if mask >= 24 {
+	//	bitShift = 1
+	//} else {
+	//	bitShift = 24 - uint8(mask)
+	//}
+	maxBitShift := uint(30 - mask)
 
-	for i = uint(1); i < limit; i++ {
-		newIPNet, xerr = netutils.NthIncludedSubnet(*networkDesc, bitShift, i)
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to choose a CIDR for the subnet")
-		}
-		if wouldOverlap(subnets, newIPNet) == nil {
-			break
+	for bs := uint(1); bs <= maxBitShift && !found; bs++ {
+		limit := uint(1 << maxBitShift)
+		for i := uint(1); i <= limit; i++ {
+			newIPNet, xerr = netutils.NthIncludedSubnet(*networkDesc, uint8(bs), i)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to choose a CIDR for the subnet")
+			}
+			if wouldOverlap(subnets, newIPNet) == nil {
+				found = true
+				break
+			}
 		}
 	}
-	if i >= limit {
-		return fail.OverflowError(nil, limit-1, "failed to find a free available CIDR ")
+	if !found {
+		return fail.OverflowError(nil, maxBitShift, "failed to find a free available CIDR ")
 	}
 
 	req.CIDR = newIPNet.String()
@@ -896,6 +865,75 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 		}
 	}
 	return nil
+}
+
+// checkUnicity checks if the Subnet name is not already used
+func (rs subnet) checkUnicity(task concurrency.Task, req abstract.SubnetRequest) fail.Error {
+	svc := rs.GetService()
+	if found, xerr := lookupSubnet(task, svc, req.NetworkID, req.Name); xerr == nil && found {
+		return fail.DuplicateError("subnet '%s' already exists", req.Name)
+	}
+
+	// Verify if the subnet already exist and in this case is not managed by SafeScale
+	if _, xerr := svc.InspectSubnetByName(req.NetworkID, req.Name); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		//case *fail.ErrInvalidRequest, *fail.ErrTimeout:
+		//	return xerr
+		default:
+			return xerr
+		}
+	} else {
+		return fail.DuplicateError("subnet '%s' already exists (not managed by SafeScale)", req.Name)
+	}
+
+	return nil
+}
+
+// validateNetwork verifies the Network exists and make sure req.NetworkID field is an ID
+func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
+	var an *abstract.Network
+	svc := rs.GetService()
+	rn, xerr := LoadNetwork(task, svc, req.NetworkID)
+	if xerr == nil {
+		xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			var ok bool
+			an, ok = clonable.(*abstract.Network)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Networking' expected, %s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// check the network exists on provider side
+			if _, innerXErr := svc.InspectNetwork(an.ID); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// TODO: automatic metadata cleanup ?
+					return fail.InconsistentError("inconsistent metadata detected for Network '%s': it does not exist anymore on provider side", an.Name)
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		})
+	} else {
+		rn = nil
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			if !svc.HasDefaultNetwork() {
+				return nil, nil, xerr
+			}
+			an, xerr = svc.GetDefaultNetwork()
+		}
+	}
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+	req.NetworkID = an.ID
+	if len(req.DNSServers) == 0 {
+		req.DNSServers = an.DNSServers
+	}
+
+	return rn, an, nil
 }
 
 // createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
@@ -1241,9 +1279,9 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("operations.subnet")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
 	rs.SafeLock(task)
@@ -1310,7 +1348,8 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return rs.unbindSecurityGroups(task, ssgV1)
+			innerXErr := rs.unbindSecurityGroups(task, ssgV1)
+			return innerXErr
 		})
 		if innerXErr != nil {
 			return innerXErr
@@ -1318,48 +1357,51 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 
 		// finally delete subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		waitMore := false
-		innerXErr = svc.DeleteSubnet(as.ID)
-		if innerXErr != nil {
+		//waitMore := false
+		if innerXErr = svc.DeleteSubnet(as.ID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
-				logrus.Warnf("Subnet not found on provider side, cleaning up metadata.")
-				return innerXErr
-			case *fail.ErrTimeout:
-				logrus.Error("Cannot delete subnet due to a timeout")
-				waitMore = true
+				logrus.Warnf("Subnet not found on provider side, cleaning up metadata")
+			//case *fail.ErrTimeout:
+			//	logrus.Error("Cannot delete Subnet due to a timeout")
+			//	waitMore = true
 			default:
-				logrus.Errorf("Cannot delete subnet, other reason: %s", innerXErr.Error())
+				return innerXErr
 			}
 		}
-		if waitMore {
-			xerrWaitMore := retry.WhileUnsuccessfulDelay1Second(
-				func() error {
-					recNet, recErr := svc.InspectSubnet(as.ID)
-					if recNet != nil {
-						return fmt.Errorf("still there")
+		//if waitMore {
+		innerXErr = retry.WhileUnsuccessfulDelay1Second(
+			func() error {
+				if _, recErr := svc.InspectSubnet(as.ID); recErr != nil {
+					switch recErr.(type) {
+					case *fail.ErrNotFound:
+						// Subnet not found, good
+					default:
+						return recErr
 					}
-					if _, ok := recErr.(*fail.ErrNotFound); ok {
-						return nil
-					}
-					return fail.Wrap(recErr, "another kind of error")
-				},
-				temporal.GetContextTimeout(),
-			)
-			if xerrWaitMore != nil {
-				if innerXErr == nil {
-					innerXErr = xerrWaitMore
-				} else {
-					_ = innerXErr.AddConsequence(xerrWaitMore)
 				}
-			}
+				return nil
+			},
+			temporal.GetContextTimeout(),
+		)
+		if innerXErr != nil {
+			return innerXErr
 		}
-		logrus.Debugf("Subnet '%s' successfully deleted.", as.Name)
+		//}
+		tracer.Trace("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups
+		var (
+			rsg    resources.SecurityGroup
+			sgName string
+		)
 		if as.GWSecurityGroupID != "" {
-			rsg, innerXErr := LoadSecurityGroup(task, svc, as.GWSecurityGroupID)
+			if rsg, innerXErr = LoadSecurityGroup(task, svc, as.GWSecurityGroupID); innerXErr == nil {
+				sgName = rsg.GetName()
+				logrus.Debugf("Deleting Security Group '%s'...", sgName)
+				innerXErr = rsg.Delete(task)
+			}
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1367,17 +1409,15 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 				default:
 					return innerXErr
 				}
-			} else {
-				sgName := rsg.GetName()
-				logrus.Debugf("Deleting Security Group %s...", sgName)
-				if innerXErr = rsg.Delete(task); innerXErr != nil {
-					return innerXErr
-				}
-				logrus.Debugf("Security Group %s successfully deleted.", sgName)
 			}
+			logrus.Debugf("Security Group '%s' successfully deleted.", sgName)
 		}
 		if as.InternalSecurityGroupID != "" {
-			rsg, innerXErr := LoadSecurityGroup(task, svc, as.InternalSecurityGroupID)
+			if rsg, innerXErr = LoadSecurityGroup(task, svc, as.InternalSecurityGroupID); innerXErr == nil {
+				sgName = rsg.GetName()
+				logrus.Debugf("Deleting Security Group '%s'...", sgName)
+				innerXErr = rsg.Delete(task)
+			}
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1385,25 +1425,18 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 				default:
 					return innerXErr
 				}
-			} else {
-				sgName := rsg.GetName()
-				logrus.Debugf("Deleting Security Group %s...", sgName)
-				if innerXErr = rsg.Delete(task); innerXErr != nil {
-					return innerXErr
-				}
-				logrus.Debugf("Security Group %s successfully deleted.", sgName)
 			}
+			logrus.Debugf("Security Group '%s' successfully deleted.", sgName)
 		}
 
-		// Remove subnet reference from owner NetworkID
-		// attach subnet to network
+		// Remove subnet reference from owner Network
 		rn, innerXErr := LoadNetwork(task, svc, as.Network)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// no Network, consider the Network metadata update as a success (this may be default Network)
 			default:
-				return fail.Wrap(innerXErr, "failed to query parent NetworkID of Subnet")
+				return fail.Wrap(innerXErr, "failed to query parent Network of Subnet")
 			}
 		} else {
 			return rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1489,16 +1522,20 @@ func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet)
 }
 
 // unbindSecurityGroups makes sure the security groups bound to subnet are unbound
-func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.SubnetSecurityGroups) fail.Error {
+func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+	var rsg resources.SecurityGroup
 	svc := rs.GetService()
 	for k, v := range sgs.ByName {
-		rsg, innerXErr := LoadSecurityGroup(task, svc, v)
-		if innerXErr != nil {
-			return innerXErr
+		if rsg, xerr = LoadSecurityGroup(task, svc, v); xerr == nil {
+			xerr = rsg.UnbindFromSubnet(task, rs)
 		}
-
-		if innerXErr = rsg.UnbindFromSubnet(task, rs); innerXErr != nil {
-			return innerXErr
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// consider a Security Group not found as a successful unbind
+			default:
+				return xerr
+			}
 		}
 
 		delete(sgs.ByID, v)
@@ -1950,7 +1987,7 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 	})
 }
 
-// InspectNetwork returns the resources.Network instance of parent NetworkID of the Subnet
+// InspectNetwork returns the resources.Network instance of parent Network of the Subnet
 func (rs *subnet) InspectNetwork(task concurrency.Task) (resources.Network, fail.Error) {
 	if rs.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -1969,7 +2006,7 @@ func (rs *subnet) InspectNetwork(task concurrency.Task) (resources.Network, fail
 		return nil, xerr
 	}
 	if networkID == "" {
-		return nil, fail.InconsistentError("metadata of Subnet does not reference a parent NetworkID")
+		return nil, fail.InconsistentError("metadata of Subnet does not reference a parent Network")
 	}
 
 	return LoadNetwork(task, rs.GetService(), networkID)

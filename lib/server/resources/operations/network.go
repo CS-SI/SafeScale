@@ -99,7 +99,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		case *fail.ErrAlteredNothing:
 			// ignore
 		default:
-			return nil, fail.Wrap(xerr, "failed to upgrade Networking properties")
+			return nullNetwork(), fail.Wrap(xerr, "failed to upgrade Networking properties")
 		}
 	}
 	return rn, nil
@@ -191,12 +191,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	logrus.Debugf("Creating network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 	an, xerr := svc.CreateNetwork(req)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrInvalidRequest, *fail.ErrTimeout:
-			return xerr
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	//// Starting from here, delete subnet if exiting with error
@@ -498,14 +493,14 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 				}
 			}
 			if !found {
-				return fail.InvalidRequestError("failed to delete NetworkID '%s', 1 subnet still inside", rn.GetName())
+				return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", rn.GetName())
 			}
 		default:
-			return fail.InvalidRequestError("failed to delete NetworkID '%s', %d subnets still inside", rn.GetName(), subnetsLen)
+			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", rn.GetName(), subnetsLen)
 		}
 
 		waitMore := false
-		// delete subnet, with tolerance
+		// delete Network, with tolerance
 		innerXErr = svc.DeleteNetwork(an.ID)
 		if innerXErr != nil {
 			switch innerXErr.(type) {

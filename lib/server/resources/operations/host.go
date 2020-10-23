@@ -114,7 +114,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	if xerr = rh.Read(task, ref); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff
+			// rewrite NotFoundError, user does not bother about metadata message
 			return nullHost(), fail.NotFoundError("failed to find Host '%s'", ref)
 		default:
 			return nullHost(), xerr

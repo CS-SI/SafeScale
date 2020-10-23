@@ -62,7 +62,9 @@ type SecurityGroup interface {
 	ForceDelete(task concurrency.Task) fail.Error                                                                     // deletes a security group unconditionally
 	Reset(concurrency.Task) fail.Error                                                                                // resets the rules of the security group from the ones registered in metadata
 	ToProtocol(concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                                        // converts a SecurityGroup to equivalent gRPC message
-	UnbindFromHost(concurrency.Task, Host) fail.Error                                                                 // unbinds a security group from host
-	UnbindFromSubnet(concurrency.Task, Subnet) fail.Error                                                             // unbinds a security group from network
+	UnbindFromHost(concurrency.Task, Host) fail.Error                                                                 // unbinds a Security Group from Host
+	UnbindFromHostByReference(concurrency.Task, string) fail.Error                                                    // unbinds a Security Group from Host
+	UnbindFromSubnet(concurrency.Task, Subnet) fail.Error                                                             // unbinds a Security Group from Subnet
+	UnbindFromSubnetByReference(concurrency.Task, string) fail.Error                                                  // unbinds a Security group from a Subnet identified by reference (ID or name)
 	//Delete(task concurrency.Task) fail.Error // Delete already defined in Metadata...
 }

@@ -40,11 +40,6 @@ const (
 	defaultCIDR = "192.168.0.0/23"
 )
 
-// safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
-// safescale network list
-// safescale network delete net1
-// safescale network inspect net1
-
 // NetworkListener network service server grpc
 type NetworkListener struct{}
 
@@ -86,29 +81,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	tracer := debug.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-	//var (
-	//	sizing *abstract.HostSizingRequirements
-	//)
-	//if in.Gateway != nil {
-	//	if in.Gateway.SizingAsString != "" {
-	//		sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
-	//		if xerr != nil {
-	//			return nil, xerr
-	//		}
-	//	} else if in.Gateway.Sizing != nil {
-	//		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Gateway.Sizing)
-	//	}
-	//}
-	//if sizing == nil {
-	//	sizing = &abstract.HostSizingRequirements{MinGPU: -1}
-	//}
-	//sizing.Image = in.Gateway.GetImageId()
-
-	//handler := handlers.NewNetworkHandler(job)
-	//network, xerr := handler.Create(networkName, in.GetCidr(), in.GetDnsServers(), in.KeepOnFailure)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
 
 	cidr := in.GetCidr()
 	if cidr == "" {
@@ -133,7 +105,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if err != nil && !in.GetKeepOnFailure() {
 			derr := rn.Delete(task)
 			if derr != nil {
-				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete NetworkID '%s'", in.GetName()))
+				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}
 	}()
@@ -142,10 +114,10 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		_, networkNet, _ := net.ParseCIDR(cidr)
 		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from NetworkID CIDR '%s'", in.GetCidr())
+			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", in.GetCidr())
 		}
 
-		logrus.Debugf("Creating default Subnet of NetworkID '%s' with CIDR '%s'", req.Name, subnetNet.String())
+		logrus.Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", req.Name, subnetNet.String())
 
 		rs, xerr := subnetfactory.New(svc)
 		if xerr != nil {
@@ -163,7 +135,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		}
 	}
 
-	tracer.Trace("NetworkID '%s' successfully created.", networkName)
+	tracer.Trace("Network '%s' successfully created.", networkName)
 	return rn.ToProtocol(task)
 }
 
@@ -201,21 +173,20 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewNetworkHandler(job)
-	//networks, err := handler.List(in.GetAll())
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	networks, xerr := networkfactory.List(task, svc)
+	var list []*abstract.Network
+	if in.GetAll() {
+		list, xerr = svc.ListNetworks()
+	} else {
+		list, xerr = networkfactory.List(task, svc)
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// Build response mapping abstract.NetworkID to protocol.NetworkID
+	// Build response mapping abstract.Network to protocol.Network
 	var pbnetworks []*protocol.Network
-	for _, network := range networks {
-		pbnetworks = append(pbnetworks, converters.NetworkFromAbstractToProtocol(network))
+	for _, v := range list {
+		pbnetworks = append(pbnetworks, converters.NetworkFromAbstractToProtocol(v))
 	}
 	rv := &protocol.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -306,13 +277,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewNetworkHandler(job)
-	//_, xerr = job.GetTask().Run(
-	//	func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	//		return nil, handler.Delete(ref)
-	//	},
-	//	nil,
-	//)
 	rn, xerr := networkfactory.Load(task, svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -336,7 +300,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 
 			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil {
 				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == an.Name {
-					return empty, fail.InvalidRequestError("cannot delete default NetworkID %s because its existence is not controlled by SafeScale", refLabel)
+					return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
 				}
 			}
 			return empty, fail.InvalidRequestError("%s is not managed by SafeScale", refLabel)
@@ -348,6 +312,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, xerr
 	}
 
-	tracer.Trace("NetworkID %s successfully deleted.", refLabel)
+	tracer.Trace("Network %s successfully deleted.", refLabel)
 	return empty, nil
 }

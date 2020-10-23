@@ -35,7 +35,7 @@ func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) (
 		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
 	}
 
-	return operations.ListSubnets(svc, networkID, all)
+	return operations.ListSubnets(task, svc, networkID, all)
 }
 
 // New creates an instance of resources.Subnet
