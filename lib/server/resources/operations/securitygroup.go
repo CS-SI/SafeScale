@@ -494,7 +494,7 @@ func (sg *securityGroup) unbindFromHosts(task concurrency.Task, in *propertiesv1
 
 	// Resets the bonds on hosts
 	in.ByID = map[string]*propertiesv1.SecurityGroupBond{}
-	in.ByName = map[string]*propertiesv1.SecurityGroupBond{}
+	in.ByName = map[string]string{}
 	return nil
 }
 
@@ -530,7 +530,7 @@ func (sg *securityGroup) unbindFromSubnets(task concurrency.Task, in *properties
 
 	// Remove the bonds on subnets
 	in.ByID = map[string]*propertiesv1.SecurityGroupBond{}
-	in.ByName = map[string]*propertiesv1.SecurityGroupBond{}
+	in.ByName = map[string]string{}
 	return nil
 }
 
@@ -764,12 +764,11 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 					Name: hostName,
 				}
 				sghV1.ByID[hostID] = item
-				sghV1.ByName[hostName] = item
+				sghV1.ByName[hostName] = hostID
 			}
 
 			// update the state
 			sghV1.ByID[hostID].Disabled = disable
-			sghV1.ByName[hostName].Disabled = disable
 
 			switch enable {
 			case resources.SecurityGroupEnable:
@@ -831,6 +830,53 @@ func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host
 	})
 }
 
+// UnbindFromHostByReference unbinds the security group from an host identified by reference (id or name)
+func (sg *securityGroup) UnbindFromHostByReference(task concurrency.Task, hostRef string) fail.Error {
+	if sg.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if hostRef == "" {
+		return fail.InvalidParameterError("hostRef", "cannot be empty string")
+	}
+
+	return sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+			if !ok {
+				return fail.InconsistentError("'*securitygroupproperty.HostsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			var (
+				b                *propertiesv1.SecurityGroupBond
+				hostID, hostName string
+			)
+			if b, ok = sgphV1.ByID[hostRef]; ok {
+				hostID = hostRef
+				hostName = b.Name
+			} else if hostID, _ = sgphV1.ByName[hostRef]; ok {
+				hostName = hostRef
+			}
+			if hostID != "" {
+
+				// Unbind security group on provider side; if not found, consider as a success
+				if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						return nil
+					default:
+						return innerXErr
+					}
+				}
+			}
+
+			// updates security group properties
+			delete(sgphV1.ByID, hostID)
+			delete(sgphV1.ByName, hostName)
+			return nil
+		})
+	})
+}
+
 // BindToSubnet binds the security group to a host
 func (sg *securityGroup) BindToSubnet(task concurrency.Task, rs resources.Subnet, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	if sg.IsNull() {
@@ -878,12 +924,11 @@ func (sg *securityGroup) BindToSubnet(task concurrency.Task, rs resources.Subnet
 					Name: subnetName,
 				}
 				sgsV1.ByID[subnetID] = item
-				sgsV1.ByName[subnetName] = item
+				sgsV1.ByName[subnetName] = subnetID
 			}
 
 			// updates security group properties
 			sgsV1.ByID[subnetID].Disabled = disable
-			sgsV1.ByName[subnetName].Disabled = disable
 			return nil
 		})
 	})
@@ -954,12 +999,63 @@ func (sg *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Su
 			}
 			innerXErr := sg.GetService().UnbindSecurityGroupFromSubnet(sg.GetID(), rs.GetID())
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+				// consider a Security Group not found as a successful unbind, and continue to update metadata
+				default:
+					return innerXErr
+				}
 			}
 
 			// updates security group metadata
 			delete(sgsV1.ByID, rs.GetID())
 			delete(sgsV1.ByName, rs.GetName())
+			return nil
+		})
+	})
+}
+
+// UnbindFromSubnet unbinds the security group from a subnet
+func (sg *securityGroup) UnbindFromSubnetByReference(task concurrency.Task, subnetRef string) fail.Error {
+	if sg.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if subnetRef == "" {
+		return fail.InvalidParameterError("rs", "cannot be empty string")
+	}
+
+	return sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
+			if !ok {
+				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			var (
+				b                    *propertiesv1.SecurityGroupBond
+				subnetID, subnetName string
+			)
+			if b, ok = sgsV1.ByID[subnetRef]; ok {
+				subnetID = subnetRef
+				subnetName = b.Name
+			} else if subnetID, _ = sgsV1.ByName[subnetRef]; ok {
+				subnetName = subnetRef
+			}
+			if subnetID != "" {
+				innerXErr := sg.GetService().UnbindSecurityGroupFromSubnet(sg.GetID(), subnetID)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// consider a Security Group not found as a successful unbind, and continue to update metadata
+					default:
+						return innerXErr
+					}
+				}
+			}
+
+			// updates security group metadata
+			delete(sgsV1.ByID, subnetID)
+			delete(sgsV1.ByName, subnetName)
 			return nil
 		})
 	})

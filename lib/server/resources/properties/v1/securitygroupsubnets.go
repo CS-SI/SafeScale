@@ -28,15 +28,15 @@ import (
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupSubnets struct {
 	DefaultFor string                        `json:"default_for,omitempty"` // contains the ID of the subnet for which the Security Group is default
-	ByID       map[string]*SecurityGroupBond `json:"by_id"`                 // contains the status of a security group (true=active, false=suspended) of subnets using it, indexed on network ID
-	ByName     map[string]*SecurityGroupBond `json:"by_name"`               // contains the status of a security group (true=active, false=suspended) of subnets using it, indexed on network Name
+	ByID       map[string]*SecurityGroupBond `json:"by_id"`                 // contains the bonds of a Security Group with Subnets using it, indexed on Subnets' ID
+	ByName     map[string]string             `json:"by_name"`               // contains the Subnets' ID indexed on Subnets' Name
 }
 
 // NewSecurityGroupSubnets ...
 func NewSecurityGroupSubnets() *SecurityGroupSubnets {
 	return &SecurityGroupSubnets{
 		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]*SecurityGroupBond{},
+		ByName: map[string]string{},
 	}
 }
 
@@ -44,7 +44,7 @@ func NewSecurityGroupSubnets() *SecurityGroupSubnets {
 func (sgn *SecurityGroupSubnets) Reset() *SecurityGroupSubnets {
 	if sgn != nil {
 		sgn.ByID = map[string]*SecurityGroupBond{}
-		sgn.ByName = map[string]*SecurityGroupBond{}
+		sgn.ByName = map[string]string{}
 		return sgn
 	}
 	return NewSecurityGroupSubnets()
@@ -62,9 +62,9 @@ func (sgn *SecurityGroupSubnets) Replace(p data.Clonable) data.Clonable {
 	for k, v := range src.ByID {
 		sgn.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	sgn.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
+	sgn.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
-		sgn.ByName[k] = v.Clone().(*SecurityGroupBond)
+		sgn.ByName[k] = v
 	}
 	return sgn
 }

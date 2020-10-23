@@ -48,7 +48,8 @@ type SubnetListener struct{}
 // Create a new subnet
 func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create subnet")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot create Subnet")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -126,7 +127,8 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 // List existing networks
 func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list subnets")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot list Subnets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -195,7 +197,9 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 // Inspect returns infos on a subnet
 func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspectRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect Subnet")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -210,7 +214,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -241,6 +245,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 // Delete a/many subnet/s
 func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitLogError(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Subnet")
 
 	empty = &googleprotobuf.Empty{}
@@ -280,38 +285,28 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewSubnetHandler(job)
-	//_, xerr = job.GetTask().Run(
-	//	func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	//		return nil, handler.Delete(networkRef, subnetRef)
-	//	},
-	//	nil,
-	//)
-	//if xerr != nil {
-	//	return empty, xerr
-	//}
-
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
-	if xerr != nil {
-		return empty, xerr
+	var rs resources.Subnet
+	if rs, xerr = subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
+		xerr = rs.Delete(task)
 	}
-	if xerr = rs.Delete(task); xerr != nil {
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return empty, fail.NotFoundError("failed to find Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			// consider a Subnet not found as a successful deletion
 		default:
-			return empty, xerr
+			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
 	}
 
-	//tracer.Trace("Subnet '%s' successfully deleted.", subnetRefLabel)
+	logrus.Infof("Subnet %s successfully deleted.", subnetRefLabel)
 	return empty, nil
 }
 
 // BindSecurityGroup attaches a Security Group to a hostnetwork
 func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -379,7 +374,8 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 // UnbindSecurityGroup detaches a Security Group from a subnet
 func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -424,16 +420,22 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
-	if xerr != nil {
-		return empty, xerr
-	}
 	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.UnbindSecurityGroup(task, sg); xerr != nil {
-		return empty, xerr
+
+	if rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
+		xerr = rs.UnbindSecurityGroup(task, sg)
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
+			xerr = sg.UnbindFromSubnetByReference(task, subnetRef)
+		default:
+			return empty, xerr
+		}
 	}
 	return empty, nil
 }
@@ -441,7 +443,8 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 // EnableSecurityGroup applies the rules of a bound security group on a network
 func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot enable Security Group of Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -500,7 +503,8 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 // DisableSecurityGroup detaches a Security Group from a subnet
 func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot disable security group on network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot disable Security Group of Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -559,7 +563,8 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 // ListSecurityGroups lists the Security Group bound to subnet
 func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	//defer fail.OnExitWrapError(&err, "cannot list security groups bound to network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot list Security Groups bound to Subnet")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
