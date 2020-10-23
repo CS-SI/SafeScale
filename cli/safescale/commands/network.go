@@ -913,22 +913,25 @@ var subnetList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		subnets, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.GetExecutionTimeout())
+		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
 		}
-		jsoned, err := json.Marshal(subnets)
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
-		}
-		var result map[string][]map[string]interface{}
-		if err != json.Unmarshal([]byte(jsoned), &result) {
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
-		}
-		for _, v := range result["subnets"] {
-			delete(v, "gateway_ids")
-			delete(v, "state")
+		var result []map[string]interface{}
+		subnets := resp.GetSubnets()
+		if len(subnets) > 0 {
+			jsoned, err := json.Marshal(subnets)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+			}
+			if err != json.Unmarshal([]byte(jsoned), &result) {
+				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+			}
+			for _, v := range result {
+				delete(v, "gateway_ids")
+				delete(v, "state")
+			}
 		}
 		return clitools.SuccessResponse(result)
 	},
