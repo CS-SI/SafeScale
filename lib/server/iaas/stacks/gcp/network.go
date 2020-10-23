@@ -588,14 +588,14 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.
 		}
 	}
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to find network '%s'", req.NetworkID)
+		return nil, fail.Wrap(xerr, "failed to find Network '%s'", req.NetworkID)
 	}
 
 	// Checks if IPRanges is valid...
 	if req.CIDR == "" {
-		tracer.Trace("IPRanges is empty, choosing one...")
+		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("IPRanges chosen for network is '%s'", req.CIDR)
+		tracer.Trace("CIDR chosen for Subnet is '%s'", req.CIDR)
 	}
 
 	// Create subnet

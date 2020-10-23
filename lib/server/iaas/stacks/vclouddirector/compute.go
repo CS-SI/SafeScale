@@ -748,8 +748,8 @@ func stateConvert(stateVcd int) hoststate.Enum {
 	}
 }
 
-// GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
+// InspectHostByName returns the host identified by ref (name or id)
+func (s *Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -773,14 +773,12 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
 		return nil, abstract.ResourceNotFoundError("host", name)
 	}
 
-	// FIXME: Populate this
-	ahc := &abstract.HostCore{
-		ID:        vapp.VApp.ID,
-		Name:      vapp.VApp.Name,
-		LastState: stateConvert(vapp.VApp.Status),
-	}
+	ahf := abstract.NewHostFull()
+	ahf.Core.ID = vapp.VApp.ID
+	ahf.Core.Name = vapp.VApp.Name
+	ahf.Core.LastState = stateConvert(vapp.VApp.Status)
 
-	return ahc, nil
+	return ahf, nil
 }
 
 // DeleteHost deletes the host identified by id

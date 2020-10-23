@@ -190,8 +190,8 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull,
 }
 
 // InspectHostByName stub
-func (s *Stack) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
-	return abstract.NewHostCore(), gError
+func (s *Stack) InspectHostByName(string) (*abstract.HostFull, fail.Error) {
+	return abstract.NewHostFull(), gError
 }
 
 // GetHostState stub

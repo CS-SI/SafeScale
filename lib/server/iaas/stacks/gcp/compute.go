@@ -743,13 +743,12 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 	}
 }
 
-// GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
+// InspectHostByName returns the host identified by ref (name or id)
+func (s Stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+
 	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).Entering().Exiting()
@@ -757,16 +756,16 @@ func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.
 
 	hosts, xerr := s.ListHosts(false)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
 
 	for _, host := range hosts {
 		if host.Core.Name == name {
-			return host.Core, nil
+			return host, nil
 		}
 	}
 
-	return nil, abstract.ResourceNotFoundError("host", name)
+	return nullAHF, abstract.ResourceNotFoundError("host", name)
 }
 
 // DeleteHost deletes the host identified by id

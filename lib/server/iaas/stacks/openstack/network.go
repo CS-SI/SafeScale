@@ -864,9 +864,6 @@ func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
 func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
-	//if s == nil {
-	//	return fail.InvalidInstanceError()
-	//}
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}

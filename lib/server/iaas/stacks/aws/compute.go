@@ -1256,13 +1256,10 @@ func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
 }
 
 // InspectHostByName returns host information by its name
-func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.Error) {
-	nullAhc := abstract.NewHostCore()
-	if s == nil {
-		return nullAhc, fail.InvalidInstanceError()
-	}
+func (s Stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
 	if name == "" {
-		return nullAhc, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
@@ -1270,16 +1267,16 @@ func (s *Stack) InspectHostByName(name string) (_ *abstract.HostCore, xerr fail.
 
 	hosts, err := s.ListHosts(false)
 	if err != nil {
-		return nullAhc, err
+		return nullAHF, err
 	}
 
-	for _, ahf := range hosts {
-		if ahf.GetName() == name {
-			return ahf.Core, nil
+	for _, v := range hosts {
+		if v.GetName() == name {
+			return v, nil
 		}
 	}
 
-	return nil, abstract.ResourceNotFoundError("host", name)
+	return nullAHF, abstract.ResourceNotFoundError("host", name)
 }
 
 // GetHostState returns the current state of the host
