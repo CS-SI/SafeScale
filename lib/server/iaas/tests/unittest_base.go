@@ -585,24 +585,24 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, host)
 	{
-		err := tester.Service.StopHost(host.ID)
+		err := tester.Service.StopHost(host.Core.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, hoststate.STOPPED, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.STOPPED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
 		// assert.Equal(t, host.State, hoststate.STOPPED)
 	}
 	{
-		err := tester.Service.StartHost(host.ID)
+		err := tester.Service.StartHost(host.Core.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, hoststate.STARTED, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.STARTED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, host.LastState, hoststate.STARTED)
+		assert.Equal(t, host.Core.LastState, hoststate.STARTED)
 	}
 }
 
@@ -706,33 +706,33 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		Name:     "Attachment1",
-		HostID:   host.ID,
+		HostID:   host.Core.ID,
 		VolumeID: v1.ID,
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va1ID)
 	defer func() {
-		_ = tester.Service.DeleteVolumeAttachment(host.ID, va1ID)
+		_ = tester.Service.DeleteVolumeAttachment(host.Core.ID, va1ID)
 	}()
 
 	va2ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		Name:     "Attachment2",
-		HostID:   host.ID,
+		HostID:   host.Core.ID,
 		VolumeID: v2.ID,
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va2ID)
 	defer func() {
-		_ = tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
+		_ = tester.Service.DeleteVolumeAttachment(host.Core.ID, va2ID)
 	}()
 
-	va1, err := tester.Service.InspectVolumeAttachment(host.ID, v1.ID)
+	va1, err := tester.Service.InspectVolumeAttachment(host.Core.ID, v1.ID)
 	assert.Nil(t, err)
 
-	va2, err := tester.Service.InspectVolumeAttachment(host.ID, v2.ID)
+	va2, err := tester.Service.InspectVolumeAttachment(host.Core.ID, v2.ID)
 	assert.Nil(t, err)
 
-	lst, err := tester.Service.ListVolumeAttachments(host.ID)
+	lst, err := tester.Service.ListVolumeAttachments(host.Core.ID)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {
