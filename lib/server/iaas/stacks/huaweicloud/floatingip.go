@@ -21,7 +21,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
@@ -149,7 +148,7 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 		func() error {
 			_, err := s.Stack.Driver.Request("GET", url, &opts)
 			r.Err = err
-			return openstack.NormalizeError(err)
+			return normalizeError(err)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -159,7 +158,7 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, openstack.NormalizeError(err)
+		return nil, normalizeError(err)
 	}
 	return fip, nil
 }
@@ -184,7 +183,7 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 				}
 				return true, nil
 			})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -204,7 +203,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	}
 	bi, err := ipOpts.toFloatingIPCreateMap()
 	if err != nil {
-		return nil, openstack.NormalizeError(err)
+		return nil, normalizeError(err)
 	}
 	bandwidthOpts := bandwidthCreateOpts{
 		Name:      "bandwidth-" + s.vpc.Name,
@@ -213,7 +212,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	}
 	bb, err := bandwidthOpts.toBandwidthCreateMap()
 	if err != nil {
-		return nil, openstack.NormalizeError(err)
+		return nil, normalizeError(err)
 	}
 	// Merger bi in bb
 	for k, v := range bi {
@@ -230,7 +229,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
 			_, innerErr := s.Stack.Driver.Request("POST", url, &opts)
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -239,7 +238,7 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	}
 	fip, err := r.Extract()
 	if err != nil {
-		return nil, openstack.NormalizeError(err)
+		return nil, normalizeError(err)
 	}
 	return fip, nil
 }
@@ -256,7 +255,7 @@ func (s *Stack) DeleteFloatingIP(id string) fail.Error {
 		func() error {
 			_, r.Err = s.Stack.Driver.Request("DELETE", url, &opts)
 			err := r.ExtractErr()
-			return openstack.NormalizeError(err)
+			return normalizeError(err)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -279,7 +278,7 @@ func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 		func() error {
 			r := servers.ActionResult{}
 			_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
-			return openstack.NormalizeError(r.ExtractErr())
+			return normalizeError(r.ExtractErr())
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -302,7 +301,7 @@ func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Er
 		func() error {
 			r := servers.ActionResult{}
 			_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
-			return openstack.NormalizeError(r.ExtractErr())
+			return normalizeError(r.ExtractErr())
 		},
 		temporal.GetCommunicationTimeout(),
 	)

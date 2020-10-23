@@ -159,9 +159,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"classic":    volumespeed.COLD,
 			"high-speed": volumespeed.HDD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:           metadataBucketName,
+		OperatorUsername:         operatorUsername,
+		ProviderName:             providerName,
+		DefaultSecurityGroupName: "default",
 	}
 
 	serviceVersions := map[string]string{"volume": "v1"}

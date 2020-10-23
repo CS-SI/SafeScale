@@ -82,10 +82,10 @@ type AuthenticationOptions struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
-	// Name of the VPC (Virtual Private Cloud)
-	VPCName string
-	// IPRanges if the VPC
-	VPCCIDR string
+	//// Name of the VPC (Virtual Private Cloud)
+	//VPCName string
+	//// IPRanges if the VPC
+	//VPCCIDR string
 }
 
 // ConfigurationOptions are the stack configuration options
@@ -125,6 +125,9 @@ type ConfigurationOptions struct {
 
 	// DefaultSecurityGroupName contains the name of the default security group
 	DefaultSecurityGroupName string
+
+	DefaultNetworkName string // contains the name of the Network/VPC that is used by default (corresponds to keywords 'VPCName' or 'NetworkName' in tenant section 'compute')
+	DefaultNetworkCIDR string // contains the CIDR of the default Network/VPC
 
 	// Customizations map[string]string
 

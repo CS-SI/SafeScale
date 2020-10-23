@@ -17,13 +17,17 @@
 package propertiesv1
 
 import (
+<<<<<<< HEAD:lib/server/resources/properties/v1/network.go
 	"time"
 
+=======
+>>>>>>> subnets+securitygroups:lib/server/resources/properties/v1/networkhosts.go
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
+<<<<<<< HEAD:lib/server/resources/properties/v1/network.go
 // NetworkDescription contains additional information describing the network, in V1
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -55,6 +59,8 @@ func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
 	return nd
 }
 
+=======
+>>>>>>> subnets+securitygroups:lib/server/resources/properties/v1/networkhosts.go
 // NetworkHosts contains information about hosts connected to the network
 type NetworkHosts struct {
 	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
@@ -103,5 +109,8 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 
 func init() {
 	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.HostsV1), NewNetworkHosts())
+<<<<<<< HEAD:lib/server/resources/properties/v1/network.go
 	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.DescriptionV1), NewNetworkDescription())
+=======
+>>>>>>> subnets+securitygroups:lib/server/resources/properties/v1/networkhosts.go
 }

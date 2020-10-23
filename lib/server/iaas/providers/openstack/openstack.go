@@ -98,15 +98,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,
+		DNSList:                   dnsServers,
+		DefaultImage:              defaultImage,
+		MetadataBucket:            metadataBucketName,
+		OperatorUsername:          operatorUsername,
+		ProviderName:              providerName,
+		DefaultSecurityGroupName:  "default",
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"standard":   volumespeed.COLD,
 			"performant": volumespeed.HDD,
 		},
-		DNSList:          dnsServers,
-		DefaultImage:     defaultImage,
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)

@@ -119,6 +119,7 @@ type Image struct {
 	URL         string `json:"url,omitempty"`
 	Description string `json:"description,omitempty"`
 	StorageType string `json:"storage_type,omitempty"`
+	DiskSize    int64  `json:"disk_size_Gb,omitempty"`
 }
 
 // OK ...
@@ -313,7 +314,7 @@ func (hc *HostCore) GetID() string {
 // HostSubnet contains subnet information related to Host
 type HostSubnet struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
-	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the Default getGateway
+	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the default gateway
 	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // DEPRECATED: contains the private IP of the default gateway
 	DefaultSubnetID         string            `json:"default_network_id,omitempty"`         // contains the ID of the default subnet
 	SubnetsByID             map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each subnet bound to the host (indexed by ID)

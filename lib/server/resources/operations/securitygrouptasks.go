@@ -39,7 +39,7 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 	sgID := sg.GetID()
 
 	// Unbind security group from host on provider side
-	xerr := sg.GetService().UnbindSecurityGroupFromHost(rh.GetID(), sgID)
+	xerr := sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

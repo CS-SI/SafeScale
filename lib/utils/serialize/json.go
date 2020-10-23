@@ -67,6 +67,10 @@ func NewJSONProperties(module string) (*JSONProperties, fail.Error) {
 
 // Lookup tells if a key is present in JSonProperties
 func (x *JSONProperties) Lookup(key string) bool {
+	if x == nil {
+		return false
+	}
+
 	x.RLock()
 	defer x.RUnlock()
 
@@ -76,6 +80,10 @@ func (x *JSONProperties) Lookup(key string) bool {
 
 // Clone ...
 func (x *JSONProperties) Clone() *JSONProperties {
+	if x == nil {
+		return nil
+	}
+
 	x.RLock()
 	defer x.RUnlock()
 
@@ -88,12 +96,12 @@ func (x *JSONProperties) Clone() *JSONProperties {
 	return newP
 }
 
-// Count returns thenumber of properties available
-func (x *JSONProperties) Count() int {
+// Count returns the number of properties available
+func (x *JSONProperties) Count() uint {
 	if x == nil {
 		return 0
 	}
-	return len(x.Properties)
+	return uint(len(x.Properties))
 }
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function

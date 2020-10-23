@@ -54,14 +54,14 @@ type ComputeConfiguration struct {
 	BlacklistImageRegexp    *regexp.Regexp
 }
 
-// NetworConfiguration outscale network configuration
-type NetworConfiguration struct {
+// NetworkConfiguration Outscale network configuration
+type NetworkConfiguration struct {
 	VPCName string
 	VPCCIDR string
 	VPCID   string
 }
 
-// StorageConfiguration outscale storage configuration
+// StorageConfiguration Outscale storage configuration
 type StorageConfiguration struct {
 	Type      string
 	Endpoint  string
@@ -83,7 +83,7 @@ type MetadataConfiguration struct {
 type ConfigurationOptions struct {
 	Identity      Credentials           `json:"identity,omitempty"`
 	Compute       ComputeConfiguration  `json:"compute,omitempty"`
-	Network       NetworConfiguration   `json:"network,omitempty"`
+	Network       NetworkConfiguration  `json:"network,omitempty"`
 	ObjectStorage StorageConfiguration  `json:"objectstorage,omitempty"`
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }

@@ -65,6 +65,8 @@ type Stack interface {
 	AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 	DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
+	GetDefaultSecurityGroupName() string
 
 	// CreateNetwork creates a network named name
 	CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error)
@@ -76,28 +78,28 @@ type Stack interface {
 	ListNetworks() ([]*abstract.Network, fail.Error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) fail.Error
-	//// BindSecurityGroupToSubnet attaches a security group to a network
-	//BindSecurityGroupToSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error
-	//// UnbindSecurityGroupFromSubnet detaches a security group from a network
-	//UnbindSecurityGroupFromSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error
+	// HasDefaultNetwork tells if the stack has a default network (defined in tenant settings)
+	HasDefaultNetwork() bool
+	// GetDefaultNetwork returns the abstract.Network used as default Network
+	GetDefaultNetwork() (*abstract.Network, fail.Error)
 
 	// CreateSubnet creates a subnet in a existing network
 	CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)
 	// InspectSubnet returns the network identified by id
 	InspectSubnet(id string) (*abstract.Subnet, fail.Error)
 	// InspectSubnetByName returns the network identified by name)
-	InspectSubnetByName(networkRef, name string) (*abstract.Subnet, fail.Error)
+	InspectSubnetByName(networkID, name string) (*abstract.Subnet, fail.Error)
 	// ListSubnets lists all subnets of a network (or all subnets if no networkRef is provided)
-	ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error)
+	ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error)
 	// DeleteSubnet deletes the subnet identified by id
 	DeleteSubnet(id string) fail.Error
 	// BindSecurityGroupToSubnet attaches a security group to a network
-	BindSecurityGroupToSubnet(id string, sgParam stacks.SecurityGroupParameter) fail.Error
+	BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error
 	// UnbindSecurityGroupFromSubnet detaches a security group from a network
-	UnbindSecurityGroupFromSubnet(id string, sgParam stacks.SecurityGroupParameter) fail.Error
+	UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error
 
 	// CreateVIP ...
-	CreateVIP(string, string) (*abstract.VirtualIP, fail.Error)
+	CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error)
 	// AddPublicIPToVIP adds a public IP to VIP
 	AddPublicIPToVIP(*abstract.VirtualIP) fail.Error
 	// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
@@ -130,9 +132,9 @@ type Stack interface {
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to an host
-	BindSecurityGroupToHost(hostParam stacks.HostParameter /*string, */, sgParam stacks.SecurityGroupParameter) fail.Error
+	BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error
 	// UnbindSecurityGroupFromHost detaches a security group from an host
-	UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error
+	UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error
 
 	// CreateVolume creates a block volume
 	CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error)

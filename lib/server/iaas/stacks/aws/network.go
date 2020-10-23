@@ -42,6 +42,16 @@ import (
 
 const tagNameLabel = "Name"
 
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s *Stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, fail.NotFoundError("no default network in Stack")
+}
+
 // CreateNetwork creates a Network, ie a VPC in AWS terminology
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, xerr fail.Error) {
 	if s == nil {
@@ -857,12 +867,12 @@ func (s Stack) DeleteSubnet(id string) (xerr fail.Error) {
 }
 
 // BindSecurityGroupToSubnet binds a security group to a network
-func (s *Stack) BindSecurityGroupToSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if ref == "" {
-		return fail.InvalidParameterError("ref", "cannot be empty string")
+	if subnetID == "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -880,12 +890,12 @@ func (s *Stack) BindSecurityGroupToSubnet(ref string, sgParam stacks.SecurityGro
 }
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a host
-func (s *Stack) UnbindSecurityGroupFromSubnet(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if ref == "" {
-		return fail.InvalidParameterError("ref", "cannot be empty string")
+	if subnetID == "" {
+		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -901,7 +911,7 @@ func (s *Stack) UnbindSecurityGroupFromSubnet(ref string, sgParam stacks.Securit
 }
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(string, string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

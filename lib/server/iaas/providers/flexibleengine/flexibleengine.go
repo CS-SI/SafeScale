@@ -109,8 +109,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		VPCName:          vpcName,
-		VPCCIDR:          vpcCIDR,
+		//VPCName:          vpcName,
+		//VPCCIDR:          vpcCIDR,
 	}
 
 	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
@@ -137,9 +137,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"SATA": volumespeed.COLD,
 			"SSD":  volumespeed.SSD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:           metadataBucketName,
+		OperatorUsername:         operatorUsername,
+		ProviderName:             providerName,
+		DefaultSecurityGroupName: "default",
+		DefaultNetworkName:       vpcName,
+		DefaultNetworkCIDR:       vpcCIDR,
 		// WhitelistTemplateRegexp: whitelistTemplatePattern,
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
@@ -157,7 +160,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	validRegions, xerr := stack.ListRegions()
 	if xerr != nil {
-		return nil, xerr
+		if len(validRegions) != 0 {
+			return nil, xerr
+		}
 	}
 	if len(validRegions) != 0 {
 		regionIsValidInput := false
@@ -267,7 +272,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
-	cfg.Set("VPCName", opts.VPCName)
+	//cfg.Set("VPCName", opts.VPCName)
 
 	return cfg, nil
 }
@@ -285,6 +290,8 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("DefaultNetworkName", opts.DefaultNetworkName)
+	cfg.Set("DefaultNetworkCIDR", opts.DefaultNetworkCIDR)
 	// cfg.Set("Customizations", opts.Customizations)
 
 	return cfg, nil

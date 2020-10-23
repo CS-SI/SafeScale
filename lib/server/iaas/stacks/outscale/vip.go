@@ -19,6 +19,7 @@ package outscale
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
@@ -30,9 +31,16 @@ import (
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, xerr fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
+	}
+	// networkID is not used by Outscale
+	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
+		return nil, fail.InvalidParameterError("subnetID", "cannot be empty string")
+	}
+	if name = strings.TrimSpace(name); name == "" {
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
@@ -44,14 +52,14 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, 
 		return nil, xerr
 	}
 
-	group, xerr := s.getNetworkSecurityGroup(subnet.ID)
+	//group, xerr := s.getNetworkSecurityGroup(subnet.ID)
 	if xerr != nil {
 		return nil, xerr
 	}
 	createNicRequest := osc.CreateNicRequest{
 		Description:      name,
 		SubnetId:         subnet.ID,
-		SecurityGroupIds: []string{group.SecurityGroupId},
+		SecurityGroupIds: securityGroups,
 	}
 	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
 		CreateNicRequest: optional.NewInterface(createNicRequest),
@@ -79,7 +87,7 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, 
 	return &abstract.VirtualIP{
 		ID:        nic.NicId,
 		PrivateIP: nic.PrivateIps[0].PrivateIp,
-		NetworkID: subnet.ID,
+		SubnetID:  subnet.ID,
 		Hosts:     nil,
 		PublicIP:  "",
 	}, nil

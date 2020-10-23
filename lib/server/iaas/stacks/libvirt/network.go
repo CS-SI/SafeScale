@@ -36,6 +36,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s *Stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, fail.NotFoundError("no default network in Stack")
+}
+
 func infoFromCidr(cidr string) (string, string, string, string, fail.Error) {
 	IP, IPNet, err := net.ParseCIDR(cidr)
 	if err != nil {
@@ -347,7 +357,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

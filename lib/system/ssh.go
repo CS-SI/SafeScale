@@ -744,7 +744,7 @@ func createSSHCmd(sshConfig *SSHConfig, cmdString, username, shell string, withT
 	if cmdString != "" {
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
-	logrus.Debugf("createSSHCmd() sshCmdString: %s\n", sshCmdString)
+	//logrus.Debugf("createSSHCmd() sshCmdString: %s\n", sshCmdString)
 
 	return sshCmdString, f, nil
 

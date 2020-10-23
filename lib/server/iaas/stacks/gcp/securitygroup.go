@@ -161,3 +161,8 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 	return nil, fail.NotImplementedError()
 }
+
+// GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
+func (s Stack) GetDefaultSecurityGroupName() string {
+	return s.GetConfigurationOptions().DefaultSecurityGroupName
+}

@@ -99,8 +99,8 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := xerr.(*retry.ErrTimeout); ok {
-			logrus.Debugf("timeout reading metadata of rv '%s'", ref)
-			xerr = fail.NotFoundError("failed to load metadata of rv '%s': timeout", ref)
+			logrus.Debugf("timeout reading metadata of Volume '%s'", ref)
+			xerr = fail.NotFoundError("failed to load metadata of Volume '%s': timeout", ref)
 		}
 		return nullVolume(), xerr
 	}

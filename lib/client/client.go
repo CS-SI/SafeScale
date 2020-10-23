@@ -76,11 +76,11 @@ func New(server string) (_ *Session, xerr fail.Error) {
 			return nil, fail.Wrap(xerr, "server is invalid")
 		}
 	}
-	// if server is empty, try to see if env SAFESCALED_SERVER is set...
+	// if server is empty, try to see if env SAFESCALED_LISTEN is set...
 	if server == "" {
-		server = os.Getenv("SAFESCALED_SERVER")
+		server = os.Getenv("SAFESCALED_LISTEN")
 		if server, xerr = validateServerString(server); xerr != nil {
-			logrus.Warnf("Content of environment variable SAFESCALED_SERVER is invalid, ignoring.")
+			logrus.Warnf("Content of environment variable SAFESCALED_LISTEN is invalid, ignoring.")
 			server = ""
 		}
 	}

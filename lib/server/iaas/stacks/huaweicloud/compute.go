@@ -19,13 +19,11 @@ package huaweicloud
 import (
 	"encoding/base64"
 	"fmt"
-	"net"
-	"net/http"
-
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
+	"net"
 
 	"github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
@@ -37,13 +35,11 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
@@ -94,7 +90,7 @@ type bootdiskCreateOptsExt struct {
 func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, error) {
 	base, err := opts.CreateOptsBuilder.ToServerCreateMap()
 	if err != nil {
-		return nil, openstack.NormalizeError(err)
+		return nil, normalizeError(err)
 	}
 
 	if len(opts.BlockDevice) == 0 {
@@ -113,7 +109,7 @@ func (opts bootdiskCreateOptsExt) ToServerCreateMap() (map[string]interface{}, e
 	for i, bd := range opts.BlockDevice {
 		b, err := gophercloud.BuildRequestBody(bd, "")
 		if err != nil {
-			return nil, openstack.NormalizeError(err)
+			return nil, normalizeError(err)
 		}
 		blkDevices[i] = b
 	}
@@ -193,7 +189,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 	opts.ServiceClient = nil
 	b, err := gophercloud.BuildRequestBody(opts, "")
 	if err != nil {
-		return nil, openstack.NormalizeError(err)
+		return nil, normalizeError(err)
 	}
 
 	if opts.UserData != nil {
@@ -244,7 +240,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 		xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 			func() (innerErr error) {
 				flavorID, innerErr = flavors.IDFromName(sc, opts.FlavorName)
-				return openstack.NormalizeError(innerErr)
+				return normalizeError(innerErr)
 			},
 			temporal.GetCommunicationTimeout(),
 		)
@@ -258,15 +254,14 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 }
 
 // CreateHost creates a new host
-// On success returns an instance of abstract.Host, and a string containing the script to execute to finalize host installation
 func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+	nullAhf := abstract.NewHostFull()
+	nullUdc := userdata.NewContent()
 	if s == nil {
-		return nil, nil, fail.InvalidInstanceError()
+		return nullAhf, nullUdc, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true, "(%s)", request.ResourceName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 
 	userData = userdata.NewContent()
@@ -275,7 +270,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nil, userData, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without network and without public access (would be unreachable)")
+		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// Validating name of the host
@@ -298,26 +293,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		})
 	}
 
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			return nil, userData, fail.Wrap(err, "error creating UID")
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, xerr = s.CreateKeyPair(name)
-		if xerr != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %+v", xerr)
-			logrus.Debugf(strprocess.Capitalize(msg))
-		}
-	}
-	if request.Password == "" {
-		password, xerr := utils.GeneratePassword(16)
-		if xerr != nil {
-			return nil, userData, fail.Wrap(xerr, "failed to generate password")
-		}
-		request.Password = password
+	if xerr = s.Stack.ProvideCredentialsIfNeeded(&request); xerr != nil {
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -327,18 +304,29 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-		return nil, userData, xerr
+		return nullAhf, nullUdc, xerr
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nil, userData, fail.Wrap(xerr, "failed to get image")
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get template")
 	}
 
-	// Determines appropriate disk size
+	rim, xerr := s.InspectImage(request.ImageID)
+	if xerr != nil {
+		return nullAhf, nullUdc, xerr
+	}
+
 	if request.DiskSize > template.DiskSize {
 		template.DiskSize = request.DiskSize
-	} else if template.DiskSize == 0 {
+	}
+
+	if int(rim.DiskSize) > template.DiskSize {
+		template.DiskSize = int(rim.DiskSize)
+	}
+
+	if template.DiskSize == 0 {
+		// Determines appropriate disk size
 		if template.Cores < 16 { // nolint
 			template.DiskSize = 100
 		} else if template.Cores < 32 {
@@ -351,7 +339,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	// Select usable availability zone
 	az, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nil, userData, xerr
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
 
 	// Defines boot disk
@@ -370,22 +358,23 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nil, userData, xerr
 	}
 
-	// Gets security group to use by default
-	// FUTURE: allow user to define default security group in tenants.json file ?
-	var securityGroups []string
-	if request.IsGateway || request.PublicIP {
-		sgName := request.ResourceName + abstract.HostDefaultSecurityGroupNameSuffix
-		asg, xerr := s.InspectSecurityGroup(sgName)
-		if xerr != nil {
-			return nil, userData, fail.Wrap(xerr, "failed to load default Security Group '%s' for host; must be created first", sgName)
-		}
-		securityGroups = append(securityGroups, asg.ID)
-	}
-
+	//// Gets security group to use by default
+	//// FUTURE: allow user to define default security group in tenants.json file ?
+	//var securityGroups []string
+	//if request.IsGateway || request.PublicIP {
+	//	sgName := request.ResourceName + abstract.HostDefaultSecurityGroupNameSuffix
+	//	asg, xerr := s.InspectSecurityGroup(sgName)
+	//	if xerr != nil {
+	//		return nil, userData, fail.Wrap(xerr, "failed to load default Security Group '%s' for host; must be created first", sgName)
+	//	}
+	//	securityGroups = append(securityGroups, asg.ID)
+	//}
+	//
 	// defines creation options
 	srvOpts := serverCreateOpts{
-		Name:             request.ResourceName,
-		SecurityGroups:   securityGroups,
+		Name: request.ResourceName,
+		//SecurityGroups:   securityGroups,
+		SecurityGroups:   []string{},
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		UserData:         userDataPhase1,
@@ -412,33 +401,29 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	// Retry creation until success, for 10 minutes
 	var (
-		httpResp *http.Response
-		r        servers.CreateResult
-		server   *servers.Server
+		//httpResp *http.Response
+		r      servers.CreateResult
+		server *servers.Server
 	)
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 				func() (innerErr error) {
-					httpResp, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+					_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 						OkCodes: []int{200, 202},
 					})
 					server, innerErr = r.Extract()
-					if innerErr != nil {
-						if server != nil {
+					xerr := normalizeError(innerErr)
+					if xerr != nil {
+						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.Stack.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								logrus.Errorf("cleanung up on failure, failed to delete host: %v", derr)
+								//logrus.Errorf("cleaning up on failure, failed to delete host: %v", derr)
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 							}
 						}
-						_ = httpResp // VPL: to make go vet happy
-						// var codeStr string
-						// if httpResp != nil {
-						//     codeStr = fmt.Sprintf(" (HTTP return code: %d)", httpResp.StatusCode)
-						// }
-						// return fail.NewError("query to create host '%s' failed: %s%s", request.ResourceName, openstack.ProviderErrorToString(innerErr), codeStr)
 					}
-					return openstack.NormalizeError(innerErr)
+					return xerr
 				},
 				temporal.GetCommunicationTimeout(),
 			)
@@ -692,14 +677,14 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
 	var errors []error
 	for subnetID, subnetName := range completedHost.Subnet.SubnetsByID {
 		if subnetName == "" {
-			network, xerr := s.InspectNetwork(subnetID)
+			subnet, xerr := s.InspectSubnet(subnetID)
 			if xerr != nil {
 				logrus.Errorf("failed to get network '%s'", subnetID)
 				errors = append(errors, xerr)
 				continue
 			}
-			completedHost.Subnet.SubnetsByID[subnetID] = network.Name
-			completedHost.Subnet.SubnetsByName[network.Name] = subnetID
+			completedHost.Subnet.SubnetsByID[subnetID] = subnet.Name
+			completedHost.Subnet.SubnetsByName[subnet.Name] = subnetID
 		}
 	}
 	if len(errors) > 0 {
@@ -731,7 +716,7 @@ func (s *Stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversi
 				allInterfaces = append(allInterfaces, list...)
 				return true, nil
 			})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -797,7 +782,7 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 				}
 				return true, nil
 			})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -835,7 +820,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						err := floatingips.DisassociateInstance(s.Stack.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
 							FloatingIP: fip.IP,
 						}).ExtractErr()
-						return openstack.NormalizeError(err)
+						return normalizeError(err)
 					},
 					temporal.GetCommunicationTimeout(),
 				)
@@ -847,7 +832,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				retryErr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 					func() error {
 						err := floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
-						return openstack.NormalizeError(err)
+						return normalizeError(err)
 					},
 					temporal.GetCommunicationTimeout(),
 				)
@@ -867,7 +852,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				innerRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 					func() error {
 						innerErr := servers.Delete(s.Stack.ComputeClient, ahf.Core.ID).ExtractErr()
-						return openstack.NormalizeError(innerErr)
+						return normalizeError(innerErr)
 					},
 					temporal.GetCommunicationTimeout(),
 				)
@@ -893,7 +878,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 							func() (innerErr error) {
 								host, innerErr = servers.Get(s.Stack.ComputeClient, hostRef).Extract()
-								return openstack.NormalizeError(innerErr)
+								return normalizeError(innerErr)
 							},
 							temporal.GetCommunicationTimeout(),
 						)
@@ -959,7 +944,7 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fai
 				}
 				return true, nil
 			})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -1029,7 +1014,7 @@ func (s *Stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
 			_, innerErr := ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -1053,7 +1038,7 @@ func (s *Stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 		func() error {
 			opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 			_, innerErr := ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -1095,7 +1080,7 @@ func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error
 				}
 				return true, nil
 			})
-			return openstack.NormalizeError(innerErr)
+			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)

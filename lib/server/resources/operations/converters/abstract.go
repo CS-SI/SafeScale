@@ -140,9 +140,9 @@ func HostSizingRequirementsFromAbstractToProtocol(src abstract.HostSizingRequire
 	}
 }
 
-// HostSizingRequirementsFromAbstractToPropertyV2 ...
-func HostSizingRequirementsFromAbstractToPropertyV2(src abstract.HostSizingRequirements) *propertiesv2.HostSizingRequirements {
-	return &propertiesv2.HostSizingRequirements{
+// HostSizingRequirementsFromAbstractToPropertyV1 ...
+func HostSizingRequirementsFromAbstractToPropertyV1(src abstract.HostSizingRequirements) *propertiesv1.HostSizingRequirements {
+	return &propertiesv1.HostSizingRequirements{
 		MinCores:    src.MinCores,
 		MaxCores:    src.MaxCores,
 		MinRAMSize:  src.MinRAMSize,
@@ -169,9 +169,9 @@ func VirtualIPFromAbstractToProtocol(in abstract.VirtualIP) *protocol.VirtualIp 
 	return &out
 }
 
-// HostEffectiveSizingFromAbstractToPropertyV2 ...
-func HostEffectiveSizingFromAbstractToPropertyV2(ahes *abstract.HostEffectiveSizing) *propertiesv2.HostEffectiveSizing {
-	phes := propertiesv2.NewHostEffectiveSizing()
+// HostEffectiveSizingFromAbstractToPropertyV1 ...
+func HostEffectiveSizingFromAbstractToPropertyV1(ahes *abstract.HostEffectiveSizing) *propertiesv1.HostEffectiveSizing {
+	phes := propertiesv1.NewHostEffectiveSizing()
 	phes.Cores = ahes.Cores
 	phes.RAMSize = ahes.RAMSize
 	phes.DiskSize = ahes.DiskSize
@@ -228,19 +228,33 @@ func HostDescriptionFromAbstractToPropertyV1(src abstract.HostDescription) *prop
 	}
 }
 
-// HostNetworkFromAbstractToPropertyV1 ...
-func HostNetworkFromAbstractToPropertyV1(src abstract.HostSubnet) *propertiesv1.HostNetwork {
-	return &propertiesv1.HostNetwork{
-		IsGateway:               src.IsGateway,
-		DefaultGatewayID:        src.DefaultGatewayID,
-		DefaultGatewayPrivateIP: src.DefaultGatewayPrivateIP,
-		DefaultNetworkID:        src.DefaultSubnetID,
-		NetworksByID:            src.SubnetsByID,
-		NetworksByName:          src.SubnetsByName,
-		PublicIPv4:              src.PublicIPv4,
-		PublicIPv6:              src.PublicIPv6,
-		IPv4Addresses:           src.IPv4Addresses,
-		IPv6Addresses:           src.IPv6Addresses,
+//// HostNetworkFromAbstractToPropertyV1 ... DEPRECATED
+//func HostNetworkFromAbstractToPropertyV1(src abstract.HostSubnet) *propertiesv1.HostNetwork {
+//	return &propertiesv1.HostNetwork{
+//		IsGateway:               src.IsGateway,
+//		DefaultGatewayID:        src.DefaultGatewayID,
+//		DefaultGatewayPrivateIP: src.DefaultGatewayPrivateIP,
+//		DefaultNetworkID:        src.DefaultSubnetID,
+//		NetworksByID:            src.SubnetsByID,
+//		NetworksByName:          src.SubnetsByName,
+//		PublicIPv4:              src.PublicIPv4,
+//		PublicIPv6:              src.PublicIPv6,
+//		IPv4Addresses:           src.IPv4Addresses,
+//		IPv6Addresses:           src.IPv6Addresses,
+//	}
+//}
+
+// HostNetworkFromAbstractToPropertyV2 ...
+func HostNetworkFromAbstractToPropertyV2(src abstract.HostSubnet) *propertiesv2.HostNetwork {
+	return &propertiesv2.HostNetwork{
+		IsGateway:       src.IsGateway,
+		DefaultSubnetID: src.DefaultSubnetID,
+		SubnetsByID:     src.SubnetsByID,
+		SubnetsByName:   src.SubnetsByName,
+		PublicIPv4:      src.PublicIPv4,
+		PublicIPv6:      src.PublicIPv6,
+		IPv4Addresses:   src.IPv4Addresses,
+		IPv6Addresses:   src.IPv6Addresses,
 	}
 }
 

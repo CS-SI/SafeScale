@@ -165,7 +165,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 			reduce = reduce || (sizing.MinCores < nhs.RequestedSize.MinCores)
 			reduce = reduce || (sizing.MinRAMSize < nhs.RequestedSize.MinRAMSize)
 			reduce = reduce || (sizing.MinGPU < nhs.RequestedSize.MinGPU)
-			reduce = reduce || (sizing.MinCPUFreq < nhs.RequestedSize.MinFreq)
+			reduce = reduce || (sizing.MinCPUFreq < nhs.RequestedSize.MinCPUFreq)
 			reduce = reduce || (sizing.MinDiskSize < nhs.RequestedSize.MinDiskSize)
 			return nil
 		})

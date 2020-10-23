@@ -87,8 +87,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		VPCName:          vpcName,
-		VPCCIDR:          vpcCIDR,
+		//VPCName:          vpcName,
+		//VPCCIDR:          vpcCIDR,
 	}
 
 	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
@@ -116,9 +116,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"SAS":  volumespeed.HDD,
 			"SSD":  volumespeed.SSD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:     metadataBucketName,
+		OperatorUsername:   operatorUsername,
+		ProviderName:       providerName,
+		DefaultNetworkName: vpcName,
+		DefaultNetworkCIDR: vpcCIDR,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {

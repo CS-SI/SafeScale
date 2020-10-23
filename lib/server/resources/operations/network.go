@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"reflect"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -29,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -79,16 +80,19 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	objn, xerr := NewNetwork(svc)
+	rn, xerr := NewNetwork(svc)
 	if xerr != nil {
 		return nullNetwork(), xerr
 	}
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return objn.Read(task, ref)
-		},
-		10*time.Second, // FIXME: parameterize
-	)
+	// VPL: writes are now considered successful only if the remote content is read and checked, so now need to wait on read.
+	//xerr = retry.WhileUnsuccessfulDelay1Second(
+	//	func() error {
+	//		return rn.Read(task, ref)
+	//	},
+	//	10*time.Second, // FIXME: parameterize
+	//)
+	// FIXME: object storage comms may fail, Read operation does not retry on this currently (cf. roadmap to replace stow with rclone)
+	xerr = rn.Read(task, ref)
 	if xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
 		if _, ok := xerr.(*retry.ErrTimeout); ok {
@@ -97,7 +101,45 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		}
 		return nullNetwork(), xerr
 	}
-	return objn, nil
+
+	if xerr = upgradeProperties(task, rn); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrAlteredNothing:
+			// ignore
+		default:
+			return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
+		}
+	}
+	return rn, nil
+}
+
+// upgradeProperties upgrades properties to most recent version
+func upgradeProperties(task concurrency.Task, rn resources.Network) fail.Error {
+	return rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		if props.Count() > 0 && !props.Lookup(networkproperty.SubnetsV1) {
+			rs, xerr := NewSubnet(rn.GetService())
+			if xerr != nil {
+				return xerr
+			}
+			as := abstract.NewSubnet()
+			as.Name = an.Name
+			as.Network = an.ID
+			//as.IPVersion = an.IPVersion
+			//as.DNSServers = an.DNSServers
+			//as.CIDR = as.CIDR
+			//as.Domain = an.Domain
+			//as.VIP = an.VIP
+			//xerr = rs.Create(task, req, gwname)
+			_ = rs
+			return nil
+		}
+		return fail.AlteredNothingError()
+	})
 }
 
 // IsNull tells if the instance corresponds to subnet Null Value
@@ -153,8 +195,8 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		}
 	}
 
-	// Create the subnet
-	logrus.Debugf("Creating network '%s' ...", req.Name)
+	// Create the network
+	logrus.Debugf("Creating network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 	an, xerr := svc.CreateNetwork(req)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -678,11 +720,31 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 
-	pn := &protocol.Network{
-		Id:   rn.GetID(),
-		Name: rn.GetName(),
-		Cidr: rn.CIDR(task),
-	}
+	var pn *protocol.Network
+	xerr = rn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+
+		}
+
+		pn = &protocol.Network{
+			Id:   an.ID,
+			Name: an.Name,
+			Cidr: an.CIDR,
+		}
+
+		return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			for k := range nsV1.ByName {
+				pn.Subnets = append(pn.Subnets, k)
+			}
+			return nil
+		})
+	})
 	return pn, nil
 }
 

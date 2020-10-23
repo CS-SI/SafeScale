@@ -110,21 +110,20 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	//	return nil, xerr
 	//}
 
-	rn, xerr := networkfactory.New(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	cidr := in.GetCidr()
 	if cidr == "" {
 		cidr = defaultCIDR
 	}
 
 	req := abstract.NetworkRequest{
-		Name:       in.GetName(),
-		CIDR:       cidr,
-		DNSServers: in.GetDnsServers(),
-		//KeepOnFailure: in.GetKeepOnFailure(),
+		Name:          in.GetName(),
+		CIDR:          cidr,
+		DNSServers:    in.GetDnsServers(),
+		KeepOnFailure: in.GetKeepOnFailure(),
+	}
+	rn, xerr := networkfactory.New(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
 	if xerr = rn.Create(task, req); xerr != nil {
 		return nil, xerr
@@ -140,22 +139,23 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	}()
 
 	if !in.GetNoSubnet() {
-		logrus.Debugf("Creating default Subnet of Network '%s'", req.Name)
-
 		_, networkNet, _ := net.ParseCIDR(cidr)
 		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", in.GetCidr())
 		}
 
+		logrus.Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", req.Name, subnetNet.String())
+
 		rs, xerr := subnetfactory.New(svc)
 		if xerr != nil {
 			return nil, xerr
 		}
 		req := abstract.SubnetRequest{
-			Network: rn.GetID(),
-			Name:    in.GetName(),
-			CIDR:    subnetNet.String(),
+			Network:       rn.GetID(),
+			Name:          in.GetName(),
+			CIDR:          subnetNet.String(),
+			KeepOnFailure: in.GetKeepOnFailure(),
 		}
 		xerr = rs.Create(task, req, "", nil)
 		if xerr != nil {
@@ -185,7 +185,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -207,7 +207,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	//	return nil, err
 	//}
 
-	rn, xerr := networkfactory.New(svc)
+	networks, xerr := networkfactory.List(task, svc)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -260,7 +260,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer job.Close()
 	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, true /*tracing.SjouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -317,9 +317,36 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	//	},
 	//	nil,
 	//)
-	rn, xerr := networkfactory.Load(task, job.GetService(), ref)
+	rn, xerr := networkfactory.Load(task, svc, ref)
 	if xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			an, xerr := svc.InspectNetworkByName(ref)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					an, xerr = svc.InspectNetwork(ref)
+				default:
+					return empty, xerr
+				}
+			}
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					return empty, fail.NotFoundError("failed to find Network %s", refLabel)
+				}
+				return empty, xerr
+			}
+
+			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil {
+				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == an.Name {
+					return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
+				}
+			}
+			return empty, fail.InvalidRequestError("%s is not managed by SafeScale", refLabel)
+		default:
+			return empty, xerr
+		}
 	}
 	if xerr = rn.Delete(task); xerr != nil {
 		return empty, xerr

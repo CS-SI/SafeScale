@@ -1044,7 +1044,7 @@ func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) (xerr fail.Error) {
+func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	// TODO: validate parameters
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
@@ -1053,7 +1053,7 @@ func (s Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam s
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) (xerr fail.Error) {
+func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	// TODO: validate parameters
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)

@@ -808,7 +808,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //	return s.DeleteHost(ref)
 // }
 
-func (s *Stack) CreateVIP(s1 string, s2 string) (*abstract.VirtualIP, fail.Error) {
+func (s *Stack) CreateVIP(string, string, string, []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

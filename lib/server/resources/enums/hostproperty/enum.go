@@ -19,13 +19,13 @@ package hostproperty
 const (
 	DescriptionV1       = "1"  // (optional) additional info describing host (purpose, ...)
 	NetworkV1           = "2"  // Deprecated: additional info about the network of the host
-	SizingV1            = "3"  // Deprecated: additional info about the sizing of the host
+	SizingV1            = "3"  // optional additional info about the sizing of the host
 	FeaturesV1          = "4"  // optional additional info describing installed features on a host
 	VolumesV1           = "5"  // optional additional info about attached volumes on the host
 	SharesV1            = "6"  // optional additional info about Nas role of the host
 	MountsV1            = "7"  // optional additional info about mounted devices (locally attached or remote filesystem)
 	SystemV1            = "8"  // optional additional info about system
-	SizingV2            = "9"  // optional additional info about the sizing of the host
+	_                   = "9"  // not used (was SizingV2, actually not needed when created)
 	ClusterMembershipV1 = "10" // optional additional information about the cluster membership of the host
 	SecurityGroupsV1    = "11" // optional additional information about security groups binded to the host
 	NetworkV2           = "12" // NetworkV2 contains optional additional information about network of the host

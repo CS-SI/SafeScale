@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -176,14 +177,16 @@ func (f *folder) Read(path string, name string, callback func([]byte) fail.Error
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
-	xerr = callback(data)
-	if xerr != nil {
+	if xerr = callback(data); xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
 	}
 	return nil
 }
 
-// Write writes the content in Object Storage
+// Write writes the content in Object Storage, and check the write is committed.
+// Returns nil on success (with assurance the write has been committed on remote side)
+// May return fail.ErrTimeout if the read-after-write operation timed out.
+// Return any other errors that can occur from the remote side
 func (f *folder) Write(path string, name string, content []byte) fail.Error {
 	if f == nil {
 		return fail.InvalidInstanceError()
@@ -203,9 +206,32 @@ func (f *folder) Write(path string, name string, content []byte) fail.Error {
 		data = content
 	}
 
+	bucketName := f.getBucket().Name
+	absolutePath := f.absolutePath(path, name)
 	source := bytes.NewBuffer(data)
-	_, xerr := f.service.WriteObject(f.getBucket().Name, f.absolutePath(path, name), source, int64(source.Len()), nil)
-	return xerr
+	_, xerr := f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
+
+	// FIXME: find a way to raise the delay at each turnm
+	return retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			var target bytes.Buffer
+			innerErr := f.service.ReadObject(bucketName, absolutePath, &target, 0, 0)
+			if innerErr != nil {
+				return innerErr
+			}
+			check := target.Bytes()
+			if bytes.Compare(data, check) != 0 {
+				return fail.NewError("remote content is different than source")
+			}
+			return nil
+		},
+		temporal.GetBigDelay(),
+	)
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'cb' on each entry

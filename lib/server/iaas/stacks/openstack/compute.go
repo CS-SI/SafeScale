@@ -69,9 +69,9 @@ func (s *Stack) ListRegions() (list []string, xerr fail.Error) {
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
-				ParentRegionID: "RegionOne",
+				//ParentRegionID: "RegionOne",
 			}
-			allPages, innerErr = regions.List(s.ComputeClient, listOpts).AllPages()
+			allPages, innerErr = regions.List(s.IdentityClient, listOpts).AllPages()
 			return NormalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
@@ -85,8 +85,8 @@ func (s *Stack) ListRegions() (list []string, xerr fail.Error) {
 		return results, fail.ToError(err)
 	}
 
-	for _, reg := range allRegions {
-		results = append(results, reg.ID)
+	for _, v := range allRegions {
+		results = append(results, v.ID)
 	}
 	return results, nil
 }
@@ -168,7 +168,7 @@ func (s *Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 	return imgList, nil
 }
 
-// GetImage returns the Image referenced by id
+// InspectImage returns the Image referenced by id
 func (s *Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) {
 	nullImage := &abstract.Image{}
 	if s == nil {
@@ -194,7 +194,13 @@ func (s *Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error)
 	if xerr != nil {
 		return nullImage, xerr
 	}
-	return &abstract.Image{ID: img.ID, Name: img.Name}, nil
+
+	out := &abstract.Image{
+		ID:       img.ID,
+		Name:     img.Name,
+		DiskSize: int64(img.MinDiskGigabytes),
+	}
+	return out, nil
 }
 
 // GetTemplate returns the Template referenced by id
@@ -663,7 +669,7 @@ func (s *Stack) InspectHostByName(name string) (*abstract.HostCore, fail.Error) 
 	return nullAhc, abstract.ResourceNotFoundError("host", name)
 }
 
-// CreateHost creates an host satisfying request
+// CreateHost creates a new host
 func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
 	nullAhf := abstract.NewHostFull()
 	nullUdc := userdata.NewContent()
@@ -687,7 +693,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
 
-	nets, sgs, xerr := s.identifyOpenstackSubnets(request, defaultSubnet)
+	nets /*, sgs*/, xerr := s.identifyOpenstackSubnets(request, defaultSubnet)
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to construct list of Subnets for the host")
 	}
@@ -706,7 +712,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		}
 	}()
 
-	if xerr = s.provideCredentialsIfNeeded(&request); xerr != nil {
+	if xerr = s.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
@@ -738,8 +744,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	}
 
 	srvOpts := servers.CreateOpts{
-		Name:             request.ResourceName,
-		SecurityGroups:   sgs,
+		Name: request.ResourceName,
+		//SecurityGroups:   sgs,
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
@@ -852,12 +858,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		return nullAhf, nullUdc, retryErr
 	}
 
-	// update Security Group of port on Provider Network
-	if request.IsGateway || request.PublicIP {
-		if xerr = s.updateSecurityGroupOfExternalPort(ahc, sgs); xerr != nil {
-			return nullAhf, nullUdc, fail.Wrap(xerr, "failed to update Security Group of Internet interface used by host")
-		}
-	}
+	//// update Security Group of port on Provider Network
+	//if request.IsGateway || request.PublicIP {
+	//	if xerr = s.updateSecurityGroupOfExternalPort(ahc, sgs); xerr != nil {
+	//		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to update Security Group of Internet interface used by host")
+	//	}
+	//}
 
 	logrus.Debugf("host resource created.")
 
@@ -954,32 +960,33 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 }
 
 // identifyOpenstackSubnets ...
-func (s *Stack) identifyOpenstackSubnets(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, sgs []string, xerr fail.Error) {
-	sgs = []string{}
+func (s *Stack) identifyOpenstackSubnets(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network /*sgs []string,*/, xerr fail.Error) {
+	//sgs = []string{}
 	nets = []servers.Network{}
 
-	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
-		if request.PublicIP {
-			sgs = []string{defaultSubnet.PublicSecurityGroupID}
-		}
-		// IsGateway state takes precedence over PublicIP
-		if request.IsGateway {
-			sgs = []string{defaultSubnet.GWSecurityGroupID}
-		}
-	}
+	//if !s.cfgOpts.UseFloatingIP && request.PublicIP {
+	//	//if request.PublicIP {
+	//	//	sgs = []string{defaultSubnet.PublicSecurityGroupID}
+	//	//}
+	//	// IsGateway state takes precedence over PublicIP
+	//	sgs = append(sgs, defaultSubnet.InternalSecurityGroupID)
+	//	if request.IsGateway {
+	//		sgs = append(sgs, defaultSubnet.GWSecurityGroupID)
+	//	}
+	//}
 
 	// private networks
 	for _, n := range request.Subnets {
 		req := ports.CreateOpts{
-			NetworkID:      n.Network,
-			Name:           fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
-			Description:    fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
-			FixedIPs:       []ports.IP{{SubnetID: n.ID}},
-			SecurityGroups: &sgs,
+			NetworkID:   n.Network,
+			Name:        fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
+			Description: fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
+			FixedIPs:    []ports.IP{{SubnetID: n.ID}},
+			//SecurityGroups: &sgs,
 		}
 		port, xerr := s.createPort(req)
 		if xerr != nil {
-			return nets, sgs, fail.Wrap(xerr, "failed to create port on subnet '%s'", n.Name)
+			return nets /*, sgs */, fail.Wrap(xerr, "failed to create port on subnet '%s'", n.Name)
 		}
 
 		defer func() {
@@ -996,18 +1003,18 @@ func (s *Stack) identifyOpenstackSubnets(request abstract.HostRequest, defaultSu
 	// If floating IPs are not used and host is public
 	// then add provider external network to host networks
 	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
-		adminState := false
+		adminState := true
 		req := ports.CreateOpts{
 			NetworkID:   s.ProviderNetworkID,
 			Name:        fmt.Sprintf("nic_%s_external", request.ResourceName),
 			Description: fmt.Sprintf("nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork),
 			//	FixedIPs:       []ports.IP{{SubnetID: n.ID}},
-			SecurityGroups: &sgs,
-			AdminStateUp:   &adminState,
+			//SecurityGroups: &sgs,
+			AdminStateUp: &adminState,
 		}
 		port, xerr := s.createPort(req)
 		if xerr != nil {
-			return nets, sgs, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
+			return nets /*, sgs*/, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
 		}
 
 		defer func() {
@@ -1023,11 +1030,11 @@ func (s *Stack) identifyOpenstackSubnets(request abstract.HostRequest, defaultSu
 		//nets = append(nets, servers.Network{UUID: s.ProviderNetworkID})
 	}
 
-	return nets, sgs, nil
+	return nets /*, sgs*/, nil
 }
 
-// provideCredentialsIfNeeded ...
-func (s *Stack) provideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
+// ProvideCredentialsIfNeeded ...
+func (s *Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
 	if request == nil {
 		return fail.InvalidParameterError("request", "cannot be nil")
 	}
@@ -1606,7 +1613,7 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter /*ip string, */, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -1634,20 +1641,15 @@ func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter /*ip stri
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
-	if xerr != nil {
-		return xerr
-	}
-
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(asg)
+	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
