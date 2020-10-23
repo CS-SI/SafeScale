@@ -89,11 +89,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectID, _ := compute["ProjectID"].(string)
 	vpcName, _ := network["DefaultNetworkName"].(string)
 	if vpcName == "" {
-		vpcName, _ := network["VPCName"].(string)
+		vpcName, _ = network["VPCName"].(string)
 	}
 	vpcCIDR, _ := network["DefaultNetworkCIDR"].(string)
 	if vpcCIDR == "" {
-		vpcCIDR, _ := network["VPCCIDR"].(string)
+		vpcCIDR, _ = network["VPCCIDR"].(string)
 	}
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)

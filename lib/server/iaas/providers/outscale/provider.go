@@ -80,9 +80,9 @@ func volumeSpeed(s string) volumespeed.Enum {
 		return volumespeed.SSD
 	}
 	return volumespeed.HDD
-
 }
 
+// Build ...
 func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr fail.Error) {
 	if p == nil {
 		return nil, fail.InvalidInstanceError()
@@ -102,7 +102,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		stackName := get(identity, "provider")
 		userID := get(identity, "UserID")
 		if userID == "" {
-			return nil, fail.SyntaxError("field 'UserID' in section 'identity' not found in tenant file", nil, nil)
+			return nil, fail.SyntaxError("field 'UserID' in section 'identity' not found in tenant file")
 		}
 		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if xerr != nil {
