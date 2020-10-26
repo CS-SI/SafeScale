@@ -255,10 +255,10 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 }
 
 // CreateHost creates a new host
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
 	nullAhf := abstract.NewHostFull()
 	nullUdc := userdata.NewContent()
-	if s == nil {
+	if s.IsNull() {
 		return nullAhf, nullUdc, fail.InvalidInstanceError()
 	}
 
@@ -565,29 +565,27 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
 
 	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
 	if server == nil {
-		return nil, abstract.ResourceNotFoundError("host", hostRef)
+		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
 	if host, xerr = s.complementHost(ahf.Core, server); xerr != nil {
-		return nil, xerr
-	}
-	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
@@ -596,7 +594,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.Host
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
+func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
@@ -698,7 +696,7 @@ func (s *Stack) complementHost(host *abstract.HostCore, server *servers.Server) 
 // collectAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s *Stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
+func (s stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
 	var (
 		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
@@ -752,9 +750,10 @@ func (s *Stack) collectAddresses(host *abstract.HostCore) ([]string, map[ipversi
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
+	var emptyList abstract.HostList
+	if s.IsNull() {
+		return emptyList, fail.InvalidInstanceError()
 	}
 
 	var hostList abstract.HostList
@@ -788,16 +787,15 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
-
+		return emptyList, xerr
 	}
 	// VPL: empty host list is not an abnormal situation, do not log or raise error
 	return hostList, nil
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -928,7 +926,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
-func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail.Error) {
+func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
@@ -963,7 +961,7 @@ func (s *Stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fai
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to an host
-func (s *Stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Error) {
+func (s stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Error) {
 	fip, xerr := s.CreateFloatingIP()
 	if xerr != nil {
 		return nil, xerr
@@ -982,7 +980,7 @@ func (s *Stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Err
 }
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
-func (s *Stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
+func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 	var (
 		portID *string
 	)
@@ -1026,7 +1024,7 @@ func (s *Stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 }
 
 // DisableHostRouterMode disables the host to act as a router/gateway.
-func (s *Stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
+func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 	portID, xerr := s.getOpenstackPortID(host)
 	if xerr != nil {
 		return fail.NewError("failed to disable Router Mode on host '%s'", host.Core.Name)
@@ -1050,7 +1048,7 @@ func (s *Stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 }
 
 // listInterfaces returns a pager of the interfaces attached to host identified by 'serverID'
-func (s *Stack) listInterfaces(hostID string) pagination.Pager {
+func (s stack) listInterfaces(hostID string) pagination.Pager {
 	url := s.Stack.ComputeClient.ServiceURL("servers", hostID, "os-interface")
 	return pagination.NewPager(s.Stack.ComputeClient, url, func(r pagination.PageResult) pagination.Page {
 		return nics.InterfacePage{SinglePageBase: pagination.SinglePageBase(r)}
@@ -1059,7 +1057,7 @@ func (s *Stack) listInterfaces(hostID string) pagination.Pager {
 
 // getOpenstackPortID returns the port ID corresponding to the first private IP address of the host
 // returns nil,nil if not found
-func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error) {
+func (s stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error) {
 	ip := host.Networking.IPv4Addresses[host.Networking.DefaultSubnetID]
 	found := false
 	nic := nics.Interface{}
@@ -1093,29 +1091,6 @@ func (s *Stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error
 	}
 	return &nic.PortID, nil
 }
-
-// // toHostSizing converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-// func (s *Stack) toHostSizing(flavor map[string]interface{}) *abstract.HostEffectiveSizing {
-// 	if i, ok := flavor["id"]; ok {
-// 		fid, ok := i.(string)
-// 		if !ok {
-// 			return nil
-// 		}
-// 		tpl, err := s.InspectTemplate(fid)
-// 		if err != nil {
-// 			return nil
-// 		}
-// 		return converters.HostTemplateToHostEffectiveSizing(tpl)
-// 	}
-// 	hostSizing := &abstract.HostEffectiveSizing{}
-// 	if _, ok := flavor["vcpus"]; ok {
-// 		hostSizing.Cores, _ = flavor["vcpus"].(int)
-// 		hostSizing.DiskSize, _ = flavor["disk"].(int)
-// 		hostSizing.RAMSize, _ = flavor["ram"].(float32)
-// 		hostSizing.RAMSize /= 1000.0
-// 	}
-// 	return hostSizing
-// }
 
 // toHostState converts host status returned by FlexibleEngine driver into HostState enum
 func toHostState(status string) hoststate.Enum {

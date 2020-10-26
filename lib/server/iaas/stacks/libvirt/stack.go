@@ -27,20 +27,31 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-type Stack struct {
+type stack struct {
 	LibvirtService *libvirt.Connect
 	LibvirtConfig  *stacks.LocalConfiguration
 	Config         *stacks.ConfigurationOptions
 	AuthOptions    *stacks.AuthenticationOptions
 }
 
-func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) fail.Error {
+// NullStack is not exposed through API, is needed essentially by testss
+func NullStack() *stack {
+	return &stack{}
+}
+
+// IsNull tells if the instance represents a null value of stack
+func (s *stack) IsNull() {
+	return s == nil || s.LibvirtService == nil
+}
+
+// WaitHostReady ...
+func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) fail.Error {
 	return fail.NotImplementedError("WaitHostReady not implemented yet!") // FIXME: Technical debt
 }
 
 // Build Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
-	stack := &Stack{
+func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) {
+	stack := &stack{
 		Config:        &cfg,
 		LibvirtConfig: &localCfg,
 		AuthOptions:   &auth,

@@ -32,8 +32,8 @@ import (
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
-	if s == nil {
+func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	// networkID is not used by Outscale
@@ -98,15 +98,15 @@ func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []str
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
-	if s == nil {
+func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet")
 }
 
-func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
+func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 	readNicsOpts := osc.ReadNicsOpts{
 		ReadNicsRequest: optional.NewInterface(osc.ReadNicsRequest{
 			Filters: osc.FiltersNic{
@@ -146,8 +146,8 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -193,8 +193,8 @@ func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -231,8 +231,8 @@ func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr 
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {

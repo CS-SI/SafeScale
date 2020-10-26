@@ -19,8 +19,6 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"testing"
 	"time"
 
@@ -29,10 +27,12 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -61,12 +61,12 @@ type ServiceTester struct {
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	var stack api.Stack
 
-	stack = &aws.Stack{}         // nolint
-	stack = &gcp.Stack{}         // nolint
-	stack = &huaweicloud.Stack{} // nolint
-	stack = &libvirt.Stack{}     // nolint
-	stack = &openstack.Stack{}   // nolint
-	stack = &outscale.Stack{}    // nolint
+	stack = aws.NullStack()         // nolint
+	stack = gcp.NullStack()         // nolint
+	stack = huaweicloud.NullStack() // nolint
+	stack = libvirt.NullStack()     // nolint
+	stack = openstack.NullStack()   // nolint
+	stack = outscale.NullStack()    // nolint
 
 	_ = stack
 }

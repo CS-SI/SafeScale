@@ -87,8 +87,8 @@ type ConfigurationOptions struct {
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-// Stack Outscale Stack to adapt outscale IaaS API
-type Stack struct {
+// stack Outscale Stack to adapt outscale IaaS API
+type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
 	auth                 context.Context
@@ -107,13 +107,19 @@ type Stack struct {
 	//SecurityGroup     *secgroups.SecGroup
 }
 
-// New creates a new Stack
-func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
+// NullStacks returns a null value of the stack
+func NullStack() *stack {
+	return &stack{}
+}
+
+// New creates a new stack
+//func New(authOpts stacks.AuthenticationOptions, cfgOpts stacks.ConfigurationOptions) (_ api.Stack, xerr fail.Error) {
+func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) {
 	if options == nil {
 		return nil, fail.InvalidParameterError("options", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", options).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -127,7 +133,7 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
 		"gp2":      volumespeed.HDD,
 		"io1":      volumespeed.SSD,
 	}
-	s := Stack{
+	s := stack{
 		Options:         *options,
 		client:          client,
 		VolumeSpeedsMap: volumeSpeeds,
@@ -160,8 +166,13 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
 	return &s, s.initDefaultNetwork()
 }
 
+// IsNull tells if the instance is a null value of stack
+func (s *stack) IsNull() bool {
+	return s == nil || s.client == nil
+}
+
 // initDefaultNetwork() initializes the instance of the Network/VPC if one is defined in tenant
-func (s *Stack) initDefaultNetwork() fail.Error {
+func (s *stack) initDefaultNetwork() fail.Error {
 	if s.vpc == nil && s.Options.Network.DefaultNetworkName != "" {
 		an, xerr := s.InspectNetworkByName(s.Options.Network.DefaultNetworkName)
 		if xerr != nil {
@@ -197,8 +208,8 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
-	if s == nil {
+func (s stack) ListRegions() (_ []string, xerr fail.Error) {
+	if s.IsNull() {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
@@ -206,9 +217,6 @@ func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
 	return []string{
 		"cn-southeast-1",
 		"eu-west-2",
@@ -218,9 +226,9 @@ func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s *Stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 	emptyMap := make(map[string]bool, 0)
-	if s == nil {
+	if s.IsNull() {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 

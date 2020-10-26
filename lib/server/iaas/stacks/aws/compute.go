@@ -20,13 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -36,11 +30,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -53,12 +52,13 @@ type portDef struct {
 }
 
 // CreateKeyPair creates a keypair and upload it to AWS
-func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
@@ -73,14 +73,14 @@ func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error
 		PublicKeyMaterial: []byte(keypair.PublicKey),
 	})
 	if err != nil {
-		return nil, normalizeError(err)
+		return nullAKP, normalizeError(err)
 	}
 	return keypair, nil
 }
 
 // ImportKeyPair imports an existing resources.KeyPair to AWS (not in the interface yet, but will come soon)
-func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
-	if s == nil {
+func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -100,14 +100,15 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 	return normalizeError(err)
 }
 
-// GetKeyPair loads a keypair from AWS
+// InspectKeyPair loads a keypair from AWS
 // Note: the private key is not stored by AWS...
-func (s *Stack) InspectKeyPair(id string) (_ *abstract.KeyPair, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) InspectKeyPair(id string) (_ *abstract.KeyPair, xerr fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).
@@ -120,10 +121,10 @@ func (s *Stack) InspectKeyPair(id string) (_ *abstract.KeyPair, xerr fail.Error)
 		KeyNames: []*string{aws.String(id)},
 	})
 	if err != nil {
-		return nil, fail.Wrap(normalizeError(err), "failed to get keypair '%s'", id)
+		return nullAKP, fail.Wrap(normalizeError(err), "failed to get keypair '%s'", id)
 	}
 	if len(out.KeyPairs) == 0 {
-		return nil, fail.NotFoundError("failed to find keypair '%s'", id)
+		return nullAKP, fail.NotFoundError("failed to find keypair '%s'", id)
 	}
 
 	kp := out.KeyPairs[0]
@@ -136,9 +137,10 @@ func (s *Stack) InspectKeyPair(id string) (_ *abstract.KeyPair, xerr fail.Error)
 }
 
 // ListKeyPairs lists keypairs stored in AWS
-func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
+	var emptySlice []abstract.KeyPair
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).
@@ -149,7 +151,7 @@ func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 
 	out, err := s.EC2Service.DescribeKeyPairs(&ec2.DescribeKeyPairsInput{})
 	if err != nil {
-		return nil, normalizeError(err)
+		return emptySlice, normalizeError(err)
 	}
 	var keys []abstract.KeyPair
 	for _, kp := range out.KeyPairs {
@@ -164,8 +166,8 @@ func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 }
 
 // DeleteKeyPair deletes a keypair from AWS
-func (s *Stack) DeleteKeyPair(id string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteKeyPair(id string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -180,63 +182,66 @@ func (s *Stack) DeleteKeyPair(id string) (xerr fail.Error) {
 }
 
 // ListAvailabilityZones lists AWS availability zones available
-func (s *Stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
+	emptyMap := map[string]bool{}
+	if s.IsNull() {
+		return emptyMap, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	zones := make(map[string]bool)
-
 	ro, err := s.EC2Service.DescribeAvailabilityZones(&ec2.DescribeAvailabilityZonesInput{})
 	if err != nil {
-		return zones, normalizeError(err)
+		return emptyMap, normalizeError(err)
 	}
 	if ro != nil {
+		zones := make(map[string]bool, len(ro.AvailabilityZones))
 		for _, zone := range ro.AvailabilityZones {
 			zoneName := aws.StringValue(zone.ZoneName)
 			if zoneName != "" {
 				zones[zoneName] = aws.StringValue(zone.State) == "available"
 			}
 		}
+		return zones, nil
 	}
 
-	return zones, nil
+	return emptyMap, nil
 }
 
 // ListRegions lists regions available in AWS
-func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListRegions() (_ []string, xerr fail.Error) {
+	var emptySlice []string
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	var regions []string
-
 	ro, err := s.EC2Service.DescribeRegions(&ec2.DescribeRegionsInput{})
 	if err != nil {
-		return regions, normalizeError(err)
+		return emptySlice, normalizeError(err)
 	}
 	if ro != nil {
+		regions := make([]string, 0, len(ro.Regions))
 		for _, region := range ro.Regions {
 			regions = append(regions, aws.StringValue(region.RegionName))
 		}
+		return regions, nil
 	}
 
-	return regions, nil
+	return emptySlice, nil
 }
 
-// GetImage loads information about an image stored in AWS
-func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+// InspectImage loads information about an image stored in AWS
+func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
+	nullAI := &abstract.Image{}
+	if s.IsNull() {
+		return nullAI, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -244,7 +249,7 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 
 	imagesList, xerr := s.ListImages()
 	if xerr != nil {
-		return nil, xerr
+		return nullAI, xerr
 	}
 	for _, res := range imagesList {
 		if res.ID == id {
@@ -252,17 +257,17 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 		}
 	}
 
-	return nil, abstract.ResourceNotFoundError("Image", id)
+	return nullAI, abstract.ResourceNotFoundError("Image", id)
 }
 
-// GetTemplate loads information about a template stored in AWS
-func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
-	template = &abstract.HostTemplate{}
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+// InspectTemplate loads information about a template stored in AWS
+func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
+	nullAHT := &abstract.HostTemplate{}
+	if s.IsNull() {
+		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -290,7 +295,7 @@ func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xer
 		ServiceCode: aws.String("AmazonEC2"),
 	})
 	if err != nil {
-		return template, normalizeError(err)
+		return nullAHT, normalizeError(err)
 	}
 
 	for _, price := range prods.PriceList {
@@ -313,11 +318,10 @@ func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xer
 			RAMSize:   float32(ParseMemory(price.Product.Attributes.Memory)),
 		}
 
-		template = &tpl
-		break
+		return &tpl, nil
 	}
 
-	return template, nil
+	return nullAHT, abstract.ResourceNotFoundError("template", id)
 }
 
 // createFilters ...
@@ -365,15 +369,14 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s *Stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+	var emptySlice []abstract.Image
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
-
-	var images []abstract.Image
 
 	filters := []*ec2.Filter{
 		{
@@ -389,14 +392,23 @@ func (s *Stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
 	// Added filtering by owner-id
 	filters = append(filters, createFilters()...)
 
-	iout, err := s.EC2Service.DescribeImages(&ec2.DescribeImagesInput{
+	query := ec2.DescribeImagesInput{
 		Filters: filters,
-	})
-	if err != nil {
-		return images, normalizeError(err)
 	}
-	if iout != nil {
-		for _, image := range iout.Images {
+	var resp *ec2.DescribeImagesOutput
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.DescribeImages(&query)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+	if len(resp.Images) > 0 {
+		images := make([]abstract.Image, 0, len(resp.Images))
+		for _, image := range resp.Images {
 			if image != nil {
 				if !aws.BoolValue(image.EnaSupport) {
 					logrus.Warnf("ENA filtering does NOT actually work !")
@@ -410,16 +422,17 @@ func (s *Stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
 				})
 			}
 		}
+		return images, nil
 	}
 
-	return images, nil
+	return emptySlice, nil
 }
 
 // ListTemplates lists templates stored in AWS
-func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
-	templates = []abstract.HostTemplate{}
-	if s == nil {
-		return templates, fail.InvalidInstanceError()
+func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+	var emptySlice []abstract.HostTemplate
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -442,7 +455,7 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Er
 		ServiceCode: aws.String("AmazonEC2"),
 	})
 	if err != nil {
-		return templates, normalizeError(err)
+		return emptySlice, normalizeError(err)
 	}
 
 	templates = make([]abstract.HostTemplate, 0, len(prods.PriceList))
@@ -474,14 +487,14 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Er
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
-	nullAhc := abstract.NewHostCore()
-	if s == nil {
-		return nullAhc, fail.InvalidInstanceError()
+func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
+	nullAHC := abstract.NewHostCore()
+	if s.IsNull() {
+		return nullAHC, fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAhc, xerr
+		return nullAHC, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
@@ -517,25 +530,25 @@ func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durat
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAhc, fail.ToError(retryErr.Cause())
+			return nullAHC, fail.ToError(retryErr.Cause())
 		case *retry.ErrTimeout:
-			return nullAhc, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout)
+			return nullAHC, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout)
 		default:
-			return nullAhc, retryErr
+			return nullAHC, retryErr
 		}
 	}
 	return ahf.Core, nil
 }
 
 // CreateHost creates a host
-func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
-	nullAhf := abstract.NewHostFull()
-	nullUdc := userdata.NewContent()
-	if s == nil {
-		return nullAhf, nullUdc, fail.InvalidInstanceError()
+func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	nullUDC := userdata.NewContent()
+	if s.IsNull() {
+		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 	if request.KeyPair == nil {
-		return nullAhf, nullUdc, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+		return nullAHF, nullUDC, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
@@ -548,14 +561,14 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	keyPairName := request.KeyPair.Name
 
 	if subnets == nil || len(subnets) == 0 {
-		return nullAhf, nullUdc, fail.InvalidRequestError("the host '%s' must be on at least one subnet (even if public)", resourceName)
+		return nullAHF, nullUDC, fail.InvalidRequestError("the Host '%s' must be on at least one Subnet (even if public)", resourceName)
 	}
 
 	// If no password is provided, create one
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
-			return nullAhf, nullUdc, fail.Wrap(err, "failed to generate password")
+			return nullAHF, nullUDC, fail.Wrap(err, "failed to generate password")
 		}
 		request.Password = password
 	}
@@ -570,7 +583,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
 
 	if defaultSubnet == nil && !request.PublicIP {
-		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// FIXME: AWS Remove logs
@@ -610,18 +623,18 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
 		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	// Determine system disk size based on vcpus count
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
 	}
 
-	rim, err := s.InspectImage(request.ImageID)
-	if err != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
+	rim, xerr := s.InspectImage(request.ImageID)
+	if xerr != nil {
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
@@ -630,7 +643,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 	if s.AwsConfig.Zone == "" {
 		azList, xerr := s.ListAvailabilityZones()
 		if xerr != nil {
-			return nullAhf, nullUdc, xerr
+			return nullAHF, nullUDC, xerr
 		}
 		var az string
 		for az = range azList {
@@ -654,43 +667,43 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
 	// Sets provider parameters to create ahf
 	userDataPhase1, xerr := userData.Generate("phase1")
-	if err != nil {
-		return nullAhf, nullUdc, xerr
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
 	}
 
-	vpcnet, xerr := s.InspectNetworkByName(s.AwsConfig.NetworkName)
-	if err != nil {
-		return nullAhf, nullUdc, xerr
-	}
+	//vpcnet, xerr := s.InspectNetworkByName(s.AwsConfig.NetworkName)
+	//if xerr != nil {
+	//	return nullAHF, nullUDC, xerr
+	//}
 
 	// --- query provider for ahf creation ---
 
 	logrus.Debugf("requesting host resource creation...")
 	var desistError error
 
-	sgRules := stacks.DefaultTCPRules()
-	sgRules = append(sgRules, stacks.DefaultUDPRules()...)
-	sgRules = append(sgRules, stacks.DefaultICMPRules()...)
+	//sgRules := stacks.DefaultTCPRules()
+	//sgRules = append(sgRules, stacks.DefaultUDPRules()...)
+	//sgRules = append(sgRules, stacks.DefaultICMPRules()...)
 
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			var asg *abstract.SecurityGroup
-			sgName := request.ResourceName + "-default-sg"
-			if ok, innerErr := hasSecurityGroup(s.EC2Service, vpcnet.ID, sgName); innerErr == nil {
-				if !ok {
-					logrus.Debug("Security group not found")
-					asg, innerErr = s.CreateSecurityGroup(vpcnet.ID, sgName, fmt.Sprintf("Default Security Group for host %s", request.ResourceName), nil)
-					if innerErr != nil {
-						desistError = innerErr
-						return nil
-					}
-				}
-			} else {
-				logrus.Debugf("Error happened: %v", innerErr)
-				desistError = innerErr
-				return nil
-			}
+			//var asg *abstract.SecurityGroup
+			//sgName := request.ResourceName + "-default-sg"
+			//if ok, innerErr := hasSecurityGroup(s.EC2Service, vpcnet.ID, sgName); innerErr == nil {
+			//	if !ok {
+			//		logrus.Debug("Security group not found")
+			//		asg, innerErr = s.CreateSecurityGroup(vpcnet.ID, sgName, fmt.Sprintf("Default Security Group for host %s", request.ResourceName), nil)
+			//		if innerErr != nil {
+			//			desistError = innerErr
+			//			return nil
+			//		}
+			//	}
+			//} else {
+			//	logrus.Debugf("Error happened: %v", innerErr)
+			//	desistError = innerErr
+			//	return nil
+			//}
 
 			//sgID, err := getSecurityGroupID(s.EC2Service, vpcnet.ID, request.ResourceName)
 			//if err != nil {
@@ -709,7 +722,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 				//	netID = defaultSubnet.ID
 				//}
 
-				server, xerr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template, asg.ID)
+				server, xerr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template /*, asg.ID*/)
 			} else {
 				netID := defaultSubnet.ID
 				//if s.Config.BuildSubnets && len(defaultSubnet.Subnetworks) >= 2 {
@@ -720,24 +733,24 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 				//	}
 				//}
 
-				server, err = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template, asg.ID)
+				server, xerr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID, string(userDataPhase1), isGateway, *template /*, asg.ID*/)
 			}
-			if err != nil {
-				logrus.Warnf("error creating ahf: %+v", err)
+			if xerr != nil {
+				logrus.Warnf("error creating Host: %+v", xerr)
 
 				if server != nil {
 					killErr := s.DeleteHost(server.ID)
 					if killErr != nil {
-						return fail.Wrap(err, killErr.Error())
+						return fail.Wrap(xerr, killErr.Error())
 					}
 				}
 
-				if isAWSErr(err) {
-					desistError = err
+				if isAWSErr(xerr) {
+					desistError = xerr
 					return nil
 				}
 
-				return err
+				return xerr
 			}
 
 			if server == nil {
@@ -748,41 +761,40 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 			ahf.Core.Name = server.Name
 
 			// Wait until Host is ready, not just until the build is started
-			_, err = s.WaitHostReady(ahf, temporal.GetLongOperationTimeout())
-			if err != nil {
+			if _, xerr = s.WaitHostReady(ahf, temporal.GetLongOperationTimeout()); xerr != nil {
 				killErr := s.DeleteHost(ahf.Core.ID)
 				if killErr != nil {
-					return fail.Wrap(err, killErr.Error())
+					return fail.Wrap(xerr, killErr.Error())
 				}
-				return err
+				return xerr
 			}
 
 			return nil
 		},
 		temporal.GetLongOperationTimeout(),
 	)
-	if err != nil {
-		return nullAhf, nullUdc, fail.Wrap(err, "Error creating ahf: timeout")
+	if xerr != nil {
+		return nullAHF, nullUDC, fail.Wrap(xerr, "Error creating Host: timeout")
 	}
 	if desistError != nil {
-		return nullAhf, nullUdc, fail.ForbiddenError(fmt.Sprintf("Error creating ahf: %s", desistError.Error()))
+		return nullAHF, nullUDC, fail.ForbiddenError(fmt.Sprintf("Error creating Host: %s", desistError.Error()))
 	}
 
-	logrus.Debugf("ahf resource created.")
+	logrus.Debugf("Host resource created.")
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if err != nil { // FIXME: Handle error groups
+		if xerr != nil && !request.KeepOnFailure { // FIXME: Handle error groups
 			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
-			derr := s.DeleteHost(ahf.Core.ID)
-			if derr != nil {
+			if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 				logrus.Warnf("Error deleting ahf: %v", derr)
 			}
 		}
 	}()
 
 	if ahf.IsNull() {
-		return nullAhf, nullUdc, fail.InconsistentError("unexpected nil ahf")
+		return nullAHF, nullUDC, fail.InconsistentError("unexpected nil ahf")
 	}
 
 	if !ahf.OK() {
@@ -793,14 +805,14 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
 }
 
-// Returns true if the error is of type awserr.Error
-func isSpecificAWSErr(err error, code string, message string) bool {
-	if err, ok := err.(awserr.Error); ok {
-		logrus.Warnf("Received AWS error code: %s", err.Code())
-		return err.Code() == code && strings.Contains(err.Message(), message)
-	}
-	return false
-}
+//// Returns true if the error is of type awserr.Error
+//func isSpecificAWSErr(err error, code string, message string) bool {
+//	if err, ok := err.(awserr.Error); ok {
+//		logrus.Warnf("Received AWS error code: %s", err.Code())
+//		return err.Code() == code && strings.Contains(err.Message(), message)
+//	}
+//	return false
+//}
 
 /*
 Returns true if the error matches all these conditions:
@@ -817,25 +829,25 @@ func isAWSErr(err error) bool {
 	return false
 }
 
-func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, error) {
-	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []*ec2.Filter{{
-			Name:   aws.String("group-name"),
-			Values: []*string{aws.String(name)},
-		}},
-	})
-	if err != nil {
-		return false, err
-	}
-
-	for _, sg := range dgo.SecurityGroups {
-		if aws.StringValue(sg.VpcId) == vpcID {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
+//func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, error) {
+//	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
+//		Filters: []*ec2.Filter{{
+//			Name:   aws.String("group-name"),
+//			Values: []*string{aws.String(name)},
+//		}},
+//	})
+//	if err != nil {
+//		return false, err
+//	}
+//
+//	for _, sg := range dgo.SecurityGroups {
+//		if aws.StringValue(sg.VpcId) == vpcID {
+//			return true, nil
+//		}
+//	}
+//
+//	return false, nil
+//}
 
 //func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, error) {
 //	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
@@ -940,7 +952,7 @@ func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, err
 //	return nil
 //}
 
-func (s Stack) buildAwsSpotMachine(
+func (s stack) buildAwsSpotMachine(
 	keypairName string,
 	name string,
 	imageId string,
@@ -949,14 +961,14 @@ func (s Stack) buildAwsSpotMachine(
 	data string,
 	isGateway bool,
 	template abstract.HostTemplate,
-	sgID string,
+	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
 		AssociatePublicIpAddress: aws.Bool(isGateway),
-		Groups:                   []*string{aws.String(sgID)},
+		//Groups:                   []*string{aws.String(sgID)},
 	}
 
 	dspho, err := s.EC2Service.DescribeSpotPriceHistory(&ec2.DescribeSpotPriceHistoryInput{
@@ -1003,7 +1015,7 @@ func (s Stack) buildAwsSpotMachine(
 	return &host, nil
 }
 
-func (s Stack) buildAwsMachine(
+func (s stack) buildAwsMachine(
 	keypairName string,
 	name string,
 	imageId string,
@@ -1012,7 +1024,7 @@ func (s Stack) buildAwsMachine(
 	data string,
 	isGateway bool,
 	template abstract.HostTemplate,
-	sgID string,
+	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
 	//logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
@@ -1021,7 +1033,7 @@ func (s Stack) buildAwsMachine(
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
 		AssociatePublicIpAddress: aws.Bool(isGateway),
-		Groups:                   []*string{aws.String(sgID)},
+		//Groups:                   []*string{aws.String(sgID)},
 	}
 
 	// Run instance
@@ -1070,107 +1082,118 @@ func (s Stack) buildAwsMachine(
 }
 
 // InspectHost loads information of a host from AWS
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
-	ahf = abstract.NewHostFull()
-	if s == nil {
-		return ahf, fail.InvalidInstanceError()
+func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
-
 	var hostRef string
 	ahf, hostRef, xerr = stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return ahf, xerr
+		return nullAHF, xerr
 	}
-	if utils.IsEmpty(ahf) {
-		return nil, abstract.ResourceNotFoundError("host", hostRef)
-	}
+	//if utils.IsEmpty(ahf) {
+	//	return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
+	//}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 	defer fail.OnExitLogError(&xerr)
 
-	awsHost, err := s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String("instance-id"),
-				Values: []*string{aws.String(hostRef)},
-			},
+	var resp *ec2.DescribeInstancesOutput
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   aws.String("instance-id"),
+						Values: []*string{aws.String(hostRef)},
+					},
+				},
+			})
+			return normalizeError(innerErr)
 		},
-	})
-	if err != nil {
-		return nil, fail.ToError(err)
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return ahf, xerr
 	}
 
-	if len(awsHost.Reservations) == 0 {
-		awsHost, err = s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
+	if len(resp.Reservations) == 0 {
+		query := ec2.DescribeInstancesInput{
 			Filters: []*ec2.Filter{
 				{
-					Name: aws.String("tag:Name"),
+					Name: aws.String("tag:" + tagNameLabel),
 					Values: []*string{
 						aws.String(hostRef),
 					},
 				},
 			},
-		})
-		if err != nil {
-			return nil, fail.ToError(err)
+		}
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() (innerErr error) {
+				resp, innerErr = s.EC2Service.DescribeInstances(&query)
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			return ahf, xerr
 		}
 	}
-
-	if len(awsHost.Reservations) == 0 {
-		return nil, fail.NotFoundError(fmt.Sprintf("host %s not found", hostRef))
+	if len(resp.Reservations) == 0 {
+		return ahf, fail.NotFoundError(fmt.Sprintf("failed to find Host %s", hostRef))
 	}
 
+	return ahf, s.inspectReservations(ahf, hostRef, resp.Reservations[0])
+}
+
+func (s stack) inspectReservations(ahf *abstract.HostFull, hostRef string, reservation *ec2.Reservation) (xerr fail.Error) {
 	instanceName := ""
 	instanceType := ""
 
-	for _, r := range awsHost.Reservations {
-		for _, i := range r.Instances {
-			ahf.Core.LastState, xerr = toHostState(i.State)
-			if err != nil {
-				return nil, xerr
-			}
+	for _, i := range reservation.Instances {
+		if ahf.Core.LastState, xerr = toHostState(i.State); xerr != nil {
+			return xerr
+		}
 
-			for _, tag := range i.Tags {
-				if tag != nil {
-					if aws.StringValue(tag.Key) == "Name" || aws.StringValue(tag.Key) == "tag:Name" {
-						if aws.StringValue(tag.Value) != "" {
-							instanceName = aws.StringValue(tag.Value)
-						}
+		for _, tag := range i.Tags {
+			if tag != nil {
+				if aws.StringValue(tag.Key) == "Name" || aws.StringValue(tag.Key) == "tag:Name" {
+					if aws.StringValue(tag.Value) != "" {
+						instanceName = aws.StringValue(tag.Value)
 					}
 				}
 			}
+		}
 
-			if aws.StringValue(i.InstanceType) != "" {
-				instanceType = aws.StringValue(i.InstanceType)
-				break
-			}
+		if aws.StringValue(i.InstanceType) != "" {
+			instanceType = aws.StringValue(i.InstanceType)
+			break
 		}
 	}
 
 	if instanceType == "" {
-		return nil, fail.NewError(nil, "error recovering instance type of %s", hostRef)
+		return fail.NewError(nil, "error recovering instance type of %s", hostRef)
 	}
 
 	var subnets []IPInSubnet
 
-	for _, r := range awsHost.Reservations {
-		for _, i := range r.Instances {
-			for _, ni := range i.NetworkInterfaces {
-				newSubnet := IPInSubnet{
-					Name: getTagOfSubnet(s.EC2Service, ni.SubnetId, "Name"),
-					ID:   aws.StringValue(ni.SubnetId),
-					IP:   aws.StringValue(ni.PrivateIpAddress),
-				}
-
-				if ni.Association != nil {
-					if ni.Association.PublicIp != nil {
-						newSubnet.PublicIP = aws.StringValue(ni.Association.PublicIp)
-					}
-				}
-
-				subnets = append(subnets, newSubnet)
+	for _, i := range reservation.Instances {
+		for _, ni := range i.NetworkInterfaces {
+			newSubnet := IPInSubnet{
+				Name: getTagOfSubnet(s.EC2Service, ni.SubnetId, "Name"),
+				ID:   aws.StringValue(ni.SubnetId),
+				IP:   aws.StringValue(ni.PrivateIpAddress),
 			}
+
+			if ni.Association != nil {
+				if ni.Association.PublicIp != nil {
+					newSubnet.PublicIP = aws.StringValue(ni.Association.PublicIp)
+				}
+			}
+
+			subnets = append(subnets, newSubnet)
 		}
 	}
 
@@ -1196,7 +1219,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 		ahf.Networking.PublicIPv4 = ipv4
 	}
 
-	sizing := fromMachineTypeToHostEffectiveSizing(s, instanceType)
+	sizing := s.fromMachineTypeToHostEffectiveSizing(instanceType)
 
 	ahf.Sizing.Cores = sizing.Cores
 	ahf.Sizing.RAMSize = sizing.RAMSize
@@ -1208,13 +1231,13 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
 	}
 
-	return ahf, nil
+	return nil
 }
 
-func fromMachineTypeToHostEffectiveSizing(stack *Stack, machineType string) abstract.HostEffectiveSizing {
+func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) abstract.HostEffectiveSizing {
 	nullSizing := abstract.HostEffectiveSizing{}
 
-	templates, xerr := stack.ListTemplates()
+	templates, xerr := s.ListTemplates()
 	if xerr != nil {
 		return nullSizing
 	}
@@ -1236,15 +1259,23 @@ func fromMachineTypeToHostEffectiveSizing(stack *Stack, machineType string) abst
 }
 
 func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
-	sno, err := EC2Service.DescribeSubnets(&ec2.DescribeSubnetsInput{
+	query := ec2.DescribeSubnetsInput{
 		SubnetIds: []*string{SubnetId},
-	})
-	if err != nil {
+	}
+	var resp *ec2.DescribeSubnetsOutput
+	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, innerErr = EC2Service.DescribeSubnets(&query)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
 		return aws.StringValue(SubnetId)
 	}
 
-	if len(sno.Subnets) > 0 {
-		first := sno.Subnets[0]
+	if len(resp.Subnets) > 0 {
+		first := resp.Subnets[0]
 		for _, tag := range first.Tags {
 			if aws.StringValue(tag.Key) == s {
 				return aws.StringValue(tag.Value)
@@ -1256,8 +1287,11 @@ func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
 }
 
 // InspectHostByName returns host information by its name
-func (s Stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
+func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
+	}
 	if name == "" {
 		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -1265,24 +1299,39 @@ func (s Stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.E
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	hosts, err := s.ListHosts(false)
-	if err != nil {
-		return nullAHF, err
+	query := ec2.DescribeInstancesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("tag:" + tagNameLabel),
+				Values: []*string{aws.String(name)},
+			},
+		},
 	}
-
-	for _, v := range hosts {
-		if v.GetName() == name {
-			return v, nil
-		}
+	var resp *ec2.DescribeInstancesOutput
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.DescribeInstances(&query)
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullAHF, xerr
 	}
-
-	return nullAHF, abstract.ResourceNotFoundError("host", name)
+	if len(resp.Reservations) == 0 {
+		return nullAHF, abstract.ResourceNotFoundError("host", name)
+	}
+	if len(resp.Reservations) > 1 {
+		return nullAHF, fail.InconsistentError("provider returned more than one Host with name '%s'", name)
+	}
+	ahf := abstract.NewHostFull()
+	return ahf, s.inspectReservations(ahf, "'"+name+"'", resp.Reservations[0])
 }
 
 // GetHostState returns the current state of the host
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
-	if s == nil {
-		return hoststate.ERROR, fail.InvalidInstanceError()
+func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
+	if s.IsNull() {
+		return hoststate.UNKNOWN, fail.InvalidInstanceError()
 	}
 
 	host, xerr := s.InspectHost(hostParam)
@@ -1294,22 +1343,29 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, 
 }
 
 // ListHosts returns a list of hosts
-func (s *Stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error) {
+func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error) {
 	nullList := abstract.HostList{}
-	if s == nil {
+	if s.IsNull() {
 		return nullList, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	dio, err := s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{})
-	if err != nil {
-		return nullList, fail.ToError(err)
+	var resp *ec2.DescribeInstancesOutput
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return nullList, xerr
 	}
 
 	hosts = abstract.HostList{}
-	for _, reservation := range dio.Reservations {
+	for _, reservation := range resp.Reservations {
 		if reservation != nil {
 			for _, instance := range reservation.Instances {
 				if instance != nil {
@@ -1344,8 +1400,8 @@ func (s *Stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Erro
 }
 
 // DeleteHost deletes a host
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1356,40 +1412,63 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	ips, err := s.EC2Service.DescribeAddresses(&ec2.DescribeAddressesInput{
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String("instance-id"),
-				Values: []*string{aws.String(ahf.GetID())},
-			},
+	var ipResp *ec2.DescribeAddressesOutput
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			ipResp, innerErr = s.EC2Service.DescribeAddresses(&ec2.DescribeAddressesInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   aws.String("instance-id"),
+						Values: []*string{aws.String(ahf.GetID())},
+					},
+				},
+			})
+			return normalizeError(innerErr)
 		},
-	})
-	if err != nil {
-		if ips != nil {
-			for _, ip := range ips.Addresses {
-				_, _ = s.EC2Service.ReleaseAddress(&ec2.ReleaseAddressInput{
-					AllocationId: ip.AllocationId,
-				})
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		for _, ip := range ipResp.Addresses {
+			derr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+				func() error {
+					_, innerErr := s.EC2Service.ReleaseAddress(&ec2.ReleaseAddressInput{
+						AllocationId: ip.AllocationId,
+					})
+					return normalizeError(innerErr)
+				},
+				temporal.GetCommunicationTimeout(),
+			)
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete IP address"))
 			}
 		}
+		return xerr
 	}
 
-	dio, err := s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
-		InstanceIds: []*string{aws.String(ahf.GetID())},
-	})
-	if err != nil {
-		return fail.ToError(err)
+	var vmResp *ec2.DescribeInstancesOutput
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() (innerErr error) {
+			vmResp, innerErr = s.EC2Service.DescribeInstances(&ec2.DescribeInstancesInput{
+				InstanceIds: []*string{aws.String(ahf.GetID())},
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
 	// Get keypair and security group
-	var keyPairName string
-	var secGroupId string
+	var (
+		keyPairName     string
+		attachedVolumes []string
+		//secGroupId string
+	)
 
-	var attachedVolumes []string
-
-	if dio != nil {
-		if len(dio.Reservations) > 0 {
-			res := dio.Reservations[0]
+	if vmResp != nil {
+		if len(vmResp.Reservations) > 0 {
+			res := vmResp.Reservations[0]
 			if len(res.Instances) > 0 {
 				inst := res.Instances[0]
 
@@ -1409,21 +1488,27 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 				if inst != nil {
 					keyPairName = aws.StringValue(inst.KeyName)
-					if len(inst.SecurityGroups) > 0 {
-						sg := inst.SecurityGroups[0]
-						secGroupId = aws.StringValue(sg.GroupId)
-					}
+					//if len(inst.SecurityGroups) > 0 {
+					//	sg := inst.SecurityGroups[0]
+					//	secGroupId = aws.StringValue(sg.GroupId)
+					//}
 				}
 			}
 		}
 	}
 
 	// Terminate instance
-	_, err = s.EC2Service.TerminateInstances(&ec2.TerminateInstancesInput{
-		InstanceIds: []*string{aws.String(ahf.GetID())},
-	})
-	if err != nil {
-		return fail.ToError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, innerErr := s.EC2Service.TerminateInstances(&ec2.TerminateInstancesInput{
+				InstanceIds: []*string{aws.String(ahf.GetID())},
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
@@ -1452,33 +1537,46 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	// Remove volumes if there, mark errors as warnings
 	for _, volume := range attachedVolumes {
-		_, err = s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{
-			VolumeId: aws.String(volume),
-		})
-		if err != nil {
+		// FIXME: parallelize ?
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, innerErr := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{
+					VolumeId: aws.String(volume),
+				})
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
 			logrus.Warnf("problem cleaning up, deleting volume %s", volume)
 		}
 	}
 
-	// Remove security group
-	if secGroupId != "" {
-		_, err = s.EC2Service.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
-			GroupId: aws.String(secGroupId),
-		})
-		if err != nil {
-			return fail.Wrap(err, "error deleting security group")
-		}
-	} else {
-		logrus.Warnf("security group %s for host '%s' not found", secGroupId, hostRef)
-	}
+	//// Remove security group
+	//if secGroupId != "" {
+	//	_, err = s.EC2Service.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
+	//		GroupId: aws.String(secGroupId),
+	//	})
+	//	if err != nil {
+	//		return fail.Wrap(err, "error deleting security group")
+	//	}
+	//} else {
+	//	logrus.Warnf("security group %s for host '%s' not found", secGroupId, hostRef)
+	//}
 
 	// Remove keypair
 	if keyPairName != "" {
-		_, err = s.EC2Service.DeleteKeyPair(&ec2.DeleteKeyPairInput{
-			KeyName: aws.String(keyPairName),
-		})
-		if err != nil {
-			return fail.Wrap(err, "error deleting keypair")
+		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+			func() error {
+				_, innerErr := s.EC2Service.DeleteKeyPair(&ec2.DeleteKeyPairInput{
+					KeyName: aws.String(keyPairName),
+				})
+				return normalizeError(innerErr)
+			},
+			temporal.GetCommunicationTimeout(),
+		)
+		if xerr != nil {
+			return fail.Wrap(xerr, "error deleting keypair")
 		}
 	} else {
 		logrus.Warnf("keypair '%s' for host '%s' not found", keyPairName, ahf.GetID())
@@ -1488,8 +1586,8 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StopHost stops a running host
-func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1500,12 +1598,18 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	_, err := s.EC2Service.StopInstances(&ec2.StopInstancesInput{
-		Force:       aws.Bool(true),
-		InstanceIds: []*string{aws.String(ahf.Core.ID)},
-	})
-	if err != nil {
-		return fail.ToError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, innerErr := s.EC2Service.StopInstances(&ec2.StopInstancesInput{
+				Force:       aws.Bool(true),
+				InstanceIds: []*string{aws.String(ahf.Core.ID)},
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
@@ -1535,8 +1639,8 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // StartHost starts a stopped host
-func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1547,18 +1651,24 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	_, err := s.EC2Service.StartInstances(&ec2.StartInstancesInput{
-		InstanceIds: []*string{aws.String(ahf.Core.ID)},
-	})
-	if err != nil {
-		return normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, innerErr := s.EC2Service.StartInstances(&ec2.StartInstancesInput{
+				InstanceIds: []*string{aws.String(ahf.Core.ID)},
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, err := s.InspectHost(ahf.Core.ID)
-			if err != nil {
-				return err
+			hostTmp, innerErr := s.InspectHost(ahf.Core.ID)
+			if innerErr != nil {
+				return innerErr
 			}
 
 			if hostTmp.Core.LastState != hoststate.STARTED {
@@ -1582,8 +1692,8 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // RebootHost stops then starts a host
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1594,11 +1704,17 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	_, err := s.EC2Service.RebootInstances(&ec2.RebootInstancesInput{
-		InstanceIds: []*string{aws.String(ahf.Core.ID)},
-	})
-	if err != nil {
-		return normalizeError(err)
+	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			_, innerErr := s.EC2Service.RebootInstances(&ec2.RebootInstancesInput{
+				InstanceIds: []*string{aws.String(ahf.Core.ID)},
+			})
+			return normalizeError(innerErr)
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	if xerr != nil {
+		return xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
@@ -1629,16 +1745,29 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // ResizeHost changes the sizing of an existing host
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
+	}
+
+	return nullAHF, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
 	return fail.NotImplementedError("not yet implemented")
 }

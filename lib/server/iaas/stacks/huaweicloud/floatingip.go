@@ -129,7 +129,11 @@ type deleteResult struct {
 }
 
 // ListFloatingIPs lists all the floating IP currently requested for the VPC
-func (s *Stack) ListFloatingIPs() pagination.Pager {
+func (s stack) ListFloatingIPs() pagination.Pager {
+	if s.IsNull() {
+		return pagination.Pager{}
+	}
+
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips"
 	return pagination.NewPager(s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
@@ -137,7 +141,11 @@ func (s *Stack) ListFloatingIPs() pagination.Pager {
 }
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
-func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
+func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
+	if s.IsNull() {
+		return &FloatingIP{}, fail.InvalidInstanceError()
+	}
+
 	r := getResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
@@ -164,7 +172,11 @@ func (s *Stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 }
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
-func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
+func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
+	if s.IsNull() {
+		return &FloatingIP{}, fail.InvalidInstanceError()
+	}
+
 	found := false
 	fip := FloatingIP{}
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -197,7 +209,11 @@ func (s *Stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
+func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
+	if s.IsNull() {
+		return &FloatingIP{}, fail.InvalidInstanceError()
+	}
+
 	ipOpts := ipCreateOpts{
 		Type: "5_bgp",
 	}
@@ -244,7 +260,11 @@ func (s *Stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 }
 
 // DeleteFloatingIP deletes a floating IP
-func (s *Stack) DeleteFloatingIP(id string) fail.Error {
+func (s stack) DeleteFloatingIP(id string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
 	r := deleteResult{}
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
@@ -262,7 +282,11 @@ func (s *Stack) DeleteFloatingIP(id string) fail.Error {
 }
 
 // AssociateFloatingIP associates a floating ip to an host
-func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
 	fip, xerr := s.GetFloatingIP(id)
 	if xerr != nil {
 		return xerr
@@ -285,7 +309,11 @@ func (s *Stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 }
 
 // DissociateFloatingIP from host
-func (s *Stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
 	fip, xerr := s.GetFloatingIP(id)
 	if xerr != nil {
 		return xerr

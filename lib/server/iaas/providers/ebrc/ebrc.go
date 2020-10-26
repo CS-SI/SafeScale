@@ -18,6 +18,8 @@
 package ebrc
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -32,9 +34,14 @@ import (
 
 // provider is the provider implementation of the Ebrc provider
 type provider struct {
-	*vclouddirector.Stack
+	api.Stack
 
 	tenantParameters map[string]interface{}
+}
+
+// IsNull ...
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack.IsNull()
 }
 
 // Build build a new Client from configuration parameter
@@ -95,10 +102,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}, nil
 }
 
-// GetAuthOpts returns the auth options
+// GetAuthenticationOptions returns the auth options
 func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
@@ -111,10 +118,10 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
+// GetConfigurationOptions return configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
@@ -138,7 +145,26 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
+	if p.IsNull() {
+		return providers.Capabilities{}
+	}
 	return providers.Capabilities{}
+}
+
+// ListImages ...
+func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
+}
+
+// ListTemplates ...
+func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
 func init() {

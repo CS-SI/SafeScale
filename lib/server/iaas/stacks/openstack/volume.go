@@ -59,7 +59,7 @@ func toVolumeState(status string) volumestate.Enum {
 	}
 }
 
-func (s *Stack) getVolumeType(speed volumespeed.Enum) string {
+func (s Stack) getVolumeType(speed volumespeed.Enum) string {
 	for t, s := range s.cfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
@@ -75,7 +75,7 @@ func (s *Stack) getVolumeType(speed volumespeed.Enum) string {
 	}
 }
 
-func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
+func (s Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 	speed, ok := s.cfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
@@ -87,29 +87,30 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Volume, xerr fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
 		return nil, fail.InvalidParameterError("request.Name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
 	volume, xerr = s.InspectVolume(request.Name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
-			return nil, xerr
+			return nullAV, xerr
 		}
 	}
 	if volume != nil {
-		return nil, abstract.ResourceDuplicateError("volume", request.Name)
+		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
 	az, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nil, abstract.ResourceDuplicateError("volume", request.Name)
+		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
 	var v abstract.Volume
@@ -174,22 +175,23 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
 	}
 	if xerr != nil {
-		return nil, xerr
+		return nullAV, xerr
 	}
 
 	return &v, nil
 }
 
 // InspectVolume returns the volume identified by id
-func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var vol *volumesv2.Volume
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -202,9 +204,9 @@ func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nil, abstract.ResourceNotFoundError("volume", id)
+			return nullAV, abstract.ResourceNotFoundError("volume", id)
 		default:
-			return nil, xerr
+			return nullAV, xerr
 		}
 	}
 
@@ -219,12 +221,13 @@ func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+	var emptySlice []abstract.Volume
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "").WithStopwatch().Entering().Exiting()
 
 	var vs []abstract.Volume
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -252,7 +255,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil || len(vs) == 0 {
-		return nil, xerr
+		return emptySlice, xerr
 	}
 	// VPL: empty list is not an abnormal situation, do not log
 	// if len(vs) == 0 {
@@ -263,15 +266,15 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(id string) fail.Error {
-	if s == nil {
+func (s Stack) DeleteVolume(id string) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	var (
 		timeout   = temporal.GetBigDelay()
@@ -301,15 +304,15 @@ func (s *Stack) DeleteVolume(id string) fail.Error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if s == nil {
+func (s Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
 		return "", fail.InvalidParameterError("request.Name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
 
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
@@ -328,19 +331,20 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 	return va.ID, nil
 }
 
-// GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+// InspectVolumeAttachment returns the volume attachment identified by id
+func (s Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+	nullAVA := abstract.NewVolumeAttachment()
+	if s.IsNull() {
+		return nullAVA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return nullAVA, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAVA, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
 
 	var va *volumeattach.VolumeAttachment
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -351,7 +355,7 @@ func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAt
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
+		return nullAVA, xerr
 	}
 	return &abstract.VolumeAttachment{
 		ID:       va.ID,
@@ -362,15 +366,16 @@ func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAt
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
+	var emptySlice []abstract.VolumeAttachment
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return emptySlice, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []abstract.VolumeAttachment
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -396,14 +401,14 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return []abstract.VolumeAttachment{}, xerr
+		return emptySlice, xerr
 	}
 	return vs, nil
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
-	if s == nil {
+func (s Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -413,7 +418,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 		return fail.InvalidParameterError("vaID", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
 	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {

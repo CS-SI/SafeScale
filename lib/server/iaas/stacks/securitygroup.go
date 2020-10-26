@@ -33,7 +33,7 @@ type SecurityGroupParameter interface{}
 
 // ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
 func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, _ fail.Error) {
-	asg = abstract.NewSecurityGroup("")
+	asg = abstract.NewSecurityGroup()
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {

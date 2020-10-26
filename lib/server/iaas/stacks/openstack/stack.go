@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// Stack contains the needs to operate on stack OpenStack
+// Stack contains the needs to operate on Stack OpenStack
 type Stack struct {
 	ComputeClient  *gophercloud.ServiceClient
 	NetworkClient  *gophercloud.ServiceClient
@@ -52,6 +52,11 @@ type Stack struct {
 
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
+}
+
+// NullStacks returns a null value of the stack
+func NullStack() *Stack {
+	return &Stack{}
 }
 
 // New authenticates and returns a Stack pointer
@@ -201,4 +206,9 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	}
 
 	return &s, nil
+}
+
+// IsNull ...
+func (s *Stack) IsNull() bool {
+	return s == nil || s.Driver == nil
 }

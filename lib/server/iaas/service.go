@@ -19,7 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"math"
 	"os"
 	"regexp"
@@ -44,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 //go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
@@ -51,6 +52,8 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
+	data.NullValue
+
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)

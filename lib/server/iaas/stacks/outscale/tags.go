@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func (s *Stack) getResourceTags(id string) (map[string]string, fail.Error) {
+func (s stack) getResourceTags(id string) (map[string]string, fail.Error) {
 	tags := make(map[string]string)
 	readTagsOpts := osc.ReadTagsOpts{
 		ReadTagsRequest: optional.NewInterface(osc.ReadTagsRequest{
@@ -58,7 +58,7 @@ func getResourceTag(tags []osc.ResourceTag, key, defaultValue string) string {
 	return defaultValue
 }
 
-func (s *Stack) setResourceTags(id string, tags map[string]string) ([]osc.ResourceTag, fail.Error) {
+func (s stack) setResourceTags(id string, tags map[string]string) ([]osc.ResourceTag, fail.Error) {
 	var tagList []osc.ResourceTag
 	for k, v := range tags {
 		tagList = append(tagList, osc.ResourceTag{

@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -29,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
-type Stack struct {
+type stack struct {
 	Config      *stacks.ConfigurationOptions
 	AuthOptions *stacks.AuthenticationOptions
 	AwsConfig   *stacks.AWSConfiguration
@@ -40,17 +41,32 @@ type Stack struct {
 	PricingService *pricing.Pricing
 }
 
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+// NullStack is not exposed through API, is needed essentially by testss
+func NullStack() *stack {
+	return &stack{}
+}
+
+// IsNull tells if the instance represents a null value
+func (s *stack) IsNull() bool {
+	return s == nil || s.EC2Service == nil
+}
+
+// GetConfigurationOptions ...
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	if s.IsNull() {
+		return stacks.ConfigurationOptions{}
+	}
 	return *s.Config
 }
 
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+// GetAuthenticationOptions ...
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 	return *s.AuthOptions
 }
 
-// New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
-	stack := &Stack{
+// New creates and initializes an AWS stack
+func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (api.Stack, error) {
+	stack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
 		AwsConfig:   &localCfg,

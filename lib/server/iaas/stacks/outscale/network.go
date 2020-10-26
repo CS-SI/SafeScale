@@ -34,28 +34,29 @@ import (
 )
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s *Stack) HasDefaultNetwork() bool {
-	if s == nil {
+func (s stack) HasDefaultNetwork() bool {
+	if s.IsNull() {
 		return false
 	}
 	return s.vpc != nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s *Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
-	if s == nil {
+func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if s.vpc == nil {
-		return nil, fail.NotFoundError("no default Network in Stack")
+		return nil, fail.NotFoundError("no default Network in stack")
 	}
 	return s.vpc, nil
 }
 
 // CreateNetwork creates a network named name (in OutScale terminology, a Network corresponds to a VPC)
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, xerr fail.Error) {
-	if s == nil {
-		return abstract.NewNetwork(), fail.InvalidInstanceError()
+func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, xerr fail.Error) {
+	nullAN := abstract.NewNetwork()
+	if s.IsNull() {
+		return nullAN, fail.InvalidInstanceError()
 	}
 	if req.CIDR == "" {
 		req.CIDR = stacks.DefaultNetworkCIDR
@@ -79,7 +80,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return abstract.NewNetwork(), xerr
+		return nullAN, xerr
 	}
 	onet := respNet.Net
 
@@ -95,35 +96,35 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network
 		"name": req.Name,
 	})
 	if xerr != nil {
-		return abstract.NewNetwork(), xerr
+		return nullAN, xerr
 	}
 	onet.Tags = tags
 
 	// update default security group to allow external traffic
 	securityGroup, xerr := s.getNetworkSecurityGroup(onet.NetId)
 	if xerr != nil {
-		return abstract.NewNetwork(), xerr
+		return nullAN, xerr
 	}
 
 	xerr = s.updateDefaultSecurityRules(securityGroup)
 	if xerr != nil {
-		return abstract.NewNetwork(), fail.Wrap(xerr, "failed to update default security group of Network/VPC")
+		return nullAN, fail.Wrap(xerr, "failed to update default security group of Network/VPC")
 	}
 
 	xerr = s.createDHCPOptionSet(req, onet)
 	if xerr != nil {
-		return abstract.NewNetwork(), fail.Wrap(xerr, "failed to create DHCP options set of Network/VPC")
+		return nullAN, fail.Wrap(xerr, "failed to create DHCP options set of Network/VPC")
 	}
 
 	xerr = s.createInternetService(req, onet)
 	if xerr != nil {
-		return abstract.NewNetwork(), fail.Wrap(xerr, "failed to create Internet Service of Network/VPC")
+		return nullAN, fail.Wrap(xerr, "failed to create Internet Service of Network/VPC")
 	}
 
 	return toNetwork(onet), nil
 }
 
-func (s Stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fail.Error {
+func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fail.Error {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
@@ -178,7 +179,7 @@ func (s Stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 	)
 }
 
-func (s Stack) getDefaultDhcpNtpServers(net osc.Net) ([]string, fail.Error) {
+func (s stack) getDefaultDhcpNtpServers(net osc.Net) ([]string, fail.Error) {
 	readDhcpOptionsRequest := osc.ReadDhcpOptionsRequest{
 		Filters: osc.FiltersDhcpOptions{
 			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
@@ -203,7 +204,7 @@ func (s Stack) getDefaultDhcpNtpServers(net osc.Net) ([]string, fail.Error) {
 	return resp.DhcpOptionsSets[0].NtpServers, nil
 }
 
-func (s Stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
+func (s stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
 	// Remove DHCP options
 	namedDHCPOptions, xerr := s.checkDHCPOptionsName(onet)
 	if xerr != nil {
@@ -229,7 +230,7 @@ func (s Stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
 	)
 }
 
-func (s Stack) checkDHCPOptionsName(onet osc.Net) (bool, fail.Error) {
+func (s stack) checkDHCPOptionsName(onet osc.Net) (bool, fail.Error) {
 	tags, xerr := s.getResourceTags(onet.DhcpOptionsSetId)
 	if xerr != nil {
 		return false, xerr
@@ -238,7 +239,7 @@ func (s Stack) checkDHCPOptionsName(onet osc.Net) (bool, fail.Error) {
 	return ok, nil
 }
 
-func (s Stack) createInternetService(req abstract.NetworkRequest, onet osc.Net) fail.Error {
+func (s stack) createInternetService(req abstract.NetworkRequest, onet osc.Net) fail.Error {
 	// Create internet service to allow internet access from VMs attached to the network
 	var resp osc.CreateInternetServiceResponse
 	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
@@ -278,7 +279,7 @@ func (s Stack) createInternetService(req abstract.NetworkRequest, onet osc.Net) 
 	return s.updateRouteTable(onet, resp.InternetService)
 }
 
-func (s *Stack) deleteInternetService(netID string) fail.Error {
+func (s stack) deleteInternetService(netID string) fail.Error {
 	// Unlink and delete internet service
 	var resp osc.ReadInternetServicesResponse
 	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
@@ -340,7 +341,7 @@ func (s *Stack) deleteInternetService(netID string) fail.Error {
 	return nil
 }
 
-func (s Stack) updateRouteTable(onet osc.Net, is osc.InternetService) fail.Error {
+func (s stack) updateRouteTable(onet osc.Net, is osc.InternetService) fail.Error {
 	table, xerr := s.getDefaultRouteTable(onet)
 	if xerr != nil {
 		return xerr
@@ -361,7 +362,7 @@ func (s Stack) updateRouteTable(onet osc.Net, is osc.InternetService) fail.Error
 	)
 }
 
-func (s Stack) getDefaultRouteTable(onet osc.Net) (*osc.RouteTable, fail.Error) {
+func (s stack) getDefaultRouteTable(onet osc.Net) (*osc.RouteTable, fail.Error) {
 	readRouteTablesRequest := osc.ReadRouteTablesRequest{
 		Filters: osc.FiltersRouteTable{
 			NetIds: []string{onet.NetId},
@@ -398,10 +399,10 @@ func toNetwork(in osc.Net) *abstract.Network {
 }
 
 // InspectNetwork returns the network identified by id
-func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
-	emptyNetwork := abstract.NewNetwork()
-	if s == nil {
-		return emptyNetwork, fail.InvalidInstanceError()
+func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) {
+	nullAN := abstract.NewNetwork()
+	if s.IsNull() {
+		return nullAN, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
@@ -424,20 +425,20 @@ func (s *Stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error)
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
+		return nullAN, xerr
 	}
 	if len(resp.Nets) == 0 {
-		return nil, fail.NotFoundError("failed to find Network/VPC %s", id)
+		return nullAN, fail.NotFoundError("failed to find Network/VPC %s", id)
 	}
 
 	return toNetwork(resp.Nets[0]), nil
 }
 
 // InspectNetworkByName returns the network identified by name)
-func (s *Stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
-	emptyNetwork := abstract.NewNetwork()
-	if s == nil {
-		return emptyNetwork, fail.InvalidInstanceError()
+func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail.Error) {
+	nullAN := abstract.NewNetwork()
+	if s.IsNull() {
+		return nullAN, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
@@ -460,44 +461,44 @@ func (s *Stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fai
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return emptyNetwork, xerr
+		return nullAN, xerr
 	}
 	if len(resp.Nets) == 0 {
-		return emptyNetwork, fail.NotFoundError("failed to find a Network/VPC with name '%s'", name)
+		return nullAN, fail.NotFoundError("failed to find a Network/VPC with name '%s'", name)
 	}
 
 	return toNetwork(resp.Nets[0]), nil
 }
 
 // ListNetworks lists all networks
-func (s *Stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
-	emptyList := make([]*abstract.Network, 0)
-	if s == nil {
-		return emptyList, fail.InvalidInstanceError()
+func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
+	var emptySlice []*abstract.Network
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readNetsRequest := osc.ReadNetsRequest{
-		Filters: osc.FiltersNet{},
+	readNetsOpts := osc.ReadNetsOpts{
+		ReadNetsRequest: optional.NewInterface(osc.ReadNetsRequest{
+			Filters: osc.FiltersNet{},
+		}),
 	}
 	var resp osc.ReadNetsResponse
 	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
-			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-				ReadNetsRequest: optional.NewInterface(readNetsRequest),
-			})
+			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &readNetsOpts)
 			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
+		return emptySlice, xerr
 	}
 	if len(resp.Nets) == 0 {
-		return nil, fail.NotFoundError("no Network/VPC found")
+		return emptySlice, fail.NotFoundError("no Network/VPC found")
 	}
 
 	var nets []*abstract.Network
@@ -508,7 +509,7 @@ func (s *Stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	return nets, nil
 }
 
-func (s *Stack) deleteSecurityGroup(onet *osc.Net) fail.Error {
+func (s stack) deleteSecurityGroup(onet *osc.Net) fail.Error {
 	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
 		DryRun:  false,
 		Filters: osc.FiltersSecurityGroup{},
@@ -555,8 +556,8 @@ func (s *Stack) deleteSecurityGroup(onet *osc.Net) fail.Error {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -607,10 +608,10 @@ func (s *Stack) DeleteNetwork(id string) (xerr fail.Error) {
 }
 
 // CreateSubnet creates a Subnet
-func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xerr fail.Error) {
-	emptySubnet := abstract.NewSubnet()
-	if s == nil {
-		return emptySubnet, fail.InvalidInstanceError()
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xerr fail.Error) {
+	nullAS := abstract.NewSubnet()
+	if s.IsNull() {
+		return nullAS, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
@@ -620,19 +621,19 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, x
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
-		return emptySubnet, xerr
+		return nullAS, xerr
 	}
 
 	//	ok, xerr := netutils.DoCIDRsIntersect(vpc.IpRange), req.IPRanges)
 	ok, err := netutils.CIDRString(vpc.CIDR).Contains(netutils.CIDRString(req.CIDR))
 	if err != nil {
-		return emptySubnet, fail.Wrap(err, "failed to determine if network CIDR '%s' is inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
+		return nullAS, fail.Wrap(err, "failed to determine if network CIDR '%s' is inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
 	if !ok {
-		return emptySubnet, fail.InvalidRequestError("subnet CIDR '%s' must be inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
+		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' must be inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
 	if vpc.CIDR == req.CIDR {
-		return emptySubnet, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
+		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
 
 	// Create a subnet with the same IPRanges than the network
@@ -711,13 +712,13 @@ func (s *Stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, x
 }
 
 // InspectSubnet returns the Subnet identified by id
-func (s *Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
-	emptySubnet := abstract.NewSubnet()
-	if s == nil {
-		return emptySubnet, fail.InvalidInstanceError()
+func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
+	nullAS := abstract.NewSubnet()
+	if s.IsNull() {
+		return nullAS, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return emptySubnet, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
@@ -749,17 +750,17 @@ func (s *Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 		return nil, fail.NotFoundError("failed to find subnet %s", id)
 	}
 
-	return toSubnet(resp.Subnets[0]), nil
+	return toAbstractSubnet(resp.Subnets[0]), nil
 }
 
 // InspectSubnetByName returns the Subnet identified by id
-func (s *Stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, xerr fail.Error) {
-	emptySubnet := abstract.NewSubnet()
-	if s == nil {
-		return emptySubnet, fail.InvalidInstanceError()
+func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, xerr fail.Error) {
+	nullAS := abstract.NewSubnet()
+	if s.IsNull() {
+		return nullAS, fail.InvalidInstanceError()
 	}
 	if subnetName == "" {
-		return emptySubnet, fail.InvalidParameterError("subnetName", "cannot be empty string")
+		return nullAS, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
@@ -814,10 +815,10 @@ func (s *Stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.
 		return nil, fail.NotFoundError("failed to find subnet '%s'", subnetName)
 	}
 	//
-	return toSubnet(resp.Subnets[0]), nil
+	return toAbstractSubnet(resp.Subnets[0]), nil
 }
 
-func toSubnet(subnet osc.Subnet) *abstract.Subnet {
+func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
 	out := abstract.NewSubnet()
 	out.ID = subnet.SubnetId
 	out.CIDR = subnet.IpRange
@@ -831,10 +832,10 @@ func toSubnet(subnet osc.Subnet) *abstract.Subnet {
 }
 
 // ListSubnets lists all subnets
-func (s *Stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.Error) {
-	emptyList := make([]*abstract.Subnet, 0)
-	if s == nil {
-		return emptyList, fail.InvalidInstanceError()
+func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.Error) {
+	var emptySlice []*abstract.Subnet
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -853,10 +854,10 @@ func (s *Stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			if an, xerr = s.InspectNetworkByName(networkRef); xerr != nil {
-				return emptyList, xerr
+				return emptySlice, xerr
 			}
 		default:
-			return emptyList, xerr
+			return emptySlice, xerr
 		}
 	}
 
@@ -876,17 +877,17 @@ func (s *Stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return emptySlice, xerr
 	}
 	var subnets []*abstract.Subnet
 	for _, v := range resp.Subnets {
-		subnets = append(subnets, toSubnet(v))
+		subnets = append(subnets, toAbstractSubnet(v))
 	}
 
 	return subnets, nil
 }
 
-func (s Stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
+func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
 	var (
 		emptySubnetSlice []*abstract.Subnet
 		emptyNicSlice    []osc.Nic
@@ -923,8 +924,8 @@ func (s Stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 }
 
 // DeleteSubnet deletes the subnet identified by id
-func (s *Stack) DeleteSubnet(id string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -975,7 +976,10 @@ func (s *Stack) DeleteSubnet(id string) (xerr fail.Error) {
 
 // BindSecurityGroupToSubnet binds a Security Group to a Subnet
 // Does nothing in outscale stack
-func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
 	if subnetID != "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
@@ -996,7 +1000,10 @@ func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
 // Does nothing in outscale stack
-func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
@@ -1014,7 +1021,7 @@ func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	return nil
 }
 
-func (s *Stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
+func (s stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
 	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
 	rules = append(rules, s.createICMPPermissions()...)
 	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
@@ -1039,7 +1046,7 @@ func (s *Stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
 	return normalizeError(err)
 }
 
-func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
+func (s stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
 	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
 		Filters: osc.FiltersSecurityGroup{
 			SecurityGroupNames: []string{"default"},
@@ -1062,7 +1069,7 @@ func (s *Stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.
 }
 
 // open all ports, ingress is controlled by the vm firewall
-func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
+func (s stack) createTCPPermissions() []osc.SecurityGroupRule {
 	rule := osc.SecurityGroupRule{
 		FromPortRange: 1,
 		ToPortRange:   65535,
@@ -1073,7 +1080,7 @@ func (s *Stack) createTCPPermissions() []osc.SecurityGroupRule {
 }
 
 // open all ports, ingress is controlled by the vm firewall
-func (s *Stack) createUDPPermissions() []osc.SecurityGroupRule {
+func (s stack) createUDPPermissions() []osc.SecurityGroupRule {
 	rule := osc.SecurityGroupRule{
 		FromPortRange: 1,
 		ToPortRange:   65535,
@@ -1084,7 +1091,7 @@ func (s *Stack) createUDPPermissions() []osc.SecurityGroupRule {
 }
 
 // ingress is controlled by the vm firewall
-func (s *Stack) createICMPPermissions() []osc.SecurityGroupRule {
+func (s stack) createICMPPermissions() []osc.SecurityGroupRule {
 	var rules []osc.SecurityGroupRule
 	// Echo reply
 	rules = append(rules, osc.SecurityGroupRule{

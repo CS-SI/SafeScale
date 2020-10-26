@@ -160,7 +160,7 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 	}
 
 	return sg.core.BrowseFolder(task, func(buf []byte) fail.Error {
-		asg := abstract.NewSecurityGroup("")
+		asg := abstract.NewSecurityGroup()
 		if xerr = asg.Deserialize(buf); xerr != nil {
 			return xerr
 		}
