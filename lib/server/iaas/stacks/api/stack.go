@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -30,6 +31,8 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
+	data.NullValue
+
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones() (map[string]bool, fail.Error)
 
@@ -155,8 +158,8 @@ type Stack interface {
 	DeleteVolumeAttachment(serverID, id string) fail.Error
 }
 
-// Reserved is an interface about the methods only available to providers internally
-type Reserved interface {
+// ReservedForProviderUse is an interface about the methods only available to providers internally
+type ReservedForProviderUse interface {
 	ListImages() ([]abstract.Image, fail.Error)             // lists available OS images
 	ListTemplates() ([]abstract.HostTemplate, fail.Error)   // lists available host templates
 	GetConfigurationOptions() stacks.ConfigurationOptions   // Returns a read-only struct containing configuration options

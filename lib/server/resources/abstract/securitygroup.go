@@ -222,8 +222,8 @@ func (sg SecurityGroup) IsConsistent() bool {
 }
 
 // NewSecurityGroup ...
-func NewSecurityGroup(name string) *SecurityGroup {
-	return &SecurityGroup{Name: name}
+func NewSecurityGroup( /*name string*/ ) *SecurityGroup {
+	return &SecurityGroup{ /*Name: name*/ }
 }
 
 // Clone does a deep-copy of the Host
@@ -233,7 +233,7 @@ func (sg *SecurityGroup) Clone() data.Clonable {
 	if sg.IsNull() {
 		return sg
 	}
-	return NewSecurityGroup(sg.Name).Replace(sg)
+	return NewSecurityGroup().Replace(sg)
 }
 
 // Replace ...

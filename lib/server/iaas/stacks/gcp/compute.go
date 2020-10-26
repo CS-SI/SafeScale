@@ -45,7 +45,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
+func (s *stack) ListImages() (images []abstract.Image, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -89,7 +89,7 @@ func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
+func (s *stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -117,7 +117,7 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s *stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -167,7 +167,7 @@ func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr
 }
 
 // GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
+func (s *stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -195,7 +195,7 @@ func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
+func (s *stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -210,22 +210,22 @@ func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s *stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+func (s *stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(id string) fail.Error {
+func (s *stack) DeleteKeyPair(id string) fail.Error {
 	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+func (s *stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
 	nullAhf := abstract.NewHostFull()
 	nullUd := userdata.NewContent()
 	if s == nil {
@@ -452,7 +452,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
-func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
+func (s *stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAhc := abstract.NewHostCore()
 	if s == nil {
 		return nullAhc, fail.InvalidInstanceError()
@@ -610,7 +610,7 @@ func buildGcpMachine(
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
+func (s *stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	hostNull := abstract.NewHostFull()
 	if s == nil {
 		return hostNull, fail.InvalidInstanceError()
@@ -744,7 +744,7 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 }
 
 // InspectHostByName returns the host identified by ref (name or id)
-func (s Stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
+func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 
 	if name == "" {
@@ -769,7 +769,7 @@ func (s Stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.E
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s *stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -826,12 +826,12 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s *stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) {
+func (s *stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -875,7 +875,7 @@ func (s *Stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) 
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -905,7 +905,7 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -935,7 +935,7 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // RebootHost reboot the host identified by id
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -982,7 +982,7 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s *stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s == nil {
 		return hoststate.ERROR, fail.InvalidInstanceError()
 	}
@@ -998,7 +998,7 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
+func (s *stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
 	zones := make(map[string]bool)
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -1019,7 +1019,7 @@ func (s *Stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
 }
 
 // ListRegions ...
-func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
+func (s *stack) ListRegions() (_ []string, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1043,7 +1043,7 @@ func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	// TODO: validate parameters
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
@@ -1052,7 +1052,7 @@ func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	// TODO: validate parameters
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)

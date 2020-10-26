@@ -17,6 +17,7 @@
 package cloudferro
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
 
 	"github.com/asaskevich/govalidator"
@@ -40,7 +41,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	*openstack.Stack
+	api.Stack /**openstack.Stack*/
 
 	tenantParameters map[string]interface{}
 }
@@ -175,11 +176,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	return newP, nil
 }
 
-// GetAuthOpts returns the auth options
+// GetAuthenticationOptions returns the auth options
 func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -188,11 +189,11 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
+// GetConfigurationOptions return configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -206,7 +207,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.ListTemplates()
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -216,7 +217,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	allImages, xerr := p.Stack.ListImages()
+	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages()
 	if xerr != nil {
 		return nil, xerr
 	}

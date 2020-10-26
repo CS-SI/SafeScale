@@ -32,13 +32,13 @@ import (
 )
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
-	nullAkp := &abstract.KeyPair{}
-	if s == nil {
-		return nullAkp, fail.InvalidInstanceError()
+func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAkp, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
@@ -47,14 +47,14 @@ func (s *Stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Err
 
 	akp, xerr = abstract.NewKeyPair(name)
 	if xerr != nil {
-		return nullAkp, xerr
+		return nullAKP, xerr
 	}
 	return akp, s.ImportKeyPair(akp)
 }
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
-func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
-	if s == nil {
+func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -81,13 +81,13 @@ func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s *Stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
-	nullAkp := &abstract.KeyPair{}
-	if s == nil {
-		return nullAkp, fail.InvalidInstanceError()
+func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAkp, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
@@ -110,13 +110,13 @@ func (s *Stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Erro
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullAkp, xerr
+		return nullAKP, xerr
 	}
 	if len(resp.Keypairs) > 1 {
-		return nullAkp, fail.InconsistentError("Inconsistent provider response")
+		return nullAKP, fail.InconsistentError("Inconsistent provider response")
 	}
 	if len(resp.Keypairs) == 0 {
-		return nullAkp, fail.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
+		return nullAKP, fail.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
 	}
 	kp := resp.Keypairs[0]
 	return &abstract.KeyPair{
@@ -126,10 +126,10 @@ func (s *Stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Erro
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
-	nullList := make([]abstract.KeyPair, 0)
-	if s == nil {
-		return nullList, fail.InvalidInstanceError()
+func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
+	var emptySlice []abstract.KeyPair
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
@@ -145,7 +145,7 @@ func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullList, xerr
+		return emptySlice, xerr
 	}
 
 	var kps []abstract.KeyPair
@@ -160,8 +160,8 @@ func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(name string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

@@ -56,17 +56,15 @@ import (
 )
 
 // ListRegions ...
-func (s *Stack) ListRegions() (list []string, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) ListRegions() (list []string, xerr fail.Error) {
+	var emptySlice []string
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	var (
-		results  []string
-		allPages pagination.Page
-	)
+	var allPages pagination.Page
 	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
@@ -78,14 +76,15 @@ func (s *Stack) ListRegions() (list []string, xerr fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return results, xerr
+		return emptySlice, xerr
 	}
 
 	allRegions, err := regions.ExtractRegions(allPages)
 	if err != nil {
-		return results, fail.ToError(err)
+		return emptySlice, fail.ToError(err)
 	}
 
+	var results []string
 	for _, v := range allRegions {
 		results = append(results, v.ID)
 	}
@@ -93,12 +92,13 @@ func (s *Stack) ListRegions() (list []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+	var emptyMap map[string]bool
+	if s.IsNull() {
+		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -111,12 +111,12 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) 
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
+		return emptyMap, xerr
 	}
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return emptyMap, fail.ToError(err)
 	}
 
 	azList := map[string]bool{}
@@ -135,13 +135,13 @@ func (s *Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) 
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
-	var nullList []abstract.Image
-	if s == nil {
-		return nullList, fail.InvalidInstanceError()
+func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+	var emptySlice []abstract.Image
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -164,22 +164,22 @@ func (s *Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 		return true, nil
 	})
 	if err != nil {
-		return nullList, NormalizeError(err)
+		return emptySlice, NormalizeError(err)
 	}
 	return imgList, nil
 }
 
 // InspectImage returns the Image referenced by id
-func (s *Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) {
-	nullImage := &abstract.Image{}
-	if s == nil {
-		return nullImage, fail.InvalidInstanceError()
+func (s Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) {
+	nullAI := &abstract.Image{}
+	if s.IsNull() {
+		return nullAI, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullImage, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// VPL: coding rule : propagate the error OR log it, do not both
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -193,7 +193,7 @@ func (s *Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error)
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullImage, xerr
+		return nullAI, xerr
 	}
 
 	out := &abstract.Image{
@@ -204,17 +204,17 @@ func (s *Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error)
 	return out, nil
 }
 
-// GetTemplate returns the Template referenced by id
-func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
-	nullTemplate := &abstract.HostTemplate{}
-	if s == nil {
-		return nullTemplate, fail.InvalidInstanceError()
+// InspectTemplate returns the Template referenced by id
+func (s Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
+	nullAHT := &abstract.HostTemplate{}
+	if s.IsNull() {
+		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullTemplate, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// CODING RULE: propagate the error OR log it, do not both
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -229,7 +229,7 @@ func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xer
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullTemplate, xerr
+		return nullAHT, xerr
 	}
 	template = &abstract.HostTemplate{
 		Cores:    flv.VCPUs,
@@ -243,13 +243,13 @@ func (s *Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xer
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
-	var nullList []abstract.HostTemplate
-	if s == nil {
-		return nullList, fail.InvalidInstanceError()
+func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+	var emptySlice []abstract.HostTemplate
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
@@ -281,9 +281,9 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return nullList, xerr
+			return emptySlice, xerr
 		default:
-			return nullList, xerr
+			return emptySlice, xerr
 		}
 	}
 	if len(flvList) == 0 {
@@ -294,15 +294,16 @@ func (s *Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 
 // TODO: replace with code to create KeyPair on provider side if it exists
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return abstract.NewKeyPair(name)
@@ -310,15 +311,16 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 
 // TODO: replace with openstack code to get keypair (if it exits)
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be nil")
+		return nullAKP, fail.InvalidParameterError("id", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
@@ -335,13 +337,13 @@ func (s *Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	nullList := []abstract.KeyPair{}
-	if s == nil {
-		return nullList, fail.InvalidInstanceError()
+func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+	emptySlice := []abstract.KeyPair{}
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []abstract.KeyPair
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -367,22 +369,22 @@ func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullList, xerr
+		return emptySlice, xerr
 	}
 	// Note: empty list is not an error, so do not raise one
 	return kpList, nil
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(id string) fail.Error {
-	if s == nil {
+func (s Stack) DeleteKeyPair(id string) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
@@ -398,7 +400,7 @@ func (s *Stack) DeleteKeyPair(id string) fail.Error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (s *Stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing) {
+func (s Stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing) {
 	hostSizing := abstract.NewHostEffectiveSizing()
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)
@@ -437,24 +439,24 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost gathers host information from provider
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
-	nullAhf := abstract.NewHostFull()
-	if s == nil {
-		return nullAhf, fail.InvalidInstanceError()
+func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAhf, xerr
+		return nullAHF, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if xerr != nil {
-		return nullAhf, xerr
+		return nullAHF, xerr
 	}
 	if server == nil {
-		return nullAhf, abstract.ResourceNotFoundError("host", hostRef)
+		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
 	ahf.Core.LastState = toHostState(server.Status)
@@ -466,14 +468,14 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull,
 	return ahf, nil
 }
 
-func (s *Stack) queryServer(id string) (*servers.Server, fail.Error) {
+func (s Stack) queryServer(id string) (*servers.Server, fail.Error) {
 	return s.WaitHostState(id, hoststate.STARTED, 2*temporal.GetBigDelay())
 }
 
 // interpretAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s *Stack) interpretAddresses(
+func (s Stack) interpretAddresses(
 	addresses map[string]interface{},
 	hostNets []servers.Network, hostPorts []ports.Port,
 ) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
@@ -528,7 +530,7 @@ func (s *Stack) interpretAddresses(
 }
 
 // complementHost complements Host data with content of server parameter
-func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
+func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	//subnets, addresses, ipv4, ipv6, xerr := s.interpretAddresses(server.Addresses, hostNets, hostPorts)
@@ -687,16 +689,16 @@ func (s *Stack) complementHost(hostCore *abstract.HostCore, server servers.Serve
 }
 
 // InspectHostByName returns the host using the name passed as parameter
-func (s *Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
-	if s == nil {
+	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
 	}
 	if name == "" {
 		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
@@ -733,14 +735,14 @@ func (s *Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) 
 }
 
 // CreateHost creates a new host
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
-	nullAhf := abstract.NewHostFull()
-	nullUdc := userdata.NewContent()
-	if s == nil {
-		return nullAhf, nullUdc, fail.InvalidInstanceError()
+func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	nullUDC := userdata.NewContent()
+	if s.IsNull() {
+		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 
 	userData = userdata.NewContent()
@@ -749,7 +751,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAhf, nullUdc, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// The Default Networking is the first of the provided list, by convention
@@ -758,7 +760,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	hostNets, hostPorts /*, sgs*/, xerr := s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to construct list of Subnets for the host")
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to construct list of Subnets for the host")
 	}
 
 	// Starting from here, delete created ports if exiting with error
@@ -773,7 +775,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	}()
 
 	if xerr = s.ProvideCredentialsIfNeeded(&request); xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -783,24 +785,24 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-		return nullAhf, nullUdc, xerr
+		return nullAHF, nullUDC, xerr
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get image")
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image")
 	}
 
 	// Sets provider parameters to create host
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
-		return nullAhf, nullUdc, xerr
+		return nullAHF, nullUDC, xerr
 	}
 
 	// Select usable availability zone, the first one in the list
 	azone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
-		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select availability zone")
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to select availability zone")
 	}
 
 	srvOpts := servers.CreateOpts{
@@ -915,13 +917,13 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nullAhf, nullUdc, retryErr
+		return nullAHF, nullUDC, retryErr
 	}
 
 	//// update Security Group of port on Provider Networking
 	//if request.IsGateway || request.PublicIP {
 	//	if xerr = s.updateSecurityGroupOfExternalPort(ahc, sgs); xerr != nil {
-	//		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to update Security Group of Internet interface used by host")
+	//		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to update Security Group of Internet interface used by host")
 	//	}
 	//}
 
@@ -948,7 +950,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	newHost, xerr := s.complementHost(ahc, *server, hostNets, hostPorts)
 	if xerr != nil {
-		return nullAhf, nullUdc, xerr
+		return nullAHF, nullUDC, xerr
 	}
 	newHost.Networking.DefaultSubnetID = defaultSubnetID
 	// newHost.Networking.DefaultGatewayID = defaultGatewayID
@@ -970,7 +972,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			temporal.GetCommunicationTimeout(),
 		)
 		if xerr != nil {
-			return nullAhf, nullUdc, xerr
+			return nullAHF, nullUDC, xerr
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
@@ -1002,7 +1004,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 			temporal.GetCommunicationTimeout(),
 		)
 		if xerr != nil {
-			return nullAhf, nullUdc, xerr
+			return nullAHF, nullUDC, xerr
 		}
 
 		// FIXME: Apply Security Group for gateway of Subnet to the first NIC of the gateway ?
@@ -1020,7 +1022,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s *Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port /*sgs []string,*/, xerr fail.Error) {
+func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port /*sgs []string,*/, xerr fail.Error) {
 	//subnetCount := len(request.Subnets)
 	//sgs := []string{}
 	//if !s.cfgOpts.UseFloatingIP {
@@ -1095,7 +1097,10 @@ func (s *Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, d
 }
 
 // ProvideCredentialsIfNeeded ...
-func (s *Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
+func (s Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
 	if request == nil {
 		return fail.InvalidParameterError("request", "cannot be nil")
 	}
@@ -1139,7 +1144,7 @@ func (s *Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr 
 }
 
 // updateSecurityGroupOfExternalPort ...
-func (s *Stack) updateSecurityGroupOfExternalPort(ahc *abstract.HostCore, sgs []string) fail.Error {
+func (s Stack) updateSecurityGroupOfExternalPort(ahc *abstract.HostCore, sgs []string) fail.Error {
 	list, xerr := s.listPorts(ports.ListOpts{
 		DeviceID: ahc.ID,
 	})
@@ -1159,8 +1164,8 @@ func (s *Stack) updateSecurityGroupOfExternalPort(ahc *abstract.HostCore, sgs []
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
-func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
-	if s == nil {
+func (s Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
+	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -1201,8 +1206,8 @@ func (s *Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (s *Stack) SelectedAvailabilityZone() (string, fail.Error) {
-	if s == nil {
+func (s Stack) SelectedAvailabilityZone() (string, fail.Error) {
+	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -1226,31 +1231,31 @@ func (s *Stack) SelectedAvailabilityZone() (string, fail.Error) {
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	nullAhc := abstract.NewHostCore()
-	if s == nil {
-		return nullAhc, fail.InvalidInstanceError()
+func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	nullAHC := abstract.NewHostCore()
+	if s.IsNull() {
+		return nullAHC, fail.InvalidInstanceError()
 	}
 
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAhc, xerr
+		return nullAHC, xerr
 	}
 	server, xerr := s.WaitHostState(hostParam, hoststate.STARTED, timeout)
 	if xerr != nil {
-		return nullAhc, xerr
+		return nullAHC, xerr
 	}
 	ahf, xerr = s.complementHost(ahf.Core, *server, nil, nil)
 	if xerr != nil {
-		return nullAhc, xerr
+		return nullAHC, xerr
 	}
 	return ahf.Core, nil
 }
 
 // WaitHostState waits an host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
-	if s == nil {
+func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1259,7 +1264,7 @@ func (s *Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.En
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering().Exiting()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -1338,12 +1343,12 @@ func (s *Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.En
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if s == nil {
-		return hoststate.ERROR, fail.InvalidInstanceError()
+func (s Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	if s.IsNull() {
+		return hoststate.UNKNOWN, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
@@ -1353,12 +1358,13 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 }
 
 // ListHosts lists all hosts
-func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
+	var emptyList abstract.HostList
+	if s.IsNull() {
+		return emptyList, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	hostList := abstract.HostList{}
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -1395,7 +1401,7 @@ func (s *Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
-func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
+func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
@@ -1430,8 +1436,8 @@ func (s *Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Erro
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1439,7 +1445,7 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Detach floating IP
 	if s.cfgOpts.UseFloatingIP {
@@ -1568,8 +1574,8 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1577,7 +1583,7 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
@@ -1589,8 +1595,8 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1598,7 +1604,7 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
@@ -1614,8 +1620,8 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1623,7 +1629,7 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
@@ -1635,16 +1641,17 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
 	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// TODO: RESIZE Resize Host HERE
 	logrus.Warn("Trying to resize a Host...")
@@ -1657,8 +1664,8 @@ func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Host
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1685,8 +1692,8 @@ func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, h
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)

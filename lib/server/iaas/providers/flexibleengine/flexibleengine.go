@@ -18,6 +18,7 @@ package flexibleengine
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
 	"strings"
 
@@ -61,7 +62,7 @@ var gpuMap = map[string]gpuCfg{
 
 // provider is the implementation of FlexibleEngine provider
 type provider struct {
-	*huaweicloud.Stack
+	api.Stack
 
 	// defaultSecurityGroupName string
 
@@ -216,7 +217,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 	}
 }
 
-// GetTemplate returns the Template referenced by id
+// InspectTemplate returns the Template referenced by id; overloads Stack.InspectTemplate to inject templates with GPU
 func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	tpl, xerr := p.Stack.InspectTemplate(id)
 	if xerr != nil {
@@ -231,7 +232,7 @@ func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Erro
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.ListTemplates()
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -256,7 +257,7 @@ func isBMSImage(image abstract.Image) bool {
 
 // ListImages lists available OS images
 func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	images, xerr := p.Stack.ListImages()
+	images, xerr := p.Stack.(api.ReservedForProviderUse).ListImages()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -272,7 +273,7 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -287,7 +288,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	// caps := p.GetCapabilities()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)

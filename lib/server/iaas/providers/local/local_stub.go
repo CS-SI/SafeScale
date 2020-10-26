@@ -46,6 +46,10 @@ type AuthOptions struct {
 type CfgOptions struct {
 }
 
+func (provider *provider) IsNull() bool {
+	return false
+}
+
 // WaitHostReady ...
 func (provider *provider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	return nil, gReport

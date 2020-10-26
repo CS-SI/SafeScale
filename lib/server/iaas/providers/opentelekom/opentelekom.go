@@ -18,6 +18,7 @@ package opentelekom
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
 
 	"github.com/asaskevich/govalidator"
@@ -39,7 +40,7 @@ const (
 
 // provider is the providerementation of the OpenTelekom provider
 type provider struct {
-	*huaweicloud.Stack
+	api.Stack
 
 	tenantParameters map[string]interface{}
 }
@@ -47,6 +48,11 @@ type provider struct {
 // New creates a new instance of opentelekom provider
 func New() providers.Provider {
 	return &provider{}
+}
+
+// IsNull tells if the instance represents an null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
 }
 
 // Build build a new Client from configuration parameter
@@ -175,31 +181,29 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	return &newP, nil
 }
 
-// ListTemplates ...
+// ListTemplates ... ; overloads Stack.ListTemplates() to allow to filter templates to show
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	allTemplates, err := p.Stack.ListTemplates()
-	if err != nil {
-		return nil, err
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
-	return allTemplates, nil
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
-// ListImages ...
+// ListImages ... ; overloads Stack.ListImages() to allow to filter images to show
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	allImages, err := p.Stack.ListImages()
-	if err != nil {
-		return nil, err
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
-	return allImages, nil
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -210,10 +214,10 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -225,16 +229,18 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	return cfg, nil
 }
 
-func (p *provider) GetName() string {
+// GetName ...
+func (p provider) GetName() string {
 	return "opentelekom"
 }
 
-func (p *provider) GetTenantParameters() map[string]interface{} {
+// GetTenantParameters ...
+func (p provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}

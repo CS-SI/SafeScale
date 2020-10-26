@@ -1,3 +1,5 @@
+// +build libvirt
+
 /*
  * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
@@ -25,10 +27,10 @@ import (
 )
 
 // ListSecurityGroups lists existing security groups
-func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -37,10 +39,10 @@ func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 }
 
 // CreateSecurityGroup creates a security group
-func (s Stack) CreateSecurityGroup(networkRef, name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) CreateSecurityGroup(networkRef, name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -52,10 +54,10 @@ func (s Stack) CreateSecurityGroup(networkRef, name string, description string, 
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
-	// if s == nil {
-	//     return fail.InvalidInstanceError()
-	// }
+func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
@@ -68,10 +70,10 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 }
 
 // InspectSecurityGroup returns information about a security group
-func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return asg, xerr
@@ -84,10 +86,10 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nullAsg, fail.InvalidInstanceError()
-	// }
+func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return asg, xerr
@@ -100,10 +102,10 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nullAsg, fail.InvalidInstanceError()
-	// }
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return asg, xerr
@@ -117,10 +119,10 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return false, fail.InvalidInstanceError()
-	// }
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr

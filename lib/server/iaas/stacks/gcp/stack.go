@@ -29,8 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Stack ...
-type Stack struct {
+// stack ...
+type stack struct {
 	Config      *stacks.ConfigurationOptions
 	AuthOptions *stacks.AuthenticationOptions
 	GcpConfig   *stacks.GCPConfiguration
@@ -38,19 +38,34 @@ type Stack struct {
 	ComputeService *compute.Service
 }
 
+// NullStack is not exposed through API, is needed essentially by testss
+func NullStack() *stack {
+	return &stack{}
+}
+
+func (s *stack) IsNull() bool {
+	return s == nil || s.ComputeService == nil
+}
+
 // GetConfigurationOptions ...
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	if s.IsNull() || s.Config == nil {
+		return stacks.ConfigurationOptions{}
+	}
 	return *s.Config
 }
 
 // GetAuthenticationOptions ...
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+	if s.IsNull() || s.AuthOptions == nil {
+		return stacks.AuthenticationOptions{}
+	}
 	return *s.AuthOptions
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
-	stack := &Stack{
+func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) {
+	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
 		GcpConfig:   &localCfg,
@@ -58,18 +73,18 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 
 	d1, err := json.MarshalIndent(localCfg, "", "  ")
 	if err != nil {
-		return &Stack{}, fail.ToError(err)
+		return &stack{}, fail.ToError(err)
 	}
 
 	cred, err := google.CredentialsFromJSON(context.Background(), d1, iam.CloudPlatformScope)
 	if err != nil {
-		return &Stack{}, fail.ToError(err)
+		return &stack{}, fail.ToError(err)
 	}
 
-	stack.ComputeService, err = compute.NewService(context.Background(), option.WithTokenSource(cred.TokenSource))
+	gcpStack.ComputeService, err = compute.NewService(context.Background(), option.WithTokenSource(cred.TokenSource))
 	if err != nil {
-		return &Stack{}, fail.ToError(err)
+		return &stack{}, fail.ToError(err)
 	}
 
-	return stack, nil
+	return gcpStack, nil
 }

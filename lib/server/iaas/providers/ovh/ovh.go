@@ -18,6 +18,7 @@ package ovh
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
 	"strings"
 
@@ -75,7 +76,7 @@ var (
 
 // provider is the provider implementation of the OVH provider
 type provider struct {
-	*openstack.Stack
+	api.Stack
 
 	ExternalNetworkID string
 
@@ -225,10 +226,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
 	cfg.Set("DomainName", opts.DomainName)
@@ -243,10 +247,13 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -257,8 +264,12 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	return cfg, nil
 }
 
-// GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+// InspectTemplate overload OpenStack GetTemplate method to add GPU configuration
+func (p provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	tpl, err := p.Stack.InspectTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -274,13 +285,19 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	return p.Stack.ListImages()
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.ListTemplates()
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -337,7 +354,11 @@ func isFlexTemplate(t abstract.HostTemplate) bool {
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
+func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
+	if p.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {
@@ -346,24 +367,27 @@ func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network
 	return p.Stack.CreateNetwork(req)
 }
 
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "ovh"
 }
 
-func (p *provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() map[string]interface{} {
+	if p.IsNull() {
+		return map[string]interface{}{}
+	}
 	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}
 }
 
 // BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if p == nil {
+func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+	if p.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -377,8 +401,8 @@ func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 }
 
 // UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
-func (p *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
-	if p == nil {
+func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+	if p.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {

@@ -18,6 +18,8 @@ package outscale
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -31,7 +33,7 @@ import (
 // provider is integration of outscale IaaS API
 // see https://docs.outscale.com/api
 type provider struct {
-	outscale.Stack
+	api.Stack
 }
 
 func remap(s interface{}) map[string]interface{} {
@@ -82,9 +84,14 @@ func volumeSpeed(s string) volumespeed.Enum {
 	return volumespeed.HDD
 }
 
+// IsNull tells if the instance represents a null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
+}
+
 // Build ...
 func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr fail.Error) {
-	if p == nil {
+	if p.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -155,58 +162,58 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 	if err != nil {
 		return nil, fail.ToError(err)
 	}
-	p.Stack = *stack
+	p.Stack = stack
 	return p, nil
 }
 
 // GetAuthenticationOptions returns authentication parameters
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-	if p == nil {
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+	if p.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	m := providers.ConfigMap{}
-	m.Set("AccessKey", p.Options.Identity.AccessKey)
-	m.Set("SecretKey", p.Options.Identity.SecretKey)
-	m.Set("Region", p.Options.Compute.Region)
-	m.Set("Service", p.Options.Compute.Service)
-	m.Set("URL", p.Options.Compute.URL)
-	return m, nil
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	cfg := providers.ConfigMap{}
+	cfg.Set("AccessKey", opts.AccessKeyID)
+	cfg.Set("SecretKey", opts.SecretAccessKey)
+	cfg.Set("Region", opts.Region)
+	//cfg.Set("Service", opts.)
+	cfg.Set("URL", opts.IdentityEndpoint)
+	return cfg, nil
 }
 
 // GetConfigurationOptions returns configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
-	if p == nil {
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+	if p.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// MetadataBucketName
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg := providers.ConfigMap{}
-	//
-	cfg.Set("DNSList", p.Options.Compute.DNSList)
+	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", true)
 	cfg.Set("UseLayer3Networking", false)
-	cfg.Set("DefaultImage", p.Options.Compute.DefaultImage)
-	cfg.Set("MetadataBucketName", p.Options.Metadata.Bucket)
-	cfg.Set("OperatorUsername", p.Options.Compute.OperatorUsername)
+	cfg.Set("DefaultImage", opts.DefaultImage)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("BuildSubnets", false)
 	return cfg, nil
 }
 
 // GetName returns the provider name
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "outscale"
 }
 
 // GetTenantParameters returns the tenant parameters as-is
 // TODO:
-func (p *provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() map[string]interface{} {
 	return nil
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
 		PublicVirtualIP: false,
 		// TODO: not tested, corresponding code inside stack is commented
@@ -214,6 +221,16 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 		PrivateVirtualIP: false,
 		Layer3Networking: false,
 	}
+}
+
+// ListImages ...
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
+}
+
+// ListTemplates ...
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
 // TODO: init when finished

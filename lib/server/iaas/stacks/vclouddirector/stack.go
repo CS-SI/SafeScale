@@ -19,6 +19,7 @@
 package vclouddirector
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"net/url"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -28,23 +29,41 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
-type Stack struct {
+type stack struct {
 	EbrcService *govcd.VCDClient
 	Config      *stacks.ConfigurationOptions
 	AuthOptions *stacks.AuthenticationOptions
 }
 
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+// IsNull tells if the instance corresponds to null value
+func (s *stack) IsNull() bool {
+	return s == nil || s.EbrcService == nil
+}
+
+// GetConfigurationOptions ...
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	if s.IsNull() {
+		return stacks.ConfigurationOptions{}
+	}
 	return *s.Config
 }
 
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+// GetAuthenticationOptions ...
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+	if s.IsNull() {
+		return stacks.AuthenticationOptions{}
+	}
 	return *s.AuthOptions
 }
 
-// Build Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
-	stack := &Stack{
+// NullStacks returns a null value of the stack
+func NullStack() *stack {
+	return &stack{}
+}
+
+// New creates and initializes a ClientAPI
+func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (api.Stack, fail.Error) {
+	stack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
 	}

@@ -34,9 +34,10 @@ import (
 )
 
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
 		return nil, fail.InvalidParameterError("volume name", "cannot be empty string")
@@ -48,7 +49,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 
 	v, _ := s.InspectVolumeByName(request.Name)
 	if v != nil {
-		return nil, abstract.ResourceDuplicateError("volume", request.Name)
+		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 	IOPS := 0
 	if request.Speed == volumespeed.SSD {
@@ -76,7 +77,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nil, xerr
+		return nullAV, xerr
 	}
 
 	ov := resp.Volume
@@ -93,11 +94,11 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 		"name": request.Name,
 	})
 	if xerr != nil {
-		return nil, xerr
+		return nullAV, xerr
 	}
 	xerr = s.WaitForVolumeState(ov.VolumeId, volumestate.AVAILABLE)
 	if xerr != nil {
-		return nil, xerr
+		return nullAV, xerr
 	}
 
 	volume := abstract.NewVolume()
@@ -109,14 +110,14 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 	return volume, nil
 }
 
-func (s *Stack) volumeSpeed(t string) volumespeed.Enum {
+func (s stack) volumeSpeed(t string) volumespeed.Enum {
 	if s, ok := s.configurationOptions.VolumeSpeeds[t]; ok {
 		return s
 	}
 	return volumespeed.HDD
 }
 
-func (s *Stack) volumeType(speed volumespeed.Enum) string {
+func (s stack) volumeType(speed volumespeed.Enum) string {
 	for t, s := range s.configurationOptions.VolumeSpeeds {
 		if s == speed {
 			return t
@@ -145,8 +146,8 @@ func volumeState(state string) volumestate.Enum {
 }
 
 // WaitForVolumeState wait for volume to be in the specified state
-func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr fail.Error) {
-	if s == nil {
+func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -170,13 +171,13 @@ func (s *Stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xer
 }
 
 // InspectVolume returns the volume identified by id
-func (s *Stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
-	nullAv := abstract.NewVolume()
-	if s == nil {
-		return nullAv, fail.InvalidInstanceError()
+func (s stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAv, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
@@ -199,13 +200,13 @@ func (s *Stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) 
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullAv, xerr
+		return nullAV, xerr
 	}
 	if len(resp.Volumes) > 1 {
 		return nil, fail.InconsistentError("Invalid provider response")
 	}
 	if len(resp.Volumes) == 0 {
-		return nullAv, fail.NotFoundError("failed to find a volume '%s'", id)
+		return nullAV, fail.NotFoundError("failed to find a volume '%s'", id)
 	}
 
 	ov := resp.Volumes[0]
@@ -219,13 +220,13 @@ func (s *Stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) 
 }
 
 // InspectVolumeByName returns the volume with name name
-func (s *Stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.Error) {
-	nullAv := abstract.NewVolume()
-	if s == nil {
-		return nullAv, fail.InvalidInstanceError()
+func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAv, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAV, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
@@ -250,14 +251,14 @@ func (s *Stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullAv, xerr
+		return nullAV, xerr
 	}
 	if len(resp.Volumes) == 0 {
-		return nullAv, fail.NotFoundError("failed to find volume '%s'", name)
+		return nullAV, fail.NotFoundError("failed to find volume '%s'", name)
 	}
 
 	if len(resp.Volumes) > 1 {
-		return nullAv, fail.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
+		return nullAV, fail.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
 	}
 	ov := resp.Volumes[0]
 	av = abstract.NewVolume()
@@ -270,9 +271,9 @@ func (s *Stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail
 }
 
 // ListVolumes list available volumes
-func (s *Stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
-	emptySlice := make([]abstract.Volume, 0)
-	if s == nil {
+func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
+	var emptySlice []abstract.Volume
+	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -314,8 +315,8 @@ func (s *Stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(id string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteVolume(id string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -349,7 +350,7 @@ func freeDevice(usedDevices []string, device string) bool {
 	return true
 }
 
-func (s *Stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
+func (s stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
 	var usedDeviceNames []string
 	atts, _ := s.ListVolumeAttachments(serverID)
 	if atts == nil {
@@ -370,8 +371,8 @@ func (s *Stack) getFirstFreeDeviceName(serverID string) (string, fail.Error) {
 }
 
 // CreateVolumeAttachment attaches a volume to a host
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, xerr fail.Error) {
-	if s == nil {
+func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (_ string, xerr fail.Error) {
+	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.HostID == "" {
@@ -411,16 +412,16 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
-func (s *Stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
-	nullVa := abstract.NewVolumeAttachment()
-	if s == nil {
-		return nullVa, fail.InvalidInstanceError()
+func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
+	nullVA := abstract.NewVolumeAttachment()
+	if s.IsNull() {
+		return nullVA, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
-		return nullVa, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return nullVA, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
 	if volumeID == "" {
-		return nullVa, fail.InvalidParameterError("volumeID", "cannot be empty string")
+		return nullVA, fail.InvalidParameterError("volumeID", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
@@ -443,13 +444,13 @@ func (s *Stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
-		return nullVa, xerr
+		return nullVA, xerr
 	}
 	if len(resp.Volumes) > 1 {
-		return nullVa, fail.InconsistentError("Invalid provider response")
+		return nullVA, fail.InconsistentError("Invalid provider response")
 	}
 	if len(resp.Volumes) == 0 {
-		return nullVa, nil
+		return nullVA, nil
 	}
 
 	ov := resp.Volumes[0]
@@ -471,9 +472,9 @@ func (s *Stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, xerr fail.Error) {
+func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttachment, xerr fail.Error) {
 	emptySlice := make([]abstract.VolumeAttachment, 0)
-	if s == nil {
+	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -499,8 +500,8 @@ func (s *Stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttac
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s *Stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if serverID == "" {

@@ -14,16 +14,26 @@
  * limitations under the License.
  */
 
-package openstack
+package outscale
 
 import "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 // GetConfigurationOptions ...
-func (s Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-	return s.cfgOpts
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	return stacks.ConfigurationOptions{
+		DNSList:          s.Options.Compute.DNSList,
+		MetadataBucket:   s.Options.Metadata.Bucket,
+		OperatorUsername: s.Options.Compute.OperatorUsername,
+	}
 }
 
 // GetAuthenticationOptions ...
-func (s Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-	return s.authOpts
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+	return stacks.AuthenticationOptions{
+		AccessKeyID:      s.Options.Identity.AccessKey,
+		SecretAccessKey:  s.Options.Identity.SecretKey,
+		Region:           s.Options.Compute.Region,
+		AvailabilityZone: s.Options.Compute.Subregion,
+		IdentityEndpoint: s.Options.Compute.URL,
+	}
 }
