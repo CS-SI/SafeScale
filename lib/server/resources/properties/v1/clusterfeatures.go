@@ -41,13 +41,18 @@ func newClusterInstalledFeature() *ClusterInstalledFeature {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cif *ClusterInstalledFeature) Clone() data.Clonable {
-	return newClusterInstalledFeature().Replace(cif)
+func (cif ClusterInstalledFeature) Clone() data.Clonable {
+	return newClusterInstalledFeature().Replace(&cif)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if cif == nil || p == nil {
+		return cif
+	}
+
 	src := p.(*ClusterInstalledFeature)
 	cif.RequiredBy = make([]string, len(src.RequiredBy))
 	copy(cif.RequiredBy, src.RequiredBy)
@@ -83,13 +88,18 @@ func newClusterFeatures() *ClusterFeatures {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (f *ClusterFeatures) Clone() data.Clonable {
-	return newClusterFeatures().Replace(f)
+func (f ClusterFeatures) Clone() data.Clonable {
+	return newClusterFeatures().Replace(&f)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (f *ClusterFeatures) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if f == nil || p == nil {
+		return f
+	}
+
 	src := p.(*ClusterFeatures)
 	f.Installed = make(map[string]*ClusterInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {

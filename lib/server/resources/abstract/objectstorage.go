@@ -49,6 +49,10 @@ func (osb ObjectStorageBucket) Clone() data.Clonable {
 //
 // satisfies interface data.Clonable
 func (osb *ObjectStorageBucket) Replace(p data.Clonable) data.Clonable {
+	if osb == nil || p == nil {
+		return osb
+	}
+
 	*osb = *p.(*ObjectStorageBucket)
 	return osb
 }

@@ -59,13 +59,18 @@ func (hn *HostNetworking) Reset() {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hn *HostNetworking) Clone() data.Clonable {
-	return NewHostNetworking().Replace(hn)
+func (hn HostNetworking) Clone() data.Clonable {
+	return NewHostNetworking().Replace(&hn)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (hn *HostNetworking) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hn == nil || p == nil {
+		return hn
+	}
+
 	src := p.(*HostNetworking)
 	*hn = *src
 	hn.SubnetsByID = make(map[string]string, len(src.SubnetsByID))

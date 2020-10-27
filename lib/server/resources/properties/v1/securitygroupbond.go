@@ -46,12 +46,17 @@ func (sgb *SecurityGroupBond) Reset() *SecurityGroupBond {
 }
 
 // Clone ...
-func (sgb *SecurityGroupBond) Clone() data.Clonable {
-	return NewSecurityGroupBond().Replace(sgb)
+func (sgb SecurityGroupBond) Clone() data.Clonable {
+	return NewSecurityGroupBond().Replace(&sgb)
 }
 
 // Replace ...
 func (sgb *SecurityGroupBond) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if sgb == nil || p == nil {
+		return sgb
+	}
+
 	src := p.(*SecurityGroupBond)
 	*sgb = *src
 	return sgb

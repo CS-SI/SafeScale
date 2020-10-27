@@ -42,12 +42,17 @@ func (hcm *HostClusterMembership) Reset() {
 }
 
 // Clone ...
-func (hcm *HostClusterMembership) Clone() data.Clonable {
-	return NewHostClusterMembership().Replace(hcm)
+func (hcm HostClusterMembership) Clone() data.Clonable {
+	return NewHostClusterMembership().Replace(&hcm)
 }
 
 // Replace ...
 func (hcm *HostClusterMembership) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hcm == nil || p == nil {
+		return hcm
+	}
+
 	src := p.(*HostClusterMembership)
 	*hcm = *src
 	return hcm

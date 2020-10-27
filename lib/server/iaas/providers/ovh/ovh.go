@@ -89,6 +89,7 @@ func New() providers.Provider {
 }
 
 // Build build a new instance of Ovh using configuration parameters
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})

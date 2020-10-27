@@ -49,12 +49,17 @@ func (ssg *SubnetSecurityGroups) Reset() {
 }
 
 // Clone ...
-func (ssg *SubnetSecurityGroups) Clone() data.Clonable {
-	return NewSubnetSecurityGroups().Replace(ssg)
+func (ssg SubnetSecurityGroups) Clone() data.Clonable {
+	return NewSubnetSecurityGroups().Replace(&ssg)
 }
 
 // Replace ...
 func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if ssg == nil || p == nil {
+		return ssg
+	}
+
 	src := p.(*SubnetSecurityGroups)
 	*ssg = *src
 	ssg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))

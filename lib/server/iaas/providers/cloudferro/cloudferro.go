@@ -52,6 +52,7 @@ func New() providers.Provider {
 }
 
 // Build build a new Client from configuration parameter
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
@@ -177,8 +178,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
 	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
@@ -190,8 +194,11 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
 	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
@@ -206,17 +213,25 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+	}
+
 	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
 	if xerr != nil {
-		return nil, xerr
+		return []abstract.HostTemplate{}, xerr
 	}
 	return allTemplates, nil
 }
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
+	}
+
 	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages()
 	if xerr != nil {
 		return nil, xerr
@@ -225,17 +240,25 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // GetName returns the providerName
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "cloudferro"
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-func (p *provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() map[string]interface{} {
+	if p.IsNull() {
+		return map[string]interface{}{}
+	}
+
 	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
+	if p.IsNull() {
+		return providers.Capabilities{}
+	}
+
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}
