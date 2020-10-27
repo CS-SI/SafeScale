@@ -45,6 +45,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build build a new Client from configuration parameter
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})

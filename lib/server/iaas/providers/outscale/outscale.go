@@ -90,11 +90,8 @@ func (p *provider) IsNull() bool {
 }
 
 // Build ...
+// Can be called from nil
 func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr fail.Error) {
-	if p.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-
 	identity := remap(opt["identity"])
 	compute := remap(opt["compute"])
 	metadata := remap(opt["metadata"])

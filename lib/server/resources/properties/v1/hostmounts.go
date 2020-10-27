@@ -44,12 +44,17 @@ func (hlm *HostLocalMount) Reset() {
 }
 
 // Clone ...
-func (hlm *HostLocalMount) Clone() data.Clonable {
-	return NewHostLocalMount().Replace(hlm)
+func (hlm HostLocalMount) Clone() data.Clonable {
+	return NewHostLocalMount().Replace(&hlm)
 }
 
 // Replace ...
 func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hlm == nil || p == nil {
+		return hlm
+	}
+
 	src := p.(*HostLocalMount)
 	*hlm = *src
 	return hlm
@@ -78,12 +83,17 @@ func (hrm *HostRemoteMount) Reset() {
 }
 
 // Clone ...
-func (hrm *HostRemoteMount) Clone() data.Clonable {
-	return NewHostRemoteMount().Replace(hrm)
+func (hrm HostRemoteMount) Clone() data.Clonable {
+	return NewHostRemoteMount().Replace(&hrm)
 }
 
 // Replace ...
 func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hrm == nil || p == nil {
+		return hrm
+	}
+
 	src := p.(*HostRemoteMount)
 	*hrm = *src
 	return hrm
@@ -129,12 +139,17 @@ func (hm *HostMounts) Content() interface{} {
 }
 
 // Clone ...  (data.Clonable interface)
-func (hm *HostMounts) Clone() data.Clonable {
-	return NewHostMounts().Replace(hm)
+func (hm HostMounts) Clone() data.Clonable {
+	return NewHostMounts().Replace(&hm)
 }
 
 // Replace ...  (data.Clonable interface)
 func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hm == nil || p == nil {
+		return hm
+	}
+
 	src := p.(*HostMounts)
 	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
 	for k, v := range src.LocalMountsByDevice {

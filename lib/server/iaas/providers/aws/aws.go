@@ -37,23 +37,26 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
-func (p *provider) AddPublicIPToVIP(ip *abstract.VirtualIP) fail.Error {
+func (p provider) AddPublicIPToVIP(ip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) BindHostToVIP(*abstract.VirtualIP, string) fail.Error {
+func (p provider) BindHostToVIP(*abstract.VirtualIP, string) fail.Error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) UnbindHostFromVIP(*abstract.VirtualIP, string) fail.Error {
+func (p provider) UnbindHostFromVIP(*abstract.VirtualIP, string) fail.Error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
+func (p provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p *provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() map[string]interface{} {
+	if p.IsNull() {
+		return map[string]interface{}{}
+	}
 	return p.tenantParameters
 }
 
@@ -63,6 +66,7 @@ func New() providers.Provider {
 }
 
 // Build build a new Client from configuration parameter
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
@@ -201,8 +205,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
 	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
@@ -216,6 +223,9 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 // GetConfigurationOptions return configuration parameters
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
 	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
@@ -230,12 +240,12 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // GetName returns the providerName
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "aws"
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
@@ -243,7 +253,7 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	if p.IsNull() {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
@@ -251,7 +261,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}

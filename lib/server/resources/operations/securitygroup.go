@@ -280,7 +280,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 		}
 	}()
 
-	// VPL: not sure yet if this is wanted... If no rules are provided, Cloud Provider may put default rules in Security Group...
+	// Outscale refuses to leave empty rules in Security Group
 	if len(rules) == 0 {
 		if xerr = sg.Clear(task); xerr != nil {
 			return xerr

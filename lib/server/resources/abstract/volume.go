@@ -49,14 +49,19 @@ func NewVolume() *Volume {
 // Clone ...
 //
 // satisfies interface data.Clonable
-func (v *Volume) Clone() data.Clonable {
-	return NewVolume().Replace(v)
+func (v Volume) Clone() data.Clonable {
+	return NewVolume().Replace(&v)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
 func (v *Volume) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if v == nil || p == nil {
+		return v
+	}
+
 	src := p.(*Volume)
 	*v = *src
 	return v

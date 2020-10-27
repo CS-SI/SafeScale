@@ -933,8 +933,8 @@ type ErrInvalidParameter struct {
 }
 
 // InvalidParameterError creates a ErrInvalidParameter error
-func InvalidParameterError(what, why string) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, why, 0))
+func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 0))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())

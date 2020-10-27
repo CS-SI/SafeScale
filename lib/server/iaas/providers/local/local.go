@@ -73,6 +73,7 @@ type CfgOptions struct {
 // }
 
 // Build Create and initialize a ClientAPI
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
 	authOptions := stacks.AuthenticationOptions{}
 	localConfig := stacks.LocalConfiguration{}

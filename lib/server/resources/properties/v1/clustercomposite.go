@@ -36,13 +36,18 @@ func newClusterComposite() *ClusterComposite {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (c *ClusterComposite) Clone() data.Clonable {
-	return newClusterComposite().Replace(c)
+func (c ClusterComposite) Clone() data.Clonable {
+	return newClusterComposite().Replace(&c)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (c *ClusterComposite) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if c == nil || p == nil {
+		return c
+	}
+
 	src := p.(*ClusterComposite)
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)

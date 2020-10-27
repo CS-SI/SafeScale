@@ -75,6 +75,7 @@ func New() providers.Provider {
 }
 
 // Build initializes a new FlexibleEngine instance from parameters
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})

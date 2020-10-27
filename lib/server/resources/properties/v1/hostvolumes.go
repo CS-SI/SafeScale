@@ -78,12 +78,17 @@ func (hv *HostVolumes) Content() interface{} {
 }
 
 // Clone ...
-func (hv *HostVolumes) Clone() data.Clonable {
-	return NewHostVolumes().Replace(hv)
+func (hv HostVolumes) Clone() data.Clonable {
+	return NewHostVolumes().Replace(&hv)
 }
 
 // Replace ...
 func (hv *HostVolumes) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hv == nil || p == nil {
+		return hv
+	}
+
 	src := p.(*HostVolumes)
 	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
 	for k, v := range src.VolumesByID {

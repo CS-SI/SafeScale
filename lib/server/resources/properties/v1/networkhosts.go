@@ -50,12 +50,17 @@ func (nh *NetworkHosts) Content() interface{} {
 }
 
 // Clone ... (data.Clonable interface)
-func (nh *NetworkHosts) Clone() data.Clonable {
-	return NewNetworkHosts().Replace(nh)
+func (nh NetworkHosts) Clone() data.Clonable {
+	return NewNetworkHosts().Replace(&nh)
 }
 
 // Replace ... (data.Clonable interface)
 func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if nh == nil || p == nil {
+		return nh
+	}
+
 	src := p.(*NetworkHosts)
 	nh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {

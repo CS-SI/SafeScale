@@ -603,7 +603,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 
 		// Updates host property propertiesv2.HostNetworking
-		// FIXME: introduce a NetworkV2 with correctly named fields (Networking -> Subnet, ...)
 		innerXErr = props.Alter(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -612,6 +611,12 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			_ = hnV2.Replace(converters.HostNetworkingFromAbstractToPropertyV2(*ahf.Networking))
 			hnV2.DefaultSubnetID = defaultSubnet.GetID()
 			hnV2.IsGateway = hostReq.IsGateway
+			hnV2.PublicIPv4 = ahf.Networking.PublicIPv4
+			hnV2.PublicIPv6 = ahf.Networking.PublicIPv6
+			hnV2.SubnetsByID = ahf.Networking.SubnetsByID
+			hnV2.SubnetsByName = ahf.Networking.SubnetsByName
+			hnV2.IPv4Addresses = ahf.Networking.IPv4Addresses
+			hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
 			return nil
 		})
 		if innerXErr != nil {

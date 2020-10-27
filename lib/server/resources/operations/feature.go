@@ -214,18 +214,16 @@ func (f *feature) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (f *feature) Clone() data.Clonable {
-	if f.IsNull() {
-		return f
-	}
+func (f feature) Clone() data.Clonable {
 	res := &feature{}
-	return res.Replace(f)
+	return res.Replace(&f)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (f *feature) Replace(p data.Clonable) data.Clonable {
-	if f.IsNull() {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if f == nil || p == nil {
 		return f
 	}
 

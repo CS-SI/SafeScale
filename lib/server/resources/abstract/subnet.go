@@ -80,13 +80,18 @@ func NewSubnet() *Subnet {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s *Subnet) Clone() data.Clonable {
-	return NewSubnet().Replace(s)
+func (s Subnet) Clone() data.Clonable {
+	return NewSubnet().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (s *Subnet) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if s == nil || p == nil {
+		return s
+	}
+
 	*s = *p.(*Subnet)
 	return s
 }
@@ -173,13 +178,18 @@ func NewVirtualIP() *VirtualIP {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (vip *VirtualIP) Clone() data.Clonable {
-	return NewVirtualIP().Replace(vip)
+func (vip VirtualIP) Clone() data.Clonable {
+	return NewVirtualIP().Replace(&vip)
 }
 
 // Replace ...
 // satisfies interface data.Clonable interface
 func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if vip == nil || p == nil {
+		return vip
+	}
+
 	src := p.(*VirtualIP)
 	*vip = *src
 	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))

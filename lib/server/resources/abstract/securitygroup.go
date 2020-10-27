@@ -229,18 +229,16 @@ func NewSecurityGroup( /*name string*/ ) *SecurityGroup {
 // Clone does a deep-copy of the Host
 //
 // satisfies interface data.Clonable
-func (sg *SecurityGroup) Clone() data.Clonable {
-	if sg.IsNull() {
-		return sg
-	}
-	return NewSecurityGroup().Replace(sg)
+func (sg SecurityGroup) Clone() data.Clonable {
+	return NewSecurityGroup().Replace(&sg)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
 func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
-	if sg.IsNull() {
+	// Do not test with IsNull(), it's allowed to clone a null value
+	if sg == nil || p == nil {
 		return sg
 	}
 
