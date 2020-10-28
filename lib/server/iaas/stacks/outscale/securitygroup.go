@@ -42,7 +42,7 @@ func (s stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	groups, xerr := s.rpcReadSecurityGroups([]string{})
+	groups, xerr := s.rpcReadSecurityGroups(networkID, nil)
 	if xerr != nil {
 		return list, xerr
 	}
@@ -184,7 +184,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	group, xerr := s.rpcReadSecurityGroup(asg.ID)
+	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -216,7 +216,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	group, xerr := s.rpcReadSecurityGroup(asg.ID)
+	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
 	if xerr != nil {
 		return asg, xerr
 	}

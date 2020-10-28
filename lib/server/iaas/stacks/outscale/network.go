@@ -17,8 +17,6 @@
 package outscale
 
 import (
-	"fmt"
-
 	"github.com/antihax/optional"
 	"github.com/sirupsen/logrus"
 
@@ -32,6 +30,8 @@ import (
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
+
+const tagNameLabel = "name"
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 func (s stack) HasDefaultNetwork() bool {
@@ -65,43 +65,21 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	createNetRequest := osc.CreateNetRequest{
-		IpRange: req.CIDR,
-		Tenancy: s.Options.Compute.DefaultTenancy,
-	}
-	var respNet osc.CreateNetResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			respNet, _, innerErr = s.client.NetApi.CreateNet(s.auth, &osc.CreateNetOpts{
-				CreateNetRequest: optional.NewInterface(createNetRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcCreateNetwork(req.Name, req.CIDR)
 	if xerr != nil {
 		return nullAN, xerr
 	}
-	onet := respNet.Net
 
 	defer func() {
-		if xerr != nil {
-			if derr := s.DeleteNetwork(onet.NetId); derr != nil {
-				_ = xerr.AddConsequence(derr)
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := s.DeleteNetwork(resp.NetId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
 			}
 		}
 	}()
 
-	tags, xerr := s.setResourceTags(onet.NetId, map[string]string{
-		"name": req.Name,
-	})
-	if xerr != nil {
-		return nullAN, xerr
-	}
-	onet.Tags = tags
-
 	// update default security group to allow external traffic
-	securityGroup, xerr := s.getNetworkSecurityGroup(onet.NetId)
+	securityGroup, xerr := s.rpcReadSecurityGroupByName(resp.NetId, "default")
 	if xerr != nil {
 		return nullAN, xerr
 	}
@@ -111,41 +89,28 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 		return nullAN, fail.Wrap(xerr, "failed to update default security group of Network/VPC")
 	}
 
-	xerr = s.createDHCPOptionSet(req, onet)
-	if xerr != nil {
+	if xerr = s.createDHCPOptionSet(req, resp); xerr != nil {
 		return nullAN, fail.Wrap(xerr, "failed to create DHCP options set of Network/VPC")
 	}
 
-	xerr = s.createInternetService(req, onet)
-	if xerr != nil {
+	if xerr = s.createInternetService(req, resp); xerr != nil {
 		return nullAN, fail.Wrap(xerr, "failed to create Internet Service of Network/VPC")
 	}
 
-	return toNetwork(onet), nil
+	return toNetwork(resp), nil
 }
 
 func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fail.Error {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
+
 	ntpServers, xerr := s.getDefaultDhcpNtpServers(net)
 	if xerr != nil {
 		return xerr
 	}
-	createDhcpOptionsRequest := osc.CreateDhcpOptionsRequest{
-		NtpServers:        ntpServers,
-		DomainNameServers: req.DNSServers,
-	}
-	var resp osc.CreateDhcpOptionsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &osc.CreateDhcpOptionsOpts{
-				CreateDhcpOptionsRequest: optional.NewInterface(createDhcpOptionsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+
+	resp, xerr := s.rpcCreateDhcpOptions(req.Name, req.DNSServers, ntpServers)
 	if xerr != nil {
 		return xerr
 	}
@@ -157,51 +122,18 @@ func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 		}
 	}()
 
-	dhcpOptionID := resp.DhcpOptionsSet.DhcpOptionsSetId
-	_, xerr = s.setResourceTags(dhcpOptionID, map[string]string{
-		"name": req.Name,
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	updateNetRequest := osc.UpdateNetRequest{
-		DhcpOptionsSetId: dhcpOptionID,
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-				ReadNetsRequest: optional.NewInterface(updateNetRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcUpdateNet(net.NetId, resp.DhcpOptionsSetId)
 }
 
 func (s stack) getDefaultDhcpNtpServers(net osc.Net) ([]string, fail.Error) {
-	readDhcpOptionsRequest := osc.ReadDhcpOptionsRequest{
-		Filters: osc.FiltersDhcpOptions{
-			DhcpOptionsSetIds: []string{net.DhcpOptionsSetId},
-		},
-	}
-	var resp osc.ReadDhcpOptionsResponse
-	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &osc.ReadDhcpOptionsOpts{
-				ReadDhcpOptionsRequest: optional.NewInterface(readDhcpOptionsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadDhcpOptions(net.DhcpOptionsSetId)
 	if xerr != nil {
 		return []string{}, xerr
 	}
-	if len(resp.DhcpOptionsSets) != 1 {
+	if len(resp) != 1 {
 		return []string{}, fail.InconsistentError("inconsistent provider response")
 	}
-	return resp.DhcpOptionsSets[0].NtpServers, nil
+	return resp[0].NtpServers, nil
 }
 
 func (s stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
@@ -216,26 +148,15 @@ func (s stack) deleteDhcpOptions(onet osc.Net, checkName bool) fail.Error {
 		return nil
 	}
 
-	deleteDhcpOptionsRequest := osc.DeleteDhcpOptionsRequest{
-		DhcpOptionsSetId: onet.DhcpOptionsSetId,
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &osc.DeleteDhcpOptionsOpts{
-				DeleteDhcpOptionsRequest: optional.NewInterface(deleteDhcpOptionsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeleteDhcpOptions(onet.DhcpOptionsSetId)
 }
 
 func (s stack) checkDHCPOptionsName(onet osc.Net) (bool, fail.Error) {
-	tags, xerr := s.getResourceTags(onet.DhcpOptionsSetId)
+	tags, xerr := s.rpcReadTags(onet.DhcpOptionsSetId)
 	if xerr != nil {
 		return false, xerr
 	}
-	_, ok := tags["name"]
+	_, ok := tags[tagNameLabel]
 	return ok, nil
 }
 
@@ -253,8 +174,8 @@ func (s stack) createInternetService(req abstract.NetworkRequest, onet osc.Net) 
 		return xerr
 	}
 
-	_, xerr = s.setResourceTags(resp.InternetService.InternetServiceId, map[string]string{
-		"name": req.Name,
+	_, xerr = s.rpcCreateTags(resp.InternetService.InternetServiceId, map[string]string{
+		tagNameLabel: req.Name,
 	})
 	if xerr != nil {
 		return xerr
@@ -298,7 +219,7 @@ func (s stack) deleteInternetService(netID string) fail.Error {
 	// internet service found
 	for _, ois := range resp.InternetServices {
 		tags := unwrapTags(ois.Tags)
-		if _, ok := tags["name"]; ois.NetId != netID || !ok {
+		if _, ok := tags[tagNameLabel]; ois.NetId != netID || !ok {
 			continue
 		}
 		unlinkInternetServiceOpts := osc.UnlinkInternetServiceOpts{
@@ -392,7 +313,7 @@ func toNetwork(in osc.Net) *abstract.Network {
 	out.ID = in.NetId
 	out.CIDR = in.IpRange
 	tags := unwrapTags(in.Tags)
-	if name, ok := tags["name"]; ok {
+	if name, ok := tags[tagNameLabel]; ok {
 		out.Name = name
 	}
 	return out
@@ -445,20 +366,20 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readNetsRequest := osc.ReadNetsRequest{
-		Filters: osc.FiltersNet{
-			Tags: []string{fmt.Sprintf("%s=%s", "name", name)},
-		},
+	request := osc.ReadNetsOpts{
+		ReadNetsRequest: optional.NewInterface(osc.ReadNetsRequest{
+			Filters: osc.FiltersNet{
+				Tags: []string{tagNameLabel + "=" + name},
+			},
+		}),
 	}
 	var resp osc.ReadNetsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &osc.ReadNetsOpts{
-				ReadNetsRequest: optional.NewInterface(readNetsRequest),
-			})
-			return normalizeError(innerErr)
+			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &request)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return nullAN, xerr
@@ -481,18 +402,18 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readNetsOpts := osc.ReadNetsOpts{
+	request := osc.ReadNetsOpts{
 		ReadNetsRequest: optional.NewInterface(osc.ReadNetsRequest{
 			Filters: osc.FiltersNet{},
 		}),
 	}
 	var resp osc.ReadNetsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &readNetsOpts)
-			return normalizeError(innerErr)
+			resp, _, innerErr = s.client.NetApi.ReadNets(s.auth, &request)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -510,19 +431,18 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 }
 
 func (s stack) deleteSecurityGroup(onet *osc.Net) fail.Error {
-	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
-		DryRun:  false,
-		Filters: osc.FiltersSecurityGroup{},
+	request := osc.ReadSecurityGroupsOpts{
+		ReadSecurityGroupsRequest: optional.NewInterface(osc.ReadSecurityGroupsRequest{
+			Filters: osc.FiltersSecurityGroup{},
+		}),
 	}
 	var resp osc.ReadSecurityGroupsResponse
-	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-				ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-			})
-			return normalizeError(innerErr)
+			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &request)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return xerr
@@ -536,17 +456,17 @@ func (s stack) deleteSecurityGroup(onet *osc.Net) fail.Error {
 		if sg.NetId != onet.NetId {
 			continue
 		}
-		deleteSecurityGroupRequest := osc.DeleteSecurityGroupRequest{
-			SecurityGroupId: sg.SecurityGroupId,
+		request := osc.DeleteSecurityGroupOpts{
+			DeleteSecurityGroupRequest: optional.NewInterface(osc.DeleteSecurityGroupRequest{
+				SecurityGroupId: sg.SecurityGroupId,
+			}),
 		}
-		xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
-				_, _, innerErr := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &osc.DeleteSecurityGroupOpts{
-					DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
-				})
-				return normalizeError(innerErr)
+				_, _, innerErr := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &request)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			normalizeError,
 		)
 		if xerr != nil {
 			return xerr
@@ -565,46 +485,21 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	// Reads NIS that belong to the subnet
-	readNicsRequest := osc.ReadNicsRequest{
-		Filters: osc.FiltersNic{
-			SubnetIds: []string{id},
-		},
-	}
-	var resp osc.ReadNicsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-				ReadNicsRequest: optional.NewInterface(readNicsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	// Reads NICs that belong to the subnet
+	resp, xerr := s.rpcReadNics(id, "")
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to read nics")
+		return xerr
 	}
 
 	// Remove should succeed only when something goes wrong when deleting VMs
-	if len(resp.Nics) > 0 {
-		if xerr = s.deleteNICs(resp.Nics); xerr == nil {
-			return fail.Wrap(xerr, "failed to delete nic")
+	if len(resp) > 0 {
+		if xerr = s.deleteNICs(resp); xerr == nil {
+			return xerr
 		}
 	}
 
 	// delete VPC
-	deleteNetRequest := osc.DeleteNetRequest{
-		NetId: id,
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.NetApi.DeleteNet(s.auth, &osc.DeleteNetOpts{
-				DeleteNetRequest: optional.NewInterface(deleteNetRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeleteNetwork(id)
 }
 
 // CreateSubnet creates a Subnet
@@ -624,7 +519,6 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 		return nullAS, xerr
 	}
 
-	//	ok, xerr := netutils.DoCIDRsIntersect(vpc.IpRange), req.IPRanges)
 	ok, err := netutils.CIDRString(vpc.CIDR).Contains(netutils.CIDRString(req.CIDR))
 	if err != nil {
 		return nullAS, fail.Wrap(err, "failed to determine if network CIDR '%s' is inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
@@ -637,69 +531,20 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 	}
 
 	// Create a subnet with the same IPRanges than the network
-	createSubnetRequest := osc.CreateSubnetRequest{
-		IpRange:       req.CIDR,
-		NetId:         vpc.ID,
-		SubregionName: s.Options.Compute.Subregion,
-	}
-	var resp osc.CreateSubnetResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-				CreateSubnetRequest: optional.NewInterface(createSubnetRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcCreateSubnet(req.Name, vpc.ID, req.CIDR)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
-		if xerr != nil {
-			deleteSubnetRequest := osc.DeleteSubnetRequest{
-				SubnetId: resp.Subnet.SubnetId,
-			}
-			derr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-				func() error {
-					_, _, innerErr := s.client.SubnetApi.CreateSubnet(s.auth, &osc.CreateSubnetOpts{
-						CreateSubnetRequest: optional.NewInterface(deleteSubnetRequest),
-					})
-					return normalizeError(innerErr)
-				},
-				temporal.GetCommunicationTimeout(),
-			)
-			if derr != nil {
-				_ = xerr.AddConsequence(normalizeError(derr))
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := s.rpcDeleteSubnet(resp.Subnet.SubnetId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}
 	}()
 
-	_, xerr = s.setResourceTags(resp.Subnet.SubnetId, map[string]string{
-		"name": req.Name,
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	// Prevent automatic assignment of public ip to VM created in the subnet
-	updateSubnetRequest := osc.UpdateSubnetRequest{
-		MapPublicIpOnLaunch: false,
-		SubnetId:            resp.Subnet.SubnetId,
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.SubnetApi.UpdateSubnet(s.auth, &osc.UpdateSubnetOpts{
-				UpdateSubnetRequest: optional.NewInterface(updateSubnetRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
 
 	as = abstract.NewSubnet()
 	as.ID = resp.Subnet.SubnetId
@@ -725,35 +570,15 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readSubnetsRequest := osc.ReadSubnetsRequest{
-		Filters: osc.FiltersSubnet{
-			SubnetIds: []string{id},
-		},
-	}
-	var resp osc.ReadSubnetsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-				ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadSubnetByID(id)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if len(resp.Subnets) > 1 {
-		return nil, fail.InconsistentError("inconsistent provider response")
-	}
-	if len(resp.Subnets) == 0 {
-		return nil, fail.NotFoundError("failed to find subnet %s", id)
-	}
 
-	return toAbstractSubnet(resp.Subnets[0]), nil
+	return toAbstractSubnet(resp), nil
 }
 
-// InspectSubnetByName returns the Subnet identified by id
+// InspectSubnetByName returns the Subnet identified by name
 func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
@@ -767,14 +592,10 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	filters := osc.FiltersSubnet{
-		SubnetIds: []string{subnetName},
-	}
-
-	var an *abstract.Network
+	var networkID string
 	// If networkRef is not empty string, networkRef can be an ID or a Name; let's find out the ID of this network for sure
 	if networkRef != "" {
-		an, xerr = s.InspectNetwork(networkRef)
+		an, xerr := s.InspectNetwork(networkRef)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -787,35 +608,34 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 			return nil, xerr
 		}
 		if an != nil {
-			filters.NetIds = []string{an.ID}
+			networkID = an.ID
 		}
 	}
 
-	// FIXME: embed in a retry.WhileCommunicationUnsuccessful...
-	var resp osc.ReadSubnetsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-				ReadSubnetsRequest: optional.NewInterface(osc.ReadSubnetsRequest{Filters: filters}),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadSubnets(networkID, nil)
 	if xerr != nil {
-		return nil, xerr
+		return nullAS, xerr
 	}
-	if len(resp.Subnets) > 1 {
-		return nil, fail.InconsistentError("inconsistent provider response, returned multiple Subnets")
-	}
-	if len(resp.Subnets) == 0 {
-		if an != nil {
-			return nil, fail.NotFoundError("failed to find subnet '%s' in Network/VPC '%s'", subnetName, an.Name)
+	var (
+		found bool
+		out   osc.Subnet
+	)
+	for _, v := range resp {
+		for _, t := range v.Tags {
+			if t.Key == tagNameLabel && t.Value == subnetName {
+				out = v
+				found = true
+				break
+			}
 		}
-		return nil, fail.NotFoundError("failed to find subnet '%s'", subnetName)
+		if found {
+			break
+		}
 	}
-	//
-	return toAbstractSubnet(resp.Subnets[0]), nil
+	if !found {
+		return nullAS, fail.NotFoundError("failed to find a Subnet named '%s'", subnetName)
+	}
+	return toAbstractSubnet(out), nil
 }
 
 func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
@@ -825,7 +645,7 @@ func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
 	out.IPVersion = ipversion.IPv4
 	out.Network = subnet.NetId
 	tags := unwrapTags(subnet.Tags)
-	if name, ok := tags["name"]; ok {
+	if name, ok := tags[tagNameLabel]; ok {
 		out.Name = name
 	}
 	return out
@@ -861,26 +681,12 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 		}
 	}
 
-	readSubnetsRequest := osc.ReadSubnetsRequest{
-		Filters: osc.FiltersSubnet{
-			NetIds: []string{an.ID},
-		},
-	}
-	var resp osc.ReadSubnetsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.SubnetApi.ReadSubnets(s.auth, &osc.ReadSubnetsOpts{
-				ReadSubnetsRequest: optional.NewInterface(readSubnetsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadSubnets(an.ID, nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
 	var subnets []*abstract.Subnet
-	for _, v := range resp.Subnets {
+	for _, v := range resp {
 		subnets = append(subnets, toAbstractSubnet(v))
 	}
 
@@ -893,34 +699,20 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 		emptyNicSlice    []osc.Nic
 	)
 
-	readNicsRequest := osc.ReadNicsRequest{
-		Filters: osc.FiltersNic{
-			LinkNicVmIds: []string{hostID},
-		},
-	}
-	var resp osc.ReadNicsResponse
-	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-				ReadNicsRequest: optional.NewInterface(readNicsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadNics("", hostID)
 	if xerr != nil {
 		return emptySubnetSlice, emptyNicSlice, xerr
 	}
 
-	var subnets []*abstract.Subnet
-	for _, nic := range resp.Nics {
-		subnet, xerr := s.InspectSubnet(nic.SubnetId)
+	var list []*abstract.Subnet
+	for _, nic := range resp {
+		item, xerr := s.InspectSubnet(nic.SubnetId)
 		if xerr != nil {
 			return emptySubnetSlice, emptyNicSlice, xerr
 		}
-		subnets = append(subnets, subnet)
+		list = append(list, item)
 	}
-	return subnets, resp.Nics, nil
+	return list, resp, nil
 }
 
 // DeleteSubnet deletes the subnet identified by id
@@ -934,44 +726,19 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Reads NIS that belong to the subnet
-	readNicsRequest := osc.ReadNicsRequest{
-		Filters: osc.FiltersNic{
-			SubnetIds: []string{id},
-		},
-	}
-	var resp osc.ReadNicsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-				ReadNicsRequest: optional.NewInterface(readNicsRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadNics(id, "")
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to read nics")
 	}
 
-	if len(resp.Nics) > 0 {
+	if len(resp) > 0 {
 		// Remove should succeed only when something goes wrong when deleting VMs
-		if xerr = s.deleteNICs(resp.Nics); xerr == nil {
+		if xerr = s.deleteNICs(resp); xerr == nil {
 			logrus.Debugf("Check if nothing goes wrong deleting a VM")
 		}
 	}
 
-	deleteSubnetRequest := osc.DeleteSubnetRequest{
-		SubnetId: id,
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.SubnetApi.DeleteSubnet(s.auth, &osc.DeleteSubnetOpts{
-				DeleteSubnetRequest: optional.NewInterface(deleteSubnetRequest),
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeleteSubnet(id)
 }
 
 // BindSecurityGroupToSubnet binds a Security Group to a Subnet
@@ -1021,52 +788,43 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	return nil
 }
 
-func (s stack) updateDefaultSecurityRules(sg *osc.SecurityGroup) fail.Error {
+func (s stack) updateDefaultSecurityRules(sg osc.SecurityGroup) fail.Error {
 	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
 	rules = append(rules, s.createICMPPermissions()...)
-	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
-		SecurityGroupId: sg.SecurityGroupId,
-		Rules:           rules,
-		Flow:            "Inbound",
-	}
-	_, _, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
-		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
-	}
-	createSecurityGroupRuleRequest = osc.CreateSecurityGroupRuleRequest{
-		SecurityGroupId: sg.SecurityGroupId,
-		Rules:           rules,
-		Flow:            "Outbound",
-	}
-	_, _, err = s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
-		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
-	})
-	return normalizeError(err)
-}
-
-func (s stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
-	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
-		Filters: osc.FiltersSecurityGroup{
-			SecurityGroupNames: []string{"default"},
-		},
-	}
-	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	xerr := s.rpcCreateSecurityGroupRule(sg.SecurityGroupId, "Inbound", rules)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to add Network ingress rules to Security Group %s", sg.SecurityGroupId)
 	}
 
-	for _, sg := range res.SecurityGroups {
-		if sg.NetId == netID {
-			return &sg, nil
-		}
+	xerr = s.rpcCreateSecurityGroupRule(sg.SecurityGroupId, "Outbound", rules)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to add Network egress rules to Security Group %s", sg.SecurityGroupId)
 	}
-	// should never go there, in case this means that the network do not have a default security group
-	return nil, fail.NotFoundError("failed to get security group of Networking '%s'", netID)
+	return nil
 }
+
+// VPL: obsolete
+//func (s stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
+//	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
+//		Filters: osc.FiltersSecurityGroup{
+//			SecurityGroupNames: []string{"default"},
+//		},
+//	}
+//	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
+//		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
+//	})
+//	if err != nil {
+//		return nil, normalizeError(err)
+//	}
+//
+//	for _, sg := range res.SecurityGroups {
+//		if sg.NetId == netID {
+//			return &sg, nil
+//		}
+//	}
+//	// should never go there, in case this means that the network do not have a default security group
+//	return nil, fail.NotFoundError("failed to get security group of Networking '%s'", netID)
+//}
 
 // open all ports, ingress is controlled by the vm firewall
 func (s stack) createTCPPermissions() []osc.SecurityGroupRule {

@@ -90,7 +90,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		}
 	}()
 
-	_, xerr = s.setResourceTags(ov.VolumeId, map[string]string{
+	_, xerr = s.rpcCreateTags(ov.VolumeId, map[string]string{
 		"name": request.Name,
 	})
 	if xerr != nil {
