@@ -81,7 +81,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 	//	return nil, fail.InconsistentError("Inconsistent provider response")
 	// }
 
-	_, xerr = s.setResourceTags(nic.NicId, map[string]string{
+	_, xerr = s.rpcCreateTags(nic.NicId, map[string]string{
 		"name": name,
 	})
 	if xerr != nil {
