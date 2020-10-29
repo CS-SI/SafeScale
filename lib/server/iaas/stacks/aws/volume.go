@@ -17,11 +17,10 @@
 package aws
 
 import (
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
@@ -40,19 +39,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	query := ec2.CreateVolumeInput{
-		Size:             aws.Int64(int64(request.Size)),
-		VolumeType:       aws.String(toVolumeType(request.Speed)),
-		AvailabilityZone: aws.String(s.AwsConfig.Zone),
-	}
-	var resp *ec2.Volume
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.CreateVolume(&query)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcCreateVolume(aws.String(request.Name), int64(request.Size), fromAbstractVolumeSpeed(request.Speed))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -60,50 +47,88 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	// FIXME: Defer volume destruction
 	defer func() {
 		if xerr != nil {
-			query := ec2.DeleteVolumeInput{
-				VolumeId: resp.VolumeId,
-			}
-			derr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-				func() error {
-					_, innerErr := s.EC2Service.DeleteVolume(&query)
-					return normalizeError(innerErr)
-				},
-				temporal.GetCommunicationTimeout(),
-			)
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume"))
+			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
 			}
 		}
 	}()
-
-	tagQuery := ec2.CreateTagsInput{
-		Resources: []*string{resp.VolumeId},
-		Tags: []*ec2.Tag{
-			{
-				Key:   aws.String("Name"),
-				Value: aws.String(request.Name),
-			},
-		},
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, innerErr := s.EC2Service.CreateTags(&tagQuery)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
 
 	volume := abstract.Volume{
 		ID:    aws.StringValue(resp.VolumeId),
 		Name:  request.Name,
 		Size:  int(aws.Int64Value(resp.Size)),
-		Speed: toVolumeSpeed(resp.VolumeType),
-		State: toVolumeState(resp.State),
+		Speed: toAbstractVolumeSpeed(resp.VolumeType),
+		State: toAbstractVolumeState(resp.State),
 	}
 	return &volume, nil
+}
+
+func (s stack) rpcDeleteVolume(id *string) fail.Error {
+	if id == nil {
+		return fail.InvalidParameterError("id", "cannot be nil")
+	}
+	if *id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty AWS String")
+	}
+
+	request := ec2.DeleteVolumeInput{
+		VolumeId: id,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.DeleteVolume(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+func (s stack) rpcCreateVolume(name *string, size int64, speed string) (*ec2.Volume, fail.Error) {
+	if name == nil {
+		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be nil")
+	}
+	if aws.StringValue(name) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
+	}
+	if size <= 0 {
+		return &ec2.Volume{}, fail.InvalidParameterError("size", "cannot be negative or 0 integer")
+	}
+
+	request := ec2.CreateVolumeInput{
+		Size:             aws.Int64(size),
+		VolumeType:       aws.String(speed),
+		AvailabilityZone: aws.String(s.AwsConfig.Zone),
+	}
+	var resp *ec2.Volume
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.CreateVolume(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return &ec2.Volume{}, xerr
+	}
+
+	defer func() {
+		if xerr != nil {
+			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
+			}
+		}
+	}()
+
+	tags := []*ec2.Tag{
+		{
+			Key:   awsTagNameLabel,
+			Value: name,
+		},
+	}
+	if xerr := s.rpcCreateTags([]*string{resp.VolumeId}, tags); xerr != nil {
+		return nil, xerr
+	}
+
+	return resp, nil
 }
 
 // InspectVolume ...
@@ -119,36 +144,74 @@ func (s stack) InspectVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	var resp *ec2.DescribeVolumesOutput
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{
-				VolumeIds: []*string{aws.String(id)},
-			})
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcDescribeVolumeByID(aws.String(id))
 	if xerr != nil {
-		return nil, xerr
+		return nullAV, xerr
 	}
-
-	if len(resp.Volumes) == 0 {
-		return nullAV, abstract.ResourceNotFoundError("Volume", id)
+	var (
+		name string
+	)
+	for _, v := range resp.Tags {
+		if aws.StringValue(v.Key) == tagNameLabel {
+			name = aws.StringValue(v.Value)
+			break
+		}
 	}
-
-	v := resp.Volumes[0]
 	volume := abstract.Volume{
-		ID:    aws.StringValue(v.VolumeId),
-		Name:  aws.StringValue(v.VolumeId), // FIXME: Append name as Tags
-		Size:  int(aws.Int64Value(v.Size)),
-		Speed: toVolumeSpeed(v.VolumeType),
-		State: toVolumeState(v.State),
+		ID:    aws.StringValue(resp.VolumeId),
+		Name:  name,
+		Size:  int(aws.Int64Value(resp.Size)),
+		Speed: toAbstractVolumeSpeed(resp.VolumeType),
+		State: toAbstractVolumeState(resp.State),
 	}
 	return &volume, nil
 }
 
-func toVolumeType(speed volumespeed.Enum) string {
+func (s stack) rpcDescribeVolumes(ids []*string) ([]*ec2.Volume, fail.Error) {
+	var request ec2.DescribeVolumesInput
+	if len(ids) > 0 {
+		request.VolumeIds = ids
+	}
+	var resp *ec2.DescribeVolumesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Volume{}, xerr
+	}
+	if len(resp.Volumes) == 0 {
+		return []*ec2.Volume{}, nil
+	}
+	return resp.Volumes, nil
+}
+
+func (s stack) rpcDescribeVolumeByID(id *string) (*ec2.Volume, fail.Error) {
+	if id == nil {
+		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be nil")
+	}
+	if aws.StringValue(id) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be empty AWS String")
+	}
+
+	resp, xerr := s.rpcDescribeVolumes([]*string{id})
+	if xerr != nil {
+		return &ec2.Volume{}, xerr
+	}
+	if len(resp) == 0 {
+		return &ec2.Volume{}, fail.NotFoundError("failed to find a Volume with ID %s", aws.StringValue(id))
+	}
+	if len(resp) > 1 {
+		return &ec2.Volume{}, fail.InconsistentError("found more than one Volume with ID %s", aws.StringValue(id))
+	}
+
+	return resp[0], nil
+}
+
+func fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
 	switch speed {
 	case volumespeed.COLD:
 		return "sc1"
@@ -160,7 +223,7 @@ func toVolumeType(speed volumespeed.Enum) string {
 	return "gp2"
 }
 
-func toVolumeSpeed(t *string) volumespeed.Enum {
+func toAbstractVolumeSpeed(t *string) volumespeed.Enum {
 	if t == nil {
 		return volumespeed.HDD
 	}
@@ -176,7 +239,7 @@ func toVolumeSpeed(t *string) volumespeed.Enum {
 	return volumespeed.HDD
 }
 
-func toVolumeState(s *string) volumestate.Enum {
+func toAbstractVolumeState(s *string) volumestate.Enum {
 	// VolumeStateCreating = "creating"
 	// VolumeStateAvailable = "available"
 	// VolumeStateInUse = "in-use"
@@ -218,12 +281,12 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr)
 
 	var resp *ec2.DescribeVolumesOutput
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -246,8 +309,8 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 			ID:    aws.StringValue(v.VolumeId),
 			Name:  volumeName,
 			Size:  int(aws.Int64Value(v.Size)),
-			Speed: toVolumeSpeed(v.VolumeType),
-			State: toVolumeState(v.State),
+			Speed: toAbstractVolumeSpeed(v.VolumeType),
+			State: toAbstractVolumeState(v.State),
 		}
 		volumes = append(volumes, volume)
 	}
@@ -270,12 +333,12 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 	query := ec2.DeleteVolumeInput{
 		VolumeId: aws.String(id),
 	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := s.EC2Service.DeleteVolume(&query)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 }
 
@@ -289,7 +352,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 	defer fail.OnExitLogError(&xerr)
 
 	var resp *ec2.VolumeAttachment
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.AttachVolume(&ec2.AttachVolumeInput{
 				Device:     aws.String(request.Name),
@@ -298,7 +361,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 			})
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return "", xerr
@@ -326,12 +389,12 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 		VolumeIds: []*string{aws.String(id)},
 	}
 	var resp *ec2.DescribeVolumesOutput
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.DescribeVolumes(&query)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -372,12 +435,12 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 		},
 	}
 	var resp *ec2.DescribeVolumesOutput
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.DescribeVolumes(&query)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -415,11 +478,11 @@ func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
 		InstanceId: aws.String(serverID),
 		VolumeId:   aws.String(id),
 	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := s.EC2Service.DetachVolume(&query)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 }
