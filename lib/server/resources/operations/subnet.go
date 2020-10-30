@@ -695,8 +695,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
 	}
 
-	// Update metadata of Subnet object
-	xerr = rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	// Update userdata of gateway(s)
+	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -723,13 +723,6 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
 			secondaryUserdata.IsPrimaryGateway = false
 		}
-
-		// update gateway ID(s) of Subnet
-		as.GatewayIDs = append(as.GatewayIDs, primaryUserdata.PrimaryGatewayPrivateIP)
-		if secondaryGateway != nil {
-			as.GatewayIDs = append(as.GatewayIDs, primaryUserdata.SecondaryGatewayPrivateIP)
-		}
-
 		return nil
 	})
 	if xerr != nil {
@@ -1496,7 +1489,7 @@ func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					logrus.Infof("Gateway '%s' of Subnet '%s' appears to be already deleted", v, subnet.Name)
+					// missing gateway is considered as a successful deletion, continue
 				default:
 					return xerr
 				}
@@ -1506,7 +1499,7 @@ func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet)
 				if xerr := rh.(*host).relaxedDeleteHost(task); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						logrus.Infof("Gateway appears already deleted")
+						// missing gateway is considered as a successful deletion, continue
 					default:
 						return xerr
 					}

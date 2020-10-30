@@ -18,17 +18,11 @@ package outscale
 
 import (
 	"encoding/base64"
-	"fmt"
-
-	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateKeyPair creates and import a key pair
@@ -43,7 +37,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Erro
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	akp, xerr = abstract.NewKeyPair(name)
 	if xerr != nil {
@@ -63,21 +57,9 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	createKeypairOpts := osc.CreateKeypairOpts{
-		CreateKeypairRequest: optional.NewInterface(osc.CreateKeypairRequest{
-			KeypairName: keypair.Name,
-			PublicKey:   base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)),
-		}),
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.KeypairApi.CreateKeypair(s.auth, &createKeypairOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcCreateKeypair(keypair.Name, base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)))
 }
 
 // InspectKeyPair returns the key pair identified by id
@@ -92,37 +74,18 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readKeypairsOpts := osc.ReadKeypairsOpts{
-		ReadKeypairsRequest: optional.NewInterface(osc.ReadKeypairsRequest{
-			Filters: osc.FiltersKeypair{
-				KeypairNames: []string{id},
-			},
-		}),
-	}
-	var resp osc.ReadKeypairsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.KeypairApi.ReadKeypairs(s.auth, &readKeypairsOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadKeypairByName(id)
 	if xerr != nil {
 		return nullAKP, xerr
 	}
-	if len(resp.Keypairs) > 1 {
-		return nullAKP, fail.InconsistentError("Inconsistent provider response")
+
+	kp := abstract.KeyPair{
+		ID:   resp.KeypairName,
+		Name: resp.KeypairName,
 	}
-	if len(resp.Keypairs) == 0 {
-		return nullAKP, fail.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
-	}
-	kp := resp.Keypairs[0]
-	return &abstract.KeyPair{
-		ID:   kp.KeypairName,
-		Name: kp.KeypairName,
-	}, nil
+	return &kp, nil
 }
 
 // ListKeyPairs lists available key pairs
@@ -136,20 +99,13 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	var resp osc.ReadKeypairsResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.KeypairApi.ReadKeypairs(s.auth, nil)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadKeypairs(nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
 
 	var kps []abstract.KeyPair
-	for _, kp := range resp.Keypairs {
+	for _, kp := range resp {
 		kps = append(kps, abstract.KeyPair{
 			ID:   kp.KeypairName,
 			Name: kp.KeypairName,
@@ -172,16 +128,5 @@ func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	deleteKeypairOpts := osc.DeleteKeypairOpts{
-		DeleteKeypairRequest: optional.NewInterface(osc.DeleteKeypairRequest{
-			KeypairName: name,
-		}),
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.KeypairApi.DeleteKeypair(s.auth, &deleteKeypairOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeleteKeypair(name)
 }

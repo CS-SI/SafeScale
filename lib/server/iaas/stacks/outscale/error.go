@@ -74,6 +74,8 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.InvalidRequestError(details)
 	case "5057":
 		return fail.NotFoundError("network not found")
+	case "5063":
+		return fail.NotFoundError("host not found")
 	case "5071":
 		return fail.NotFoundError("keypair not found")
 	case "9008":
