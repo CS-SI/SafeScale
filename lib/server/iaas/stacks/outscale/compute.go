@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/antihax/optional"
 	"github.com/sirupsen/logrus"
 
 	"github.com/outscale/osc-sdk-go/osc"
@@ -73,19 +72,13 @@ func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	var resp osc.ReadImagesResponse
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.ImageApi.ReadImages(s.auth, nil)
-			return innerErr
-		},
-		normalizeError,
-	)
+	resp, xerr := s.rpcReadImages(nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
+
 	var images []abstract.Image
-	for _, omi := range resp.Images {
+	for _, omi := range resp {
 		images = append(images, abstract.Image{
 			Description: omi.Description,
 			ID:          omi.ImageId,
@@ -345,37 +338,18 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 		}
 	}()
 
-	readImagesOpts := osc.ReadImagesOpts{
-		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
-			DryRun: false,
-			Filters: osc.FiltersImage{
-				ImageIds: []string{id},
-			},
-		}),
-	}
-	var resp osc.ReadImagesResponse
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.ImageApi.ReadImages(s.auth, &readImagesOpts)
-			return innerErr
-		},
-		normalizeError,
-	)
+	resp, xerr := s.rpcReadImageByID(id)
 	if xerr != nil {
 		return nullImage, xerr
 	}
-	if len(resp.Images) != 1 {
-		return nullImage, fail.InconsistentError("more than one image with the same id")
+	img := abstract.Image{
+		Description: resp.Description,
+		ID:          resp.ImageId,
+		Name:        resp.ImageName,
+		StorageType: resp.RootDeviceType,
+		URL:         resp.FileLocation,
 	}
-	img := resp.Images[0]
-	out := &abstract.Image{
-		Description: img.Description,
-		ID:          img.ImageId,
-		Name:        img.ImageName,
-		StorageType: img.RootDeviceType,
-		URL:         img.FileLocation,
-	}
-	return out, nil
+	return &img, nil
 }
 
 // InspectTemplate returns the Template referenced by id
@@ -422,7 +396,9 @@ func (s stack) prepareUserData(request abstract.HostRequest, ud *userdata.Conten
 }
 
 func (s stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet) (osc.Nic, fail.Error) {
-	resp, xerr := s.rpcCreateNic(subnet.ID, request.ResourceName)
+	name := fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, subnet.Name)
+	description := fmt.Sprintf("nic of Host %s on Subnet %s", request.ResourceName, subnet.Name)
+	resp, xerr := s.rpcCreateNic(name, subnet.ID, description, nil)
 	if xerr != nil {
 		return osc.Nic{}, xerr
 	}
@@ -437,7 +413,7 @@ func (s stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr f
 	nics, xerr = s.tryCreateNICS(request, nics)
 	if xerr != nil { // if error delete created NICS
 		for _, v := range nics {
-			xerr := s.rpcDeleteNic(v)
+			xerr := s.rpcDeleteNic(v.NicId)
 			if xerr != nil {
 				logrus.Errorf("impossible to delete NIC '%s': %v", v.NicId, xerr)
 			}
@@ -459,7 +435,8 @@ func (s stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]o
 
 func (s stack) deleteNICs(nics []osc.Nic) fail.Error {
 	for _, nic := range nics {
-		if xerr := s.rpcDeleteNic(nic); xerr != nil {
+		// FIXME: parallelize ?
+		if xerr := s.rpcDeleteNic(nic.NicId); xerr != nil {
 			return xerr
 		}
 	}
@@ -493,7 +470,7 @@ func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return hoststate.TERMINATED, retry.StopRetryError(xerr)
+			return hoststate.TERMINATED, nil
 		default:
 			return hoststate.ERROR, xerr
 		}
@@ -522,12 +499,12 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		return nullAHC, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nullAHC, xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -535,14 +512,21 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		func() error {
 			st, innerXErr := s.hostState(ahf.Core.ID)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// if waited state is TERMINATED, a missing host means a terminated host, so consider this as a success
+					if state != hoststate.TERMINATED {
+						return innerXErr
+					}
+					st = hoststate.TERMINATED
+				default:
+					return innerXErr
+				}
 			}
 
 			switch st {
 			case hoststate.ERROR:
 				return retry.StopRetryError(fail.NewError("host in 'error' state"))
-			case hoststate.TERMINATED:
-				return retry.StopRetryError(fail.NewError("host in 'terminated' state"))
 			case state:
 				ahf.Core.LastState = st
 				return nil
@@ -553,7 +537,14 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		timeout,
 	)
 	if xerr != nil {
-		return nullAHC, xerr
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return nullAHC, fail.ToError(xerr.Cause())
+		case *retry.ErrStopRetry:
+			return nullAHC, fail.NotFoundError("failed to find Host %s", hostLabel)
+		default:
+			return nullAHC, xerr
+		}
 	}
 	return ahf.Core, nil
 }
@@ -671,57 +662,27 @@ func (s stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 //	return resp, nil
 //}
 
-func (s stack) addPublicIP(nic osc.Nic) (*osc.PublicIp, fail.Error) {
+func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
 	// Allocate Public IP
-	var resp osc.CreatePublicIpResponse
-	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
-			return innerErr
-		},
-		normalizeError,
-	)
+	resp, xerr := s.rpcCreatePublicIp()
 	if xerr != nil {
-		return nil, xerr
+		return osc.PublicIp{}, xerr
 	}
+
 	defer func() {
 		if xerr != nil {
-			deletePublicIpRequest := osc.DeletePublicIpRequest{
-				PublicIpId: resp.PublicIp.PublicIpId,
-			}
-			derr := stacks.RetryableRemoteCall(
-				func() error {
-					_, _, innerErr := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-						DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-					})
-					return innerErr
-				},
-				normalizeError,
-			)
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete public ip %s", resp.PublicIp.PublicIpId))
+			if derr := s.rpcDeletePublicIpByID(resp.PublicIpId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Public IP with ID %s", resp.PublicIpId))
 			}
 		}
 	}()
 
 	// Attach public ip
-	linkPublicIpRequest := osc.LinkPublicIpRequest{
-		NicId:      nic.NicId,
-		PublicIpId: resp.PublicIp.PublicIpId,
+	if xerr = s.rpcLinkPublicIp(resp.PublicIpId, nic.NicId); xerr != nil {
+		return osc.PublicIp{}, xerr
 	}
-	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.PublicIpApi.LinkPublicIp(s.auth, &osc.LinkPublicIpOpts{
-				LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest)},
-			)
-			return innerErr
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-	return &resp.PublicIp, nil
+
+	return resp, nil
 }
 
 func (s stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic) fail.Error {
@@ -819,16 +780,15 @@ func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	return nil
 }
 
-func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, fail.Error) {
+func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (osc.PublicIp, fail.Error) {
 	ip, xerr := s.addPublicIP(primaryNIC)
 	if xerr != nil {
-		return nil, xerr
+		return osc.PublicIp{}, xerr
 	}
 
 	for _, nic := range otherNICs {
-		_, xerr = s.addPublicIP(nic)
-		if xerr != nil {
-			return nil, xerr
+		if _, xerr = s.addPublicIP(nic); xerr != nil {
+			return osc.PublicIp{}, xerr
 		}
 	}
 	return ip, nil
@@ -939,31 +899,22 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				DeleteOnVmDeletion: true,
 				SnapshotId:         "",
 				VolumeSize:         int32(diskSize),
-				VolumeType:         s.volumeType(s.Options.Compute.DefaultVolumeSpeed),
+				VolumeType:         s.fromAbstractVolumeSpeed(s.Options.Compute.DefaultVolumeSpeed),
 			},
 			NoDevice:   "true",
 			DeviceName: "/dev/sda1",
 		},
 	}
 
-	var resp osc.CreateVmsResponse
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
-				CreateVmsRequest: optional.NewInterface(vmsRequest),
-			})
-			return innerErr
-		},
-		normalizeError,
-	)
+	resp, xerr := s.rpcCreateVms(vmsRequest)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
-	if len(resp.Vms) == 0 {
+	if len(resp) == 0 {
 		return nullAHF, nullUDC, fail.InconsistentError("after creation submission, virtual machine list is empty")
 	}
-	vm := resp.Vms[0]
+	vm := resp[0]
 
 	defer func() {
 		if xerr != nil {
@@ -996,10 +947,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		if xerr != nil {
 			return nullAHF, nullUDC, xerr
 		}
-		if ip != nil {
-			udc.PublicIP = ip.PublicIp
-			vm.PublicIp = udc.PublicIP
-		}
+		udc.PublicIP = ip.PublicIp
+		vm.PublicIp = udc.PublicIP
 	}
 
 	if xerr = s.addGPUs(&request, *tpl, vm.VmId); xerr != nil {
@@ -1035,7 +984,7 @@ func (s stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Er
 }
 
 func (s stack) deleteHost(id string) fail.Error {
-	if xerr := s.rpcDeleteHosts([]string{id}); xerr != nil {
+	if xerr := s.rpcDeleteVms([]string{id}); xerr != nil {
 		return xerr
 	}
 	_, xerr := s.WaitHostState(id, hoststate.TERMINATED, temporal.GetHostCreationTimeout())
@@ -1054,23 +1003,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readPublicIpsRequest := osc.ReadPublicIpsRequest{
-		Filters: osc.FiltersPublicIp{VmIds: []string{ahf.Core.ID}},
-	}
-	var resp osc.ReadPublicIpsResponse
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
-				ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
-			})
-			return innerErr
-		},
-		normalizeError,
-	)
+	publicIPs, xerr := s.rpcReadPublicIpsOfVm(ahf.Core.ID)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to read public IPs of Host %s", ahf.Core.ID)
+		return fail.Wrap(xerr, "failed to read public IPs of Host with ID %s", ahf.Core.ID)
 	}
 
 	// list attached volumes
@@ -1085,24 +1022,12 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	}
 
 	// delete public IPs
-	if len(resp.PublicIps) == 0 {
+	if len(publicIPs) == 0 {
 		return nil
 	}
 	var lastErr fail.Error
-	for _, ip := range resp.PublicIps {
-		deletePublicIpRequest := osc.DeletePublicIpRequest{
-			PublicIpId: ip.PublicIpId,
-		}
-		xerr = stacks.RetryableRemoteCall(
-			func() error {
-				_, _, innerErr := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-					DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-				})
-				return innerErr
-			},
-			normalizeError,
-		)
-		if xerr != nil { // continue to delete even if error
+	for _, ip := range publicIPs {
+		if xerr = s.rpcDeletePublicIpByID(ip.PublicIpId); xerr != nil { // continue to delete even if error
 			lastErr = xerr
 			logrus.Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
 		}
@@ -1110,17 +1035,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	// delete volumes
 	for _, v := range volumes {
-		tags, xerr := s.rpcReadTags(v.VolumeID)
+		tags, xerr := s.rpcReadTagsOfResource(v.VolumeID)
 		if xerr != nil {
 			continue
 		}
-		del := func() string {
-			if del, ok := tags["DeleteWithVM"]; ok {
-				return del
-			}
-			return "false"
-		}()
-		if del == "true" {
+		if _, ok := tags["DeleteWithVM"]; ok {
 			if xerr = s.DeleteVolume(v.VolumeID); xerr != nil { // continue to delete even if error
 				logrus.Errorf("Unable to delete Volume %s of Host %s", v.VolumeID, ahf.Core.ID)
 			}
@@ -1152,7 +1071,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	}
 
 	if ahf.Core.Name == "" {
-		tags, xerr := s.rpcReadTags(vm.VmId)
+		tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
 		if xerr != nil {
 			return nullAHF, xerr
 		}
@@ -1223,20 +1142,13 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	var resp osc.ReadVmsResponse
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VmApi.ReadVms(s.auth, nil)
-			return innerErr
-		},
-		normalizeError,
-	)
+	resp, xerr := s.rpcReadVms(nil)
 	if xerr != nil {
 		return emptyList, xerr
 	}
 
 	var hosts abstract.HostList
-	for _, vm := range resp.Vms {
+	for _, vm := range resp {
 		if hostState(vm.State) == hoststate.TERMINATED {
 			continue
 		}
@@ -1250,7 +1162,7 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 				return nil, xerr
 			}
 		} else {
-			tags, xerr := s.rpcReadTags(vm.VmId)
+			tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
 			if xerr != nil {
 				return emptyList, xerr
 			}
@@ -1275,21 +1187,9 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	request := osc.StopVmsOpts{
-		StopVmsRequest: optional.NewInterface(osc.StopVmsRequest{
-			VmIds:     []string{ahf.Core.ID},
-			ForceStop: true,
-		}),
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.VmApi.StopVms(s.auth, &request)
-			return innerErr
-		},
-		normalizeError,
-	)
+	return s.rpcStopVms([]string{ahf.Core.ID})
 }
 
 // StartHost starts the host identified by id
@@ -1306,18 +1206,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	request := osc.StartVmsOpts{
-		StartVmsRequest: optional.NewInterface(osc.StartVmsRequest{
-			VmIds: []string{ahf.Core.ID},
-		}),
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.VmApi.StartVms(s.auth, &request)
-			return innerErr
-		},
-		normalizeError,
-	)
+	return s.rpcStartVms([]string{ahf.Core.ID})
 }
 
 // RebootHost Reboot host
@@ -1334,18 +1223,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	request := osc.RebootVmsOpts{
-		RebootVmsRequest: optional.NewInterface(osc.RebootVmsRequest{
-			VmIds: []string{ahf.Core.ID},
-		}),
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.VmApi.RebootVms(s.auth, &request)
-			return innerErr
-		},
-		normalizeError,
-	)
+	return s.rpcRebootVms([]string{ahf.Core.ID})
 }
 
 func (s stack) perfFromFreq(freq float32) int {
@@ -1381,20 +1259,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSi
 	perf := s.perfFromFreq(sizing.MinCPUFreq)
 	t := gpuTemplateName(0, sizing.MaxCores, int(sizing.MaxRAMSize), perf, 0, "")
 
-	request := osc.UpdateVmOpts{
-		UpdateVmRequest: optional.NewInterface(osc.UpdateVmRequest{
-			VmId:   ahf.Core.ID,
-			VmType: t,
-		}),
-	}
-	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.VmApi.UpdateVm(s.auth, &request)
-			return innerErr
-		},
-		normalizeError,
-	)
-	if xerr != nil {
+	if xerr := s.rpcUpdateVmType(ahf.Core.ID, t); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1443,19 +1308,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 
 	// Add new SG to Host
 	sgs = append(sgs, asg.ID)
-	updateVmRequest := osc.UpdateVmRequest{
-		VmId:             ahf.Core.ID,
-		SecurityGroupIds: sgs,
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
-				UpdateVmRequest: optional.NewInterface(updateVmRequest),
-			})
-			return innerErr
-		},
-		normalizeError,
-	)
+	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
 }
 
 // UnbindSecurityGroupFromHost ...
@@ -1474,7 +1327,13 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 
 	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// if host is not found, consider operation as a success
+			//return nil
+		default:
+			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
+		}
 	}
 
 	found := false
@@ -1492,17 +1351,5 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	}
 
 	// Update Security Groups of Host
-	updateVmRequest := osc.UpdateVmRequest{
-		VmId:             ahf.Core.ID,
-		SecurityGroupIds: sgs,
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, _, innerErr := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
-				UpdateVmRequest: optional.NewInterface(updateVmRequest),
-			})
-			return innerErr
-		},
-		normalizeError,
-	)
+	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
 }

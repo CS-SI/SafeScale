@@ -17,18 +17,12 @@
 package outscale
 
 import (
-	"fmt"
-
-	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -45,7 +39,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	v, _ := s.InspectVolumeByName(request.Name)
 	if v != nil {
@@ -58,75 +52,50 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 			IOPS = 13000
 		}
 	}
-	createVolumeOpts := osc.CreateVolumeOpts{
-		CreateVolumeRequest: optional.NewInterface(osc.CreateVolumeRequest{
-			DryRun:        false,
-			Iops:          int32(IOPS),
-			Size:          int32(request.Size),
-			SnapshotId:    "",
-			SubregionName: s.Options.Compute.Subregion,
-			VolumeType:    s.volumeType(request.Speed),
-		}),
-	}
-	var resp osc.CreateVolumeResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VolumeApi.CreateVolume(s.auth, &createVolumeOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcCreateVolume(request.Name, int32(request.Size), int32(IOPS), s.fromAbstractVolumeSpeed(request.Speed))
 	if xerr != nil {
 		return nullAV, xerr
 	}
 
-	ov := resp.Volume
-
 	defer func() {
 		if xerr != nil {
-			if derr := s.DeleteVolume(ov.VolumeId); derr != nil {
+			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume"))
 			}
 		}
 	}()
 
-	_, xerr = s.rpcCreateTags(ov.VolumeId, map[string]string{
-		"name": request.Name,
-	})
-	if xerr != nil {
-		return nullAV, xerr
-	}
-	xerr = s.WaitForVolumeState(ov.VolumeId, volumestate.AVAILABLE)
+	xerr = s.WaitForVolumeState(resp.VolumeId, volumestate.AVAILABLE)
 	if xerr != nil {
 		return nullAV, xerr
 	}
 
 	volume := abstract.NewVolume()
-	volume.ID = ov.VolumeId
-	volume.Speed = s.volumeSpeed(ov.VolumeType)
-	volume.Size = int(ov.Size)
+	volume.ID = resp.VolumeId
+	volume.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
+	volume.Size = int(resp.Size)
 	volume.State = volumestate.AVAILABLE
 	volume.Name = request.Name
 	return volume, nil
 }
 
-func (s stack) volumeSpeed(t string) volumespeed.Enum {
+func (s stack) toAbstractVolumeSpeed(t string) volumespeed.Enum {
 	if s, ok := s.configurationOptions.VolumeSpeeds[t]; ok {
 		return s
 	}
 	return volumespeed.HDD
 }
 
-func (s stack) volumeType(speed volumespeed.Enum) string {
+func (s stack) fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
 	for t, s := range s.configurationOptions.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
 	}
-	return s.volumeType(volumespeed.HDD)
+	return s.fromAbstractVolumeSpeed(volumespeed.HDD)
 }
 
-func volumeState(state string) volumestate.Enum {
+func toAbstractVolumeState(state string) volumestate.Enum {
 	if state == "creating" {
 		return volumestate.CREATING
 	}
@@ -153,7 +122,7 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
@@ -182,40 +151,19 @@ func (s stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readVolumesOpts := osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
-			Filters: osc.FiltersVolume{
-				VolumeIds: []string{id},
-			},
-		}),
-	}
-	var resp osc.ReadVolumesResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadVolumeByID(id)
 	if xerr != nil {
 		return nullAV, xerr
 	}
-	if len(resp.Volumes) > 1 {
-		return nil, fail.InconsistentError("Invalid provider response")
-	}
-	if len(resp.Volumes) == 0 {
-		return nullAV, fail.NotFoundError("failed to find a volume '%s'", id)
-	}
 
-	ov := resp.Volumes[0]
 	av = abstract.NewVolume()
-	av.ID = ov.VolumeId
-	av.Speed = s.volumeSpeed(ov.VolumeType)
-	av.Size = int(ov.Size)
-	av.State = volumeState(ov.State)
-	av.Name = getResourceTag(ov.Tags, "name", "")
+	av.ID = resp.VolumeId
+	av.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
+	av.Size = int(resp.Size)
+	av.State = toAbstractVolumeState(resp.State)
+	av.Name = getResourceTag(resp.Tags, tagNameLabel, "")
 	return av, nil
 }
 
@@ -231,41 +179,18 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	subregion := s.Options.Compute.Subregion
-	readVolumesOpts := osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
-			Filters: osc.FiltersVolume{
-				Tags:           []string{fmt.Sprintf("name=%s", name)},
-				SubregionNames: []string{subregion},
-			},
-		}),
-	}
-	var resp osc.ReadVolumesResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadVolumeByName(name)
 	if xerr != nil {
 		return nullAV, xerr
 	}
-	if len(resp.Volumes) == 0 {
-		return nullAV, fail.NotFoundError("failed to find volume '%s'", name)
-	}
 
-	if len(resp.Volumes) > 1 {
-		return nullAV, fail.InconsistentError(fmt.Sprintf("two volumes with name %s in subregion %s", name, subregion))
-	}
-	ov := resp.Volumes[0]
 	av = abstract.NewVolume()
-	av.ID = ov.VolumeId
-	av.Speed = s.volumeSpeed(ov.VolumeType)
-	av.Size = int(ov.Size)
-	av.State = volumeState(ov.State)
+	av.ID = resp.VolumeId
+	av.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
+	av.Size = int(resp.Size)
+	av.State = toAbstractVolumeState(resp.State)
 	av.Name = name
 	return av, nil
 }
@@ -279,35 +204,20 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	subregion := s.Options.Compute.Subregion
-	readVolumesOpts := osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
-			Filters: osc.FiltersVolume{
-				SubregionNames: []string{subregion},
-			},
-		}),
-	}
-	var resp osc.ReadVolumesResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadVolumes(nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
 
-	volumes := make([]abstract.Volume, 0, len(resp.Volumes))
-	for _, ov := range resp.Volumes {
+	volumes := make([]abstract.Volume, 0, len(resp))
+	for _, ov := range resp {
 		volume := abstract.NewVolume()
 		volume.ID = ov.VolumeId
-		volume.Speed = s.volumeSpeed(ov.VolumeType)
+		volume.Speed = s.toAbstractVolumeSpeed(ov.VolumeType)
 		volume.Size = int(ov.Size)
-		volume.State = volumeState(ov.State)
+		volume.State = toAbstractVolumeState(ov.State)
 		volume.Name = getResourceTag(ov.Tags, "name", "")
 		volumes = append(volumes, *volume)
 	}
@@ -325,20 +235,9 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	deleteVolumeOpts := osc.DeleteVolumeOpts{
-		DeleteVolumeRequest: optional.NewInterface(osc.DeleteVolumeRequest{
-			VolumeId: id,
-		}),
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &deleteVolumeOpts)
-			return normalizeError(err)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeleteVolume(id)
 }
 
 func freeDevice(usedDevices []string, device string) bool {
@@ -384,30 +283,17 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	firstDeviceName, xerr := s.getFirstFreeDeviceName(request.HostID)
 	if xerr != nil {
 		return "", xerr
 	}
 
-	linkVolumeOpts := osc.LinkVolumeOpts{
-		LinkVolumeRequest: optional.NewInterface(osc.LinkVolumeRequest{
-			DeviceName: firstDeviceName,
-			VmId:       request.HostID,
-			VolumeId:   request.VolumeID,
-		}),
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.VolumeApi.LinkVolume(s.auth, &linkVolumeOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-	if xerr != nil {
+	if xerr := s.rpcLinkVolume(request.VolumeID, request.HostID, firstDeviceName); xerr != nil {
 		return "", xerr
 	}
+	// No ID of attachment in outscale, volume can be attached to only one server; Volume Attachment ID is equal to VolumeID
 	return request.VolumeID, nil
 }
 
@@ -426,35 +312,14 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readVolumesOpts := osc.ReadVolumesOpts{
-		ReadVolumesRequest: optional.NewInterface(osc.ReadVolumesRequest{
-			Filters: osc.FiltersVolume{
-				VolumeIds: []string{volumeID},
-			},
-		}),
-	}
-	var resp osc.ReadVolumesResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.VolumeApi.ReadVolumes(s.auth, &readVolumesOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadVolumeByID(volumeID)
 	if xerr != nil {
 		return nullVA, xerr
 	}
-	if len(resp.Volumes) > 1 {
-		return nullVA, fail.InconsistentError("Invalid provider response")
-	}
-	if len(resp.Volumes) == 0 {
-		return nullVA, nil
-	}
 
-	ov := resp.Volumes[0]
-	for _, lv := range ov.LinkedVolumes {
+	for _, lv := range resp.LinkedVolumes {
 		if lv.VmId == serverID {
 			return &abstract.VolumeAttachment{
 				VolumeID:   volumeID,
@@ -468,7 +333,7 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 		}
 	}
 
-	return nil, fail.NotFoundError("failed to find an attachment of volume '%s' on host '%s'", volumeID, serverID)
+	return nil, fail.NotFoundError("failed to find an attachment of Volume '%s' on Host '%s'", volumeID, serverID)
 }
 
 // ListVolumeAttachments lists available volume attachment
@@ -483,7 +348,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", serverID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	volumes, err := s.ListVolumes()
 	if err != nil {
@@ -513,20 +378,9 @@ func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Erro
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	unlinkVolumeOpts := osc.UnlinkVolumeOpts{
-		UnlinkVolumeRequest: optional.NewInterface(osc.UnlinkVolumeRequest{
-			VolumeId: volumeID,
-		}),
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.VolumeApi.UnlinkVolume(s.auth, &unlinkVolumeOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	xerr = s.rpcUnlinkVolume(volumeID)
 	if xerr != nil {
 		return xerr
 	}

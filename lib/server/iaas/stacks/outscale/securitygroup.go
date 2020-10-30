@@ -17,8 +17,6 @@
 package outscale
 
 import (
-	"github.com/antihax/optional"
-
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -28,8 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // ListSecurityGroups lists existing security groups
@@ -96,37 +92,20 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules []
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	createSecurityGroupOpts := osc.CreateSecurityGroupOpts{
-		CreateSecurityGroupRequest: optional.NewInterface(osc.CreateSecurityGroupRequest{
-			NetId:             networkID,
-			Description:       description,
-			SecurityGroupName: name,
-		}),
-	}
-	var resp osc.CreateSecurityGroupResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &createSecurityGroupOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcCreateSecurityGroup(networkID, name, description)
 	if xerr != nil {
 		return nullASG, xerr
 	}
 
-	asg = toAbstractSecurityGroup(resp.SecurityGroup)
-	sgID := asg.ID
-	sgName := asg.Name
-
 	defer func() {
 		if xerr != nil {
-			if derr := s.DeleteSecurityGroup(sgID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
+			if derr := s.rpcDeleteSecurityGroup(resp.SecurityGroupId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()
 
+	asg = toAbstractSecurityGroup(resp)
 	for k, v := range rules {
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
@@ -156,18 +135,7 @@ func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	deleteSecurityGroupOpts := osc.DeleteSecurityGroupOpts{
-		DeleteSecurityGroupRequest: optional.NewInterface(osc.DeleteSecurityGroupRequest{
-			SecurityGroupId: asg.ID,
-		}),
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &deleteSecurityGroupOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeleteSecurityGroup(asg.ID)
 }
 
 // InspectSecurityGroup returns information about a security group
@@ -221,12 +189,15 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		return asg, xerr
 	}
 
-	if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, securitygroupruledirection.INGRESS, group.InboundRules); xerr != nil {
-		return asg, xerr
+	if len(group.InboundRules) > 0 {
+		if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, "Inbound", group.InboundRules); xerr != nil {
+			return asg, xerr
+		}
 	}
-
-	if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, securitygroupruledirection.EGRESS, group.OutboundRules); xerr != nil {
-		return asg, xerr
+	if len(group.OutboundRules) > 0 {
+		if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, "Outbound", group.OutboundRules); xerr != nil {
+			return asg, xerr
+		}
 	}
 
 	asg.Rules = abstract.SecurityGroupRules{}
@@ -263,21 +234,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return asg, xerr
 	}
 
-	createSecurityGroupRuleOpts := osc.CreateSecurityGroupRuleOpts{
-		CreateSecurityGroupRuleRequest: optional.NewInterface(osc.CreateSecurityGroupRuleRequest{
-			SecurityGroupId: asg.ID,
-			Rules:           []osc.SecurityGroupRule{oscRule},
-			Flow:            flow,
-		}),
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &createSecurityGroupRuleOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-	if xerr != nil {
+	if xerr := s.rpcCreateSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
 		return asg, xerr
 	}
 	return s.InspectSecurityGroup(asg.ID)
@@ -353,21 +310,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return nil, xerr
 	}
 
-	deleteSecurityGroupRuleOpts := osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(osc.DeleteSecurityGroupRuleRequest{
-			SecurityGroupId: asg.ID,
-			Rules:           []osc.SecurityGroupRule{oscRule},
-			Flow:            flow,
-		}),
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &deleteSecurityGroupRuleOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-	if xerr != nil {
+	if xerr := s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
 		return nil, xerr
 	}
 

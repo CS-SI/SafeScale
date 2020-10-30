@@ -1863,7 +1863,6 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 							return stateErr
 						}
 					}
-					logrus.Warnf("Waiting for host deletion, host status is '%s'", state)
 					if state == hoststate.ERROR {
 						return fail.NotAvailableError("host is in state ERROR")
 					}

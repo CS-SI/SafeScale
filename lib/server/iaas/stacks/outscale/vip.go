@@ -20,15 +20,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // CreateVIP ...
@@ -53,45 +48,24 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 		return nil, xerr
 	}
 
-	createNicOpts := osc.CreateNicOpts{
-		CreateNicRequest: optional.NewInterface(osc.CreateNicRequest{
-			Description:      name,
-			SubnetId:         subnet.ID,
-			SecurityGroupIds: securityGroups,
-		}),
-	}
-	var resp osc.CreateNicResponse
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.NicApi.CreateNic(s.auth, &createNicOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcCreateNic(subnet.ID, name, name, securityGroups)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if len(resp.Nic.PrivateIps) < 1 {
+	if len(resp.PrivateIps) < 1 {
 		return nil, fail.InconsistentError("inconsistent provider response, no interface found")
 	}
-	nic := resp.Nic
+
 	// ip, err := s.addPublicIP(&nic)
 	// VPL: twice ?
 	// if len(res.Nic.PrivateIps) < 1 {
 	//	return nil, fail.InconsistentError("Inconsistent provider response")
 	// }
 
-	_, xerr = s.rpcCreateTags(nic.NicId, map[string]string{
-		"name": name,
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	vip := abstract.NewVirtualIP()
-	vip.ID = nic.NicId
+	vip.ID = resp.NicId
 	vip.Name = name
-	vip.PrivateIP = nic.PrivateIps[0].PrivateIp
+	vip.PrivateIP = resp.PrivateIps[0].PrivateIp
 	vip.SubnetID = subnet.ID
 	vip.PublicIP = ""
 	return vip, nil
@@ -107,29 +81,13 @@ func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
 }
 
 func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
-	readNicsOpts := osc.ReadNicsOpts{
-		ReadNicsRequest: optional.NewInterface(osc.ReadNicsRequest{
-			Filters: osc.FiltersNic{
-				LinkNicVmIds: []string{hostID},
-			},
-		}),
-	}
-	var resp osc.ReadNicsResponse
-	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() (innerErr error) {
-			resp, _, innerErr = s.client.NicApi.ReadNics(s.auth, &readNicsOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	resp, xerr := s.rpcReadNicsOfVm(hostID)
 	if xerr != nil {
 		return 0, xerr
 	}
-	if len(resp.Nics) == 0 {
-		return -1, fail.NewError("no nics linked to the VM")
-	}
+
 	var numbers sort.IntSlice
-	for _, nic := range resp.Nics {
+	for _, nic := range resp {
 		numbers = append(numbers, int(nic.LinkNic.DeviceNumber))
 	}
 	if numbers == nil {
@@ -243,32 +201,9 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	deleteNicOpts := osc.DeleteNicOpts{
-		DeleteNicRequest: optional.NewInterface(osc.DeleteNicRequest{
-			NicId: vip.ID,
-		}),
-	}
-	xerr = netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.NicApi.DeleteNic(s.auth, &deleteNicOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-	if xerr != nil {
+	if xerr := s.rpcDeleteNic(vip.ID); xerr != nil {
 		return xerr
 	}
 
-	deletePublicIpOpts := osc.DeletePublicIpOpts{
-		DeletePublicIpRequest: optional.NewInterface(osc.DeletePublicIpRequest{
-			PublicIp: vip.PublicIP,
-		}),
-	}
-	return netutils.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			_, _, innerErr := s.client.PublicIpApi.DeletePublicIp(s.auth, &deletePublicIpOpts)
-			return normalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
+	return s.rpcDeletePublicIpByIP(vip.PublicIP)
 }
