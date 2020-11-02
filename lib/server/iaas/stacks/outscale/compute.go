@@ -1271,7 +1271,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1316,7 +1316,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}

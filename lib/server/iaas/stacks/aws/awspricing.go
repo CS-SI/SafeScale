@@ -129,7 +129,7 @@ func ParseNumber(str string, failureValue int) int {
 // TODO: comment
 // ParseStorage ...
 func ParseStorage(str string) float64 {
-	r, _ := regexp.Compile("([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?")
+	r, _ := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
 	b := bytes.Buffer{}
 	b.WriteString(str)
 	tokens := r.FindAllStringSubmatch(str, -1)
@@ -154,7 +154,7 @@ func ParseStorage(str string) float64 {
 // TODO: comment
 // ParseMemory ...
 func ParseMemory(str string) float64 {
-	r, err := regexp.Compile("([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?")
+	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
 	if err != nil {
 		return 0.0
 	}

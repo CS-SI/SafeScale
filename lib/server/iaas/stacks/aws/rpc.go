@@ -325,8 +325,14 @@ func (s stack) rpcDeleteInternetGateway(id *string) fail.Error {
 	)
 }
 
-func (s stack) rpcDescribeInternetGateways(ids []*string) ([]*ec2.InternetGateway, fail.Error) {
+func (s stack) rpcDescribeInternetGateways(vpcID *string, ids []*string) ([]*ec2.InternetGateway, fail.Error) {
 	var filters []*ec2.Filter
+	if vpcID != nil && aws.StringValue(vpcID) != "" {
+		filters = append(filters, &ec2.Filter{
+			Name:   aws.String("attachment.vpc-id"),
+			Values: []*string{vpcID},
+		})
+	}
 	if len(ids) > 0 {
 		filters = append(filters, &ec2.Filter{
 			Name:   aws.String("internet-gateway-id"),

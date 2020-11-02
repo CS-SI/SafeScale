@@ -225,7 +225,7 @@ func (f *folder) Write(path string, name string, content []byte) fail.Error {
 				return innerErr
 			}
 			check := target.Bytes()
-			if bytes.Compare(data, check) != 0 {
+			if !bytes.Equal(data, check) {
 				return fail.NewError("remote content is different than source")
 			}
 			return nil

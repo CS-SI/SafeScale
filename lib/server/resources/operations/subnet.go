@@ -310,13 +310,13 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
-	// Check if subnet already exists and is managed by SafeScale
-	if xerr = rs.checkUnicity(task, req); xerr != nil {
+	rn, an, xerr := rs.validateNetwork(task, &req)
+	if xerr != nil {
 		return xerr
 	}
 
-	rn, an, xerr := rs.validateNetwork(task, &req)
-	if xerr != nil {
+	// Check if subnet already exists and is managed by SafeScale
+	if xerr = rs.checkUnicity(task, req); xerr != nil {
 		return xerr
 	}
 
@@ -1609,14 +1609,14 @@ func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Erro
 	return ip, xerr
 }
 
-// getEndpointIP ...
-func (rs subnet) getEndpointIP(task concurrency.Task) string {
-	if rs.IsNull() {
-		return ""
-	}
-	ip, _ := rs.GetEndpointIP(task)
-	return ip
-}
+// // getEndpointIP ...
+// func (rs subnet) getEndpointIP(task concurrency.Task) string {
+// 	if rs.IsNull() {
+// 		return ""
+// 	}
+// 	ip, _ := rs.GetEndpointIP(task)
+// 	return ip
+// }
 
 // HasVirtualIP tells if the subnet uses a VIP a default route
 func (rs subnet) HasVirtualIP(task concurrency.Task) bool {

@@ -18,8 +18,6 @@ package operations
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"reflect"
 
 	"github.com/sirupsen/logrus"
@@ -60,7 +58,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
 
-	coreInstance, xerr := newCore(svc, "subnet", networksFolderName, &abstract.Network{})
+	coreInstance, xerr := newCore(svc, "network", networksFolderName, &abstract.Network{})
 	if xerr != nil {
 		return nullNetwork(), xerr
 	}
@@ -734,6 +732,9 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 			return nil
 		})
 	})
+	if xerr != nil {
+		return nil, xerr
+	}
 	return pn, nil
 }
 
