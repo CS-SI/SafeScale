@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
@@ -68,8 +69,8 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	asg := abstract.NewSecurityGroup()
 	asg.Name = name
 	asg.ID = aws.StringValue(resp)
+	asg.NetworkID = network.ID
 	asg.Description = description
-	asg.Rules = rules
 
 	defer func() {
 		if xerr != nil {
@@ -127,16 +128,23 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	//		}))
 	//}
 
+	// clears default rules set at creation
+	if _, xerr = s.ClearSecurityGroup(asg); xerr != nil {
+		return nil, xerr
+	}
+
 	// Converts abstract rules to AWS IpPermissions
 	ingressPermissions, egressPermissions, xerr := fromAbstractSecurityGroupRules(rules)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// Add permissions to the security group
+	// Add permissions to the Security Group
 	if xerr = s.addRules(asg, ingressPermissions, egressPermissions); xerr != nil {
 		return nil, xerr
 	}
+
+	asg.Rules = rules
 
 	return asg, nil
 }
@@ -144,13 +152,17 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 // fromAbstractSecurityGroupRules converts a slice of abstract.SecurityGrouRule to a couple of slices of AWS IpPermission,
 // corresponding rspectively to ingress and egress IpPermission
 func fromAbstractSecurityGroupRules(in abstract.SecurityGroupRules) ([]*ec2.IpPermission, []*ec2.IpPermission, fail.Error) {
-	if in == nil {
-		return nil, nil, fail.InvalidParameterError("in", "cannot be nil")
+	if len(in) == 0 {
+		return nil, nil, fail.InvalidParameterError("in", "cannot be empty slice")
 	}
 
 	ingress := make([]*ec2.IpPermission, 0, len(in))
 	egress := make([]*ec2.IpPermission, 0, len(in))
 	for _, v := range in {
+		// IPv6 rules not supported (there is something to do on VPC or subnet side, currently adding IPv6 rules leads to AWS error "CIDR block ::/0 is malformed"
+		if v.EtherType == ipversion.IPv6 {
+			continue
+		}
 		switch v.Direction {
 		case securitygroupruledirection.INGRESS:
 			ingress = append(ingress, fromAbstractSecurityGroupRule(v))
@@ -170,6 +182,9 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) *ec2.IpPermiss
 		ipranges = append(ipranges, &ec2.IpRange{CidrIp: aws.String(v)})
 	}
 
+	if in.PortTo == 0 {
+		in.PortTo = in.PortFrom
+	}
 	out := &ec2.IpPermission{}
 	out.SetIpProtocol(in.Protocol).
 		SetFromPort(int64(in.PortFrom)).
@@ -183,7 +198,7 @@ func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -206,25 +221,34 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcDescribeSecurityGroupByID(aws.String(asg.ID))
-	if xerr != nil {
-		return nil, xerr
+	if asg.ID != "" {
+		resp, xerr := s.rpcDescribeSecurityGroupByID(aws.String(asg.ID))
+		if xerr != nil {
+			return nil, xerr
+		}
+		return toAbstractSecurityGroup(resp)
 	}
-	return toAbstractSecurityGroup(resp)
+
+	if asg.Name != "" {
+		if asg.NetworkID == "" {
+			return nullASG, fail.InvalidParameterError("sgParam", "field 'NetworkID' cannot be empty string when using Security Group name")
+		}
+		resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(asg.NetworkID), aws.String(asg.Name))
+		if xerr != nil {
+			return nil, xerr
+		}
+		return toAbstractSecurityGroup(resp)
+	}
+
+	return nullASG, fail.NotFoundError("failed to find Security Group %s", sgLabel)
 }
 
 // toAbstractSecurityGroup converts a security group coming from AWS to an abstracted Security Group
@@ -327,7 +351,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}
@@ -346,13 +370,16 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		return asg, xerr
 	}
 
-	if xerr = s.rpcRevokeSecurityGroupIngress(aws.String(asg.ID), resp.IpPermissions); xerr != nil {
-		return asg, xerr
+	if len(resp.IpPermissions) > 0 {
+		if xerr = s.rpcRevokeSecurityGroupIngress(aws.String(asg.ID), resp.IpPermissions); xerr != nil {
+			return asg, xerr
+		}
 	}
-	if xerr = s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), resp.IpPermissionsEgress); xerr != nil {
-		return asg, xerr
+	if len(resp.IpPermissionsEgress) > 0 {
+		if xerr = s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), resp.IpPermissionsEgress); xerr != nil {
+			return asg, xerr
+		}
 	}
-
 	return s.InspectSecurityGroup(asg)
 }
 
@@ -362,7 +389,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}
@@ -391,12 +418,15 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // addRules applies the rules to the security group
 func (s stack) addRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
-	if xerr := s.rpcAuthorizeSecurityGroupIngress(aws.String(asg.ID), ingress); xerr != nil {
-		return fail.Wrap(xerr, "unable to add ingress rules to Security Group '%s'", asg.Name)
+	if len(ingress) > 0 {
+		if xerr := s.rpcAuthorizeSecurityGroupIngress(aws.String(asg.ID), ingress); xerr != nil {
+			return fail.Wrap(xerr, "unable to add ingress rules to Security Group '%s'", asg.Name)
+		}
 	}
-
-	if xerr := s.rpcAuthorizeSecurityGroupEgress(aws.String(asg.ID), egress); xerr != nil {
-		return fail.Wrap(xerr, "unable to add egress rules to Security Group '%s'", asg.Name)
+	if len(egress) > 0 {
+		if xerr := s.rpcAuthorizeSecurityGroupEgress(aws.String(asg.ID), egress); xerr != nil {
+			return fail.Wrap(xerr, "unable to add egress rules to Security Group '%s'", asg.Name)
+		}
 	}
 	return nil
 }
@@ -408,7 +438,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}

@@ -65,7 +65,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	// Check if network already there
 	if _, xerr = s.rpcDescribeVpcByName(aws.String(req.Name)); xerr != nil {
@@ -192,7 +192,7 @@ func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) 
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcDescribeVpcByID(aws.String(id))
 	if xerr != nil {
@@ -240,7 +240,7 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s')", name).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcDescribeVpcByName(aws.String(name))
 	if xerr != nil {
@@ -267,7 +267,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcDescribeVpcs(nil)
 	if xerr != nil {
@@ -321,27 +321,27 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	if _, xerr = s.InspectNetwork(id); xerr != nil {
 		return xerr
 	}
 
-	resp, xerr := s.rpcDescribeAddresses(nil)
-	if xerr != nil {
-		return xerr
-	}
+	// resp, xerr := s.rpcDescribeAddresses(nil)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	//
+	// for _, addr := range resp {
+	// 	if xerr = s.rpcDisassociateAddress(addr.AssociationId); xerr != nil {
+	// 		return xerr
+	// 	}
+	// 	if xerr = s.rpcReleaseAddress(addr.AllocationId); xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 
-	for _, addr := range resp {
-		if xerr = s.rpcDisassociateAddress(addr.AssociationId); xerr != nil {
-			return xerr
-		}
-		if xerr = s.rpcReleaseAddress(addr.AllocationId); xerr != nil {
-			return xerr
-		}
-	}
-
-	gwTmp, xerr := s.rpcDescribeInternetGateways(nil)
+	gwTmp, xerr := s.rpcDescribeInternetGateways(aws.String(id), nil)
 	if xerr != nil {
 		return xerr
 	}
@@ -444,7 +444,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
 		return nullAS, fail.Wrap(err, "error parsing requested IPRanges")
@@ -525,7 +525,7 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcDescribeSubnetByID(aws.String(id))
 	if xerr != nil {
@@ -564,7 +564,7 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s', '%s')", networkRef, subnetName).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	req, xerr := s.initEC2DescribeSubnetsInput(networkRef)
 	if xerr != nil {
@@ -611,7 +611,7 @@ func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fai
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	//out, err := s.EC2Service.DescribeVpcs(&ec2.DescribeVpcsInput{})
 	//if err != nil {
@@ -693,7 +693,7 @@ func (s stack) initEC2DescribeSubnetsInput(networkRef string) (*ec2.DescribeSubn
 // listSubnetIDs ...
 func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	req, xerr := s.initEC2DescribeSubnetsInput(networkRef)
 	if xerr != nil {
@@ -730,15 +730,15 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 
 	// Disassociate route tables from subnet
-	tables, xerr := s.rpcDescribeRouteTables(aws.String("subnet-id"), []*string{aws.String(id)})
+	tables, xerr := s.rpcDescribeRouteTables(aws.String("association.subnet-id"), []*string{aws.String(id)})
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find route tables of Subnet")
 	}
 
-	if tables != nil && len(tables) > 0 {
+	if len(tables) > 0 {
 		for _, v := range tables {
 			for _, a := range v.Associations {
 				if aws.StringValue(a.SubnetId) == id {
@@ -755,6 +755,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 }
 
 // BindSecurityGroupToSubnet binds a security group to a network
+// No bind of Security Group to Subnet at AWS; so always succeed
 func (s *stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
@@ -763,21 +764,22 @@ func (s *stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter,
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg)
-		if xerr != nil {
-			return xerr
-		}
-	}
+	// asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !asg.IsConsistent() {
+	// 	asg, xerr = s.InspectSecurityGroup(asg)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 
-	return fail.NotImplementedError()
+	return nil
 }
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a host
+// No bind of Security Group to Subnet at AWS; so always succeed
 func (s *stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
@@ -786,16 +788,16 @@ func (s *stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParame
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
-	}
+	// asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// asg, xerr = s.InspectSecurityGroup(asg)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
-	return fail.NotImplementedError()
+	return nil
 }
 
 // CreateVIP ...
