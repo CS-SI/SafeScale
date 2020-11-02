@@ -66,7 +66,7 @@ func getAttachmentID(volume *libvirt.StorageVol, domain *libvirt.Domain) (string
 	return hash(volumeName) + "-" + hash(domainName), nil
 }
 
-func (s *Stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, fail.Error) {
+func (s stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, fail.Error) {
 	storagePools, err := s.LibvirtService.ListAllStoragePools(3)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to list all storagePools")
@@ -88,7 +88,7 @@ func (s *Stack) getStoragePoolByPath(path string) (*libvirt.StoragePool, fail.Er
 	return nil, fail.NotFoundError("no matching storage pool found")
 }
 
-func (s *Stack) CreatePoolIfUnexistant(path string) fail.Error {
+func (s stack) CreatePoolIfInexistant(path string) fail.Error {
 	_, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
 		requestXML := `
@@ -106,7 +106,7 @@ func (s *Stack) CreatePoolIfUnexistant(path string) fail.Error {
 	return nil
 }
 
-func (s *Stack) getLibvirtVolume(ref string) (*libvirt.StorageVol, fail.Error) {
+func (s stack) getLibvirtVolume(ref string) (*libvirt.StorageVol, fail.Error) {
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to get storage pool from path")
@@ -221,8 +221,17 @@ func getAttachmentFromVolumeAndDomain(volume *libvirt.StorageVol, domain *libvir
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	// FIXME: validate parameters
+func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if request.Name == "" {
+		return nil, fail.InvalidParameterError("request.Name", "cannot be empty string")
+	}
+	if request.Size <= 0 {
+		return nil, fail.InvalidParameterError("request.Size", "cannot be negative or zero integer")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s',%d)", request.Name, request.Size), true).Entering().Exiting()
 
 	// volume speed is ignored
@@ -271,8 +280,14 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 }
 
 // InspectVolume returns the volume identified by id
-func (s *Stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
-	// FIXME: validate parameters
+func (s stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ref == "" {
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().Exiting()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
@@ -289,8 +304,11 @@ func (s *Stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	// FIXME: validate parameters
+func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 
 	storagePool, err := s.getStoragePoolByPath(s.LibvirtConfig.LibvirtStorage)
@@ -315,8 +333,14 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(ref string) fail.Error {
-	// FIXME: validate parameters
+func (s stack) DeleteVolume(ref string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if ref == "" {
+		return fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).Entering().Exiting()
 
 	libvirtVolume, err := s.getLibvirtVolume(ref)
@@ -336,8 +360,20 @@ func (s *Stack) DeleteVolume(ref string) fail.Error {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	// FIXME: validate parameters
+func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+	if s.IsNull() {
+		return "", fail.InvalidInstanceError()
+	}
+	if request.Name == "" {
+		return "", fail.InvalidParameterError("request.Name", "cannot be empty string")
+	}
+	if request.HostID == "" {
+		return "", fail.InvalidParameterError("request.HostID", "cannot be empty string")
+	}
+	if request.VolumeID == "" {
+		return "", fail.InvalidParameterError("request.VolumeID", "cannot be empty string")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s', '%s'", request.Name, request.VolumeID, request.HostID), true).Entering().Exiting()
 
 	_, domain, err := s.getHostAndDomainFromRef(request.HostID)
@@ -393,8 +429,17 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	// FIXME: validate parameters
+func (s stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if serverID == "" {
+		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+	}
+	if id == "" {
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().Exiting()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
@@ -416,8 +461,17 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 }
 
 // DeleteVolumeAttachment ...
-func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
-	// FIXME: validate parameters
+func (s stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if serverID == "" {
+		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+	}
+	if id == "" {
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", serverID, id), true).Entering().Exiting()
 
 	_, domain, err := s.getHostAndDomainFromRef(serverID)
@@ -465,8 +519,14 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-	// FIXME: validate parameters
+func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if serverID == "" {
+		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+	}
+
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", serverID), true).Entering().Exiting()
 
 	var volumes []*libvirt.StorageVol

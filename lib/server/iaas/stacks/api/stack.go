@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -30,6 +31,8 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
+	data.NullValue
+
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones() (map[string]bool, fail.Error)
 
@@ -111,10 +114,10 @@ type Stack interface {
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
-	// InspectHost returns the host identified by id or updates content of a *abstract.HostFull
+	// InspectHost returns the information of the Host identified by id
 	InspectHost(stacks.HostParameter) (*abstract.HostFull, fail.Error)
-	// InspectHostByName returns the ID of the host identified by name
-	InspectHostByName(string) (*abstract.HostCore, fail.Error)
+	// InspectHostByName returns the information of the Host identified by name
+	InspectHostByName(string) (*abstract.HostFull, fail.Error)
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(stacks.HostParameter) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts
@@ -155,8 +158,8 @@ type Stack interface {
 	DeleteVolumeAttachment(serverID, id string) fail.Error
 }
 
-// Reserved is an interface about the methods only available to providers internally
-type Reserved interface {
+// ReservedForProviderUse is an interface about the methods only available to providers internally
+type ReservedForProviderUse interface {
 	ListImages() ([]abstract.Image, fail.Error)             // lists available OS images
 	ListTemplates() ([]abstract.HostTemplate, fail.Error)   // lists available host templates
 	GetConfigurationOptions() stacks.ConfigurationOptions   // Returns a read-only struct containing configuration options

@@ -33,12 +33,17 @@ type jsonProperty struct {
 	module, key string
 }
 
-func (jp *jsonProperty) Clone() data.Clonable {
+func (jp jsonProperty) Clone() data.Clonable {
 	newP := &jsonProperty{}
-	return newP.Replace(jp)
+	return newP.Replace(&jp)
 }
 
 func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if jp == nil || clonable == nil {
+		return jp
+	}
+
 	srcP := clonable.(*jsonProperty)
 	*jp = *srcP
 	jp.Shielded = srcP.Shielded.Clone()

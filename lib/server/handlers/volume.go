@@ -76,7 +76,7 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr f
 	task := handler.job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	objv, xerr := volumefactory.New(handler.job.GetService())
 	if xerr != nil {
@@ -111,7 +111,7 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 	task := handler.job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
 	objv, xerr := volumefactory.Load(task, handler.job.GetService(), ref)
@@ -164,7 +164,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 	task := handler.job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
 	objv, xerr := volumefactory.Load(task, handler.job.GetService(), ref)
@@ -244,7 +244,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	task := handler.job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	objv, xerr = volumefactory.New(handler.job.GetService())
 	if xerr != nil {
@@ -285,7 +285,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	task := handler.job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
 	svc := handler.job.GetService()
@@ -563,7 +563,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	task := handler.job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
 	// Load volume data

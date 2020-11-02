@@ -22,7 +22,7 @@ import (
 )
 
 // GetAuthOpts returns the auth options
-func (s *Stack) GetAuthOpts() (providers.Config, error) {
+func (s stack) GetAuthOpts() (providers.Config, error) {
 	cfg := providers.ConfigMap{}
 
 	cfg.Set("DomainName", s.authOpts.DomainName)
@@ -30,17 +30,17 @@ func (s *Stack) GetAuthOpts() (providers.Config, error) {
 	cfg.Set("Password", s.authOpts.Password)
 	cfg.Set("AuthUrl", s.authOpts.IdentityEndpoint)
 	cfg.Set("Region", s.authOpts.Region)
-	//cfg.Set("VPCName", s.authOpts.VPCName)
+	//cfg.Set("DefaultNetworkName", s.authOpts.DefaultNetworkName)
 
 	return cfg, nil
 }
 
 // GetConfigurationOptions ...
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	return s.cfgOpts
 }
 
 // GetAuthenticationOptions ...
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 	return s.authOpts
 }

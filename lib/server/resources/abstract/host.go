@@ -242,14 +242,19 @@ func (hc *HostCore) OK() bool {
 // Clone does a deep-copy of the Host
 //
 // satisfies interface data.Clonable
-func (hc *HostCore) Clone() data.Clonable {
-	return NewHostCore().Replace(hc)
+func (hc HostCore) Clone() data.Clonable {
+	return NewHostCore().Replace(&hc)
 }
 
 // Replace ...
 //
 // satisfies interface data.Clonable
 func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hc == nil || p == nil {
+		return hc
+	}
+
 	*hc = *p.(*HostCore)
 	return hc
 }
@@ -311,8 +316,8 @@ func (hc *HostCore) GetID() string {
 	return hc.ID
 }
 
-// HostSubnet contains subnet information related to Host
-type HostSubnet struct {
+// HostNetworking contains subnets information related to Host
+type HostNetworking struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
 	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the default gateway
 	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // DEPRECATED: contains the private IP of the default gateway
@@ -325,9 +330,9 @@ type HostSubnet struct {
 	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by subnet ID) allocated to the host
 }
 
-// NewHostSubnet creates a new instance of HostSubnet
-func NewHostSubnet() *HostSubnet {
-	return &HostSubnet{
+// NewHostNetworking creates a new instance of HostNetworking
+func NewHostNetworking() *HostNetworking {
+	return &HostNetworking{
 		SubnetsByID:   map[string]string{},
 		SubnetsByName: map[string]string{},
 		IPv4Addresses: map[string]string{},
@@ -348,7 +353,7 @@ type HostDescription struct {
 type HostFull struct {
 	Core         *HostCore
 	Sizing       *HostEffectiveSizing
-	Subnet       *HostSubnet
+	Networking   *HostNetworking
 	Description  *HostDescription
 	CurrentState hoststate.Enum `json:"current_state,omitempty"`
 }
@@ -358,7 +363,7 @@ func NewHostFull() *HostFull {
 	return &HostFull{
 		Core:         NewHostCore(),
 		Sizing:       NewHostEffectiveSizing(),
-		Subnet:       NewHostSubnet(),
+		Networking:   NewHostNetworking(),
 		Description:  &HostDescription{},
 		CurrentState: hoststate.UNKNOWN,
 	}
@@ -372,7 +377,7 @@ func (hf *HostFull) IsNull() bool {
 
 // IsConsistent returns true if the struct is consistent
 func (hf *HostFull) IsConsistent() bool {
-	return hf != nil && hf.Core.OK() // && hc.Description.OK() && hc.Sizing.OK() && hc.Network.OK()
+	return hf != nil && hf.Core.OK() // && hc.Description.OK() && hc.Sizing.OK() && hc.Networking.OK()
 }
 
 // OK is a synonym to IsConsistent

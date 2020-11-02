@@ -32,11 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// // DeleteVolume deletes the volume identified by id
-// func (s *Stack) DeleteVolume(id string) error {
-// 	return s.Stack.DeleteVolume(id)
-// }
-
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
 func toVolumeState(status string) volumestate.Enum {
 	switch status {
@@ -59,7 +54,7 @@ func toVolumeState(status string) volumestate.Enum {
 	}
 }
 
-func (s *Stack) getVolumeType(speed volumespeed.Enum) string {
+func (s stack) getVolumeType(speed volumespeed.Enum) string {
 	for t, s := range s.cfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
@@ -75,7 +70,7 @@ func (s *Stack) getVolumeType(speed volumespeed.Enum) string {
 	}
 }
 
-func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
+func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 	speed, ok := s.cfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
@@ -84,14 +79,15 @@ func (s *Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 }
 
 // CreateVolume creates a block volume
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 
 	volume, xerr := s.InspectVolume(request.Name)
 	if xerr == nil && volume != nil {
-		return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
+		return nullAV, fail.DuplicateError("volume '%s' already exists", request.Name)
 	}
 
 	az, xerr := s.SelectedAvailabilityZone()
@@ -113,7 +109,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 		temporal.GetCommunicationTimeout(),
 	)
 	if commRetryErr != nil {
-		return nil, commRetryErr
+		return nullAV, commRetryErr
 	}
 
 	v := abstract.Volume{
@@ -126,14 +122,14 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	return &v, nil
 }
 
-// GetVolume returns the volume identified by id
-// If volume not found, returns (nil, nil) - TODO: returns utils.ErrNotFound
-func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+// InspectVolume returns the volume identified by id
+func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	var vol *volumes.Volume
@@ -147,9 +143,9 @@ func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	if commRetryErr != nil {
 		switch commRetryErr.(type) {
 		case *fail.ErrNotFound:
-			return nil, abstract.ResourceNotFoundError("volume", id)
+			return nullAV, abstract.ResourceNotFoundError("volume", id)
 		default:
-			return nil, commRetryErr
+			return nullAV, commRetryErr
 		}
 	}
 
@@ -164,9 +160,10 @@ func (s *Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes lists volumes
-func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+	var emptySlice []abstract.Volume
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	var vs []abstract.Volume
@@ -195,7 +192,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		temporal.GetCommunicationTimeout(),
 	)
 	if commRetryErr != nil {
-		return nil, commRetryErr
+		return emptySlice, commRetryErr
 	}
 	// VPL: empty list is not an abnormal situation, do not log or raise error
 	// if len(vs) == 0 {
@@ -203,23 +200,3 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	// }
 	return vs, nil
 }
-
-// // CreateVolumeAttachment attaches a volume to an host
-// func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-// 	return s.Stack.CreateVolumeAttachment(request)
-// }
-//
-// // InspectVolumeAttachment returns the volume attachment identified by id
-// func (s *Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-// 	return s.Stack.InspectVolumeAttachment(serverID, id)
-// }
-//
-// // ListVolumeAttachments lists available volume attachment
-// func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, error) {
-// 	return s.Stack.ListVolumeAttachments(serverID)
-// }
-//
-// // DeleteVolumeAttachment deletes the volume attachment identifed by id
-// func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) error {
-// 	return s.Stack.DeleteVolumeAttachment(serverID, vaID)
-// }

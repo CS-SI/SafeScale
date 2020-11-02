@@ -49,12 +49,17 @@ func (hsg *HostSecurityGroups) Reset() {
 }
 
 // Clone ...
-func (hsg *HostSecurityGroups) Clone() data.Clonable {
-	return NewHostSecurityGroups().Replace(hsg)
+func (hsg HostSecurityGroups) Clone() data.Clonable {
+	return NewHostSecurityGroups().Replace(&hsg)
 }
 
 // Replace ...
 func (hsg *HostSecurityGroups) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hsg == nil || p == nil {
+		return hsg
+	}
+
 	src := p.(*HostSecurityGroups)
 	*hsg = *src
 	hsg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))

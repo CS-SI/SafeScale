@@ -17,22 +17,23 @@
 package huaweicloud
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	// Gophercloud OpenStack API
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// Stack is the implementation for huaweicloud cloud stack
-type Stack struct {
-	// use openstack stack when fully openstack compliant
+// stack is the implementation for huaweicloud cloud stack
+type stack struct {
+	// use openstack Stack when fully openstack compliant
 	*openstack.Stack
 	// Identity contains service client of openstack Identity service
 	identityClient *gophercloud.ServiceClient
@@ -44,8 +45,13 @@ type Stack struct {
 	vpc *abstract.Network
 }
 
+// NullStack is not exposed through API, is needed essentially by testss
+func NullStack() *stack {
+	return &stack{}
+}
+
 // New authenticates and return interface Stack
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (api.Stack, fail.Error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
@@ -58,7 +64,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 		DomainName:  auth.DomainName,
 	}
 
-	stack, xerr := openstack.New(auth, &scope, cfg, nil)
+	parentStack, xerr := openstack.New(auth, &scope, cfg, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -67,7 +73,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	var identity *gophercloud.ServiceClient
 	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() (innerErr error) {
-			identity, innerErr = gcos.NewIdentityV3(stack.Driver, gophercloud.EndpointOpts{})
+			identity, innerErr = gcos.NewIdentityV3(parentStack.Driver, gophercloud.EndpointOpts{})
 			return normalizeError(innerErr)
 		},
 		temporal.GetCommunicationTimeout(),
@@ -102,11 +108,11 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 		return nil, fail.NewError("failed to found project ID corresponding to region '%s'", authOptions.Region)
 	}
 
-	s := Stack{
+	s := stack{
 		authOpts:       auth,
 		cfgOpts:        cfg,
 		identityClient: identity,
-		Stack:          stack,
+		Stack:          parentStack,
 	}
 	s.cfgOpts.UseFloatingIP = true
 
@@ -119,49 +125,30 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	return &s, nil
 }
 
-// initVPC initializes the instance of the Network/VPC if one is defined in tenant
-func (s *Stack) initVPC() fail.Error {
+// initVPC initializes the instance of the Networking/VPC if one is defined in tenant
+func (s *stack) initVPC() fail.Error {
 	if s.cfgOpts.DefaultNetworkName != "" {
 		an, xerr := s.InspectNetworkByName(s.cfgOpts.DefaultNetworkName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				// FIXME: error or automatic DefaultNetwork creation ?
 				//// VPC not found, create it
 				//req := abstract.NetworkRequest{
-				//	Name: s.authOpts.VPCName,
-				//	CIDR: s.authOpts.VPCCIDR,
+				//	Name: s.authOpts.DefaultNetworkName,
+				//	CIDR: s.authOpts.DefaultNetworkCIDR,
 				//}
 				//an, xerr = s.CreateNetwork(req)
 				//if xerr != nil {
-				//	return fail.NewError("failed to initialize VPC '%s'", s.authOpts.VPCName)
+				//	return fail.NewError("failed to initialize VPC '%s'", s.authOpts.DefaultNetworkName)
 				//}
 				//s.vpc = an
 			default:
 				return xerr
 			}
+		} else {
+			s.vpc = an
 		}
-		s.vpc = an
 	}
 	return nil
 }
-
-//// findVPC returns the ID about the VPC
-//func (s *Stack) findVPCID() (*string, fail.Error) {
-//	var router *openstack.Router
-//	found := false
-//	routers, xerr := s.Stack.ListRouters()
-//	if xerr != nil {
-//		return nil, xerr
-//	}
-//	for _, r := range routers {
-//		if r.Name == s.cfgOpts.DefaultNetworkName {
-//			found = true
-//			router = &r
-//			break
-//		}
-//	}
-//	if found && router != nil {
-//		return &router.ID, nil
-//	}
-//	return nil, nil
-//}

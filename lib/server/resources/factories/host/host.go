@@ -32,8 +32,6 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	// FIXME: get code from HostListener
-
 	if all {
 		return svc.ListHosts(all)
 	}

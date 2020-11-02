@@ -53,12 +53,17 @@ func (hd *HostDescription) Content() interface{} {
 }
 
 // Clone ... (data.Clonable interface)
-func (hd *HostDescription) Clone() data.Clonable {
-	return NewHostDescription().Replace(hd)
+func (hd HostDescription) Clone() data.Clonable {
+	return NewHostDescription().Replace(&hd)
 }
 
 // Replace ... (data.Clonable interface)
 func (hd *HostDescription) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hd == nil || p == nil {
+		return hd
+	}
+
 	*hd = *p.(*HostDescription)
 	return hd
 }

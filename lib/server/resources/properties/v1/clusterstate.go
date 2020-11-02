@@ -39,13 +39,18 @@ func newClusterState() *ClusterState {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s *ClusterState) Clone() data.Clonable {
-	return newClusterState().Replace(s)
+func (s ClusterState) Clone() data.Clonable {
+	return newClusterState().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (s *ClusterState) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if s == nil || p == nil {
+		return s
+	}
+
 	*s = *p.(*ClusterState)
 	return s
 }

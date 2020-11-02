@@ -45,7 +45,7 @@ const (
 	networksFolderName = "networks"
 )
 
-// network links Object Storage folder and Network
+// network links Object Storage folder and Networking
 type network struct {
 	*core
 }
@@ -54,7 +54,7 @@ func nullNetwork() *network {
 	return &network{core: nullCore()}
 }
 
-// NewNetwork creates an instance of Network
+// NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc.IsNull() {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
@@ -84,22 +84,16 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 	if xerr != nil {
 		return nullNetwork(), xerr
 	}
-	// VPL: writes are now considered successful only if the remote content is read and checked, so now need to wait on read.
-	//xerr = retry.WhileUnsuccessfulDelay1Second(
-	//	func() error {
-	//		return rn.Read(task, ref)
-	//	},
-	//	10*time.Second, // FIXME: parameterize
-	//)
-	// FIXME: object storage comms may fail, Read operation does not retry on this currently (cf. roadmap to replace stow with rclone)
-	xerr = rn.Read(task, ref)
-	if xerr != nil {
-		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(*retry.ErrTimeout); ok {
-			logrus.Debugf("timeout reading metadata of subnet '%s'", ref)
-			xerr = fail.NotFoundError("subnet '%s' not found: %s", ref, fail.RootCause(xerr).Error())
+
+	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if xerr = rn.Read(task, ref); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// rewrite NotFoundError, user does not bother about metadata stuff
+			return nullNetwork(), fail.NotFoundError("failed to find Network '%s'", ref)
+		default:
+			return nullNetwork(), xerr
 		}
-		return nullNetwork(), xerr
 	}
 
 	if xerr = upgradeProperties(task, rn); xerr != nil {
@@ -107,7 +101,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		case *fail.ErrAlteredNothing:
 			// ignore
 		default:
-			return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
+			return nullNetwork(), fail.Wrap(xerr, "failed to upgrade Networking properties")
 		}
 	}
 	return rn, nil
@@ -118,7 +112,7 @@ func upgradeProperties(task concurrency.Task, rn resources.Network) fail.Error {
 	return rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		if props.Count() > 0 && !props.Lookup(networkproperty.SubnetsV1) {
@@ -191,7 +185,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
 		}
 		if routable {
-			return fail.InvalidRequestError("cannot create such a Network, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
+			return fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
 		}
 	}
 
@@ -199,12 +193,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	logrus.Debugf("Creating network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 	an, xerr := svc.CreateNetwork(req)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrInvalidRequest, *fail.ErrTimeout:
-			return xerr
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	//// Starting from here, delete subnet if exiting with error
@@ -214,11 +203,11 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	//		if derr != nil {
 	//			switch derr.(type) {
 	//			case *fail.ErrNotFound:
-	//				logrus.Errorf("failed to delete Network: resource not found: %+v", derr)
+	//				logrus.Errorf("failed to delete NetworkID: resource not found: %+v", derr)
 	//			case *fail.ErrTimeout:
-	//				logrus.Errorf("failed to delete Network: timeout: %+v", derr)
+	//				logrus.Errorf("failed to delete NetworkID: timeout: %+v", derr)
 	//			default:
-	//				logrus.Errorf("failed to delete Network: %+v", derr)
+	//				logrus.Errorf("failed to delete NetworkID: %+v", derr)
 	//			}
 	//			_ = xerr.AddConsequence(derr)
 	//		}
@@ -422,9 +411,9 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 //
 //	var gatewayID string
 //	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-//		an, ok := clonable.(*abstract.Network)
+//		an, ok := clonable.(*abstract.Networking)
 //		if !ok {
-//			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+//			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 //		}
 //		if primary {
 //			gatewayID = an.GatewayID
@@ -468,7 +457,7 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	xerr = rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		svc := rn.GetService()
@@ -506,14 +495,14 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 				}
 			}
 			if !found {
-				return fail.InvalidRequestError("failed to delete Network '%s', 1 subnet still inside", rn.GetName())
+				return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", rn.GetName())
 			}
 		default:
-			return fail.InvalidRequestError("failed to delete Network '%s', %d subnets still inside", rn.GetName(), subnetsLen)
+			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", rn.GetName(), subnetsLen)
 		}
 
 		waitMore := false
-		// delete subnet, with tolerance
+		// delete Network, with tolerance
 		innerXErr = svc.DeleteNetwork(an.ID)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
@@ -567,9 +556,9 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 //
 //	ip = ""
 //	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-//		an, ok := clonable.(*abstract.Network)
+//		an, ok := clonable.(*abstract.Networking)
 //		if !ok {
-//			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+//			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 //		}
 //		if an.VIP != nil && an.VIP.PrivateIP != "" {
 //			ip = an.VIP.PrivateIP
@@ -606,9 +595,9 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 //	}
 //
 //	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-//		an, ok := clonable.(*abstract.Network)
+//		an, ok := clonable.(*abstract.Networking)
 //		if !ok {
-//			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+//			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 //		}
 //		if an.VIP != nil && an.VIP.PublicIP != "" {
 //			ip = an.VIP.PublicIP
@@ -643,9 +632,9 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 //
 //	var found bool
 //	xerr := rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-//		an, ok := clonable.(*abstract.Network)
+//		an, ok := clonable.(*abstract.Networking)
 //		if !ok {
-//			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+//			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 //		}
 //		found = an.VIP != nil
 //		return nil
@@ -663,9 +652,9 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 //	}
 //
 //	xerr = rn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-//		an, ok := clonable.(*abstract.Network)
+//		an, ok := clonable.(*abstract.Networking)
 //		if !ok {
-//			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+//			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 //		}
 //		vip = an.VIP
 //		return nil
@@ -693,7 +682,7 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		cidr = an.CIDR
 		return nil
@@ -724,7 +713,7 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 	xerr = rn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 
 		}
 

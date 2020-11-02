@@ -19,6 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"math"
 	"os"
 	"regexp"
@@ -43,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 //go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
@@ -50,6 +52,8 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
+	data.NullValue
+
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
@@ -446,12 +450,15 @@ func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements,
 		if sizing.MinDiskSize > 0 {
 			diskMsg = fmt.Sprintf(" and at least %d GB of disk", sizing.MinDiskSize)
 		}
-
-		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
+		gpuMsg := ""
+		if sizing.MinGPU >= 0 {
+			gpuMsg = fmt.Sprintf("%d GPU%s", sizing.MinGPU, strprocess.Plural(uint(sizing.MinGPU)))
+		}
+		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg))
 	}
 
 	for _, t := range allTpls {
-		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
+		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.GPUNumber, t.DiskSize)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
 			logrus.Debugf(msg, "not enough cores")
@@ -471,6 +478,10 @@ func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements,
 		}
 		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
 			logrus.Debugf(msg, "not enough disk")
+			continue
+		}
+		if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
+			logrus.Debugf(msg, "too many GPU")
 			continue
 		}
 

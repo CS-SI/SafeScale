@@ -38,7 +38,7 @@ const (
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type SubnetRequest struct {
-	Network       string         // contains the ID of the parent Network
+	NetworkID     string         // contains the ID of the parent Network
 	Name          string         // contains the name of the subnet (must be unique in a network)
 	IPVersion     ipversion.Enum // must be IPv4 or IPv6 (see IPVersion)
 	CIDR          string         // CIDR mask
@@ -80,13 +80,18 @@ func NewSubnet() *Subnet {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (s *Subnet) Clone() data.Clonable {
-	return NewSubnet().Replace(s)
+func (s Subnet) Clone() data.Clonable {
+	return NewSubnet().Replace(&s)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (s *Subnet) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if s == nil || p == nil {
+		return s
+	}
+
 	*s = *p.(*Subnet)
 	return s
 }
@@ -105,7 +110,7 @@ func (s *Subnet) OK() bool {
 	}
 	result = result && (s.Network != "")
 	if s.Name == "" {
-		logrus.Debug("Subnet without parent Network")
+		logrus.Debug("Subnet without parent Networking")
 	}
 	result = result && (s.CIDR != "")
 	if s.CIDR == "" {
@@ -173,13 +178,18 @@ func NewVirtualIP() *VirtualIP {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (vip *VirtualIP) Clone() data.Clonable {
-	return NewVirtualIP().Replace(vip)
+func (vip VirtualIP) Clone() data.Clonable {
+	return NewVirtualIP().Replace(&vip)
 }
 
 // Replace ...
 // satisfies interface data.Clonable interface
 func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if vip == nil || p == nil {
+		return vip
+	}
+
 	src := p.(*VirtualIP)
 	*vip = *src
 	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))

@@ -17,12 +17,8 @@
 package outscale
 
 import (
-	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -31,8 +27,8 @@ import (
 )
 
 // CreateVIP ...
-func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
-	if s == nil {
+func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	// networkID is not used by Outscale
@@ -52,73 +48,46 @@ func (s *Stack) CreateVIP(networkID, subnetID, name string, securityGroups []str
 		return nil, xerr
 	}
 
-	//group, xerr := s.getNetworkSecurityGroup(subnet.ID)
+	resp, xerr := s.rpcCreateNic(subnet.ID, name, name, securityGroups)
 	if xerr != nil {
 		return nil, xerr
 	}
-	createNicRequest := osc.CreateNicRequest{
-		Description:      name,
-		SubnetId:         subnet.ID,
-		SecurityGroupIds: securityGroups,
-	}
-	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
-		CreateNicRequest: optional.NewInterface(createNicRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	if len(res.Nic.PrivateIps) < 1 {
+	if len(resp.PrivateIps) < 1 {
 		return nil, fail.InconsistentError("inconsistent provider response, no interface found")
 	}
-	nic := res.Nic
+
 	// ip, err := s.addPublicIP(&nic)
 	// VPL: twice ?
 	// if len(res.Nic.PrivateIps) < 1 {
 	//	return nil, fail.InconsistentError("Inconsistent provider response")
 	// }
 
-	xerr = s.setResourceTags(nic.NicId, map[string]string{
-		"name": name,
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-	// primary := deviceNumber == 0
-	return &abstract.VirtualIP{
-		ID:        nic.NicId,
-		PrivateIP: nic.PrivateIps[0].PrivateIp,
-		SubnetID:  subnet.ID,
-		Hosts:     nil,
-		PublicIP:  "",
-	}, nil
+	vip := abstract.NewVirtualIP()
+	vip.ID = resp.NicId
+	vip.Name = name
+	vip.PrivateIP = resp.PrivateIps[0].PrivateIp
+	vip.SubnetID = subnet.ID
+	vip.PublicIP = ""
+	return vip, nil
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
-	if s == nil {
+func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet")
 }
 
-func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
-	readNicsRequest := osc.ReadNicsRequest{
-		Filters: osc.FiltersNic{
-			LinkNicVmIds: []string{hostID},
-		},
+func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
+	resp, xerr := s.rpcReadNicsOfVm(hostID)
+	if xerr != nil {
+		return 0, xerr
 	}
-	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{
-		ReadNicsRequest: optional.NewInterface(readNicsRequest),
-	})
-	if err != nil {
-		return 0, normalizeError(err)
-	}
-	if len(res.Nics) == 0 {
-		return -1, fail.NewError("no nics linked to the VM")
-	}
+
 	var numbers sort.IntSlice
-	for _, nic := range res.Nics {
+	for _, nic := range resp {
 		numbers = append(numbers, int(nic.LinkNic.DeviceNumber))
 	}
 	if numbers == nil {
@@ -131,12 +100,12 @@ func (s *Stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
 			return int64(i), nil
 		}
 	}
-	return 0, fail.InvalidRequestError(fmt.Sprintf("No more free device on host %s", hostID))
+	return 0, fail.InvalidRequestError("no more free device on host %s", hostID)
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -182,8 +151,8 @@ func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
-	if s == nil {
+func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -220,8 +189,8 @@ func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr 
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -232,20 +201,9 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	deleteNicRequest := osc.DeleteNicRequest{
-		NicId: vip.ID,
+	if xerr := s.rpcDeleteNic(vip.ID); xerr != nil {
+		return xerr
 	}
-	_, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
-		DeleteNicRequest: optional.NewInterface(deleteNicRequest),
-	})
-	if err != nil {
-		return normalizeError(err)
-	}
-	deletePublicIpRequest := osc.DeletePublicIpRequest{
-		PublicIp: vip.PublicIP,
-	}
-	_, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-		DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-	})
-	return normalizeError(err)
+
+	return s.rpcDeletePublicIpByIP(vip.PublicIP)
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -29,7 +30,7 @@ import (
 
 // provider is the provider implementation of the Gcp provider
 type provider struct {
-	*gcp.Stack
+	api.Stack
 
 	tenantParameters map[string]interface{}
 }
@@ -40,6 +41,7 @@ func New() providers.Provider {
 }
 
 // Build build a new Client from configuration parameter
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
@@ -152,10 +154,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -165,10 +167,10 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -180,13 +182,24 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // GetName returns the providerName
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "gcp"
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	return p.Stack.ListImages()
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
+}
+
+// ListTemplates ...
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
 // GetTenantParameters returns the tenant parameters as-is

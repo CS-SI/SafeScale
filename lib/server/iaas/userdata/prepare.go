@@ -130,6 +130,9 @@ func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string) fail.Error {
+	if ud == nil {
+		return fail.InvalidInstanceError()
+	}
 
 	// Generate password for user safescale
 	var (

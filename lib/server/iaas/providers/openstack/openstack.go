@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -33,7 +34,7 @@ import (
 
 // provider is the provider implementation of the openstack provider respecting api.Provider
 type provider struct {
-	*openstack.Stack
+	api.Stack
 
 	SecurityGroup     *secgroups.SecurityGroup
 	ExternalNetworkID string
@@ -44,6 +45,10 @@ type provider struct {
 // New creates a new instance of pure openstack provider
 func New() providers.Provider {
 	return &provider{}
+}
+
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
 }
 
 // Build build a new Client from configuration parameter
@@ -166,7 +171,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 // GetAuthenticationOptions returns the auth options
 func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg := providers.ConfigMap{}
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
@@ -182,7 +187,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -198,21 +203,19 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // ListTemplates ...
 // Value of all has no impact on the result
 func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.ListTemplates()
-	if xerr != nil {
-		return nil, xerr
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
-	return allTemplates, nil
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
 // ListImages ...
 // Value of all has no impact on the result
 func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	allImages, xerr := p.Stack.ListImages()
-	if xerr != nil {
-		return nil, xerr
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
-	return allImages, nil
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
 }
 
 // GetName returns the providerName
