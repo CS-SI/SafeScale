@@ -67,10 +67,9 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
-
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
-		return nil, fail.InvalidRequestError("network name cannot be empty string")
+		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("subnet create '%s'", networkRef))
@@ -104,8 +103,13 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	req := abstract.SubnetRequest{
-		NetworkID:     networkRef,
+		NetworkID:     rn.GetID(),
 		Name:          in.GetName(),
 		CIDR:          in.GetCidr(),
 		Domain:        in.GetDomain(),
@@ -420,19 +424,23 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	var sg resources.SecurityGroup
+	sg, xerr = securitygroupfactory.Load(task, svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
+	var rs resources.Subnet
+	if rs, xerr = subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
 		xerr = rs.UnbindSecurityGroup(task, sg)
 	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
-			xerr = sg.UnbindFromSubnetByReference(task, subnetRef)
+			if xerr = sg.UnbindFromSubnetByReference(task, subnetRef); xerr != nil {
+				return empty, xerr
+			}
 		default:
 			return empty, xerr
 		}

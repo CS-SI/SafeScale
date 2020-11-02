@@ -626,7 +626,9 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
-	_, rerr := svc.InspectHostByName(request.ResourceName)
+	ah := abstract.NewHostCore()
+	ah.Name = request.ResourceName
+	_, rerr := svc.InspectHost(ah)
 	if rerr == nil {
 		return nil, nil, nil, abstract.ResourceDuplicateError("Host", request.ResourceName)
 	}

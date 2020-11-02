@@ -502,14 +502,15 @@ func (s *stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter,
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
-	}
+	// FIXME: add tracing
+	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// asg, xerr = s.InspectSecurityGroup(asg)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	return fail.NotImplementedError()
 }
@@ -523,14 +524,14 @@ func (s *stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParame
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = s.InspectSecurityGroup(asg)
-	if xerr != nil {
-		return xerr
-	}
+	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// asg, xerr = s.InspectSecurityGroup(asg)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	return fail.NotImplementedError()
 }

@@ -53,10 +53,10 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 
 // DeleteSecurityGroup deletes a security group and its rules
 func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
-	// if s == nil {
-	//     return fail.InvalidInstanceError()
-	// }
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -75,10 +75,10 @@ func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 
 // InspectSecurityGroup returns information about a security group
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if s.IsNull() {
+		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
+	}
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -97,10 +97,11 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 
 // ClearSecurityGroup removes all rules but keep group
 func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	// FIXME: check s.IsNull()
 	// if s == nil {
 	//     return nullAsg, fail.InvalidInstanceError()
 	// }
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -122,7 +123,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	// if s == nil {
 	//     return nullAsg, fail.InvalidInstanceError()
 	// }
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -133,7 +134,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		}
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return asg, fail.NotImplementedError()
@@ -145,7 +146,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	// if s == nil {
 	//     return false, fail.InvalidInstanceError()
 	// }
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -156,7 +157,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		}
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", asg.ID, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError()

@@ -146,13 +146,13 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 		_, tenantMetadataFound := tenant["metadata"]
 
 		// Initializes Provider
-		providerInstance, err := svc.Build( /*tenantClient*/ tenant)
-		if err != nil {
-			return NullService(), fail.Wrap(err, "error creating tenant '%s' on provider '%s'", tenantName, provider)
+		providerInstance, xerr := svc.Build( /*tenantClient*/ tenant)
+		if xerr != nil {
+			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
 		}
-		serviceCfg, err := providerInstance.GetConfigurationOptions()
-		if err != nil {
-			return NullService(), err
+		serviceCfg, xerr := providerInstance.GetConfigurationOptions()
+		if xerr != nil {
+			return NullService(), xerr
 		}
 
 		// Initializes Object Storage
@@ -161,17 +161,17 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 			authOpts              providers.Config
 		)
 		if tenantObjectStorageFound {
-			authOpts, err = providerInstance.GetAuthenticationOptions()
-			if err != nil {
-				return NullService(), err
+			authOpts, xerr = providerInstance.GetAuthenticationOptions()
+			if xerr != nil {
+				return NullService(), xerr
 			}
-			objectStorageConfig, err := initObjectStorageLocationConfig(authOpts, tenant)
-			if err != nil {
-				return NullService(), err
+			objectStorageConfig, xerr := initObjectStorageLocationConfig(authOpts, tenant)
+			if xerr != nil {
+				return NullService(), xerr
 			}
-			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
-			if err != nil {
-				return NullService(), fail.Wrap(err, "error connecting to Object Storage location")
+			objectStorageLocation, xerr = objectstorage.NewLocation(objectStorageConfig)
+			if xerr != nil {
+				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
 			}
 		} else {
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)

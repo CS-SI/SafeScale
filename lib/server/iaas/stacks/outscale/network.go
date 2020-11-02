@@ -617,16 +617,16 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return xerr
-		}
-	}
+	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !asg.IsConsistent() {
+	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 
 	return nil
 }
@@ -640,16 +640,16 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return xerr
-		}
-	}
+	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !asg.IsConsistent() {
+	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 
 	return nil
 }
