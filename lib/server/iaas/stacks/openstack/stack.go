@@ -17,15 +17,14 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Stack contains the needs to operate on Stack OpenStack
@@ -100,27 +99,32 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	}
 
 	// Openstack client
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			s.Driver, innerErr = openstack.AuthenticatedClient(gcOpts)
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAuthenticated:
+			return nil, fail.NotAuthenticatedError("authentication failed")
+		default:
+			return nil, xerr
+		}
 	}
 
 	// Identity API
 	endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			s.IdentityClient, innerErr = openstack.NewIdentityV2(s.Driver, endpointOpts)
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -130,13 +134,13 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	//endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
 	switch s.versions["compute"] {
 	case "v2":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.ComputeClient, innerErr = openstack.NewComputeV2(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	default:
 		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
@@ -148,13 +152,13 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Network API
 	switch s.versions["network"] {
 	case "v2":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.NetworkClient, innerErr = openstack.NewNetworkV2(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	default:
 		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
@@ -166,22 +170,22 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Volume API
 	switch s.versions["volume"] {
 	case "v1":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = openstack.NewBlockStorageV1(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	case "v2":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = openstack.NewBlockStorageV2(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	default:
 		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
@@ -192,13 +196,13 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.ProviderNetworkID, innerErr = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			return nil, xerr

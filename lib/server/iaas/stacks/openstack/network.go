@@ -19,7 +19,6 @@ package openstack
 import (
 	"net"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -36,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -99,12 +97,12 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 
 	// Creates the network
 	var network *networks.Network
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			network, innerErr = networks.Create(s.NetworkClient, opts).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAN, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
@@ -113,12 +111,11 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 	// Starting from here, delete network if exit with error
 	defer func() {
 		if xerr != nil {
-			derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			derr := stacks.RetryableRemoteCall(
 				func() error {
-					innerErr := networks.Delete(s.NetworkClient, network.ID).ExtractErr()
-					return NormalizeError(innerErr)
+					return networks.Delete(s.NetworkClient, network.ID).ExtractErr()
 				},
-				temporal.GetCommunicationTimeout(),
+				NormalizeError,
 			)
 			if derr != nil {
 				logrus.Errorf("failed to delete Network '%s': %v", req.Name, derr)
@@ -148,14 +145,14 @@ func (s Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			_, r.Err = s.ComputeClient.Get(s.NetworkClient.ServiceURL("networks?name="+name), &r.Body, &gophercloud.RequestOpts{
 				OkCodes: []int{200, 203},
 			})
-			return NormalizeError(r.Err)
+			return r.Err
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -196,12 +193,12 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	// If not found, we look for any network from provider
 	// 1st try with id
 	var network *networks.Network
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			network, innerErr = networks.Get(s.NetworkClient, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -235,7 +232,7 @@ func (s Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*abstract.Network
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := networks.List(s.NetworkClient, networks.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
@@ -261,7 +258,7 @@ func (s Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 			)
 			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -281,12 +278,12 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var network *networks.Network
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			network, innerErr = networks.Get(s.NetworkClient, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		logrus.Errorf("failed to get network '%s': %+v", id, xerr)
@@ -303,12 +300,11 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 		return fail.InvalidRequestError("cannot delete a Network with Subnets in it")
 	}
 
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := networks.Delete(s.NetworkClient, id).ExtractErr()
-			return NormalizeError(innerErr)
+			return networks.Delete(s.NetworkClient, id).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to delete network '%s'", network.Name)
@@ -406,38 +402,38 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 	var subnet *subnets.Subnet
 	// Execute the operation and get back a subnets.Subnet struct
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
-			innerErr = NormalizeError(innerErr)
-			if innerErr != nil {
-				switch innerErr.(type) { // nolint
-				case *fail.ErrInvalidRequest:
-					neutronError, innerXErr := ParseNeutronError(innerErr.Error())
-					if innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrSyntax:
-							return innerXErr
-						default:
-							return retry.StopRetryError(innerXErr)
-						}
-					}
-					if neutronError != nil {
-						return retry.StopRetryError(fail.NewError("bad request: %s", neutronError["message"]))
-					}
-				default:
-					return retry.StopRetryError(innerErr)
-				}
-			}
-			return nil
+			return innerErr
+			// if innerErr != nil {
+			// 	switch innerErr.(type) { // nolint
+			// 	case *fail.ErrInvalidRequest:
+			// 		neutronError, innerXErr := ParseNeutronError(innerErr.Error())
+			// 		if innerXErr != nil {
+			// 			switch innerXErr.(type) {
+			// 			case *fail.ErrSyntax:
+			// 				return innerXErr
+			// 			default:
+			// 				return retry.StopRetryError(innerXErr)
+			// 			}
+			// 		}
+			// 		if neutronError != nil {
+			// 			return retry.StopRetryError(fail.NewError("bad request: %s", neutronError["message"]))
+			// 		}
+			// 	default:
+			// 		return retry.StopRetryError(innerErr)
+			// 	}
+			// }
+			// return nil
 		},
-		10*time.Second,
+		NormalizeError,
 	)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrStopRetry:
-			xerr = fail.ToError(xerr.Cause())
-		}
+		// switch xerr.(type) {
+		// case *retry.ErrStopRetry:
+		// 	xerr = fail.ToError(xerr.Cause())
+		// }
 		return nullAS, xerr
 	}
 
@@ -502,25 +498,25 @@ func (s Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	as := abstract.NewSubnet()
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			sn, innerErr := subnets.Get(s.NetworkClient, id).Extract()
-			if innerErr != nil {
-				return NormalizeError(innerErr)
-			}
-			as.ID = sn.ID
-			as.Name = sn.Name
-			as.Network = sn.NetworkID
-			as.IPVersion = ToAbstractIPVersion(sn.IPVersion)
-			as.CIDR = sn.CIDR
-			as.DNSServers = sn.DNSNameservers
-			return nil
+	var sn *subnets.Subnet
+	xerr = stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAS, xerr
 	}
+
+	as.ID = sn.ID
+	as.Name = sn.Name
+	as.Network = sn.NetworkID
+	as.IPVersion = ToAbstractIPVersion(sn.IPVersion)
+	as.CIDR = sn.CIDR
+	as.DNSServers = sn.DNSNameservers
+
 	return as, nil
 }
 
@@ -555,15 +551,15 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 	}
 
 	var resp []subnets.Subnet
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var allPages pagination.Page
 			if allPages, innerErr = subnets.List(s.NetworkClient, listOpts).AllPages(); innerErr == nil {
 				resp, innerErr = subnets.ExtractSubnets(allPages)
 			}
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAS, xerr
@@ -611,9 +607,9 @@ func (s Stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
 		listOpts.NetworkID = networkID
 	}
 	var subnetList []*abstract.Subnet
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := subnets.List(s.NetworkClient, listOpts).EachPage(func(page pagination.Page) (bool, error) {
+			return subnets.List(s.NetworkClient, listOpts).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := subnets.ExtractSubnets(page)
 				if err != nil {
 					return false, NormalizeError(err)
@@ -629,9 +625,8 @@ func (s Stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -669,12 +664,11 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
-					err := subnets.Delete(s.NetworkClient, id).ExtractErr()
-					return NormalizeError(err)
+					return subnets.Delete(s.NetworkClient, id).ExtractErr()
 				},
-				temporal.GetCommunicationTimeout(),
+				NormalizeError,
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -682,27 +676,30 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 					msg := "hosts or services are still attached"
 					logrus.Warnf(strprocess.Capitalize(msg))
 					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
-				default: // case gophercloud.ErrUnexpectedResponseCode:
-					neutronError, innerErr := ParseNeutronError(innerXErr.Error())
-					if innerErr != nil {
-						switch innerErr.(type) {
-						case *fail.ErrSyntax:
-						default:
-							return retry.StopRetryError(innerXErr)
-						}
-					}
-
-					switch neutronError["type"] {
-					case "SubnetInUse":
-						msg := "hosts or services are still attached"
-						logrus.Warnf(strprocess.Capitalize(msg))
-						return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
-					default:
-						logrus.Debugf("NeutronError: type = %s", neutronError["type"])
-					}
+				// default: // case gophercloud.ErrUnexpectedResponseCode:
+				// 	neutronError, innerErr := ParseNeutronError(innerXErr.Error())
+				// 	if innerErr != nil {
+				// 		switch innerErr.(type) {
+				// 		case *fail.ErrSyntax:
+				// 		default:
+				// 			return retry.StopRetryError(innerXErr)
+				// 		}
+				// 	}
+				//
+				// 	switch neutronError["type"] {
+				// 	case "SubnetInUse":
+				// 		msg := "hosts or services are still attached"
+				// 		logrus.Warnf(strprocess.Capitalize(msg))
+				// 		return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
+				// 	default:
+				// 		logrus.Debugf("NeutronError: type = %s", neutronError["type"])
+				// 	}
+				// }
+				default:
+					return innerXErr
 				}
 			}
-			return innerXErr
+			return nil
 		},
 		temporal.GetContextTimeout(),
 	)
@@ -732,12 +729,12 @@ func (s Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 		GatewayInfo:  &gi,
 	}
 	var router *routers.Router
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			router, innerErr = routers.Create(s.NetworkClient, opts).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -758,9 +755,9 @@ func (s Stack) ListRouters() ([]Router, fail.Error) {
 	}
 
 	var ns []Router
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := routers.List(s.NetworkClient, routers.ListOpts{}).EachPage(
+			return routers.List(s.NetworkClient, routers.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := routers.ExtractRouters(page)
 					if err != nil {
@@ -777,47 +774,45 @@ func (s Stack) ListRouters() ([]Router, fail.Error) {
 					return true, nil
 				},
 			)
-			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	return ns, xerr
 }
 
 // deleteRouter deletes the router identified by id
 func (s Stack) deleteRouter(id string) fail.Error {
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := routers.Delete(s.NetworkClient, id).ExtractErr()
-			return NormalizeError(innerErr)
+			return routers.Delete(s.NetworkClient, id).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
 // addSubnetToRouter attaches subnet to router
 func (s Stack) addSubnetToRouter(routerID string, subnetID string) fail.Error {
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := routers.AddInterface(s.NetworkClient, routerID, routers.AddInterfaceOpts{
 				SubnetID: subnetID,
 			}).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
 // removeSubnetFromRouter detaches a subnet from router interface
 func (s Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Error {
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := routers.RemoveInterface(s.NetworkClient, routerID, routers.RemoveInterfaceOpts{
 				SubnetID: subnetID,
 			}).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -830,25 +825,25 @@ func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return xerr
-		}
-	}
+	// asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !asg.IsConsistent() {
+	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			// FIXME: bind security group to port associated to subnet
 			//innerErr = secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -860,86 +855,25 @@ func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return xerr
-		}
-	}
+	// asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !asg.IsConsistent() {
+	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			// FIXME: unbind security group from port associated to subnet
 			//innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
-	)
-}
-
-// BindSecurityGroupToSubnet binds a security group to a subnet
-func (s Stack) BindSecurityGroupToSubnet(subnetID string, sgParam stacks.SecurityGroupParameter) fail.Error {
-	//if s == nil {
-	//	return fail.InvalidInstanceError()
-	//}
-	if subnetID != "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return xerr
-		}
-	}
-
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			var innerErr error
-			// FIXME: bind security group to port associated to subnet
-			//innerErr = secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-}
-
-// UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-func (s Stack) UnbindSecurityGroupFromSubnet(subnetID string, sgParam stacks.SecurityGroupParameter) fail.Error {
-	//if s == nil {
-	//	return fail.InvalidInstanceError()
-	//}
-	if subnetID == "" {
-		return fail.InvalidParameterError("subnetID", "cannot be empty string")
-	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return xerr
-		}
-	}
-
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			var innerErr error
-			// FIXME: unbind security group from port associated to subnet
-			//innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -961,20 +895,20 @@ func (s Stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 	}
 
 	var port *ports.Port
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	asu := true
+	options := ports.CreateOpts{
+		NetworkID:      networkID,
+		AdminStateUp:   &asu,
+		Name:           name,
+		SecurityGroups: &securityGroups,
+		FixedIPs:       []ports.IP{{SubnetID: subnetID}},
+	}
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			asu := true
-			options := ports.CreateOpts{
-				NetworkID:      networkID,
-				AdminStateUp:   &asu,
-				Name:           name,
-				SecurityGroups: &securityGroups,
-				FixedIPs:       []ports.IP{{SubnetID: subnetID}},
-			}
 			port, innerErr = ports.Create(s.NetworkClient, options).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAVIP, xerr
@@ -1007,12 +941,12 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 	}
 
 	var vipPort *ports.Port
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return xerr
@@ -1030,12 +964,12 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 	}
 	for _, p := range hostPorts {
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			return xerr
@@ -1057,12 +991,12 @@ func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 	}
 
 	var vipPort *ports.Port
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return xerr
@@ -1081,12 +1015,12 @@ func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 				newAllowedAddressPairs = append(newAllowedAddressPairs, a)
 			}
 		}
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			return xerr
@@ -1110,12 +1044,11 @@ func (s Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 			return xerr
 		}
 	}
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -1125,12 +1058,12 @@ func (s Stack) createPort(req ports.CreateOpts) (port *ports.Port, xerr fail.Err
 		return nil, fail.InvalidInstanceError()
 	}
 
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -1151,12 +1084,11 @@ func (s Stack) deletePort(id string) fail.Error {
 		return fail.NotFoundError("failed to query port %s", id)
 	}
 
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			innerErr = ports.Delete(s.NetworkClient, id).ExtractErr()
-			return NormalizeError(innerErr)
+			return ports.Delete(s.NetworkClient, id).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return xerr
@@ -1168,12 +1100,12 @@ func (s Stack) deletePort(id string) fail.Error {
 // listPorts lists all ports available
 func (s Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var allPages pagination.Page
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -1182,26 +1114,26 @@ func (s Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
 	return r, NormalizeError(err)
 }
 
-// updatePort updates the settings of a port
-func (s Stack) updatePort(id string, options ports.UpdateOpts) fail.Error {
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
-		func() error {
-			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
-			_ = resp
-			return NormalizeError(innerErr)
-		},
-		temporal.GetCommunicationTimeout(),
-	)
-}
+// // updatePort updates the settings of a port
+// func (s Stack) updatePort(id string, options ports.UpdateOpts) fail.Error {
+// 	return stacks.RetryableRemoteCall(
+// 		func() error {
+// 			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
+// 			_ = resp
+// 			return NormalizeError(innerErr)
+// 		},
+// 		NormalizeError,
+// 	)
+// }
 
 // inspectPort returns port from its ID
 func (s Stack) inspectPort(id string) (port *ports.Port, xerr fail.Error) {
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr

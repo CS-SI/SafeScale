@@ -18,9 +18,10 @@ package openstack
 
 import (
 	"fmt"
-	"github.com/asaskevich/govalidator"
 	"strings"
 	"time"
+
+	"github.com/asaskevich/govalidator"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -49,7 +50,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -65,7 +65,7 @@ func (s Stack) ListRegions() (list []string, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
 				//ParentRegionID: "RegionOne",
@@ -73,7 +73,7 @@ func (s Stack) ListRegions() (list []string, xerr fail.Error) {
 			allPages, innerErr = regions.List(s.IdentityClient, listOpts).AllPages()
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -103,12 +103,12 @@ func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return emptyMap, xerr
@@ -185,12 +185,12 @@ func (s Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) 
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	var img *images.Image
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			img, innerErr = images.Get(s.ComputeClient, id).Extract()
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAI, xerr
@@ -221,12 +221,12 @@ func (s Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr
 
 	// Try to get template
 	var flv *flavors.Flavor
-	xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAHT, xerr
@@ -255,7 +255,7 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	opts := flavors.ListOpts{}
 
 	var flvList []abstract.HostTemplate
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := flavors.ListDetail(s.ComputeClient, opts).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := flavors.ExtractFlavors(page)
@@ -276,7 +276,7 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 			})
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -346,7 +346,7 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []abstract.KeyPair
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			innerErr = keypairs.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := keypairs.ExtractKeyPairs(page)
@@ -366,7 +366,7 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 			})
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -386,12 +386,12 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			innerErr = keypairs.Delete(s.ComputeClient, id).ExtractErr()
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return xerr
@@ -468,66 +468,66 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	return ahf, nil
 }
 
-func (s Stack) queryServer(id string) (*servers.Server, fail.Error) {
-	return s.WaitHostState(id, hoststate.STARTED, 2*temporal.GetBigDelay())
-}
+// func (s Stack) queryServer(id string) (*servers.Server, fail.Error) {
+// 	return s.WaitHostState(id, hoststate.STARTED, 2*temporal.GetBigDelay())
+// }
 
-// interpretAddresses converts adresses returned by the OpenStack driver
-// Returns string slice containing the name of the networks, string map of IP addresses
-// (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s Stack) interpretAddresses(
-	addresses map[string]interface{},
-	hostNets []servers.Network, hostPorts []ports.Port,
-) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
-	var (
-		subnets     []string
-		addrs       = map[ipversion.Enum]map[string]string{}
-		AcccessIPv4 string
-		AcccessIPv6 string
-	)
-
-	addrs[ipversion.IPv4] = map[string]string{}
-	addrs[ipversion.IPv6] = map[string]string{}
-
-	for n, obj := range addresses {
-		for _, subnetAddresses := range obj.([]interface{}) {
-			address, ok := subnetAddresses.(map[string]interface{})
-			if !ok {
-				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid network address")
-			}
-			version, ok := address["version"].(float64)
-			if !ok {
-				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid version")
-			}
-			fixedIP, ok := address["addr"].(string)
-			if !ok {
-				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid addr")
-			}
-
-			// Find port having this interface
-
-			if n == s.cfgOpts.ProviderNetwork {
-				switch version {
-				case 4:
-					AcccessIPv4 = fixedIP
-				case 6:
-					AcccessIPv6 = fixedIP
-				}
-			} else {
-				switch version {
-				case 4:
-					addrs[ipversion.IPv4][n] = fixedIP
-				case 6:
-					addrs[ipversion.IPv6][n] = fixedIP
-				}
-			}
-
-			subnets = append(subnets, n)
-
-		}
-	}
-	return subnets, addrs, AcccessIPv4, AcccessIPv6, nil
-}
+// // interpretAddresses converts adresses returned by the OpenStack driver
+// // Returns string slice containing the name of the networks, string map of IP addresses
+// // (indexed on network name), public ipv4 and ipv6 (if they exists)
+// func (s Stack) interpretAddresses(
+// 	addresses map[string]interface{},
+// 	hostNets []servers.Network, hostPorts []ports.Port,
+// ) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
+// 	var (
+// 		subnets     []string
+// 		addrs       = map[ipversion.Enum]map[string]string{}
+// 		AcccessIPv4 string
+// 		AcccessIPv6 string
+// 	)
+//
+// 	addrs[ipversion.IPv4] = map[string]string{}
+// 	addrs[ipversion.IPv6] = map[string]string{}
+//
+// 	for n, obj := range addresses {
+// 		for _, subnetAddresses := range obj.([]interface{}) {
+// 			address, ok := subnetAddresses.(map[string]interface{})
+// 			if !ok {
+// 				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid network address")
+// 			}
+// 			version, ok := address["version"].(float64)
+// 			if !ok {
+// 				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid version")
+// 			}
+// 			fixedIP, ok := address["addr"].(string)
+// 			if !ok {
+// 				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid addr")
+// 			}
+//
+// 			// Find port having this interface
+//
+// 			if n == s.cfgOpts.ProviderNetwork {
+// 				switch version {
+// 				case 4:
+// 					AcccessIPv4 = fixedIP
+// 				case 6:
+// 					AcccessIPv6 = fixedIP
+// 				}
+// 			} else {
+// 				switch version {
+// 				case 4:
+// 					addrs[ipversion.IPv4][n] = fixedIP
+// 				case 6:
+// 					addrs[ipversion.IPv6][n] = fixedIP
+// 				}
+// 			}
+//
+// 			subnets = append(subnets, n)
+//
+// 		}
+// 	}
+// 	return subnets, addrs, AcccessIPv4, AcccessIPv6, nil
+// }
 
 // complementHost complements Host data with content of server parameter
 func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
@@ -702,14 +702,14 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			_, r.Err = s.ComputeClient.Get(s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
 				OkCodes: []int{200, 203},
 			})
 			return NormalizeError(r.Err)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAHF, xerr
@@ -829,7 +829,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server = nil
-			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			innerXErr := stacks.RetryableRemoteCall(
 				func() (err error) {
 					server, err = servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
 						CreateOptsBuilder: srvOpts,
@@ -845,7 +845,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					}
 					return nil
 				},
-				temporal.GetCommunicationTimeout(),
+				NormalizeError,
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -853,12 +853,12 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					innerXErr = fail.ToError(innerXErr.Cause())
 				}
 				if server != nil {
-					derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+					derr := stacks.RetryableRemoteCall(
 						func() error {
 							err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							return NormalizeError(err)
 						},
-						temporal.GetCommunicationTimeout(),
+						NormalizeError,
 					)
 					if derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
@@ -874,12 +874,12 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			// Starting from here, delete host if exiting with error
 			defer func() {
 				if xerr != nil {
-					derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+					derr := stacks.RetryableRemoteCall(
 						func() error {
 							err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							return NormalizeError(err)
 						},
-						temporal.GetCommunicationTimeout(),
+						NormalizeError,
 					)
 					if derr != nil {
 						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
@@ -962,14 +962,14 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
 		var ip *floatingips.FloatingIP
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() (innerErr error) {
 				ip, innerErr = floatingips.Create(s.ComputeClient, floatingips.CreateOpts{
 					Pool: s.authOpts.FloatingIPPool,
 				}).Extract()
 				return NormalizeError(innerErr)
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			return nullAHF, nullUDC, xerr
@@ -979,12 +979,12 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		defer func() {
 			if xerr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				derr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+				derr := stacks.RetryableRemoteCall(
 					func() (innerErr error) {
 						innerErr = floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 						return NormalizeError(innerErr)
 					},
-					temporal.GetCommunicationTimeout(),
+					NormalizeError,
 				)
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
@@ -994,14 +994,14 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		}()
 
 		// Associate floating IP to host
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() (innerErr error) {
 				innerErr = floatingips.AssociateInstance(s.ComputeClient, newHost.Core.ID, floatingips.AssociateOpts{
 					FloatingIP: ip.IP,
 				}).ExtractErr()
 				return NormalizeError(innerErr)
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			return nullAHF, nullUDC, xerr
@@ -1143,25 +1143,25 @@ func (s Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr f
 	return nil
 }
 
-// updateSecurityGroupOfExternalPort ...
-func (s Stack) updateSecurityGroupOfExternalPort(ahc *abstract.HostCore, sgs []string) fail.Error {
-	list, xerr := s.listPorts(ports.ListOpts{
-		DeviceID: ahc.ID,
-	})
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to list ports attached to host")
-	}
-	for _, v := range list {
-		if v.NetworkID == s.ProviderNetworkID {
-			xerr = s.updatePort(v.ID, ports.UpdateOpts{SecurityGroups: &sgs})
-			if xerr != nil {
-				return fail.Wrap(xerr, "failed to update Security Groups of port from Networking '%s'", s.cfgOpts.ProviderNetwork)
-			}
-			break
-		}
-	}
-	return nil
-}
+// // updateSecurityGroupOfExternalPort ...
+// func (s Stack) updateSecurityGroupOfExternalPort(ahc *abstract.HostCore, sgs []string) fail.Error {
+// 	list, xerr := s.listPorts(ports.ListOpts{
+// 		DeviceID: ahc.ID,
+// 	})
+// 	if xerr != nil {
+// 		return fail.Wrap(xerr, "failed to list ports attached to host")
+// 	}
+// 	for _, v := range list {
+// 		if v.NetworkID == s.ProviderNetworkID {
+// 			xerr = s.updatePort(v.ID, ports.UpdateOpts{SecurityGroups: &sgs})
+// 			if xerr != nil {
+// 				return fail.Wrap(xerr, "failed to update Security Groups of port from Networking '%s'", s.cfgOpts.ProviderNetwork)
+// 			}
+// 			break
+// 		}
+// 	}
+// 	return nil
+// }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
 func (s Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
@@ -1181,12 +1181,12 @@ func (s Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 		allPages   pagination.Page
 		allServers []ServerWithAZ
 	)
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = servers.List(s.ComputeClient, nil).AllPages()
 			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return "", xerr
@@ -1268,12 +1268,12 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			innerXErr := stacks.RetryableRemoteCall(
 				func() (innerErr error) {
 					server, innerErr = servers.Get(s.ComputeClient, ahf.Core.ID).Extract()
-					return NormalizeError(innerErr)
+					return innerErr
 				},
-				temporal.GetCommunicationTimeout(),
+				NormalizeError,
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1367,7 +1367,7 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	hostList := abstract.HostList{}
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := servers.ExtractServers(page)
@@ -1392,9 +1392,9 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	return hostList, xerr
 }
@@ -1403,7 +1403,7 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 // By convention only one floating IP is allocated to an host
 func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := floatingips.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := floatingips.ExtractFloatingIPs(page)
@@ -1419,9 +1419,9 @@ func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -1485,11 +1485,11 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
 			// 1st, send delete host order
-			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
-					return NormalizeError(servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr())
+					return servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr()
 				},
-				temporal.GetCommunicationTimeout(),
+				NormalizeError,
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1507,18 +1507,18 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// If check fails and error is not 'not found', retry
 			innerXErr = retry.WhileUnsuccessfulDelay5Seconds(
 				func() error {
-					commErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+					commErr := stacks.RetryableRemoteCall(
 						func() error {
 							host, err := servers.Get(s.ComputeClient, ahf.Core.ID).Extract()
 							if err == nil {
 								if toHostState(host.Status) == hoststate.ERROR {
 									return nil
 								}
-								return fail.NotAvailableError("host '%s' state is '%s'", host.Name, host.Status)
+								return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
 							}
-							return NormalizeError(err)
+							return err
 						},
-						temporal.GetCommunicationTimeout(),
+						NormalizeError,
 					)
 					switch commErr.(type) {
 					case *fail.ErrNotFound:
@@ -1585,12 +1585,11 @@ func (s Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -1607,15 +1606,15 @@ func (s Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := servers.Reboot(s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
 			if innerErr != nil {
 				innerErr = servers.Reboot(s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
 			}
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -1631,12 +1630,11 @@ func (s Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -1673,7 +1671,7 @@ func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 		return xerr
 	}
 
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1682,12 +1680,11 @@ func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 		return xerr
 	}
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
 
@@ -1696,7 +1693,7 @@ func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1705,11 +1702,10 @@ func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		return xerr
 	}
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
-			return NormalizeError(innerErr)
+			return secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
