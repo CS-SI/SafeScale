@@ -26,13 +26,13 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -117,17 +117,18 @@ func (s Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 	switch s.versions["volume"] {
 	case "v1":
 		var vol *volumesv1.Volume
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		opts := volumesv1.CreateOpts{
+			AvailabilityZone: az,
+			Name:             request.Name,
+			Size:             request.Size,
+			VolumeType:       s.getVolumeType(request.Speed),
+		}
+		xerr = stacks.RetryableRemoteCall(
 			func() (innerErr error) {
-				vol, innerErr = volumesv1.Create(s.VolumeClient, volumesv1.CreateOpts{
-					AvailabilityZone: az,
-					Name:             request.Name,
-					Size:             request.Size,
-					VolumeType:       s.getVolumeType(request.Speed),
-				}).Extract()
-				return NormalizeError(innerErr)
+				vol, innerErr = volumesv1.Create(s.VolumeClient, opts).Extract()
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			break
@@ -144,18 +145,19 @@ func (s Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 			State: toVolumeState(vol.Status),
 		}
 	case "v2":
+		opts := volumesv2.CreateOpts{
+			AvailabilityZone: az,
+			Name:             request.Name,
+			Size:             request.Size,
+			VolumeType:       s.getVolumeType(request.Speed),
+		}
 		var vol *volumesv2.Volume
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() (innerErr error) {
-				vol, innerErr = volumesv2.Create(s.VolumeClient, volumesv2.CreateOpts{
-					AvailabilityZone: az,
-					Name:             request.Name,
-					Size:             request.Size,
-					VolumeType:       s.getVolumeType(request.Speed),
-				}).Extract()
-				return NormalizeError(innerErr)
+				vol, innerErr = volumesv2.Create(s.VolumeClient, opts).Extract()
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			break
@@ -194,12 +196,12 @@ func (s Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var vol *volumesv2.Volume
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			vol, innerErr = volumesv2.Get(s.VolumeClient, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -230,8 +232,9 @@ func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "").WithStopwatch().Entering().Exiting()
 
 	var vs []abstract.Volume
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
+			vs = []abstract.Volume{} // If call fails, need to restart list from 0...
 			innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumesv2.ExtractVolumes(page)
 				if err != nil {
@@ -250,9 +253,9 @@ func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil || len(vs) == 0 {
 		return emptySlice, xerr
@@ -277,18 +280,16 @@ func (s Stack) DeleteVolume(id string) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	var (
-		timeout   = temporal.GetBigDelay()
-		commDelay = temporal.GetCommunicationTimeout()
+		timeout = temporal.GetBigDelay()
 	)
 
 	return retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			innerXErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
-					innerErr := volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
-					return NormalizeError(innerErr)
+					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
 				},
-				commDelay,
+				NormalizeError,
 			)
 			switch innerXErr.(type) {
 			case *fail.ErrInvalidRequest:
@@ -316,14 +317,14 @@ func (s Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			va, innerErr = volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
 				VolumeID: request.VolumeID,
 			}).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return "", xerr
@@ -347,12 +348,12 @@ func (s Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
 
 	var va *volumeattach.VolumeAttachment
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAVA, xerr
@@ -378,9 +379,10 @@ func (s Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []abstract.VolumeAttachment
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
+			vs = []abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
+			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumeattach.ExtractVolumeAttachments(page)
 				if err != nil {
 					return false, err
@@ -396,9 +398,8 @@ func (s Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 	if xerr != nil {
 		return emptySlice, xerr
@@ -420,11 +421,10 @@ func (s Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
-			return NormalizeError(innerErr)
+			return volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
 	)
 }
