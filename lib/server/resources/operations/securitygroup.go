@@ -91,13 +91,7 @@ func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (b
 		return false, xerr
 	}
 
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return rsg.Read(task, ref)
-		},
-		10*time.Second,
-	)
-	if xerr != nil {
+	if xerr = rsg.Read(task, ref); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *retry.ErrTimeout:
 			return false, nil
@@ -239,15 +233,21 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	}
 
 	// Check if securityGroup exists but is not managed by SafeScale
-	if _, xerr = svc.InspectSecurityGroup(name); xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+	asg := abstract.NewSecurityGroup()
+	asg.Name = name
+	asg.NetworkID = networkID
+	if _, xerr = svc.InspectSecurityGroup(asg); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		// continue
+		default:
 			return fail.Wrap(xerr, "failed to check if Security Group name '%s' is already used", name)
 		}
 	} else {
 		return fail.DuplicateError("a Security Group named '%s' already exists (but not managed by SafeScale)", name)
 	}
 
-	asg, xerr := svc.CreateSecurityGroup(networkID, name, description, rules)
+	asg, xerr = svc.CreateSecurityGroup(networkID, name, description, rules)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
 			return xerr
@@ -280,7 +280,6 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 		}
 	}()
 
-	// Outscale refuses to leave empty rules in Security Group
 	if len(rules) == 0 {
 		if xerr = sg.Clear(task); xerr != nil {
 			return xerr
@@ -548,8 +547,7 @@ func (sg *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		var innerXErr fail.Error
-		asg, innerXErr = sg.GetService().ClearSecurityGroup(asg)
+		_, innerXErr := sg.GetService().ClearSecurityGroup(asg)
 		return innerXErr
 	})
 }
@@ -853,7 +851,7 @@ func (sg *securityGroup) UnbindFromHostByReference(task concurrency.Task, hostRe
 			if b, ok = sgphV1.ByID[hostRef]; ok {
 				hostID = hostRef
 				hostName = b.Name
-			} else if hostID, _ = sgphV1.ByName[hostRef]; ok {
+			} else if hostID, ok = sgphV1.ByName[hostRef]; ok {
 				hostName = hostRef
 			}
 			if hostID != "" {
@@ -1038,7 +1036,7 @@ func (sg *securityGroup) UnbindFromSubnetByReference(task concurrency.Task, subn
 			if b, ok = sgsV1.ByID[subnetRef]; ok {
 				subnetID = subnetRef
 				subnetName = b.Name
-			} else if subnetID, _ = sgsV1.ByName[subnetRef]; ok {
+			} else if subnetID, ok = sgsV1.ByName[subnetRef]; ok {
 				subnetName = subnetRef
 			}
 			if subnetID != "" {

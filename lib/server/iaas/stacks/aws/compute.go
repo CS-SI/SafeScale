@@ -44,11 +44,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-type portDef struct {
-	protocol string
-	fromPort int64
-	toPort   int64
-}
+// type portDef struct {
+// 	protocol string
+// 	fromPort int64
+// 	toPort   int64
+// }
 
 // CreateKeyPair creates a keypair and upload it to AWS
 func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
@@ -703,7 +703,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// hostMustHavePublicIP := request.PublicIP
 	keyPairName := request.KeyPair.Name
 
-	if subnets == nil || len(subnets) == 0 {
+	if len(subnets) == 0 {
 		return nullAHF, nullUDC, fail.InvalidRequestError("the Host '%s' must be on at least one Subnet (even if public)", resourceName)
 	}
 

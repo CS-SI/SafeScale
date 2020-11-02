@@ -27,7 +27,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -55,12 +54,12 @@ type bucket struct {
 	// MountPoint string `json:"mountPoint,omitempty"`
 	// // NbItems    int    `json:"nbitems,omitempty"`
 
-	svc       iaas.Service
-	location  objectstorage.Location
-	container objectstorage.Bucket
+	svc iaas.Service
+	// location objectstorage.Location
+	// container objectstorage.Bucket
 }
 
-// NewObjectStorageBucket intanciaxxtes bucket struct
+// NewBucket intanciates bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
@@ -78,7 +77,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	return b, nil
 }
 
-// LoadBucket instanciantes a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
+// LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
 func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
 	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")

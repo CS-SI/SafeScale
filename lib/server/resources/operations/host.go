@@ -472,7 +472,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	if _, xerr = svc.InspectHostByName(hostReq.ResourceName); xerr != nil {
+	ahc := abstract.NewHostCore()
+	ahc.Name = hostReq.ResourceName
+	if _, xerr = svc.InspectHost(ahc); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -2625,12 +2627,12 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 	return shares, xerr
 }
 
-// Shares returns the information about the shares of the host
-// Intented to be used when objn is notoriously not nil (because previously checked)
-func (rh host) getShares(task concurrency.Task) *propertiesv1.HostShares {
-	shares, _ := rh.GetShares(task)
-	return shares
-}
+// // Shares returns the information about the shares of the host
+// // Intented to be used when objn is notoriously not nil (because previously checked)
+// func (rh host) getShares(task concurrency.Task) *propertiesv1.HostShares {
+// 	shares, _ := rh.GetShares(task)
+// 	return shares
+// }
 
 // GetMounts returns the information abouts the mounts of the host
 func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, xerr fail.Error) {

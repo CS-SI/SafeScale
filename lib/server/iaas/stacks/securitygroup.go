@@ -32,23 +32,29 @@ import (
 type SecurityGroupParameter interface{}
 
 // ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
-func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, _ fail.Error) {
+func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
 	asg = abstract.NewSecurityGroup()
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {
-			return asg, fail.InvalidParameterError("sgaram", "cannot be empty string")
+			return asg, "", fail.InvalidParameterError("sgaram", "cannot be empty string")
 		}
 		asg.ID = sgParam
+		sgLabel = asg.ID
 	case *abstract.SecurityGroup:
 		if sgParam.IsNull() {
-			return asg, fail.InvalidParameterError("sgParam", "cannot be *abstract.ScurityGroup null value")
+			return asg, "", fail.InvalidParameterError("sgParam", "cannot be *abstract.ScurityGroup null value")
 		}
 		asg = sgParam
+		if asg.Name != "" {
+			sgLabel = "'" + asg.Name + "'"
+		} else {
+			sgLabel = asg.ID
+		}
 	default:
-		return asg, fail.InvalidParameterError("sgParam", "valid types are non-empty string or *abstract.SecurityGroup")
+		return asg, "", fail.InvalidParameterError("sgParam", "valid types are non-empty string or *abstract.SecurityGroup")
 	}
-	return asg, nil
+	return asg, sgLabel, nil
 }
 
 // DefaultTCPRules creates TCP rules to configure the default security group for public hosts

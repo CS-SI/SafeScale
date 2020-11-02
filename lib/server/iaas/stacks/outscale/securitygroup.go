@@ -121,7 +121,7 @@ func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -144,12 +144,12 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
@@ -170,7 +170,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -181,7 +181,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		}
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
@@ -210,7 +210,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}
@@ -221,7 +221,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		}
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if rule.EtherType == ipversion.IPv6 {
@@ -286,7 +286,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -297,7 +297,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		}
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s, %s)", asg.ID, rule.Description).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s, %s)", sgLabel, rule.Description).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// IPv6 not supported at Outscale (?)
