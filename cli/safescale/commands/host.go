@@ -54,7 +54,7 @@ var HostCommand = &cli.Command{
 		hostAddFeatureCommand,    // Legacy, will be deprecated
 		hostRemoveFeatureCommand, // Legacy, will be deprecated
 		hostListFeaturesCommand,  // Legacy, will be deprecated
-		hostSecurityGroupCommands,
+		hostSecurityCommands,
 		hostFeatureCommands,
 	},
 }

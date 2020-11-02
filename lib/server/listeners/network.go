@@ -24,6 +24,8 @@ import (
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
+	"github.com/asaskevich/govalidator"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
@@ -33,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/asaskevich/govalidator"
 )
 
 const (
@@ -182,11 +183,6 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	if xerr != nil {
 		return nil, xerr
 	}
-	var networks []*abstract.Network
-	xerr = rn.Browse(task, func(an *abstract.Network) fail.Error {
-		networks = append(networks, an)
-		return nil
-	})
 
 	// Build response mapping abstract.Network to protocol.Network
 	var pbnetworks []*protocol.Network
@@ -276,6 +272,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	}
 	defer job.Close()
 	task := job.GetTask()
+	svc := job.GetService()
 
 	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()

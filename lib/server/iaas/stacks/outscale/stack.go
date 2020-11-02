@@ -227,7 +227,7 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 
 // ListAvailabilityZones returns availability zone in a set
 func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
-	emptyMap := make(map[string]bool, 0)
+	emptyMap := make(map[string]bool)
 	if s.IsNull() {
 		return emptyMap, fail.InvalidInstanceError()
 	}
