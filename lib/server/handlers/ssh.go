@@ -132,26 +132,26 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
+				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				var innerXErr fail.Error
-				if hostNetworkV2.DefaultSubnetID != "" {
-					rs, innerXErr = subnetfactory.Load(task, svc, "", hostNetworkV2.DefaultSubnetID)
+				if hnV2.DefaultSubnetID != "" {
+					rs, innerXErr = subnetfactory.Load(task, svc, "", hnV2.DefaultSubnetID)
 					return innerXErr
 				}
 				return nil
 			})
 		}
 		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
+			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostSubnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			if hostNetworkV2.DefaultSubnetID != "" {
+			if hnV2.DefaultSubnetID != "" {
 				var innerXErr fail.Error
-				rs, innerXErr = subnetfactory.Load(task, svc, "", hostNetworkV2.DefaultSubnetID)
+				rs, innerXErr = subnetfactory.Load(task, svc, "", hnV2.DefaultSubnetID)
 				if innerXErr != nil {
 					return innerXErr
 				}

@@ -22,11 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"reflect"
-
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -52,7 +48,8 @@ type SubnetListener struct{}
 // Create a new subnet
 func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot create subnet")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot create Subnet")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -81,8 +78,9 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 	defer job.Close()
-
 	task := job.GetTask()
+	svc := job.GetService()
+
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -106,33 +104,15 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
-	rn, xerr := networkfactory.Load(task, job.GetService(), networkRef)
-	if xerr != nil {
-		return nil, xerr
-	}
-	var dnsServers []string
-	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		an, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, %s' provided", reflect.TypeOf(clonable).String())
-		}
-		dnsServers = an.DNSServers
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	req := abstract.SubnetRequest{
-		Network:       networkRef,
+		NetworkID:     networkRef,
 		Name:          in.GetName(),
 		CIDR:          in.GetCidr(),
-		DNSServers:    dnsServers,
 		Domain:        in.GetDomain(),
 		HA:            in.GetFailOver(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}
-	rs, xerr := subnetfactory.New(job.GetService())
+	rs, xerr := subnetfactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -147,7 +127,8 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 // List existing networks
 func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list subnets")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot list Subnets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -202,10 +183,10 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		return nil, xerr
 	}
 
-	// Build response mapping abstract.Network to protocol.Network
+	// Build response mapping abstract.Networking to protocol.Networking
 	var pbList []*protocol.Subnet
 	for _, subnet := range list {
-		//if networkID == "" || subnet.Network == networkID {
+		//if networkID == "" || subnet.Networking == networkID {
 		pbList = append(pbList, converters.SubnetFromAbstractToProtocol(subnet))
 		//}
 	}
@@ -216,7 +197,9 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 // Inspect returns infos on a subnet
 func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspectRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot inspect Subnet")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -231,7 +214,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -262,7 +245,8 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 // Delete a/many subnet/s
 func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot delete Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -301,34 +285,28 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewSubnetHandler(job)
-	//_, xerr = job.GetTask().Run(
-	//	func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	//		return nil, handler.Delete(networkRef, subnetRef)
-	//	},
-	//	nil,
-	//)
-	//if xerr != nil {
-	//	return empty, xerr
-	//}
-
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
+	var rs resources.Subnet
+	if rs, xerr = subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
+		xerr = rs.Delete(task)
+	}
 	if xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider a Subnet not found as a successful deletion
+		default:
+			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		}
 	}
-	if xerr = rs.Delete(task); xerr != nil {
 
-		return empty, xerr
-	}
-
-	//tracer.Trace("Subnet '%s' successfully deleted.", subnetRefLabel)
+	logrus.Infof("Subnet %s successfully deleted.", subnetRefLabel)
 	return empty, nil
 }
 
 // BindSecurityGroup attaches a Security Group to a hostnetwork
 func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -396,7 +374,8 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 // UnbindSecurityGroup detaches a Security Group from a subnet
 func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -416,7 +395,7 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
-		return empty, fail.InvalidRequestError("neither name nor id given as reference of Network")
+		return empty, fail.InvalidRequestError("neither name nor id given as reference of Networking")
 	}
 
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
@@ -441,16 +420,22 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
-	if xerr != nil {
-		return empty, xerr
-	}
 	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.UnbindSecurityGroup(task, sg); xerr != nil {
-		return empty, xerr
+
+	if rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
+		xerr = rs.UnbindSecurityGroup(task, sg)
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
+			xerr = sg.UnbindFromSubnetByReference(task, subnetRef)
+		default:
+			return empty, xerr
+		}
 	}
 	return empty, nil
 }
@@ -458,7 +443,8 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 // EnableSecurityGroup applies the rules of a bound security group on a network
 func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot enable Security Group of Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -517,7 +503,8 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 // DisableSecurityGroup detaches a Security Group from a subnet
 func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot disable security group on network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot disable Security Group of Subnet")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -576,7 +563,8 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 // ListSecurityGroups lists the Security Group bound to subnet
 func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.SecurityGroupSubnetBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	//defer fail.OnExitWrapError(&err, "cannot list security groups bound to network")
+	defer fail.OnExitLogError(&err)
+	defer fail.OnExitWrapError(&err, "cannot list Security Groups bound to Subnet")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()

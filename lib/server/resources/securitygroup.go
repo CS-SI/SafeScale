@@ -49,20 +49,22 @@ type SecurityGroup interface {
 	data.NullValue
 	data.Identifiable
 
-	AddRule(concurrency.Task, abstract.SecurityGroupRule) fail.Error                                                   // returns true if the host is member of a cluster
-	BindToHost(concurrency.Task, Host, SecurityGroupActivation, SecurityGroupMark) fail.Error                          // binds a security group to a host
-	BindToSubnet(concurrency.Task, Subnet, SecurityGroupActivation, SecurityGroupMark) fail.Error                      // binds a security group to a network
-	Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                        // browses the metadata folder of Security Groups and call the callback on each entry
-	CheckConsistency(concurrency.Task) fail.Error                                                                      // tells if the security group described exists on Provider side with exact same parameters
-	Clear(concurrency.Task) fail.Error                                                                                 // removes rules from the security group
-	Create(task concurrency.Task, rn Network, name, description string, rules []abstract.SecurityGroupRule) fail.Error // creates a new host and its metadata
-	DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error                                      // deletes a rule from a Security Group
-	GetBoundHosts(concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                    // returns a slice of bonds corresponding to hosts bound to the security group
-	GetBoundSubnets(concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                  // returns a slice of bonds corresponding to networks bound to the security group
-	ForceDelete(task concurrency.Task) fail.Error                                                                      // deletes a security group unconditionally
-	Reset(concurrency.Task) fail.Error                                                                                 // resets the rules of the security group from the ones registered in metadata
-	ToProtocol(concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                                         // converts a SecurityGroup to equivalent gRPC message
-	UnbindFromHost(concurrency.Task, Host) fail.Error                                                                  // unbinds a security group from host
-	UnbindFromSubnet(concurrency.Task, Subnet) fail.Error                                                              // unbinds a security group from network
+	AddRule(concurrency.Task, abstract.SecurityGroupRule) fail.Error                                                  // returns true if the host is member of a cluster
+	BindToHost(concurrency.Task, Host, SecurityGroupActivation, SecurityGroupMark) fail.Error                         // binds a security group to a host
+	BindToSubnet(concurrency.Task, Subnet, SecurityGroupActivation, SecurityGroupMark) fail.Error                     // binds a security group to a network
+	Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                       // browses the metadata folder of Security Groups and call the callback on each entry
+	CheckConsistency(concurrency.Task) fail.Error                                                                     // tells if the security group described exists on Provider side with exact same parameters
+	Clear(concurrency.Task) fail.Error                                                                                // removes rules from the security group
+	Create(task concurrency.Task, networkID, name, description string, rules []abstract.SecurityGroupRule) fail.Error // creates a new host and its metadata
+	DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error                                     // deletes a rule from a Security Group
+	GetBoundHosts(concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                   // returns a slice of bonds corresponding to hosts bound to the security group
+	GetBoundSubnets(concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                 // returns a slice of bonds corresponding to networks bound to the security group
+	ForceDelete(task concurrency.Task) fail.Error                                                                     // deletes a security group unconditionally
+	Reset(concurrency.Task) fail.Error                                                                                // resets the rules of the security group from the ones registered in metadata
+	ToProtocol(concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error)                                        // converts a SecurityGroup to equivalent gRPC message
+	UnbindFromHost(concurrency.Task, Host) fail.Error                                                                 // unbinds a Security Group from Host
+	UnbindFromHostByReference(concurrency.Task, string) fail.Error                                                    // unbinds a Security Group from Host
+	UnbindFromSubnet(concurrency.Task, Subnet) fail.Error                                                             // unbinds a Security Group from Subnet
+	UnbindFromSubnetByReference(concurrency.Task, string) fail.Error                                                  // unbinds a Security group from a Subnet identified by reference (ID or name)
 	//Delete(task concurrency.Task) fail.Error // Delete already defined in Metadata...
 }

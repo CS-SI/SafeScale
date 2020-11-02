@@ -30,13 +30,13 @@ type HostNetwork struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
 	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the Default getGateway
 	DefaultGatewayPrivateIP string            `json:"default_gateway_private_ip,omitempty"` // DEPRECATED: contains the private IP of the default gateway
-	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Network
+	DefaultNetworkID        string            `json:"default_network_id,omitempty"`         // contains the ID of the default Networking
 	NetworksByID            map[string]string `json:"networks_by_id,omitempty"`             // contains the name of each network bound to the host (indexed by ID)
 	NetworksByName          map[string]string `json:"networks_by_name,omitempty"`           // contains the ID of each network bound to the host (indexed by GetName)
 	PublicIPv4              string            `json:"public_ip_v4,omitempty"`               // contains the public IPv4 address of the host
 	PublicIPv6              string            `json:"public_ip_v6,omitempty"`               // contains the public IPv6 address of the host
-	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"`             // contains ipv4 (indexed by Network ID) allocated to the host
-	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"`             // contains ipv6 (indexed by Network ID) allocated to the host
+	IPv4Addresses           map[string]string `json:"ipv4_addresses,omitempty"`             // contains ipv4 (indexed by Networking ID) allocated to the host
+	IPv6Addresses           map[string]string `json:"ipv6_addresses,omitempty"`             // contains ipv6 (indexed by Networking ID) allocated to the host
 }
 
 // NewHostNetwork ...
@@ -61,13 +61,18 @@ func (hn *HostNetwork) Reset() {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hn *HostNetwork) Clone() data.Clonable {
-	return NewHostNetwork().Replace(hn)
+func (hn HostNetwork) Clone() data.Clonable {
+	return NewHostNetwork().Replace(&hn)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hn == nil || p == nil {
+		return hn
+	}
+
 	src := p.(*HostNetwork)
 	*hn = *src
 	hn.NetworksByID = make(map[string]string, len(src.NetworksByID))

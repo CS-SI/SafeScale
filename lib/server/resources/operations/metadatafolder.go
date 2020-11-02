@@ -134,7 +134,7 @@ func (f folder) Search(path string, name string) fail.Error {
 			return nil
 		}
 	}
-	return fail.NotFoundError("failed to find '%s'", fullPath)
+	return fail.NotFoundError("failed to find metadata '%s'", fullPath)
 }
 
 // Delete removes metadata passed as parameter

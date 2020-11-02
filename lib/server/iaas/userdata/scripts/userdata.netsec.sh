@@ -657,6 +657,7 @@ EOF
 
     sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 207
     sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 208
+    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config || sfFail 209
     systemctl restart sshd
 
     echo done
@@ -762,7 +763,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -q -y systemd pciutils || fail 209
+            sfApt install -q -y systemd pciutils || fail 210
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -776,9 +777,9 @@ EOF
             sfApt update
             # Force update of systemd, pciutils and netplan
             if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-                sfApt install -y systemd pciutils netplan.io || fail 210
+                sfApt install -y systemd pciutils netplan.io || fail 211
             else
-                sfApt install -y systemd pciutils || fail 211
+                sfApt install -y systemd pciutils || fail 212
             fi
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
@@ -792,7 +793,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -q -y systemd pciutils yum-utils || fail 212
+            yum install -q -y systemd pciutils yum-utils || fail 213
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -806,14 +807,14 @@ EOF
 install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
-            sfApt install -y -qq jq zip time zip &>/dev/null || fail 213
+            sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
             ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 214
+            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
             ;;
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 215
+            fail 216
             ;;
      esac
 }
@@ -876,7 +877,7 @@ configure_network
 
 install_packages
 
-update_kernel_settings || fail 216
+update_kernel_settings || fail 217
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 

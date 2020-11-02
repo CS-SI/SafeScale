@@ -40,11 +40,6 @@ const (
 	defaultCIDR = "192.168.0.0/23"
 )
 
-// safescale network create net1 --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
-// safescale network list
-// safescale network delete net1
-// safescale network inspect net1
-
 // NetworkListener network service server grpc
 type NetworkListener struct{}
 
@@ -86,29 +81,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	tracer := debug.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-	//var (
-	//	sizing *abstract.HostSizingRequirements
-	//)
-	//if in.Gateway != nil {
-	//	if in.Gateway.SizingAsString != "" {
-	//		sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.Gateway.SizingAsString)
-	//		if xerr != nil {
-	//			return nil, xerr
-	//		}
-	//	} else if in.Gateway.Sizing != nil {
-	//		sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.Gateway.Sizing)
-	//	}
-	//}
-	//if sizing == nil {
-	//	sizing = &abstract.HostSizingRequirements{MinGPU: -1}
-	//}
-	//sizing.Image = in.Gateway.GetImageId()
-
-	//handler := handlers.NewNetworkHandler(job)
-	//network, xerr := handler.Create(networkName, in.GetCidr(), in.GetDnsServers(), in.KeepOnFailure)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
 
 	cidr := in.GetCidr()
 	if cidr == "" {
@@ -152,7 +124,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			return nil, xerr
 		}
 		req := abstract.SubnetRequest{
-			Network:       rn.GetID(),
+			NetworkID:     rn.GetID(),
 			Name:          in.GetName(),
 			CIDR:          subnetNet.String(),
 			KeepOnFailure: in.GetKeepOnFailure(),
@@ -201,13 +173,12 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewNetworkHandler(job)
-	//networks, err := handler.List(in.GetAll())
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	networks, xerr := networkfactory.List(task, svc)
+	var list []*abstract.Network
+	if in.GetAll() {
+		list, xerr = svc.ListNetworks()
+	} else {
+		list, xerr = networkfactory.List(task, svc)
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -219,8 +190,8 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 
 	// Build response mapping abstract.Network to protocol.Network
 	var pbnetworks []*protocol.Network
-	for _, network := range networks {
-		pbnetworks = append(pbnetworks, converters.NetworkFromAbstractToProtocol(network))
+	for _, v := range list {
+		pbnetworks = append(pbnetworks, converters.NetworkFromAbstractToProtocol(v))
 	}
 	rv := &protocol.NetworkList{Networks: pbnetworks}
 	return rv, nil
@@ -310,13 +281,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//handler := handlers.NewNetworkHandler(job)
-	//_, xerr = job.GetTask().Run(
-	//	func(_ concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	//		return nil, handler.Delete(ref)
-	//	},
-	//	nil,
-	//)
 	rn, xerr := networkfactory.Load(task, svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {

@@ -45,12 +45,17 @@ func (sd *SubnetDescription) Content() interface{} {
 }
 
 // Clone ... (data.Clonable interface)
-func (sd *SubnetDescription) Clone() data.Clonable {
-	return NewNetworkDescription().Replace(sd)
+func (sd SubnetDescription) Clone() data.Clonable {
+	return NewNetworkDescription().Replace(&sd)
 }
 
 // Replace ... (data.Clonable interface)
 func (sd *SubnetDescription) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if sd == nil || p == nil {
+		return sd
+	}
+
 	*sd = *p.(*SubnetDescription)
 	return sd
 }

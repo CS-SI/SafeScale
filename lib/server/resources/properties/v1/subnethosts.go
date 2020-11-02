@@ -50,12 +50,17 @@ func (sh *SubnetHosts) Content() interface{} {
 }
 
 // Clone ... (data.Clonable interface)
-func (sh *SubnetHosts) Clone() data.Clonable {
-	return NewSubnetHosts().Replace(sh)
+func (sh SubnetHosts) Clone() data.Clonable {
+	return NewSubnetHosts().Replace(&sh)
 }
 
 // Replace ... (data.Clonable interface)
 func (sh *SubnetHosts) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if sh == nil || p == nil {
+		return sh
+	}
+
 	src := p.(*SubnetHosts)
 	sh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {

@@ -748,7 +748,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 
 // VPL: has to disappear
 // // CreateGateway creates a public Gateway for a private network
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, err error) {
+// func (s *stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, err error) {
 //	logrus.Debug("vclouddirector.Client.CreateGateway() called")
 //	defer logrus.Debug("vclouddirector.Client.CreateGateway() done")
 //
@@ -756,12 +756,12 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //		return nil, nil, fail.InvalidInstanceError()
 //	}
 //
-//	if req.Network == nil {
-//		return nil, nil, fail.InvalidParameterError("req.Network", "cannot be nil")
+//	if req.Networking == nil {
+//		return nil, nil, fail.InvalidParameterError("req.Networking", "cannot be nil")
 //	}
 //	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
 //	if gwname == "" {
-//		gwname = "gw-" + req.Network.Name
+//		gwname = "gw-" + req.Networking.Name
 //	}
 //
 //	hostReq := abstract.HostRequest{
@@ -770,7 +770,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //		HostName:     req.Name,
 //		ResourceName: gwname,
 //		TemplateID:   req.TemplateID,
-//		Networks:     []*abstract.Network{req.Network},
+//		Networks:     []*abstract.Networking{req.Networking},
 //		PublicIP:     true,
 //	}
 //	if sizing != nil && sizing.MinDiskSize > 0 {
@@ -800,7 +800,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 // }
 //
 // // DeleteGateway delete the public gateway referenced by ref (id or name)
-// func (s *Stack) DeleteGateway(ref string) error {
+// func (s *stack) DeleteGateway(ref string) error {
 //	if s == nil {
 //		return fail.InvalidInstanceError()
 //	}

@@ -46,12 +46,17 @@ func (vd *VolumeDescription) Content() interface{} {
 }
 
 // Clone ...
-func (vd *VolumeDescription) Clone() data.Clonable {
-	return NewVolumeDescription().Replace(vd)
+func (vd VolumeDescription) Clone() data.Clonable {
+	return NewVolumeDescription().Replace(&vd)
 }
 
 // Replace ...
 func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if vd == nil || p == nil {
+		return vd
+	}
+
 	*vd = *p.(*VolumeDescription)
 	return vd
 }
@@ -85,12 +90,17 @@ func (va *VolumeAttachments) Content() interface{} {
 }
 
 // Clone ... (data.Clonable interface)
-func (va *VolumeAttachments) Clone() data.Clonable {
-	return NewVolumeAttachments().Replace(va)
+func (va VolumeAttachments) Clone() data.Clonable {
+	return NewVolumeAttachments().Replace(&va)
 }
 
 // Replace ... (data.Clonable interface)
 func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if va == nil || p == nil {
+		return va
+	}
+
 	src := p.(*VolumeAttachments)
 	*va = *src
 	va.Hosts = make(map[string]string, len(src.Hosts))

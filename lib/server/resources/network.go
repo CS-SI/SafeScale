@@ -35,10 +35,4 @@ type Network interface {
 	Create(task concurrency.Task, req abstract.NetworkRequest) fail.Error                 // creates a network
 	InspectSubnet(task concurrency.Task, subnetRef string) (Subnet, fail.Error)           // returns the Subnet instance corresponding to subnet reference (ID or name) provided
 	ToProtocol(task concurrency.Task) (*protocol.Network, fail.Error)                     // converts the network to protobuf message
-
-	//BindSecurityGroup(task concurrency.Task, sg SecurityGroup, disabled bool) fail.Error                                            // binds a security group to the network
-	//DisableSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                               // disables a binded security group on host
-	//EnableSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                // enables a binded security group on host
-	//ListSecurityGroups(task concurrency.Task, kind string) ([]*propertiesv1.SecurityGroupBond, fail.Error) // lists the security groups bound to the network
-	//UnbindSecurityGroup(task concurrency.Task, sg SecurityGroup) fail.Error                                // unbinds a security group from the network
 }

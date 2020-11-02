@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -203,16 +202,12 @@ func (handler *hostHandler) Create(
 		if len(req.Subnets) > 0 {
 			subnetName = req.Subnets[0].Name
 		} else {
-			return nil, fail.InvalidParameterError("req.Networks", "must contain at least on network if req.getPublicIP is false")
+			return nil, fail.InvalidParameterError("req.Subnets", "must contain at least one Subnet if req.PublicIP is false")
 		}
 	} else {
 		subnetName = abstract.SingleHostNetworkName
 	}
-	tracer := debug.NewTracer(
-		task,
-		tracing.ShouldTrace("handlers.host"),
-		"('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, subnetName, req.ImageID, req.PublicIP, force,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, subnetName, req.ImageID, req.PublicIP, force).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
@@ -241,20 +236,21 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.E
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	if all {
-		return handler.job.GetService().ListHosts(true)
-	}
-
-	objh, xerr := hostfactory.New(handler.job.GetService())
-	if xerr != nil {
-		return nil, xerr
-	}
-	hosts = abstract.HostList{}
-	xerr = objh.Browse(task, func(ahc *abstract.HostCore) fail.Error {
-		hosts = append(hosts, converters.HostCoreToHostFull(*ahc))
-		return nil
-	})
-	return hosts, xerr
+	return hostfactory.List(task, handler.job.GetService(), all)
+	//if all {
+	//	return handler.job.GetService().ListHosts(true)
+	//}
+	//
+	//objh, xerr := hostfactory.New(handler.job.GetService())
+	//if xerr != nil {
+	//	return nil, xerr
+	//}
+	//hosts = abstract.HostList{}
+	//xerr = objh.Browse(task, func(ahc *abstract.HostCore) fail.Error {
+	//	hosts = append(hosts, converters.HostCoreToHostFull(*ahc))
+	//	return nil
+	//})
+	//return hosts, xerr
 }
 
 // Inspect returns the host identified by ref, ref can be the name or the id

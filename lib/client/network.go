@@ -26,7 +26,7 @@ import (
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
-// network is the part of safescale client handling Network
+// network is the part of safescale client handling Networking
 type network struct {
 	// session is not used currently
 	session *Session

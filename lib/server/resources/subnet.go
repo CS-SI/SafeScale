@@ -43,6 +43,7 @@ type Subnet interface {
 	GetGateway(task concurrency.Task, primary bool) (Host, fail.Error)                                                             // returns the gateway related to subnet
 	GetDefaultRouteIP(concurrency.Task) (string, fail.Error)                                                                       // returns the IP of the default route of the subnet
 	GetEndpointIP(concurrency.Task) (string, fail.Error)                                                                           // returns the IP address corresponding to the default route
+	GetNetwork(concurrency.Task) (Network, fail.Error)                                                                             // returns the parent Network of the Subnet
 	GetState(concurrency.Task) (subnetstate.Enum, fail.Error)                                                                      // gives the current state of the subnet
 	HasVirtualIP(concurrency.Task) bool                                                                                            // tells if the subnet is using a VIP a default route
 	InspectNetwork(concurrency.Task) (Network, fail.Error)                                                                         // returns the instance of the parent Network of the Subnet

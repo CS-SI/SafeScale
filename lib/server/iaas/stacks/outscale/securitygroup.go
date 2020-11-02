@@ -17,36 +17,34 @@
 package outscale
 
 import (
+	"github.com/outscale/osc-sdk-go/osc"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/antihax/optional"
-	"github.com/outscale/osc-sdk-go/osc"
 )
 
 // ListSecurityGroups lists existing security groups
-func (s Stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGroup, xerr fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGroup, xerr fail.Error) {
 	list = []*abstract.SecurityGroup{}
+	if s.IsNull() {
+		return list, fail.InvalidInstanceError()
+	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{}
-	resp, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	groups, xerr := s.rpcReadSecurityGroups(networkID, nil)
+	if xerr != nil {
+		return list, xerr
 	}
 
-	list = make([]*abstract.SecurityGroup, 0, len(resp.SecurityGroups))
-	for _, v := range resp.SecurityGroups {
+	list = make([]*abstract.SecurityGroup, 0, len(groups))
+	for _, v := range groups {
 		if networkID == "" || v.NetId == networkID {
 			asg := toAbstractSecurityGroup(v)
 			list = append(list, asg)
@@ -56,7 +54,8 @@ func (s Stack) ListSecurityGroups(networkID string) (list []*abstract.SecurityGr
 }
 
 func toAbstractSecurityGroup(in osc.SecurityGroup) *abstract.SecurityGroup {
-	out := abstract.NewSecurityGroup(in.SecurityGroupName)
+	out := abstract.NewSecurityGroup()
+	out.Name = in.SecurityGroupName
 	out.ID = in.SecurityGroupId
 	out.Description = in.Description
 	out.Rules = make([]abstract.SecurityGroupRule, 0, len(in.InboundRules)+len(in.OutboundRules))
@@ -80,36 +79,12 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 	return out
 }
 
-//// listSecurityGroupIDs lists the ids of the security group bound to Network
-//func (s Stack) listSecurityGroupIDs(networkID string) (list []string, xerr fail.Error) {
-//    list = []string{}
-//
-//    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
-//    defer tracer.Exiting()
-//
-//    readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{}
-//    resp, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-//        ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-//    })
-//    if err != nil {
-//        return nil, normalizeError(err)
-//    }
-//
-//    list = make([]string, 0, len(resp.SecurityGroups))
-//    for _, v := range resp.SecurityGroups {
-//        if networkID == "" || v.NetId == networkID {
-//            list = append(list, v.SecurityGroupId)
-//        }
-//    }
-//    return list, nil
-//}
-
 // CreateSecurityGroup creates a security group
-// Note: parameter 'networkRef' is not used in Outscale, Security Groups scope is tenant-wide.
-func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) CreateSecurityGroup(networkID, name, description string, rules []abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+	nullASG := abstract.NewSecurityGroup()
+	if s.IsNull() {
+		return nullASG, fail.InvalidInstanceError()
+	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -117,28 +92,20 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	createSecurityGroupRequest := osc.CreateSecurityGroupRequest{
-		Description:       description,
-		SecurityGroupName: name,
+	resp, xerr := s.rpcCreateSecurityGroup(networkID, name, description)
+	if xerr != nil {
+		return nullASG, xerr
 	}
-	resp, _, err := s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &osc.CreateSecurityGroupOpts{
-		CreateSecurityGroupRequest: optional.NewInterface(createSecurityGroupRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-
-	asg = toAbstractSecurityGroup(resp.SecurityGroup)
 
 	defer func() {
 		if xerr != nil {
-			derr := s.DeleteSecurityGroup(asg.ID)
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", asg.Name))
+			if derr := s.rpcDeleteSecurityGroup(resp.SecurityGroupId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()
 
+	asg = toAbstractSecurityGroup(resp)
 	for k, v := range rules {
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
@@ -150,10 +117,10 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules [
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
-	// if s == nil {
-	//     return fail.InvalidInstanceError()
-	// }
+func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
@@ -168,65 +135,41 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	deleteSecurityGroupRequest := osc.DeleteSecurityGroupRequest{
-		SecurityGroupId: asg.ID,
-	}
-	_, _, err := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &osc.DeleteSecurityGroupOpts{
-		DeleteSecurityGroupRequest: optional.NewInterface(deleteSecurityGroupRequest),
-	})
-	return normalizeError(err)
+	return s.rpcDeleteSecurityGroup(asg.ID)
 }
 
 // InspectSecurityGroup returns information about a security group
-func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	nullASG := abstract.NewSecurityGroup()
+	if s.IsNull() {
+		return nullASG, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nil, xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
+		return nullASG, xerr
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
-		Filters: osc.FiltersSecurityGroup{
-			SecurityGroupIds: []string{asg.ID},
-		},
-	}
-	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	sgs := res.SecurityGroups
-	if len(sgs) == 0 {
-		return nil, fail.NotFoundError("failed to find a Security Group with ID '%s'", asg.ID)
-	}
-	if len(sgs) > 1 {
-		return nil, fail.InconsistentError("found more than one Security Group with ID '%s'", asg.ID)
+	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	sg := res.SecurityGroups[0]
-	out := abstract.NewSecurityGroup(sg.SecurityGroupName)
+	out := abstract.NewSecurityGroup()
+	out.Name = group.SecurityGroupName
 	out.ID = asg.ID
-	out.Description = sg.Description
+	out.Description = group.Description
 	return out, nil
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nullAsg, fail.InvalidInstanceError()
-	// }
+func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	nullASG := abstract.NewSecurityGroup()
+	if s.IsNull() {
+		return nullASG, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
@@ -241,37 +184,35 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
-		SecurityGroupId: asg.ID,
-		//Rules:           sg.InboundRules,
-		Flow: "Inbound",
-	}
-	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
+	if xerr != nil {
+		return asg, xerr
 	}
 
-	deleteSecurityGroupRuleRequest.Flow = "Outbound"
-	_, _, err = s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	if len(group.InboundRules) > 0 {
+		if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, "Inbound", group.InboundRules); xerr != nil {
+			return asg, xerr
+		}
 	}
+	if len(group.OutboundRules) > 0 {
+		if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, "Outbound", group.OutboundRules); xerr != nil {
+			return asg, xerr
+		}
+	}
+
 	asg.Rules = abstract.SecurityGroupRules{}
 	return asg, nil
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nullAsg, fail.InvalidInstanceError()
-	// }
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	nullASG := abstract.NewSecurityGroup()
+	if s.IsNull() {
+		return nullASG, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullASG, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -283,26 +224,28 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	if rule.EtherType == ipversion.IPv6 {
+		// No IPv6 at Outscale (?)
+		return asg, nil
+	}
+
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
-		return nil, xerr
+		return asg, xerr
 	}
-	createSecurityGroupRuleRequest := osc.CreateSecurityGroupRuleRequest{
-		SecurityGroupId: asg.ID,
-		Rules:           []osc.SecurityGroupRule{oscRule},
-		Flow:            flow,
-	}
-	_, _, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &osc.CreateSecurityGroupRuleOpts{
-		CreateSecurityGroupRuleRequest: optional.NewInterface(createSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+
+	if xerr := s.rpcCreateSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
+		return asg, xerr
 	}
 	return s.InspectSecurityGroup(asg.ID)
 }
 
 func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.SecurityGroupRule, fail.Error) {
 	rule := osc.SecurityGroupRule{}
+	if in.EtherType == ipversion.IPv6 {
+		// No IPv6 at Outscale (?)
+		return "", rule, fail.InvalidRequestError("IPv6 is not supported")
+	}
 
 	flow := ""
 	switch in.Direction {
@@ -315,11 +258,20 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.S
 	}
 
 	rule.IpProtocol = in.Protocol
-	if in.PortFrom <= 0 && in.PortTo <= 0 {
-		rule.FromPortRange, rule.ToPortRange = -1, -1
+	rule.FromPortRange = int32(in.PortFrom)
+	rule.ToPortRange = int32(in.PortTo)
+	if rule.FromPortRange == 0 && rule.ToPortRange == 0 {
+		if in.Protocol == "icmp" {
+			rule.FromPortRange, rule.ToPortRange = -1, -1
+		} else {
+			rule.FromPortRange, rule.ToPortRange = 1, 65535
+		}
 	} else {
-		if in.PortFrom > in.PortTo {
-			in.PortFrom, in.PortTo = in.PortTo, in.PortFrom
+		if rule.ToPortRange == 0 && rule.FromPortRange > 0 {
+			rule.ToPortRange = rule.FromPortRange
+		}
+		if rule.FromPortRange > rule.ToPortRange {
+			rule.FromPortRange, rule.ToPortRange = rule.ToPortRange, rule.FromPortRange
 		}
 	}
 	rule.IpRanges = in.IPRanges
@@ -329,10 +281,11 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.S
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return false, fail.InvalidInstanceError()
-	// }
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	nullASG := abstract.NewSecurityGroup()
+	if s.IsNull() {
+		return nullASG, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
@@ -347,27 +300,24 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s, %s)", asg.ID, rule.Description).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	// IPv6 not supported at Outscale (?)
+	if rule.EtherType == ipversion.IPv6 {
+		return asg, nil
+	}
+
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	deleteSecurityGroupRuleRequest := osc.DeleteSecurityGroupRuleRequest{
-		SecurityGroupId: asg.ID,
-		Rules:           []osc.SecurityGroupRule{oscRule},
-		Flow:            flow,
-	}
-	_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &osc.DeleteSecurityGroupRuleOpts{
-		DeleteSecurityGroupRuleRequest: optional.NewInterface(deleteSecurityGroupRuleRequest),
-	})
-	if err != nil {
-		return asg, normalizeError(err)
+	if xerr := s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
+		return nil, xerr
 	}
 
 	return s.InspectSecurityGroup(asg.ID)
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s Stack) GetDefaultSecurityGroupName() string {
+func (s stack) GetDefaultSecurityGroupName() string {
 	return ""
 }

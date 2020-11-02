@@ -101,12 +101,17 @@ func (handler *networkHandler) List(all bool) (netList []*abstract.Network, xerr
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	objn, xerr := networkfactory.New(handler.job.GetService())
+	svc := handler.job.GetService()
+	if all {
+		return svc.ListNetworks()
+	}
+
+	rn, xerr := networkfactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = objn.Browse(task, func(rn *abstract.Network) fail.Error {
+	xerr = rn.Browse(task, func(rn *abstract.Network) fail.Error {
 		netList = append(netList, rn)
 		return nil
 	})

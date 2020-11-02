@@ -88,12 +88,17 @@ func (hs *HostSizing) Reset() {
 }
 
 // Clone ... (data.Clonable interface)
-func (hs *HostSizing) Clone() data.Clonable {
-	return NewHostSizing().Replace(hs)
+func (hs HostSizing) Clone() data.Clonable {
+	return NewHostSizing().Replace(&hs)
 }
 
 // Replace ...
 func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hs == nil || p == nil {
+		return hs
+	}
+
 	src := p.(*HostSizing)
 	hs.RequestedSize = NewHostSizingRequirements()
 	*hs.RequestedSize = *src.RequestedSize

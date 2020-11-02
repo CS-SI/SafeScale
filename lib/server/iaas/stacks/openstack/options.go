@@ -19,11 +19,11 @@ package openstack
 import "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 // GetConfigurationOptions ...
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	return s.cfgOpts
 }
 
 // GetAuthenticationOptions ...
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+func (s Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 	return s.authOpts
 }

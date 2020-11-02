@@ -19,8 +19,6 @@ package tests
 // TODO NOTICE Side-effects imports here
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"testing"
 	"time"
 
@@ -29,10 +27,12 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -61,12 +61,12 @@ type ServiceTester struct {
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	var stack api.Stack
 
-	stack = &aws.Stack{}         // nolint
-	stack = &gcp.Stack{}         // nolint
-	stack = &huaweicloud.Stack{} // nolint
-	stack = &libvirt.Stack{}     // nolint
-	stack = &openstack.Stack{}   // nolint
-	stack = &outscale.Stack{}    // nolint
+	stack = aws.NullStack()         // nolint
+	stack = gcp.NullStack()         // nolint
+	stack = huaweicloud.NullStack() // nolint
+	stack = libvirt.NullStack()     // nolint
+	stack = openstack.NullStack()   // nolint
+	stack = outscale.NullStack()    // nolint
 
 	_ = stack
 }
@@ -192,7 +192,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 	subnet, err := tester.Service.CreateSubnet(abstract.SubnetRequest{
 		Name:      name,
 		IPVersion: ipversion.IPv4,
-		Network:   networkID,
+		NetworkID: networkID,
 		CIDR:      cidr,
 	})
 	require.NoError(t, err)
@@ -290,7 +290,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 //	defer func() {
 //		_ = tester.Service.DeleteNetwork(network1.ID)
 //	}()
-//	fmt.Println(fmt.Sprintf("Created a Network with name %v and id %v", network1.Name, network1.ID))
+//	fmt.Println(fmt.Sprintf("Created a NetworkID with name %v and id %v", network1.Name, network1.ID))
 //
 //	networkFound := false
 //
@@ -334,7 +334,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	// TODO: see if there is something to test at this level
 	// gw1NetworkV1 := propertiesv1.NewHostSubnet()
 	// err = gw1.properties.Inspect(HostProperty.NetworkV1, func(clonable interface{}) error {
-	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostSubnet)
+	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostNetworking)
 	// 	return nil
 	// })
 	// assert.Nil(t, err)
@@ -434,13 +434,13 @@ func (tester *ServiceTester) Subnets(t *testing.T) {
 	assert.Equal(t, subnet1.CIDR, subnet1CIDR)
 	assert.Equal(t, subnet1.GatewayIDs[0], gw1.Core.ID)
 	assert.Equal(t, gw1.Core.Name, "gw-"+subnet1.Name)
-	assert.NotEmpty(t, gw1.Subnet.PublicIPv4)
+	assert.NotEmpty(t, gw1.Networking.PublicIPv4)
 
 	// VPL: properties are not inside stack instances anymore
 	// TODO: see if there is something to test at this level
 	// gw1NetworkV1 := propertiesv1.NewHostSubnet()
 	// err = gw1.properties.Inspect(HostProperty.NetworkV1, func(clonable interface{}) error {
-	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostSubnet)
+	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostNetworking)
 	// 	return nil
 	// })
 	// assert.Nil(t, err)
@@ -585,24 +585,24 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, host)
 	{
-		err := tester.Service.StopHost(host.ID)
+		err := tester.Service.StopHost(host.Core.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, hoststate.STOPPED, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.STOPPED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
 		// assert.Equal(t, host.State, hoststate.STOPPED)
 	}
 	{
-		err := tester.Service.StartHost(host.ID)
+		err := tester.Service.StartHost(host.Core.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.ID, hoststate.STARTED, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.STARTED, temporal.GetBigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		assert.Equal(t, host.LastState, hoststate.STARTED)
+		assert.Equal(t, host.Core.LastState, hoststate.STARTED)
 	}
 }
 
@@ -706,33 +706,33 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		Name:     "Attachment1",
-		HostID:   host.ID,
+		HostID:   host.Core.ID,
 		VolumeID: v1.ID,
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va1ID)
 	defer func() {
-		_ = tester.Service.DeleteVolumeAttachment(host.ID, va1ID)
+		_ = tester.Service.DeleteVolumeAttachment(host.Core.ID, va1ID)
 	}()
 
 	va2ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		Name:     "Attachment2",
-		HostID:   host.ID,
+		HostID:   host.Core.ID,
 		VolumeID: v2.ID,
 	})
 	assert.Nil(t, err)
 	assert.NotEmpty(t, va2ID)
 	defer func() {
-		_ = tester.Service.DeleteVolumeAttachment(host.ID, va2ID)
+		_ = tester.Service.DeleteVolumeAttachment(host.Core.ID, va2ID)
 	}()
 
-	va1, err := tester.Service.InspectVolumeAttachment(host.ID, v1.ID)
+	va1, err := tester.Service.InspectVolumeAttachment(host.Core.ID, v1.ID)
 	assert.Nil(t, err)
 
-	va2, err := tester.Service.InspectVolumeAttachment(host.ID, v2.ID)
+	va2, err := tester.Service.InspectVolumeAttachment(host.Core.ID, v2.ID)
 	assert.Nil(t, err)
 
-	lst, err := tester.Service.ListVolumeAttachments(host.ID)
+	lst, err := tester.Service.ListVolumeAttachments(host.Core.ID)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(lst))
 	for _, val := range lst {

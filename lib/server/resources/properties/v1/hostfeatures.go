@@ -71,12 +71,17 @@ func (hf *HostFeatures) Reset() {
 }
 
 // Clone ...  (data.Clonable interface)
-func (hf *HostFeatures) Clone() data.Clonable {
-	return NewHostFeatures().Replace(hf)
+func (hf HostFeatures) Clone() data.Clonable {
+	return NewHostFeatures().Replace(&hf)
 }
 
 // Replace ...  (data.Clonable interface)
 func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hf == nil || p == nil {
+		return hf
+	}
+
 	src := p.(*HostFeatures)
 	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {

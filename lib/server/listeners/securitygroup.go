@@ -128,7 +128,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, xerr
 	}
 
-	xerr = rsg.Create(task, rn, name, in.Description, rules)
+	xerr = rsg.Create(task, rn.GetID(), name, in.Description, rules)
 	if xerr != nil {
 		return nil, xerr
 	}

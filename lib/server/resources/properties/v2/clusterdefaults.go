@@ -38,13 +38,18 @@ func newClusterDefaults() *ClusterDefaults {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cd *ClusterDefaults) Clone() data.Clonable {
-	return newClusterDefaults().Replace(cd)
+func (cd ClusterDefaults) Clone() data.Clonable {
+	return newClusterDefaults().Replace(&cd)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if cd == nil || p == nil {
+		return cd
+	}
+
 	*cd = *p.(*ClusterDefaults)
 	return cd
 }

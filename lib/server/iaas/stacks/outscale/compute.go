@@ -25,22 +25,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-
-	"github.com/antihax/optional"
 	"github.com/sirupsen/logrus"
 
 	"github.com/outscale/osc-sdk-go/osc"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 func normalizeImageName(name string) string {
@@ -64,21 +62,23 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s *Stack) ListImages(all bool) (_ []abstract.Image, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+	var emptySlice []abstract.Image
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	res, _, err := s.client.ImageApi.ReadImages(s.auth, nil)
-	if err != nil {
-		return nil, fail.Wrap(normalizeError(err), "failed to list images")
+	resp, xerr := s.rpcReadImages(nil)
+	if xerr != nil {
+		return emptySlice, xerr
 	}
+
 	var images []abstract.Image
-	for _, omi := range res.Images {
+	for _, omi := range resp {
 		images = append(images, abstract.Image{
 			Description: omi.Description,
 			ID:          omi.ImageId,
@@ -107,7 +107,7 @@ func gpuTemplateName(version, cpu, ram, perf, gpu int, gpuType string) (name str
 	return
 }
 
-func (s *Stack) cpuFreq(perf int) float32 {
+func (s stack) cpuFreq(perf int) float32 {
 	freq := float32(2.0)
 	if f, ok := s.CPUPerformanceMap[perf]; ok {
 		freq = f
@@ -161,7 +161,7 @@ func parseGPU(s string) (gpus int, gpuType string, xerr fail.Error) {
 	return
 }
 
-func (s *Stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
+func (s stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 || !strings.HasPrefix(id, "tina") {
 		return nil, fail.InvalidParameterError("id", "invalid template id")
@@ -193,12 +193,13 @@ func (s *Stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) 
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
+	var emptySlice []abstract.HostTemplate
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -230,7 +231,7 @@ func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Er
 
 		}
 	}
-	// instances wit gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
+	// instances with gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
 	// with nvidia-k2 GPU
 	gpus := intRange(1, 8, 2)
 	for _, gpu := range gpus {
@@ -318,15 +319,16 @@ func (s *Stack) ListTemplates(all bool) (_ []abstract.HostTemplate, xerr fail.Er
 }
 
 // InspectImage returns the Image referenced by id
-func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
+	nullImage := &abstract.Image{}
+	if s.IsNull() {
+		return nullImage, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullImage, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -336,65 +338,38 @@ func (s *Stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 		}
 	}()
 
-	res, _, err := s.client.ImageApi.ReadImages(s.auth, &osc.ReadImagesOpts{
-		ReadImagesRequest: optional.NewInterface(osc.ReadImagesRequest{
-			DryRun: false,
-			Filters: osc.FiltersImage{
-				ImageIds: []string{id},
-			},
-		}),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	resp, xerr := s.rpcReadImageByID(id)
+	if xerr != nil {
+		return nullImage, xerr
 	}
-	if len(res.Images) != 1 {
-		return nil, fail.InconsistentError("more than one image with the same id")
+	img := abstract.Image{
+		Description: resp.Description,
+		ID:          resp.ImageId,
+		Name:        resp.ImageName,
+		StorageType: resp.RootDeviceType,
+		URL:         resp.FileLocation,
 	}
-	img := res.Images[0]
-	return &abstract.Image{
-		Description: img.Description,
-		ID:          img.ImageId,
-		Name:        img.ImageName,
-		StorageType: img.RootDeviceType,
-		URL:         img.FileLocation,
-	}, nil
+	return &img, nil
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s *Stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
+	nullHT := &abstract.HostTemplate{}
+	if s.IsNull() {
+		return nullHT, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return s.parseTemplateID(id)
 }
 
-// VPL: obsolete
-// func (s *Stack) getOrCreateKeypair(request abstract.HostRequest) (*abstract.KeyPair, error) {
-//	id, err := uuid.NewV4()
-//	if err != nil {
-//		msg := fmt.Sprintf("failed to create host UUID: %+v", err)
-//		logrus.Debugf(utils.Capitalize(msg))
-//		return nil, fmt.Errorf(msg)
-//	}
-//	if request.KeyPair == nil {
-//		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-//		kp, err := s.CreateKeyPair(name)
-//		if err != nil {
-//			msg := fmt.Sprintf("Failed to create host key pair: %+v", err)
-//			logrus.Errorf(msg)
-//			return nil, fmt.Errorf(msg)
-//		}
-//		return kp, nil
-//	}
-//	return request.KeyPair, nil
-// }
-
-func (s *Stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.Error) {
+func (s stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.Error) {
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
@@ -405,7 +380,7 @@ func (s *Stack) getOrCreatePassword(request abstract.HostRequest) (string, fail.
 	return request.Password, nil
 }
 
-func (s *Stack) prepareUserData(request abstract.HostRequest, ud *userdata.Content) fail.Error {
+func (s stack) prepareUserData(request abstract.HostRequest, ud *userdata.Content) fail.Error {
 	cidr := func() string {
 		if len(request.Subnets) == 0 {
 			return ""
@@ -420,35 +395,25 @@ func (s *Stack) prepareUserData(request abstract.HostRequest, ud *userdata.Conte
 	return nil
 }
 
-func (s *Stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet) (*osc.Nic, fail.Error) {
-	//groups, xerr := s.listSecurityGroupIDs(subnet.Network)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-
-	nicRequest := osc.CreateNicRequest{
-		Description: request.ResourceName,
-		SubnetId:    subnet.ID,
-		//SecurityGroupIds: groups,
-	}
-	res, _, err := s.client.NicApi.CreateNic(s.auth, &osc.CreateNicOpts{
-		CreateNicRequest: optional.NewInterface(nicRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+func (s stack) createNIC(request *abstract.HostRequest, subnet *abstract.Subnet) (osc.Nic, fail.Error) {
+	name := fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, subnet.Name)
+	description := fmt.Sprintf("nic of Host %s on Subnet %s", request.ResourceName, subnet.Name)
+	resp, xerr := s.rpcCreateNic(name, subnet.ID, description, nil)
+	if xerr != nil {
+		return osc.Nic{}, xerr
 	}
 	// primary := deviceNumber == 0
-	return &res.Nic, nil
+	return resp, nil
 }
 
-func (s *Stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr fail.Error) {
+func (s stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr fail.Error) {
 	nics = []osc.Nic{}
 
 	// first network is the default network
 	nics, xerr = s.tryCreateNICS(request, nics)
 	if xerr != nil { // if error delete created NICS
 		for _, v := range nics {
-			xerr := s.deleteNIC(v)
+			xerr := s.rpcDeleteNic(v.NicId)
 			if xerr != nil {
 				logrus.Errorf("impossible to delete NIC '%s': %v", v.NicId, xerr)
 			}
@@ -457,35 +422,25 @@ func (s *Stack) createNICs(request *abstract.HostRequest) (nics []osc.Nic, xerr 
 	return nics, xerr
 }
 
-func (s Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]osc.Nic, fail.Error) {
+func (s stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]osc.Nic, fail.Error) {
 	for _, n := range request.Subnets[1:] {
 		nic, xerr := s.createNIC(request, n)
 		if xerr != nil {
 			return nics, xerr
 		}
-		nics = append(nics, *nic)
+		nics = append(nics, nic)
 	}
 	return nics, nil
 }
 
-func (s Stack) deleteNICs(nics []osc.Nic) fail.Error {
+func (s stack) deleteNICs(nics []osc.Nic) fail.Error {
 	for _, nic := range nics {
-		xerr := s.deleteNIC(nic)
-		if xerr != nil {
+		// FIXME: parallelize ?
+		if xerr := s.rpcDeleteNic(nic.NicId); xerr != nil {
 			return xerr
 		}
 	}
 	return nil
-}
-
-func (s Stack) deleteNIC(nic osc.Nic) fail.Error {
-	request := osc.DeleteNicRequest{
-		NicId: nic.NicId,
-	}
-	_, _, err := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{
-		DeleteNicRequest: optional.NewInterface(request),
-	})
-	return normalizeError(err)
 }
 
 func hostState(state string) hoststate.Enum {
@@ -510,23 +465,25 @@ func hostState(state string) hoststate.Enum {
 	return hoststate.UNKNOWN
 }
 
-func (s Stack) hostState(id string) (hoststate.Enum, fail.Error) {
-	vm, xerr := s.getVM(id)
+func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
+	vm, xerr := s.rpcReadVmByID(id)
 	if xerr != nil {
-		return hoststate.ERROR, xerr
-	}
-	if vm == nil {
-		return hoststate.TERMINATED, retry.StopRetryError(fail.NotFoundError("vm '%s' does not exist", id))
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return hoststate.TERMINATED, nil
+		default:
+			return hoststate.ERROR, xerr
+		}
 	}
 	return hostState(vm.State), nil
 }
 
 // WaitHostReady waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	//if s == nil {
-	//	return abstract.NewHostCore(), fail.InvalidInstanceError()
-	//}
+func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	if s.IsNull() {
+		return abstract.NewHostCore(), fail.InvalidInstanceError()
+	}
 
 	return s.WaitHostState(hostParam, hoststate.STARTED, timeout)
 }
@@ -536,18 +493,18 @@ func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // - *retry.ErrTimeout: when the timeout is reached
 // - *retry.ErrStopRetry: when a breaking error arises; xerr.Cause() contains the real error encountered
 // - fail.Error: any other errors
-func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
-	nullAhc := abstract.NewHostCore()
-	//if s == nil {
-	//	return nullAhc, fail.InvalidInstanceError()
-	//}
-
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
-	if xerr != nil {
-		return nullAhc, xerr
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
+	nullAHC := abstract.NewHostCore()
+	if s.IsNull() {
+		return nullAHC, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s, %v)", hostRef, state.String(), timeout).WithStopwatch().Entering()
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return nullAHC, xerr
+	}
+
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -555,21 +512,39 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		func() error {
 			st, innerXErr := s.hostState(ahf.Core.ID)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// if waited state is TERMINATED, a missing host means a terminated host, so consider this as a success
+					if state != hoststate.TERMINATED {
+						return innerXErr
+					}
+					st = hoststate.TERMINATED
+				default:
+					return innerXErr
+				}
 			}
-			if st != state {
-				return fail.NewError("wrong st")
+
+			switch st {
+			case hoststate.ERROR:
+				return retry.StopRetryError(fail.NewError("host in 'error' state"))
+			case state:
+				ahf.Core.LastState = st
+				return nil
+			default:
+				return fail.NewError("wrong state")
 			}
-			if st == hoststate.ERROR {
-				return retry.StopRetryError(fail.NewError("host in error state"))
-			}
-			ahf.Core.LastState = st
-			return nil
 		},
 		timeout,
 	)
 	if xerr != nil {
-		return nullAhc, xerr
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return nullAHC, fail.ToError(xerr.Cause())
+		case *retry.ErrStopRetry:
+			return nullAHC, fail.NotFoundError("failed to find Host %s", hostLabel)
+		default:
+			return nullAHC, xerr
+		}
 	}
 	return ahf.Core, nil
 }
@@ -585,24 +560,17 @@ func outscaleTemplateID(id string) (string, fail.Error) {
 	return fmt.Sprintf("%s.%s", tokens[0], tokens[1]), nil
 }
 
-func (s Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
+func (s stack) addNICs(request *abstract.HostRequest, vmID string) ([]osc.Nic, fail.Error) {
 	if len(request.Subnets) > 1 {
 		nics, xerr := s.createNICs(request)
 		if xerr != nil {
 			return nil, xerr
 		}
 		for i, nic := range nics {
-			nicRequest := osc.LinkNicRequest{
-				VmId:         vmID,
-				NicId:        nic.NicId,
-				DeviceNumber: int32(i + 1),
-			}
-			_, _, err := s.client.NicApi.LinkNic(s.auth, &osc.LinkNicOpts{
-				LinkNicRequest: optional.NewInterface(nicRequest),
-			})
-			if err != nil {
-				logrus.Errorf("Error attaching NIC %s to VM %s: %v", nic.NicId, vmID, err)
-				return nil, normalizeError(err)
+			xerr = s.rpcLinkNic(vmID, nic.NicId, int32(i+1))
+			if xerr != nil {
+				logrus.Errorf("failed to attach NIC %s to Host %s: %v", nic.NicId, vmID, xerr)
+				return nil, xerr
 			}
 		}
 		return nics, nil
@@ -610,14 +578,14 @@ func (s Stack) addNICS(request *abstract.HostRequest, vmID string) ([]osc.Nic, f
 	return nil, nil
 }
 
-func (s Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
-	tpl, xerr := s.InspectTemplate(request.TemplateID)
-	if xerr != nil {
-		return xerr
-	}
-	if tpl == nil {
-		return fail.InvalidParameterError("request.TemplateID", "Template does not exists")
-	}
+func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate, vmID string) (xerr fail.Error) {
+	//tpl, xerr := s.InspectTemplate(request.TemplateID)
+	//if xerr != nil {
+	//	return xerr
+	//}
+	//if tpl == nil {
+	//	return fail.InvalidParameterError("request.TemplateID", "Template does not exists")
+	//}
 	if tpl.GPUNumber <= 0 {
 		return nil
 	}
@@ -627,49 +595,33 @@ func (s Stack) addGPUs(request *abstract.HostRequest, vmID string) fail.Error {
 		createErr    fail.Error
 	)
 	for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
-		resCreate, _, err := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &osc.CreateFlexibleGpuOpts{
-			CreateFlexibleGpuRequest: optional.NewInterface(osc.CreateFlexibleGpuRequest{
-				DeleteOnVmDeletion: true,
-				Generation:         "",
-				ModelName:          tpl.GPUType,
-				SubregionName:      s.Options.Compute.Subregion,
-			}),
-		})
-		if err != nil {
-			createErr = normalizeError(err)
+		resp, xerr := s.rpcCreateFlexibleGpu(tpl.GPUType)
+		if xerr != nil {
+			createErr = xerr
 			break
 		}
-		flexibleGpus = append(flexibleGpus, resCreate.FlexibleGpu)
-		_, _, err = s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &osc.LinkFlexibleGpuOpts{
-			LinkFlexibleGpuRequest: optional.NewInterface(osc.LinkFlexibleGpuRequest{
-				DryRun:        false,
-				FlexibleGpuId: resCreate.FlexibleGpu.FlexibleGpuId,
-				VmId:          vmID,
-			}),
-		})
-		if err != nil {
-			createErr = normalizeError(err)
+		flexibleGpus = append(flexibleGpus, resp)
+
+		xerr = s.rpcLinkFlexibleGpu(vmID, resp.FlexibleGpuId)
+		if xerr != nil {
 			break
 		}
 	}
-	if createErr != nil {
+	if xerr != nil {
 		for _, gpu := range flexibleGpus {
-			// FIXME: handle error
-			_, _, _ = s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &osc.DeleteFlexibleGpuOpts{
-				DeleteFlexibleGpuRequest: optional.NewInterface(osc.DeleteFlexibleGpuRequest{
-					DryRun:        false,
-					FlexibleGpuId: gpu.FlexibleGpuId,
-				}),
-			})
+			if derr := s.rpcDeleteFlexibleGpu(gpu.FlexibleGpuId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Flexible GPU"))
+			}
 		}
 	}
 	return createErr
 }
 
-func (s Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.Error) {
+func (s stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.Error) {
 	if request.DiskSize == 0 {
 		return nil
 	}
+
 	v, xerr := s.CreateVolume(abstract.VolumeRequest{
 		Name:  fmt.Sprintf("vol-%s", request.HostName),
 		Size:  request.DiskSize,
@@ -687,12 +639,13 @@ func (s Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 		}
 	}()
 
-	xerr = s.setResourceTags(v.ID, map[string]string{
+	_, xerr = s.rpcCreateTags(v.ID, map[string]string{
 		"DeleteWithVM": "true",
 	})
 	if xerr != nil {
 		return xerr
 	}
+
 	_, xerr = s.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
 		HostID:   vmID,
 		VolumeID: v.ID,
@@ -700,47 +653,39 @@ func (s Stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 	return xerr
 }
 
-func (s Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
-	request := osc.ReadNicsRequest{
-		Filters: osc.FiltersNic{
-			LinkNicVmIds: []string{vmID},
-		},
+// VPL: obsolete
+//func (s stack) getNICs(vmID string) ([]osc.Nic, fail.Error) {
+//	resp, xerr := s.rpcReadNics("", vmID)
+//	if xerr != nil {
+//		return nil, xerr
+//	}
+//	return resp, nil
+//}
+
+func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
+	// Allocate Public IP
+	resp, xerr := s.rpcCreatePublicIp()
+	if xerr != nil {
+		return osc.PublicIp{}, xerr
 	}
-	res, _, err := s.client.NicApi.ReadNics(s.auth, &osc.ReadNicsOpts{ReadNicsRequest: optional.NewInterface(request)})
-	if err != nil {
-		return nil, normalizeError(err)
+
+	defer func() {
+		if xerr != nil {
+			if derr := s.rpcDeletePublicIpByID(resp.PublicIpId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Public IP with ID %s", resp.PublicIpId))
+			}
+		}
+	}()
+
+	// Attach public ip
+	if xerr = s.rpcLinkPublicIp(resp.PublicIpId, nic.NicId); xerr != nil {
+		return osc.PublicIp{}, xerr
 	}
-	return res.Nics, nil
+
+	return resp, nil
 }
 
-func (s Stack) addPublicIP(nic osc.Nic) (*osc.PublicIp, fail.Error) {
-	resIP, _, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	linkPublicIpRequest := osc.LinkPublicIpRequest{
-		NicId:      nic.NicId,
-		PublicIpId: resIP.PublicIp.PublicIpId,
-	}
-	_, _, err = s.client.PublicIpApi.LinkPublicIp(s.auth, &osc.LinkPublicIpOpts{
-		LinkPublicIpRequest: optional.NewInterface(linkPublicIpRequest)},
-	)
-	if err != nil {
-		deletePublicIpRequest := osc.DeletePublicIpRequest{
-			PublicIpId: resIP.PublicIp.PublicIpId,
-		}
-		_, _, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-		})
-		if err != nil {
-			logrus.Warnf(fmt.Sprintf("Cannot delete public ip '%s': %v", resIP.PublicIp.PublicIpId, err))
-			return nil, normalizeError(err)
-		}
-	}
-	return &resIP.PublicIp, nil
-}
-
-func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Subnet, vm *osc.Vm, nics []osc.Nic) fail.Error {
+func (s stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic) fail.Error {
 	vmType, xerr := s.InspectTemplate(vm.VmType)
 	if xerr != nil {
 		return xerr
@@ -758,7 +703,7 @@ func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Su
 	host.Sizing.GPUType = vmType.GPUType
 	host.Sizing.RAMSize = vmType.RAMSize
 
-	// Updates Host Property propsv1.HostSubnet
+	// Updates Host Property propsv1.HostNetworking
 	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
 	// between network ID and network Name in Host definition
@@ -779,15 +724,17 @@ func (s Stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Su
 			return ""
 		}()
 	}
-	host.Subnet.SubnetsByID = subnetsByID
-	host.Subnet.SubnetsByName = subnetsByName
+	host.Networking.SubnetsByID = subnetsByID
+	host.Networking.SubnetsByName = subnetsByName
 	// IPvxAddresses are here indexed by names... At least we have them...
-	host.Subnet.IPv4Addresses = ipv4Addresses
-	host.Subnet.IPv6Addresses = ipv6Addresses
+	host.Networking.IPv4Addresses = ipv4Addresses
+	host.Networking.IPv6Addresses = ipv6Addresses
+	host.Networking.PublicIPv4 = vm.PublicIp
+
 	return nil
 }
 
-func (s Stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull) fail.Error {
+func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull) fail.Error {
 	defaultSubnet := func() *abstract.Subnet {
 		if len(request.Subnets) == 0 {
 			return nil
@@ -813,15 +760,15 @@ func (s Stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Core.Password = request.Password
 
-	host.Subnet.DefaultSubnetID = func() string {
+	host.Networking.DefaultSubnetID = func() string {
 		if defaultSubnet == nil {
 			return ""
 		}
 		return defaultSubnet.ID
 	}()
-	// host.Network.DefaultGatewayID = defaultGatewayID
-	// host.Network.DefaultGatewayPrivateIP = request.DefaultRouteIP
-	host.Subnet.IsGateway = isGateway
+	// host.Networking.DefaultGatewayID = defaultGatewayID
+	// host.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
+	host.Networking.IsGateway = isGateway
 
 	// Adds Host property SizingV1
 	host.Sizing.Cores = template.Cores
@@ -833,29 +780,27 @@ func (s Stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	return nil
 }
 
-func (s Stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (*osc.PublicIp, fail.Error) {
+func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (osc.PublicIp, fail.Error) {
 	ip, xerr := s.addPublicIP(primaryNIC)
 	if xerr != nil {
-		return nil, xerr
+		return osc.PublicIp{}, xerr
 	}
 
 	for _, nic := range otherNICs {
-		_, xerr = s.addPublicIP(nic)
-		if xerr != nil {
-			return nil, xerr
+		if _, xerr = s.addPublicIP(nic); xerr != nil {
+			return osc.PublicIp{}, xerr
 		}
 	}
 	return ip, nil
 }
 
 // CreateHost creates an host that fulfils the request
-func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, xerr fail.Error) {
+func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
-
-	//if s == nil {
-	//	return nullAHF, nullUDC, fail.InvalidInstanceError()
-	//}
+	if s.IsNull() {
+		return nullAHF, nullUDC, fail.InvalidInstanceError()
+	}
 	if request.KeyPair == nil {
 		return nullAHF, nullUDC, fail.InvalidRequestError("request.KeyPair", "cannot be nil")
 	}
@@ -863,41 +808,22 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached subnet")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.outscale"), "(%v)", request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
+	// Get or create password
 	password, xerr := s.getOrCreatePassword(request)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 	request.Password = password
 
+	// gather default subnet ID
 	subnetID, xerr := s.getDefaultSubnetID(request)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
-
-	xerr = s.prepareUserData(request, udc)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	if xerr = s.initHostProperties(&request, ahf); xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-
-	userDataPhase1, xerr := udc.Generate("phase1")
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	vmType, xerr := outscaleTemplateID(request.TemplateID)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	op := s.Options.Compute.OperatorUsername
-	patchSSH := fmt.Sprintf("\nchown -R %s:%s /home/%s", op, op, op)
-	buf := bytes.NewBuffer(userDataPhase1)
-	buf.WriteString(patchSSH)
 
 	// Import keypair to create host
 	creationKeyPair, xerr := abstract.NewKeyPair(request.ResourceName + "_install")
@@ -914,7 +840,34 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			logrus.Errorf("failed to delete creation keypair: %v", derr)
 		}
 	}()
+	request.KeyPair = creationKeyPair
 
+	// Configure userdata content
+	udc = userdata.NewContent()
+	xerr = s.prepareUserData(request, udc)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+	ahf = abstract.NewHostFull()
+	if xerr = s.initHostProperties(&request, ahf); xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
+	// prepare userdata phase1 execution
+	userDataPhase1, xerr := udc.Generate(userdata.PHASE1_INIT)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+	vmType, xerr := outscaleTemplateID(request.TemplateID)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+	//op := s.Options.Compute.OperatorUsername
+	//patchSSH := fmt.Sprintf("\nchown -R %s:%s /home/%s", op, op, op)
+	buf := bytes.NewBuffer(userDataPhase1)
+	//buf.WriteString(patchSSH)
+
+	// create host
 	vmsRequest := osc.CreateVmsRequest{
 		ImageId:  request.ImageID,
 		UserData: base64.StdEncoding.EncodeToString(buf.Bytes()),
@@ -926,33 +879,57 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		},
 		KeypairName: creationKeyPair.Name,
 	}
-	resVM, _, err := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
-		CreateVmsRequest: optional.NewInterface(vmsRequest),
-	})
-	if err != nil {
-		return nullAHF, nullUDC, fail.Wrap(normalizeError(err), fmt.Sprintf("failed to create host '%s'", request.ResourceName))
+
+	tpl, xerr := s.InspectTemplate(request.TemplateID)
+	if xerr != nil {
+		return nil, nil, xerr
 	}
 
-	if len(resVM.Vms) == 0 {
-		return nullAHF, nullUDC, fail.InconsistentError("virtual machine list empty")
+	var diskSize int = tpl.DiskSize
+	if request.DiskSize > diskSize {
+		diskSize = request.DiskSize
+	}
+	if diskSize < 10 {
+		diskSize = 10
 	}
 
-	vm := resVM.Vms[0]
+	vmsRequest.BlockDeviceMappings = []osc.BlockDeviceMappingVmCreation{
+		{
+			Bsu: osc.BsuToCreate{
+				DeleteOnVmDeletion: true,
+				SnapshotId:         "",
+				VolumeSize:         int32(diskSize),
+				VolumeType:         s.fromAbstractVolumeSpeed(s.Options.Compute.DefaultVolumeSpeed),
+			},
+			NoDevice:   "true",
+			DeviceName: "/dev/sda1",
+		},
+	}
+
+	resp, xerr := s.rpcCreateVms(vmsRequest)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
+	if len(resp) == 0 {
+		return nullAHF, nullUDC, fail.InconsistentError("after creation submission, virtual machine list is empty")
+	}
+	vm := resp[0]
+
 	defer func() {
 		if xerr != nil {
-			derr := s.DeleteHost(vm.VmId)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+			if derr := s.DeleteHost(vm.VmId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 			}
 		}
 	}()
 
-	_, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, time.Duration(0))
-	if xerr != nil {
+	if _, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout()); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
+
 	// Retrieve default Nic use to create public ip
-	nics, xerr := s.getNICS(vm.VmId)
+	nics, xerr := s.rpcReadNics("", vm.VmId)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -961,7 +938,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 	defaultNic := nics[0]
 
-	nics, xerr = s.addNICS(&request, vm.VmId)
+	nics, xerr = s.addNICs(&request, vm.VmId)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -970,30 +947,21 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		if xerr != nil {
 			return nullAHF, nullUDC, xerr
 		}
-		if ip != nil {
-			udc.PublicIP = ip.PublicIp
-			vm.PublicIp = udc.PublicIP
-		}
+		udc.PublicIP = ip.PublicIp
+		vm.PublicIp = udc.PublicIP
 	}
 
-	xerr = s.addVolume(&request, vm.VmId)
-	if xerr != nil {
+	if xerr = s.addGPUs(&request, *tpl, vm.VmId); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
-
-	xerr = s.addGPUs(&request, vm.VmId)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-	xerr = s.setResourceTags(vm.VmId, map[string]string{
+	_, xerr = s.rpcCreateTags(vm.VmId, map[string]string{
 		"name": request.ResourceName,
 	})
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
-	_, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, time.Duration(0))
-	if xerr != nil {
+	if _, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout()); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
@@ -1004,162 +972,108 @@ func (s Stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.PrivateKey = request.KeyPair.PrivateKey
 	ahf.Core.LastState = hoststate.STARTED
 	nics = append(nics, defaultNic)
-	xerr = s.setHostProperties(ahf, request.Subnets, &vm, nics)
+	xerr = s.setHostProperties(ahf, request.Subnets, vm, nics)
 	return ahf, udc, xerr
 }
 
-func (s *Stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Error) {
-	if s == nil {
-		return "", fail.InvalidInstanceError()
-	}
+func (s stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Error) {
 	if len(request.Subnets) == 0 {
 		return "", nil
 	}
-	defaultSubnet := request.Subnets[0]
-	return defaultSubnet.ID, nil
-	//subnet, err := s.InspectSubnet(defaultSubet.Network, defaultSubnet.ID)
-	//if err != nil {
-	//	return "", err
-	//}
-	//if subnet == nil {
-	//	return "", abstract.ResourceInvalidRequestError("request.Networks", "Invalid network, no subnet found")
-	//}
-	//return subnet.SubnetId, nil
+	return request.Subnets[0].ID, nil
 }
 
-func (s *Stack) getVM(vmID string) (*osc.Vm, fail.Error) {
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
+func (s stack) deleteHost(id string) fail.Error {
+	if xerr := s.rpcDeleteVms([]string{id}); xerr != nil {
+		return xerr
 	}
-	readVmsRequest := osc.ReadVmsRequest{
-		Filters: osc.FiltersVm{
-			VmIds: []string{vmID},
-		},
-	}
-	vm, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
-		ReadVmsRequest: optional.NewInterface(readVmsRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	if len(vm.Vms) == 0 {
-		return nil, nil
-	}
-	return &vm.Vms[0], nil
-}
-
-func (s *Stack) deleteHost(id string) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
-	}
-	request := osc.DeleteVmsRequest{
-		VmIds: []string{id},
-	}
-	_, _, err := s.client.VmApi.DeleteVms(s.auth, &osc.DeleteVmsOpts{
-		DeleteVmsRequest: optional.NewInterface(request),
-	})
-	if err != nil {
-		return normalizeError(err)
-	}
-	_, xerr := s.WaitHostState(id, hoststate.TERMINATED, time.Duration(0))
+	_, xerr := s.WaitHostState(id, hoststate.TERMINATED, temporal.GetHostCreationTimeout())
 	return xerr
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%vs)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	readPublicIpsRequest := osc.ReadPublicIpsRequest{
-		Filters: osc.FiltersPublicIp{VmIds: []string{ahf.Core.ID}},
+	publicIPs, xerr := s.rpcReadPublicIpsOfVm(ahf.Core.ID)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to read public IPs of Host with ID %s", ahf.Core.ID)
 	}
-	resp, _, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &osc.ReadPublicIpsOpts{
-		ReadPublicIpsRequest: optional.NewInterface(readPublicIpsRequest),
-	})
-	if err != nil {
-		logrus.Errorf("Unable to read public IPs of vm %s", ahf.Core.ID)
-	}
+
+	// list attached volumes
 	volumes, xerr := s.ListVolumeAttachments(ahf.Core.ID)
 	if xerr != nil {
 		volumes = []abstract.VolumeAttachment{}
 	}
-	xerr = s.deleteHost(ahf.Core.ID)
-	if xerr != nil {
+
+	// delete host
+	if xerr = s.deleteHost(ahf.Core.ID); xerr != nil {
 		return xerr
 	}
-	if len(resp.PublicIps) == 0 {
+
+	// delete public IPs
+	if len(publicIPs) == 0 {
 		return nil
 	}
 	var lastErr fail.Error
-	for _, ip := range resp.PublicIps {
-		deletePublicIpRequest := osc.DeletePublicIpRequest{
-			PublicIpId: ip.PublicIpId,
-		}
-		_, _, err = s.client.PublicIpApi.DeletePublicIp(s.auth, &osc.DeletePublicIpOpts{
-			DeletePublicIpRequest: optional.NewInterface(deletePublicIpRequest),
-		})
-		if err != nil { // continue to delete even if error
-			lastErr = normalizeError(err)
-			logrus.Errorf("Unable to delete public IP %s of vm %s", ip.PublicIpId, ahf.Core.ID)
+	for _, ip := range publicIPs {
+		if xerr = s.rpcDeletePublicIpByID(ip.PublicIpId); xerr != nil { // continue to delete even if error
+			lastErr = xerr
+			logrus.Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
 		}
 	}
 
+	// delete volumes
 	for _, v := range volumes {
-		tags, xerr := s.getResourceTags(v.VolumeID)
+		tags, xerr := s.rpcReadTagsOfResource(v.VolumeID)
 		if xerr != nil {
 			continue
 		}
-		del := func() string {
-			if del, ok := tags["DeleteWithVM"]; ok {
-				return del
-			}
-			return "false"
-		}()
-		if del == "true" {
-			xerr = s.DeleteVolume(v.VolumeID)
-			if xerr != nil { // continue to delete even if error
-				logrus.Errorf("Unable to delete volume %s of vm %s", v.VolumeID, ahf.Core.ID)
+		if _, ok := tags["DeleteWithVM"]; ok {
+			if xerr = s.DeleteVolume(v.VolumeID); xerr != nil { // continue to delete even if error
+				logrus.Errorf("Unable to delete Volume %s of Host %s", v.VolumeID, ahf.Core.ID)
 			}
 		}
-
 	}
 
 	return lastErr
 }
 
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
-	ahf = abstract.NewHostFull()
-	if s == nil {
-		return ahf, fail.InvalidInstanceError()
+func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
-	var hostRef string
-	ahf, hostRef, xerr = stacks.ValidateHostParameter(hostParam)
+	var hostLabel string
+	ahf, hostLabel, xerr = stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return ahf, xerr
+		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	vm, xerr := s.getVM(ahf.Core.ID)
+	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHF, xerr
 	}
+
 	if ahf.Core.Name == "" {
-		tags, xerr := s.getResourceTags(vm.VmId)
+		tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
 		if xerr != nil {
-			return ahf, xerr
+			return nullAHF, xerr
 		}
 		if tag, ok := tags["name"]; ok {
 			ahf.Core.Name = tag
@@ -1167,58 +1081,47 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 	}
 	subnets, nics, err := s.listSubnetsByHost(vm.VmId)
 	if err != nil {
-		return nil, err
+		return nullAHF, err
 	}
+
+	ahf = abstract.NewHostFull()
 	ahf.Core.ID = vm.VmId
 	ahf.Core.LastState = hostState(vm.State)
 	xerr = s.setHostProperties(ahf, subnets, vm, nics)
 	return ahf, xerr
-
 }
 
 // InspectHostByName returns the host identified by name
-func (s *Stack) InspectHostByName(name string) (ahc *abstract.HostCore, xerr fail.Error) {
-	nullAhc := abstract.NewHostCore()
-	if s == nil {
-		return nullAhc, fail.InvalidInstanceError()
+func (s stack) InspectHostByName(name string) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	res, _, err := s.client.VmApi.ReadVms(s.auth, &osc.ReadVmsOpts{
-		ReadVmsRequest: optional.NewInterface(osc.ReadVmsRequest{
-			DryRun: false,
-			Filters: osc.FiltersVm{
-				Tags: []string{fmt.Sprintf("name=%s", name)},
-			},
-		}),
-	})
-	if err != nil {
-		return nullAhc, normalizeError(err)
-	}
-	if len(res.Vms) == 0 {
-		return nullAhc, fail.NotFoundError("failed to find a host named '%s'", name)
+	vm, xerr := s.rpcReadVmByName(name)
+	if xerr != nil {
+		return nullAHF, xerr
 	}
 
-	vm := res.Vms[0]
-	ahc = abstract.NewHostCore()
-	ahc.ID = vm.VmId
-	ahc.Name = name
-	ahc.LastState = hostState(vm.State)
-	return ahc, nil
+	ahf = abstract.NewHostFull()
+	ahf.Core.ID = vm.VmId
+	ahf.Core.Name = name
+	ahf.Core.LastState = hostState(vm.State)
+	return ahf, nil
 }
 
 // GetHostState returns the current state of the host identified by id
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
-	if s == nil {
+func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
+	if s.IsNull() {
 		return hoststate.UNKNOWN, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
@@ -1229,23 +1132,23 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, 
 }
 
 // ListHosts lists all hosts
-func (s *Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
+func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 	emptyList := abstract.HostList{}
-	if s == nil {
+	if s.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	res, _, err := s.client.VmApi.ReadVms(s.auth, nil)
-	if err != nil {
-		return emptyList, normalizeError(err)
+	resp, xerr := s.rpcReadVms(nil)
+	if xerr != nil {
+		return emptyList, xerr
 	}
 
 	var hosts abstract.HostList
-	for _, vm := range res.Vms {
+	for _, vm := range resp {
 		if hostState(vm.State) == hoststate.TERMINATED {
 			continue
 		}
@@ -1259,7 +1162,7 @@ func (s *Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 				return nil, xerr
 			}
 		} else {
-			tags, xerr := s.getResourceTags(vm.VmId)
+			tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
 			if xerr != nil {
 				return emptyList, xerr
 			}
@@ -1273,8 +1176,8 @@ func (s *Stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1282,23 +1185,16 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	stopVmsRequest := osc.StopVmsRequest{
-		VmIds:     []string{ahf.Core.ID},
-		ForceStop: true,
-	}
-	_, _, err := s.client.VmApi.StopVms(s.auth, &osc.StopVmsOpts{
-		StopVmsRequest: optional.NewInterface(stopVmsRequest),
-	})
-	return normalizeError(err)
+	return s.rpcStopVms([]string{ahf.Core.ID})
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1306,22 +1202,16 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	startVmsRequest := osc.StartVmsRequest{
-		VmIds: []string{ahf.Core.ID},
-	}
-	_, _, err := s.client.VmApi.StartVms(s.auth, &osc.StartVmsOpts{
-		StartVmsRequest: optional.NewInterface(startVmsRequest),
-	})
-	return normalizeError(err)
+	return s.rpcStartVms([]string{ahf.Core.ID})
 }
 
 // RebootHost Reboot host
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1329,20 +1219,14 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	rebootVmsRequest := osc.RebootVmsRequest{
-		VmIds: []string{ahf.Core.ID},
-	}
-	_, _, err := s.client.VmApi.RebootVms(s.auth, &osc.RebootVmsOpts{
-		RebootVmsRequest: optional.NewInterface(rebootVmsRequest),
-	})
-	return normalizeError(err)
+	return s.rpcRebootVms([]string{ahf.Core.ID})
 }
 
-func (s *Stack) perfFromFreq(freq float32) int {
+func (s stack) perfFromFreq(freq float32) int {
 	var perfList sort.IntSlice
 	for k := range s.CPUPerformanceMap {
 		perfList = append(perfList, k)
@@ -1357,43 +1241,115 @@ func (s *Stack) perfFromFreq(freq float32) int {
 }
 
 // ResizeHost Resize host
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (ahf *abstract.HostFull, xerr fail.Error) {
-	nullAhf := abstract.NewHostFull()
-	if s == nil {
-		return ahf, fail.InvalidInstanceError()
+func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements) (ahf *abstract.HostFull, xerr fail.Error) {
+	nullAHF := abstract.NewHostFull()
+	if s.IsNull() {
+		return nullAHF, fail.InvalidInstanceError()
 	}
+
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAhf, xerr
+		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %v)", hostRef, request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)", hostRef, sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(tracer.TraceMessage(), &xerr)
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	perf := s.perfFromFreq(request.MinCPUFreq)
-	t := gpuTemplateName(0, request.MaxCores, int(request.MaxRAMSize), perf, 0, "")
-	updateVmRequest := osc.UpdateVmRequest{
-		VmId:   ahf.Core.ID,
-		VmType: t,
-		// VmType: request.,
-	}
-	_, _, err := s.client.VmApi.UpdateVm(s.auth, &osc.UpdateVmOpts{
-		UpdateVmRequest: optional.NewInterface(updateVmRequest),
-	})
-	if err != nil {
-		return nil, normalizeError(err)
+	perf := s.perfFromFreq(sizing.MinCPUFreq)
+	t := gpuTemplateName(0, sizing.MaxCores, int(sizing.MaxRAMSize), perf, 0, "")
+
+	if xerr := s.rpcUpdateVmType(ahf.Core.ID, t); xerr != nil {
+		return nil, xerr
 	}
 
 	return s.InspectHost(ahf.Core.ID)
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	return fail.NotImplementedError("not yet implemented")
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg.ID)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
+	}
+
+	found := false
+	sgs := make([]string, 0, len(vm.SecurityGroups)+1)
+	for _, v := range vm.SecurityGroups {
+		if v.SecurityGroupId == asg.ID {
+			found = true
+			break
+		}
+		sgs = append(sgs, v.SecurityGroupId)
+	}
+	if found {
+		// Security Group already bound to Host
+		return nil
+	}
+
+	// Add new SG to Host
+	sgs = append(sgs, asg.ID)
+	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
-	return fail.NotImplementedError("not yet implemented")
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// if host is not found, consider operation as a success
+			//return nil
+		default:
+			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
+		}
+	}
+
+	found := false
+	sgs := make([]string, 0, len(vm.SecurityGroups))
+	for _, v := range vm.SecurityGroups {
+		if v.SecurityGroupId != asg.ID {
+			sgs = append(sgs, v.SecurityGroupId)
+		} else {
+			found = true
+		}
+	}
+	if !found {
+		// Security Group not bound to Host, exit gracefully
+		return nil
+	}
+
+	// Update Security Groups of Host
+	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
 }

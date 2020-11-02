@@ -32,6 +32,37 @@ func normalizeError(err error) fail.Error {
 	}
 
 	switch cerr := err.(type) {
+	case awserr.RequestFailure:
+		code := cerr.StatusCode()
+		switch code {
+		case 400:
+			return fail.InvalidRequestError(err.Error())
+		case 401:
+			return fail.NotAuthenticatedError(err.Error())
+		case 403:
+			return fail.ForbiddenError(err.Error())
+		case 404:
+			return fail.NotFoundError(err.Error())
+		case 408:
+			return fail.TimeoutError(err, 0)
+		case 409:
+			return fail.InvalidRequestError(err.Error())
+		case 410:
+			return fail.NotFoundError(err.Error())
+		case 425:
+			return fail.OverloadError(err.Error())
+		case 429:
+			return fail.OverloadError(err.Error())
+		case 500:
+			return fail.ExecutionError(nil, err.Error())
+		case 503:
+			return fail.NotAvailableError(err.Error())
+		case 504:
+			return fail.NotAvailableError(err.Error())
+		default:
+			logrus.Warnf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+			return fail.NewError("unhandled error received from provider: %s", err.Error())
+		}
 	case awserr.Error:
 		switch cerr.Code() {
 		case "InvalidGroupId.Malformed":

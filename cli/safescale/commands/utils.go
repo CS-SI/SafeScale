@@ -86,7 +86,7 @@ func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, e
 	// def := protocol.HostDefinition{
 	// 	Name:    c.Args().First(),
 	// 	ImageId: c.String("os"),
-	// 	Network: c.String("net"),
+	// 	Networking: c.String("net"),
 	// 	Public:  c.Bool("public"),
 	// 	Force:   c.Bool("force"),
 	// 	Sizing:  &protocol.HostSizing{},

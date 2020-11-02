@@ -37,13 +37,18 @@ func newClusterControlPlane() *ClusterControlplane {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (cp *ClusterControlplane) Clone() data.Clonable {
-	return newClusterControlPlane().Replace(cp)
+func (cp ClusterControlplane) Clone() data.Clonable {
+	return newClusterControlPlane().Replace(&cp)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (cp *ClusterControlplane) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if cp == nil || p == nil {
+		return cp
+	}
+
 	src := p.(*ClusterControlplane)
 	*cp = *src
 	if src.VirtualIP != nil {
