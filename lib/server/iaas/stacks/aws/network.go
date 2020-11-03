@@ -415,22 +415,23 @@ func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
 	if state == nil {
 		return hoststate.ERROR, fail.NewError("unexpected host state")
 	}
-	if *state.Code == 0 {
+	code := aws.Int64Value(state.Code) & 0xff
+	if code == 0 {
 		return hoststate.STARTING, nil
 	}
-	if *state.Code == 16 {
+	if code == 16 {
 		return hoststate.STARTED, nil
 	}
-	if *state.Code == 32 {
+	if code == 32 {
 		return hoststate.STOPPING, nil
 	}
-	if *state.Code == 48 {
+	if code == 48 {
 		return hoststate.TERMINATED, nil
 	}
-	if *state.Code == 64 {
+	if code == 64 {
 		return hoststate.STOPPING, nil
 	}
-	if *state.Code == 80 {
+	if code == 80 {
 		return hoststate.STOPPED, nil
 	}
 	return hoststate.ERROR, fail.NewError("unexpected host state")

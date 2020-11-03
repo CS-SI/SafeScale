@@ -19,8 +19,10 @@ package aws
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -124,10 +126,10 @@ func (s stack) rpcDescribeVpcByID(id *string) (*ec2.Vpc, fail.Error) {
 		return &ec2.Vpc{}, xerr
 	}
 	if len(resp) == 0 {
-		return &ec2.Vpc{}, fail.NotFoundError("failed to find Network/VPC with ID %s", id)
+		return &ec2.Vpc{}, fail.NotFoundError("failed to find Network/VPC with ID %s", aws.StringValue(id))
 	}
 	if len(resp) > 1 {
-		return &ec2.Vpc{}, fail.InconsistentError("found more than 1 NetworkVPC with ID %s", id)
+		return &ec2.Vpc{}, fail.InconsistentError("found more than 1 NetworkVPC with ID %s", aws.StringValue(id))
 	}
 	return resp[0], nil
 }
@@ -157,10 +159,10 @@ func (s stack) rpcDescribeVpcByName(name *string) (*ec2.Vpc, fail.Error) {
 		return &ec2.Vpc{}, xerr
 	}
 	if len(resp.Vpcs) == 0 {
-		return &ec2.Vpc{}, fail.NotFoundError("failed to find a Network/VPC named '%s'", name)
+		return &ec2.Vpc{}, fail.NotFoundError("failed to find a Network/VPC named '%s'", aws.StringValue(name))
 	}
 	if len(resp.Vpcs) > 1 {
-		return &ec2.Vpc{}, fail.InconsistentError("found more than 1 NetworkVPC named '%s'", name)
+		return &ec2.Vpc{}, fail.InconsistentError("found more than 1 NetworkVPC named '%s'", aws.StringValue(name))
 	}
 
 	return resp.Vpcs[0], nil
@@ -388,7 +390,7 @@ func (s stack) rpcDescribeSubnetByID(id *string) (*ec2.Subnet, fail.Error) {
 		return &ec2.Subnet{}, fail.NotFoundError("failed to find a Subnet with ID %s", aws.StringValue(id))
 	}
 	if len(resp) > 1 {
-		return &ec2.Subnet{}, fail.InconsistentError("provider returned more than one Subnet with id %s", id)
+		return &ec2.Subnet{}, fail.InconsistentError("provider returned more than one Subnet with id %s", aws.StringValue(id))
 	}
 
 	return resp[0], nil
@@ -611,10 +613,10 @@ func (s stack) rpcDescribeSecurityGroupByID(id *string) (*ec2.SecurityGroup, fai
 		return &ec2.SecurityGroup{}, xerr
 	}
 	if len(resp) == 0 {
-		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group with ID %s", id)
+		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group with ID %s", aws.StringValue(id))
 	}
 	if len(resp) > 1 {
-		return &ec2.SecurityGroup{}, fail.InconsistentError("found more than one Security Group with ID %s", id)
+		return &ec2.SecurityGroup{}, fail.InconsistentError("found more than one Security Group with ID %s", aws.StringValue(id))
 	}
 	return resp[0], nil
 }
@@ -654,10 +656,10 @@ func (s stack) rpcDescribeSecurityGroupByName(networkID, name *string) (*ec2.Sec
 		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find Security Groups")
 	}
 	if len(resp.SecurityGroups) == 0 {
-		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group named '%s' in Network %s", name, networkID)
+		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group named '%s' in Network %s", aws.StringValue(name), aws.StringValue(networkID))
 	}
 	if len(resp.SecurityGroups) > 1 {
-		return &ec2.SecurityGroup{}, fail.InconsistentError("found more than one Security Group named '%s' in Network %s", name, networkID)
+		return &ec2.SecurityGroup{}, fail.InconsistentError("found more than one Security Group named '%s' in Network %s", aws.StringValue(name), aws.StringValue(networkID))
 	}
 	return resp.SecurityGroups[0], nil
 }
@@ -777,4 +779,344 @@ func (s stack) rpcReleaseAddress(id *string) fail.Error {
 		},
 		normalizeError,
 	)
+}
+
+func (s stack) rpcDescribeInstanceByID(id *string) (*ec2.Instance, fail.Error) {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return &ec2.Instance{}, xerr
+	}
+
+	resp, xerr := s.rpcDescribeInstances([]*string{id})
+	if xerr != nil {
+		return &ec2.Instance{}, xerr
+	}
+	if len(resp) == 0 {
+		return &ec2.Instance{}, fail.NotFoundError("failed to find an instance with ID %s", aws.StringValue(id))
+	}
+	if len(resp) > 1 {
+		return &ec2.Instance{}, fail.InconsistentError("found more than one instance with ID %s", aws.StringValue(id))
+	}
+	return resp[0], nil
+}
+
+func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Error) {
+	if xerr := validateAWSString(name, "name", true); xerr != nil {
+		return &ec2.Instance{}, xerr
+	}
+
+	request := ec2.DescribeInstancesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("tag:" + tagNameLabel),
+				Values: []*string{name},
+			},
+		},
+	}
+	var resp *ec2.DescribeInstancesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return &ec2.Instance{}, xerr
+	}
+	if len(resp.Reservations) == 0 {
+		return &ec2.Instance{}, fail.NotFoundError("failed to find a Host named '%s'", aws.StringValue(name))
+	}
+
+	var (
+		found    int
+		instance *ec2.Instance
+	)
+	for _, v := range resp.Reservations {
+		for _, i := range v.Instances {
+			state, xerr := toHostState(i.State)
+			if xerr != nil {
+				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
+				continue
+			}
+			if state != hoststate.TERMINATED {
+				instance = i
+				found++
+			}
+		}
+	}
+	if found == 0 {
+		return &ec2.Instance{}, fail.NotFoundError("failed to find a Host named '%s'", aws.StringValue(name))
+	}
+	if found > 1 {
+		return &ec2.Instance{}, fail.InconsistentError("found more than one Host named '%s'", aws.StringValue(name))
+	}
+	return instance, nil
+}
+
+func (s stack) rpcTerminateInstance(id *string) fail.Error {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return xerr
+	}
+
+	request := ec2.TerminateInstancesInput{
+		InstanceIds: []*string{id},
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.TerminateInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeAddresses(ids []*string) ([]*ec2.Address, fail.Error) {
+	var request ec2.DescribeAddressesInput
+	if len(ids) > 0 {
+		for _, v := range ids {
+			request.Filters = append(request.Filters, &ec2.Filter{
+				Name:   aws.String("instance-id"),
+				Values: []*string{v},
+			})
+		}
+	}
+	var resp *ec2.DescribeAddressesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeAddresses(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Address{}, xerr
+	}
+	return resp.Addresses, nil
+}
+
+func (s stack) rpcDescribeInstances(ids []*string) ([]*ec2.Instance, fail.Error) {
+	var request ec2.DescribeInstancesInput
+	if len(ids) > 0 {
+		request.InstanceIds = ids
+	}
+	var resp *ec2.DescribeInstancesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Instance{}, xerr
+	}
+
+	var nbInstance int
+	for _, v := range resp.Reservations {
+		nbInstance += len(v.Instances)
+	}
+	out := make([]*ec2.Instance, 0, nbInstance)
+	for _, v := range resp.Reservations {
+		for _, i := range v.Instances {
+			_ = ec2.InstanceState{}
+			state, xerr := toHostState(i.State)
+			if xerr != nil {
+				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
+				continue
+			}
+			if state != hoststate.TERMINATED {
+				out = append(out, i)
+			}
+		}
+	}
+	return out, nil
+}
+
+func (s stack) rpcImportKeyPair(name *string, pubKey []byte) fail.Error {
+	if xerr := validateAWSString(name, "name", true); xerr != nil {
+		return xerr
+	}
+
+	request := ec2.ImportKeyPairInput{
+		KeyName:           name,
+		PublicKeyMaterial: pubKey,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.ImportKeyPair(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeKeyPairs(ids []*string) ([]*ec2.KeyPairInfo, fail.Error) {
+	request := ec2.DescribeKeyPairsInput{}
+	if len(ids) > 0 {
+		request.KeyPairIds = ids
+	}
+	var resp *ec2.DescribeKeyPairsOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeKeyPairs(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.KeyPairInfo{}, xerr
+	}
+	return resp.KeyPairs, nil
+}
+
+func (s stack) rpcDescribeKeyPairByID(id *string) (*ec2.KeyPairInfo, fail.Error) {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return &ec2.KeyPairInfo{}, xerr
+	}
+
+	resp, xerr := s.rpcDescribeKeyPairs([]*string{id})
+	if xerr != nil {
+		return &ec2.KeyPairInfo{}, xerr
+	}
+	if len(resp) == 0 {
+		return &ec2.KeyPairInfo{}, fail.NotFoundError("failed to find a KeyPair with ID %s", aws.StringValue(id))
+	}
+	if len(resp) > 1 {
+		return &ec2.KeyPairInfo{}, fail.InconsistentError("found more than 1 KeyPair with ID %s", aws.StringValue(id))
+	}
+	return resp[0], nil
+}
+
+func (s stack) rpcDescribeKeyPairByName(name *string) (*ec2.KeyPairInfo, fail.Error) {
+	if xerr := validateAWSString(name, "name", true); xerr != nil {
+		return &ec2.KeyPairInfo{}, xerr
+	}
+
+	request := ec2.DescribeKeyPairsInput{
+		KeyNames: []*string{name},
+	}
+	var resp *ec2.DescribeKeyPairsOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeKeyPairs(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return &ec2.KeyPairInfo{}, xerr
+	}
+	if len(resp.KeyPairs) == 0 {
+		return &ec2.KeyPairInfo{}, fail.NotFoundError("failed to find a KeyPair named '%s'", aws.StringValue(name))
+	}
+	if len(resp.KeyPairs) > 1 {
+		return &ec2.KeyPairInfo{}, fail.InconsistentError("found more than 1 KeyPair named '%s'", aws.StringValue(name))
+	}
+	return resp.KeyPairs[0], nil
+}
+
+func (s stack) rpcDeleteKeyPair(id *string) fail.Error {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return xerr
+	}
+
+	request := ec2.DeleteKeyPairInput{
+		KeyName: id,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.DeleteKeyPair(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeAvailabilityZones(ids []*string) ([]*ec2.AvailabilityZone, fail.Error) {
+	var request ec2.DescribeAvailabilityZonesInput
+	if len(ids) > 0 {
+		request.ZoneIds = ids
+	}
+	var resp *ec2.DescribeAvailabilityZonesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeAvailabilityZones(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.AvailabilityZone{}, xerr
+	}
+	return resp.AvailabilityZones, nil
+}
+
+func (s stack) rpcDescribeRegions(names []*string) ([]*ec2.Region, fail.Error) {
+	var request ec2.DescribeRegionsInput
+	if len(names) > 0 {
+		request.RegionNames = names
+	}
+	var resp *ec2.DescribeRegionsOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeRegions(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Region{}, xerr
+	}
+	return resp.Regions, nil
+}
+
+func (s stack) rpcDescribeImages(ids []*string) ([]*ec2.Image, fail.Error) {
+	var request ec2.DescribeImagesInput
+	if len(ids) > 0 {
+		request.ImageIds = ids
+	} else {
+		request.Filters = []*ec2.Filter{
+			{
+				Name:   aws.String("architecture"),
+				Values: []*string{aws.String("x86_64")},
+			},
+			{
+				Name:   aws.String("state"),
+				Values: []*string{aws.String("available")},
+			},
+		}
+
+		// Added filtering by owner-id
+		request.Filters = append(request.Filters, createFilters()...)
+	}
+	var resp *ec2.DescribeImagesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeImages(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Image{}, xerr
+	}
+	return resp.Images, nil
+}
+
+func (s stack) rpcDescribeImageByID(id *string) (*ec2.Image, fail.Error) {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return &ec2.Image{}, xerr
+	}
+
+	resp, xerr := s.rpcDescribeImages([]*string{id})
+	if xerr != nil {
+		return &ec2.Image{}, xerr
+	}
+	if len(resp) == 0 {
+		return &ec2.Image{}, fail.NotFoundError("failed to find an Image with ID %s", aws.StringValue(id))
+	}
+	if len(resp) > 1 {
+		return &ec2.Image{}, fail.InconsistentError("found more than one Image with ID %s", aws.StringValue(id))
+	}
+	return resp[0], nil
 }
