@@ -485,7 +485,7 @@ func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements,
 			continue
 		}
 
-		if _, ok := scannerTpls[t.ID]; ok || !askedForSpecificScannerInfo {
+		if _, ok := scannerTpls[t.ID]; (ok || !askedForSpecificScannerInfo) && t.ID != "" {
 			newT := t
 			selectedTpls = append(selectedTpls, &newT)
 		}
