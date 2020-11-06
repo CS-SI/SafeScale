@@ -72,8 +72,8 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 	out := abstract.SecurityGroupRule{
 		Direction: direction,
 		Protocol:  in.IpProtocol,
-		PortFrom:  uint16(in.FromPortRange),
-		PortTo:    uint16(in.ToPortRange),
+		PortFrom:  int32(in.FromPortRange),
+		PortTo:    int32(in.ToPortRange),
 		IPRanges:  in.IpRanges,
 	}
 	return out

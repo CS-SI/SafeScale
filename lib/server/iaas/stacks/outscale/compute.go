@@ -529,7 +529,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			case hoststate.ERROR:
 				return retry.StopRetryError(fail.NewError("host in 'error' state"))
 			case state:
-				ahf.Core.LastState = st
+				ahf.CurrentState, ahf.Core.LastState = st, st
 				return nil
 			default:
 				return fail.NewError("wrong state")
@@ -654,15 +654,6 @@ func (s stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 	return xerr
 }
 
-// VPL: obsolete
-//func (s stack) getNICs(vmID string) ([]osc.Nic, fail.Error) {
-//	resp, xerr := s.rpcReadNics("", vmID)
-//	if xerr != nil {
-//		return nil, xerr
-//	}
-//	return resp, nil
-//}
-
 func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
 	// Allocate Public IP
 	resp, xerr := s.rpcCreatePublicIp()
@@ -686,23 +677,26 @@ func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic) fail.Error {
+func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic) fail.Error {
 	vmType, xerr := s.InspectTemplate(vm.VmType)
 	if xerr != nil {
 		return xerr
 	}
 
+	state := hostState(vm.State)
+	ahf.CurrentState, ahf.Core.LastState = state, state
+
 	// Updates Host Property propsv1.HostDescription
-	host.Description.Created = time.Now()
-	host.Description.Updated = host.Description.Created
+	ahf.Description.Created = time.Now()
+	ahf.Description.Updated = ahf.Description.Created
 
 	// Updates Host Property propsv1.HostSizing
-	host.Sizing.Cores = vmType.Cores
-	host.Sizing.CPUFreq = vmType.CPUFreq
-	host.Sizing.DiskSize = vmType.DiskSize
-	host.Sizing.GPUNumber = vmType.GPUNumber
-	host.Sizing.GPUType = vmType.GPUType
-	host.Sizing.RAMSize = vmType.RAMSize
+	ahf.Sizing.Cores = vmType.Cores
+	ahf.Sizing.CPUFreq = vmType.CPUFreq
+	ahf.Sizing.DiskSize = vmType.DiskSize
+	ahf.Sizing.GPUNumber = vmType.GPUNumber
+	ahf.Sizing.GPUType = vmType.GPUType
+	ahf.Sizing.RAMSize = vmType.RAMSize
 
 	// Updates Host Property propsv1.HostNetworking
 	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
@@ -725,12 +719,12 @@ func (s stack) setHostProperties(host *abstract.HostFull, subnets []*abstract.Su
 			return ""
 		}()
 	}
-	host.Networking.SubnetsByID = subnetsByID
-	host.Networking.SubnetsByName = subnetsByName
+	ahf.Networking.SubnetsByID = subnetsByID
+	ahf.Networking.SubnetsByName = subnetsByName
 	// IPvxAddresses are here indexed by names... At least we have them...
-	host.Networking.IPv4Addresses = ipv4Addresses
-	host.Networking.IPv6Addresses = ipv6Addresses
-	host.Networking.PublicIPv4 = vm.PublicIp
+	ahf.Networking.IPv4Addresses = ipv4Addresses
+	ahf.Networking.IPv6Addresses = ipv6Addresses
+	ahf.Networking.PublicIPv4 = vm.PublicIp
 
 	return nil
 }
@@ -968,7 +962,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.Name = request.ResourceName
 	ahf.Core.Password = request.Password
 	ahf.Core.PrivateKey = request.KeyPair.PrivateKey
-	ahf.Core.LastState = hoststate.STARTED
+	// ahf.CurrentState, ahf.Core.LastState = hoststate.STARTED, hoststate.STARTED
 	nics = append(nics, defaultNic)
 	xerr = s.setHostProperties(ahf, request.Subnets, vm, nics)
 	return ahf, udc, xerr
@@ -1068,10 +1062,16 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 		return nullAHF, xerr
 	}
 
+	return ahf, s.complementHost(ahf, vm)
+}
+
+func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
+	ahf.Core.ID = vm.VmId
+
 	if ahf.Core.Name == "" {
 		tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
 		if xerr != nil {
-			return nullAHF, xerr
+			return xerr
 		}
 		if tag, ok := tags["name"]; ok {
 			ahf.Core.Name = tag
@@ -1079,14 +1079,10 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	}
 	subnets, nics, err := s.listSubnetsByHost(vm.VmId)
 	if err != nil {
-		return nullAHF, err
+		return err
 	}
-
-	ahf = abstract.NewHostFull()
-	ahf.Core.ID = vm.VmId
-	ahf.Core.LastState = hostState(vm.State)
-	xerr = s.setHostProperties(ahf, subnets, vm, nics)
-	return ahf, xerr
+	xerr := s.setHostProperties(ahf, subnets, vm, nics)
+	return xerr
 }
 
 // InspectHostByName returns the host identified by name
@@ -1105,11 +1101,7 @@ func (s stack) InspectHostByName(name string) (ahf *abstract.HostFull, xerr fail
 		return nullAHF, xerr
 	}
 
-	ahf = abstract.NewHostFull()
-	ahf.Core.ID = vm.VmId
-	ahf.Core.Name = name
-	ahf.Core.LastState = hostState(vm.State)
-	return ahf, nil
+	return ahf, s.complementHost(ahf, vm)
 }
 
 // GetHostState returns the current state of the host identified by id
@@ -1151,9 +1143,10 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 			continue
 		}
 
+		state := hostState(vm.State)
 		ahf := abstract.NewHostFull()
 		ahf.Core.ID = vm.VmId
-		ahf.Core.LastState = hostState(vm.State)
+		ahf.CurrentState, ahf.Core.LastState = state, state
 		if details {
 			ahf, xerr = s.InspectHost(ahf)
 			if xerr != nil {

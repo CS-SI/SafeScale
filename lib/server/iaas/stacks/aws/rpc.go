@@ -17,6 +17,8 @@
 package aws
 
 import (
+	"encoding/base64"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -358,25 +360,6 @@ func (s stack) rpcDescribeInternetGateways(vpcID *string, ids []*string) ([]*ec2
 		return []*ec2.InternetGateway{}, xerr
 	}
 	return resp.InternetGateways, nil
-}
-
-func (s stack) rpcDescribeSubnets(ids []*string) ([]*ec2.Subnet, fail.Error) {
-	var request ec2.DescribeSubnetsInput
-	if len(ids) > 0 {
-		request.SubnetIds = ids
-	}
-	var resp *ec2.DescribeSubnetsOutput
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = s.EC2Service.DescribeSubnets(&request)
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return []*ec2.Subnet{}, xerr
-	}
-	return resp.Subnets, nil
 }
 
 func (s stack) rpcDescribeSubnetByID(id *string) (*ec2.Subnet, fail.Error) {
@@ -1267,4 +1250,368 @@ func (s stack) rpcDescribeInstanceTypeByID(id *string) (*ec2.InstanceTypeInfo, f
 		return &ec2.InstanceTypeInfo{}, fail.InconsistentError("found more than one instance type with ID %s", aws.StringValue(id))
 	}
 	return resp[0], nil
+}
+
+func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.SpotPrice, fail.Error) {
+	var emptySlice []*ec2.SpotPrice
+	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
+		return emptySlice, xerr
+	}
+	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
+		return emptySlice, xerr
+	}
+
+	request := ec2.DescribeSpotPriceHistoryInput{
+		AvailabilityZone:    zone,
+		InstanceTypes:       []*string{templateID},
+		ProductDescriptions: []*string{aws.String("Linux/UNIX")},
+	}
+	var resp *ec2.DescribeSpotPriceHistoryOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeSpotPriceHistory(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+	if len(resp.SpotPriceHistory) == 0 {
+		return emptySlice, nil
+	}
+	return resp.SpotPriceHistory, nil
+}
+
+func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
+	nullInstance := &ec2.SpotInstanceRequest{}
+	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(imageID, "imageID", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(keypairName, "keypairName", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if publicIP == nil {
+		publicIP = aws.Bool(false)
+	}
+
+	request := ec2.RequestSpotInstancesInput{
+		InstanceCount: aws.Int64(1),
+		LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
+			ImageId:      imageID,
+			InstanceType: templateID,
+			KeyName:      keypairName,
+			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
+				{
+					DeviceIndex:              aws.Int64(int64(0)),
+					SubnetId:                 subnetID,
+					AssociatePublicIpAddress: publicIP,
+				},
+			},
+			Placement: &ec2.SpotPlacement{
+				AvailabilityZone: zone,
+			},
+			UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),
+		},
+		SpotPrice: price, // FIXME: Round up
+		Type:      aws.String("one-time"),
+	}
+	var resp *ec2.RequestSpotInstancesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.RequestSpotInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nullInstance, xerr
+	}
+	if len(resp.SpotInstanceRequests) == 0 {
+		return nullInstance, nil
+	}
+	return resp.SpotInstanceRequests[0], nil
+}
+
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (*ec2.Instance, fail.Error) {
+	nullInstance := &ec2.Instance{}
+	if xerr := validateAWSString(name, "name", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(subnetID, "subnetID", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(imageID, "imageID", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if xerr := validateAWSString(keypairName, "keypairName", true); xerr != nil {
+		return nullInstance, xerr
+	}
+	if publicIP == nil {
+		publicIP = aws.Bool(false)
+	}
+
+	request := ec2.RunInstancesInput{
+		ImageId:      imageID,
+		InstanceType: templateID,
+		KeyName:      keypairName,
+		MaxCount:     aws.Int64(1),
+		MinCount:     aws.Int64(1),
+		Placement: &ec2.Placement{
+			AvailabilityZone: zone,
+		},
+		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
+			{
+				DeviceIndex:              aws.Int64(int64(0)),
+				SubnetId:                 subnetID,
+				AssociatePublicIpAddress: publicIP,
+			},
+		},
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String("instance"),
+				Tags: []*ec2.Tag{
+					{
+						Key:   awsTagNameLabel,
+						Value: name,
+					},
+				},
+			},
+		},
+		UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),
+	}
+	var resp *ec2.Reservation
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.RunInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nullInstance, xerr
+	}
+	if len(resp.Instances) == 0 {
+		return nullInstance, nil
+	}
+
+	defer func() {
+		if xerr != nil {
+			ids := make([]*string, 0, len(resp.Instances))
+			for _, v := range resp.Instances {
+				ids = append(ids, v.InstanceId)
+			}
+			if _, derr := s.rpcTerminateInstances(ids); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instances"))
+			}
+		}
+	}()
+
+	if len(resp.Instances) > 1 {
+		return nullInstance, fail.InconsistentError("created more than one instance")
+	}
+
+	instance := resp.Instances[0]
+	xerr = stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
+				InstanceId:      instance.InstanceId,
+				SourceDestCheck: &ec2.AttributeBooleanValue{Value: aws.Bool(false)},
+			})
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return instance, nil
+}
+
+func (s stack) rpcTerminateInstances(ids []*string) ([]*ec2.InstanceStateChange, fail.Error) {
+	var emptySlice []*ec2.InstanceStateChange
+	if len(ids) == 0 {
+		return emptySlice, fail.InvalidParameterError("ids", "cannot be empty slice")
+	}
+
+	request := ec2.TerminateInstancesInput{
+		InstanceIds: ids,
+	}
+	var resp *ec2.TerminateInstancesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.TerminateInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+	if len(resp.TerminatingInstances) == 0 {
+		if len(ids) > 0 {
+			return emptySlice, fail.NotFoundError("failed to find instances to terminate")
+		}
+		return emptySlice, nil
+	}
+	return resp.TerminatingInstances, nil
+}
+
+func (s stack) rpcStartInstances(ids []*string) fail.Error {
+	if len(ids) == 0 {
+		return fail.InvalidParameterError("ids", "cannot be empty slice")
+	}
+
+	request := ec2.StartInstancesInput{
+		InstanceIds: ids,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.StartInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcRebootInstances(ids []*string) fail.Error {
+	if len(ids) == 0 {
+		return fail.InvalidParameterError("ids", "cannot be empty slice")
+	}
+
+	request := ec2.RebootInstancesInput{
+		InstanceIds: ids,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.RebootInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeSubnets(ids []*string) ([]*ec2.Subnet, fail.Error) {
+	var emptySlice []*ec2.Subnet
+	if len(ids) == 0 {
+		return emptySlice, fail.InvalidParameterError("ids", "cannot be empty slice")
+	}
+
+	// FIXME: use NextToken to get all subnets (only the 100 first are currently recovered)
+	request := ec2.DescribeSubnetsInput{
+		SubnetIds: ids,
+	}
+	out := make([]*ec2.Subnet, 0, 100)
+	for {
+		var resp *ec2.DescribeSubnetsOutput
+		xerr := stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.EC2Service.DescribeSubnets(&request)
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+		if len(resp.Subnets) == 0 {
+			break
+		}
+
+		out = append(out, resp.Subnets...)
+		if resp.NextToken == nil {
+			break
+		}
+
+		request.NextToken = resp.NextToken
+	}
+	if len(out) == 0 {
+		if len(ids) > 0 {
+			return emptySlice, fail.NotFoundError("failed to find Subnets")
+		}
+	}
+
+	return out, nil
+}
+
+func (s stack) rpcStopInstances(ids []*string, force *bool) fail.Error {
+	if len(ids) == 0 {
+		return fail.InvalidParameterError("ids", "cannot be empty slice")
+	}
+	if force == nil {
+		force = aws.Bool(false)
+	}
+
+	request := ec2.StopInstancesInput{
+		Force:       force,
+		InstanceIds: ids,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.StopInstances(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeNetworkInterfacesOfVm(id *string) ([]*ec2.NetworkInterface, fail.Error) {
+	var emptySlice []*ec2.NetworkInterface
+	request := ec2.DescribeNetworkInterfacesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("attachment.instance-id"),
+				Values: []*string{id},
+			},
+		},
+	}
+	var resp *ec2.DescribeNetworkInterfacesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeNetworkInterfaces(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+	if len(resp.NetworkInterfaces) == 0 {
+		return emptySlice, nil
+	}
+	return resp.NetworkInterfaces, nil
+}
+
+func (s stack) rpcModifySecurityGroupsOfNetworkInterface(id *string, sgs []*string) fail.Error {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return xerr
+	}
+	request := ec2.ModifyNetworkInterfaceAttributeInput{
+		NetworkInterfaceId: id,
+		Groups:             sgs,
+	}
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			_, err = s.EC2Service.ModifyNetworkInterfaceAttribute(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return xerr
+	}
+	return nil
 }

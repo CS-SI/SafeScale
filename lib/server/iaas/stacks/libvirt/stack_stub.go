@@ -83,8 +83,8 @@ func (s stack) InspectImage(id string) (*abstract.Image, fail.Error) {
 }
 
 // InspectTemplate stub
-func (s stack) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-	return &abstract.HostTemplate{}, gError
+func (s stack) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
+	return abstract.HostTemplate{}, gError
 }
 
 // ListTemplates stub

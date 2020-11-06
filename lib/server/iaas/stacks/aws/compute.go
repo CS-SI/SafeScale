@@ -17,7 +17,6 @@
 package aws
 
 import (
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -699,58 +698,41 @@ func (s stack) buildAwsSpotMachine(
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
-	ni := &ec2.InstanceNetworkInterfaceSpecification{
-		DeviceIndex:              aws.Int64(int64(0)),
-		SubnetId:                 aws.String(netID),
-		AssociatePublicIpAddress: aws.Bool(isGateway),
-	}
-	var resp *ec2.DescribeSpotPriceHistoryOutput
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = s.EC2Service.DescribeSpotPriceHistory(&ec2.DescribeSpotPriceHistoryInput{
-				AvailabilityZone:    aws.String(zone),
-				InstanceTypes:       []*string{aws.String(template.ID)},
-				ProductDescriptions: []*string{aws.String("Linux/UNIX")},
-			})
-			return err
-		},
-		normalizeError,
-	)
+	resp, xerr := s.rpcDescribeSpotPriceHistory(aws.String(zone), aws.String(template.ID))
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	lastPrice := resp.SpotPriceHistory[len(resp.SpotPriceHistory)-1]
+	lastPrice := resp[len(resp)-1]
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	input := &ec2.RequestSpotInstancesInput{
-		InstanceCount: aws.Int64(1),
-		LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-			ImageId:           aws.String(imageId),
-			InstanceType:      aws.String(template.ID),
-			KeyName:           aws.String(keypairName),
-			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
-			Placement: &ec2.SpotPlacement{
-				AvailabilityZone: aws.String(zone),
-			},
-			UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
-		},
-		SpotPrice: lastPrice.SpotPrice, // FIXME: Round up
-		Type:      aws.String("one-time"),
-	}
-	var result *ec2.RequestSpotInstancesOutput
-	xerr = stacks.RetryableRemoteCall(
-		func() (err error) {
-			result, err = s.EC2Service.RequestSpotInstances(input)
-			return err
-		},
-		normalizeError,
-	)
+	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageId), aws.String(keypairName), []byte(data))
+	// input := &ec2.RequestSpotInstancesInput{
+	// 	InstanceCount: aws.Int64(1),
+	// 	LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
+	// 		ImageId:           aws.String(imageId),
+	// 		InstanceType:      aws.String(template.ID),
+	// 		KeyName:           aws.String(keypairName),
+	// 		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
+	// 		Placement: &ec2.SpotPlacement{
+	// 			AvailabilityZone: aws.String(zone),
+	// 		},
+	// 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
+	// 	},
+	// 	SpotPrice: lastPrice.SpotPrice, // FIXME: Round up
+	// 	Type:      aws.String("one-time"),
+	// }
+	// var result *ec2.RequestSpotInstancesOutput
+	// xerr = stacks.RetryableRemoteCall(
+	// 	func() (err error) {
+	// 		result, err = s.EC2Service.RequestSpotInstances(input)
+	// 		return err
+	// 	},
+	// 	normalizeError,
+	// )
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	instance := result.SpotInstanceRequests[0]
 
 	// FIXME: Listen to result.SpotInstanceRequests[0].State
 
@@ -766,69 +748,17 @@ func (s stack) buildAwsMachine(
 	name string,
 	imageId string,
 	zone string,
-	netID string,
+	subnetID string,
 	data string,
 	isGateway bool,
 	template abstract.HostTemplate,
 	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
-	ni := &ec2.InstanceNetworkInterfaceSpecification{
-		DeviceIndex:              aws.Int64(int64(0)),
-		SubnetId:                 aws.String(netID),
-		AssociatePublicIpAddress: aws.Bool(isGateway),
-	}
-
-	// Run instance
-	var resp *ec2.Reservation
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = s.EC2Service.RunInstances(&ec2.RunInstancesInput{
-				ImageId:      aws.String(imageId),
-				InstanceType: aws.String(template.ID),
-				KeyName:      aws.String(keypairName),
-				MaxCount:     aws.Int64(1),
-				MinCount:     aws.Int64(1),
-				Placement: &ec2.Placement{
-					AvailabilityZone: aws.String(zone),
-				},
-				NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
-				TagSpecifications: []*ec2.TagSpecification{
-					{
-						ResourceType: aws.String("instance"),
-						Tags: []*ec2.Tag{
-							{
-								Key:   aws.String("Name"),
-								Value: aws.String(name),
-							},
-						},
-					},
-				},
-				UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
-			})
-			return err
-		},
-		normalizeError,
-	)
+	instance, xerr := s.rpcRunInstance(aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageId), aws.String(keypairName), aws.Bool(isGateway), []byte(data))
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
-				InstanceId:      resp.Instances[0].InstanceId,
-				SourceDestCheck: &ec2.AttributeBooleanValue{Value: aws.Bool(false)},
-			})
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	instance := resp.Instances[0]
 
 	hostCore := abstract.HostCore{
 		ID:   aws.StringValue(instance.InstanceId),
@@ -896,7 +826,7 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 
 	for _, ni := range instance.NetworkInterfaces {
 		newSubnet := IPInSubnet{
-			Name: getTagOfSubnet(s.EC2Service, ni.SubnetId, "Name"),
+			Name: s.getTagOfSubnet(ni.SubnetId, tagNameLabel),
 			ID:   aws.StringValue(ni.SubnetId),
 			IP:   aws.StringValue(ni.PrivateIpAddress),
 		}
@@ -979,31 +909,17 @@ func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstrac
 	return *hs, nil
 }
 
-func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
-	query := ec2.DescribeSubnetsInput{
-		SubnetIds: []*string{SubnetId},
-	}
-	var resp *ec2.DescribeSubnetsOutput
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = EC2Service.DescribeSubnets(&query)
-			return err
-		},
-		normalizeError,
-	)
+func (s stack) getTagOfSubnet(SubnetId *string, str string) string {
+	resp, xerr := s.rpcDescribeSubnetByID(SubnetId)
 	if xerr != nil {
 		return aws.StringValue(SubnetId)
 	}
 
-	if len(resp.Subnets) > 0 {
-		first := resp.Subnets[0]
-		for _, tag := range first.Tags {
-			if aws.StringValue(tag.Key) == s {
-				return aws.StringValue(tag.Value)
-			}
+	for _, tag := range resp.Tags {
+		if aws.StringValue(tag.Key) == str {
+			return aws.StringValue(tag.Value)
 		}
 	}
-
 	return aws.StringValue(SubnetId)
 }
 
@@ -1039,7 +955,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, x
 		return hoststate.ERROR, xerr
 	}
 
-	return host.Core.LastState, nil
+	return host.CurrentState, nil
 }
 
 // ListHosts returns a list of hosts
@@ -1074,7 +990,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 			ahf := abstract.NewHostFull()
 			ahf.Core.ID = aws.StringValue(instance.InstanceId)
 			ahf.Core.Name = name
-			ahf.Core.LastState = state
+			ahf.CurrentState, ahf.Core.LastState = state, state
 			if details {
 				ahf, xerr = s.InspectHost(ahf)
 				if xerr != nil {
@@ -1174,8 +1090,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 				}
 
-				if !(hostTmp.Core.LastState == hoststate.STOPPED || hostTmp.Core.LastState == hoststate.TERMINATED) {
-					return fail.NewError(innerXErr, "not in stopped or terminated state (current state: %s)", hostTmp.Core.LastState.String())
+				if hostTmp.CurrentState != hoststate.TERMINATED {
+					return fail.NewError(innerXErr, "not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
 				}
 				return nil
 			},
@@ -1191,7 +1107,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			}
 		}
 
-		// Remove volumes if there, mark errors as warnings
+		// Remove volumes if some remain, mark errors as warnings
 		for _, volume := range attachedVolumes {
 			// FIXME: parallelize ?
 			xerr = stacks.RetryableRemoteCall(
@@ -1208,7 +1124,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				case *fail.ErrNotFound:
 				// A missing volume is considered as a successful deletion
 				default:
-					logrus.Warnf("problem cleaning up, deleting volume %s", volume)
+					logrus.Warnf("failed to delete volume %s", volume)
 				}
 			}
 		}
@@ -1251,17 +1167,8 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.StopInstances(&ec2.StopInstancesInput{
-				Force:       aws.Bool(true),
-				InstanceIds: []*string{aws.String(ahf.Core.ID)},
-			})
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
+	// FIXME: forcing
+	if xerr = s.rpcStopInstances([]*string{aws.String(ahf.Core.ID)}, aws.Bool(true)); xerr != nil {
 		return xerr
 	}
 
@@ -1272,8 +1179,8 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return err
 			}
 
-			if !(hostTmp.Core.LastState == hoststate.STOPPED || hostTmp.Core.LastState == hoststate.TERMINATED) {
-				return fail.NewError("not in stopped or terminated state (current state: %s)", hostTmp.Core.LastState.String())
+			if hostTmp.CurrentState != hoststate.STOPPED && hostTmp.CurrentState != hoststate.TERMINATED {
+				return fail.NewError("not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
 		},
@@ -1304,15 +1211,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.StartInstances(&ec2.StartInstancesInput{
-				InstanceIds: []*string{aws.String(ahf.Core.ID)},
-			})
-			return err
-		},
-		normalizeError,
-	)
+	xerr = s.rpcStartInstances([]*string{aws.String(ahf.Core.ID)})
 	if xerr != nil {
 		return xerr
 	}
@@ -1324,8 +1223,8 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return innerErr
 			}
 
-			if hostTmp.Core.LastState != hoststate.STARTED {
-				return fail.NewError("not in started state (current state: %s)", hostTmp.Core.LastState.String())
+			if hostTmp.CurrentState != hoststate.STARTED {
+				return fail.NewError("not in started state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
 		},
@@ -1357,16 +1256,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.RebootInstances(&ec2.RebootInstancesInput{
-				InstanceIds: []*string{aws.String(ahf.Core.ID)},
-			})
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
+	if xerr = s.rpcRebootInstances([]*string{aws.String(ahf.Core.ID)}); xerr != nil {
 		return xerr
 	}
 
@@ -1377,8 +1267,8 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return innerErr
 			}
 
-			if hostTmp.Core.LastState != hoststate.STARTED {
-				return fail.NewError("not in started state (current state: %s)", hostTmp.Core.LastState.String())
+			if hostTmp.CurrentState != hoststate.STARTED {
+				return fail.NewError("not in started state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
 		},
@@ -1448,11 +1338,16 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 			sgs = append(sgs, v.GroupId)
 		}
 	}
+
 	// If count of Security Groups does not change, do nothing (saves a remote call)
 	if len(sgs) == len(resp.SecurityGroups) {
 		return nil
 	}
-	return s.rpcModifyInstanceSecurityGroups(aws.String(ahf.GetID()), sgs)
+	if xerr = s.rpcModifyInstanceSecurityGroups(aws.String(ahf.GetID()), sgs); xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // UnbindSecurityGroupFromHost ...

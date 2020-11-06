@@ -456,7 +456,8 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	ahf.Core.LastState = toHostState(server.Status)
+	state := toHostState(server.Status)
+	ahf.CurrentState, ahf.Core.LastState = state, state
 
 	if !ahf.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
@@ -543,13 +544,14 @@ func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 		hostCore.Name = server.Name
 	}
 
-	hostCore.LastState = toHostState(server.Status)
-	if hostCore.LastState == hoststate.ERROR || hostCore.LastState == hoststate.STARTING {
-		logrus.Warnf("[TRACE] Unexpected host's last state: %v", hostCore.LastState)
+	state := toHostState(server.Status)
+	if state == hoststate.ERROR || state == hoststate.STARTING {
+		logrus.Warnf("[TRACE] Unexpected host's last state: %v", state)
 	}
 
 	host = abstract.NewHostFull()
 	host.Core = hostCore
+	host.CurrentState, hostCore.LastState = state, state
 	host.Description = &abstract.HostDescription{
 		Created: server.Created,
 		Updated: server.Updated,
@@ -1340,7 +1342,7 @@ func (s Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 	if xerr != nil {
 		return hoststate.ERROR, xerr
 	}
-	return host.Core.LastState, nil
+	return host.CurrentState, nil
 }
 
 // ListHosts lists all hosts

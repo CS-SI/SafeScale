@@ -474,8 +474,8 @@ func (s *stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durat
 				return innerErr
 			}
 
-			if hostComplete.Core.LastState != hoststate.STARTED {
-				return fail.NotAvailableError("not in ready state (current state: %s)", hostComplete.Core.LastState.String())
+			if hostComplete.CurrentState != hoststate.STARTED {
+				return fail.NotAvailableError("not in ready state (current state: %s)", hostComplete.CurrentState.String())
 			}
 			return nil
 		},
@@ -635,11 +635,13 @@ func (s *stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.Host
 	if err != nil {
 		return nil, fail.ToError(err)
 	}
-	_ = &compute.Instance{}
-	hostComplete.Core.LastState, err = stateConvert(gcpHost.Status)
+
+	state, err := stateConvert(gcpHost.Status)
 	if err != nil {
 		return nil, fail.ToError(err)
 	}
+
+	hostComplete.CurrentState, hostComplete.Core.LastState = state, state
 	hostComplete.Core.Name = gcpHost.Hostname
 
 	var subnets []IPInSubnet
@@ -993,7 +995,7 @@ func (s *stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 		return hoststate.ERROR, xerr
 	}
 
-	return host.Core.LastState, nil
+	return host.CurrentState, nil
 }
 
 // -------------Provider Infos-------------------------------------------------------------------------------------------
