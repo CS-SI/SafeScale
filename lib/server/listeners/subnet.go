@@ -163,18 +163,14 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var (
-		an        *abstract.Network
-		networkID string
-	)
-	if svc.HasDefaultNetwork() {
-		if an, xerr = svc.GetDefaultNetwork(); xerr != nil {
-			return nil, xerr
-		}
-	}
+	var networkID string
 	networkRef, _ := srvutils.GetReference(in.Network)
-	if networkRef == "" || (an != nil && an.Name == networkRef) {
-		networkID = an.ID
+	if networkRef == "" {
+		if svc.HasDefaultNetwork() {
+			if an, xerr := svc.GetDefaultNetwork(); xerr == nil {
+				networkID = an.ID
+			}
+		}
 	} else {
 		rn, xerr := networkfactory.Load(task, svc, networkRef)
 		if xerr != nil {
