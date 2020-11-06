@@ -161,25 +161,26 @@ func parseGPU(s string) (gpus int, gpuType string, xerr fail.Error) {
 	return
 }
 
-func (s stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.Error) {
+func (s stack) parseTemplateID(id string) (abstract.HostTemplate, fail.Error) {
+	nullAHT := abstract.HostTemplate{}
 	tokens := strings.Split(id, ".")
 	if len(tokens) < 2 || !strings.HasPrefix(id, "tina") {
-		return nil, fail.InvalidParameterError("id", "invalid template id")
+		return nullAHT, fail.InvalidParameterError("id", "invalid template id")
 	}
 
 	cpus, ram, perf, err := parseSizing(tokens[1])
 	if err != nil {
-		return nil, fail.InvalidParameterError("id", "invalid template id")
+		return nullAHT, fail.InvalidParameterError("id", "invalid template id")
 	}
 	gpus := 0
 	gpuType := ""
 	if len(tokens) > 2 {
 		gpus, gpuType, err = parseGPU(tokens[2])
 		if err != nil {
-			return nil, fail.InvalidParameterError("id", "invalid template id")
+			return nullAHT, fail.InvalidParameterError("id", "invalid template id")
 		}
 	}
-	return &abstract.HostTemplate{
+	return abstract.HostTemplate{
 		Cores:     cpus,
 		CPUFreq:   s.cpuFreq(perf),
 		GPUNumber: gpus,
@@ -353,13 +354,13 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
-	nullHT := &abstract.HostTemplate{}
+func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Error) {
+	nullAHT := abstract.HostTemplate{}
 	if s.IsNull() {
-		return nullHT, fail.InvalidInstanceError()
+		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
@@ -753,9 +754,6 @@ func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	if err != nil {
 		return err
 	}
-	if template == nil {
-		return fail.InvalidParameterError("request.TemplateID", "Invalid template ID")
-	}
 
 	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
 	host.Core.Password = request.Password
@@ -951,7 +949,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		vm.PublicIp = udc.PublicIP
 	}
 
-	if xerr = s.addGPUs(&request, *tpl, vm.VmId); xerr != nil {
+	if xerr = s.addGPUs(&request, tpl, vm.VmId); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 	_, xerr = s.rpcCreateTags(vm.VmId, map[string]string{

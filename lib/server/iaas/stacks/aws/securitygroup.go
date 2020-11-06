@@ -30,15 +30,29 @@ import (
 )
 
 // ListSecurityGroups lists existing security groups
-func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, fail.Error) {
+	var emptySlice []*abstract.SecurityGroup
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return nil, fail.NotImplementedError()
+	resp, xerr := s.rpcDescribeSecurityGroups(aws.String(networkID), nil)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	out := make([]*abstract.SecurityGroup, 0, len(resp))
+	for k, v := range resp {
+		item, xerr := toAbstractSecurityGroup(v)
+		if xerr != nil {
+			return emptySlice, fail.Wrap(xerr, "failed to convert rule #%d", k)
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 // CreateSecurityGroup creates a security group
@@ -80,54 +94,6 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 		}
 	}()
 
-	//var ports []portDef
-
-	//// Add common ports
-	//ports = append(ports, portDef{"tcp", 22, 22})
-	//ports = append(ports, portDef{"tcp", 80, 80})
-	//ports = append(ports, portDef{"tcp", 443, 443})
-	//
-	//// Guacamole ports
-	//ports = append(ports, portDef{"tcp", 8080, 8080})
-	//ports = append(ports, portDef{"tcp", 8009, 8009})
-	//ports = append(ports, portDef{"tcp", 9009, 9009})
-	//ports = append(ports, portDef{"tcp", 3389, 3389})
-	//ports = append(ports, portDef{"tcp", 5900, 5900})
-	//ports = append(ports, portDef{"tcp", 63011, 63011})
-	//
-	//// Add time server
-	//ports = append(ports, portDef{"udp", 123, 123})
-	//
-	//// Add kubernetes see https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
-	//ports = append(ports, portDef{"tcp", 6443, 6443})
-	//ports = append(ports, portDef{"tcp", 2379, 2380})
-	//ports = append(ports, portDef{"tcp", 10250, 10250})
-	//ports = append(ports, portDef{"tcp", 10251, 10251})
-	//ports = append(ports, portDef{"tcp", 10252, 10252})
-	//ports = append(ports, portDef{"tcp", 10255, 10255})
-	//ports = append(ports, portDef{"tcp", 30000, 32767})
-	//
-	//// Add docker swarm ports
-	//ports = append(ports, portDef{"tcp", 2376, 2376})
-	//ports = append(ports, portDef{"tcp", 2377, 2377})
-	//ports = append(ports, portDef{"tcp", 7946, 7946})
-	//ports = append(ports, portDef{"udp", 7946, 7946})
-	//ports = append(ports, portDef{"udp", 4789, 4789})
-	//
-	//// ping
-	//ports = append(ports, portDef{"icmp", -1, -1})
-
-	//var permissions []*ec2.IpPermission
-	//for _, item := range ports {
-	//	permissions = append(permissions, (&ec2.IpPermission{}).
-	//		SetIpProtocol(item.protocol).
-	//		SetFromPort(item.fromPort).
-	//		SetToPort(item.toPort).
-	//		SetIpRanges([]*ec2.IpRange{
-	//			{CidrIp: aws.String("0.0.0.0/0")},
-	//		}))
-	//}
-
 	// clears default rules set at creation
 	if _, xerr = s.ClearSecurityGroup(asg); xerr != nil {
 		return nil, xerr
@@ -149,12 +115,12 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	return asg, nil
 }
 
-// fromAbstractSecurityGroupRules converts a slice of abstract.SecurityGrouRule to a couple of slices of AWS IpPermission,
+// fromAbstractSecurityGroupRules converts a slice of abstract.SecurityGrouRule to a couple of slices of AWS ec2.IpPermission,
 // corresponding rspectively to ingress and egress IpPermission
 func fromAbstractSecurityGroupRules(in abstract.SecurityGroupRules) ([]*ec2.IpPermission, []*ec2.IpPermission, fail.Error) {
-	if len(in) == 0 {
-		return nil, nil, fail.InvalidParameterError("in", "cannot be empty slice")
-	}
+	// if len(in) == 0 {
+	// 	return nil, nil, fail.InvalidParameterError("in", "cannot be empty slice")
+	// }
 
 	ingress := make([]*ec2.IpPermission, 0, len(in))
 	egress := make([]*ec2.IpPermission, 0, len(in))
@@ -175,7 +141,7 @@ func fromAbstractSecurityGroupRules(in abstract.SecurityGroupRules) ([]*ec2.IpPe
 	return ingress, egress, nil
 }
 
-// fromAbstractSecurityGroupRule converts an abstract.SecurityGroupRule to AWS IpPermission
+// fromAbstractSecurityGroupRule converts an abstract.SecurityGroupRule to AWS ec2.IpPermission
 func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) *ec2.IpPermission {
 	ipranges := make([]*ec2.IpRange, 0, len(in.IPRanges))
 	for _, v := range in.IPRanges {
@@ -275,7 +241,7 @@ func toAbstractSecurityGroupRules(in *ec2.SecurityGroup) ([]abstract.SecurityGro
 	}
 	var out []abstract.SecurityGroupRule
 	for _, v := range in.IpPermissions {
-		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.INGRESS)
+		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.INGRESS, ipversion.IPv4)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -283,7 +249,7 @@ func toAbstractSecurityGroupRules(in *ec2.SecurityGroup) ([]abstract.SecurityGro
 	}
 
 	for _, v := range in.IpPermissionsEgress {
-		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.EGRESS)
+		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.EGRESS, ipversion.IPv4)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -294,7 +260,7 @@ func toAbstractSecurityGroupRules(in *ec2.SecurityGroup) ([]abstract.SecurityGro
 }
 
 // toAbstractSecurityGroupRule converts a security group coming from AWS to a slice of abstracted security group rules
-func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupruledirection.Enum) ([]abstract.SecurityGroupRule, fail.Error) {
+func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupruledirection.Enum, etherType ipversion.Enum) ([]abstract.SecurityGroupRule, fail.Error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -302,6 +268,7 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 	out := make([]abstract.SecurityGroupRule, 0, len(in.IpRanges))
 	item := abstract.NewSecurityGroupRule()
 	item.Direction = direction
+	item.EtherType = etherType
 	item.Protocol = aws.StringValue(in.IpProtocol)
 	item.PortFrom = uint16(aws.Int64Value(in.FromPort))
 	item.PortTo = uint16(aws.Int64Value(in.ToPort))
@@ -309,7 +276,6 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 	item.IPRanges = make([]string, 0, len(in.IpRanges))
 	for _, ip := range in.IpRanges {
 		item.IPRanges = append(item.IPRanges, aws.StringValue(ip.CidrIp))
-		out = append(out, item)
 	}
 	return out, nil
 }

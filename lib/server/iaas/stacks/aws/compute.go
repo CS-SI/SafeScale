@@ -18,16 +18,13 @@ package aws
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/pricing"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -231,8 +228,8 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 }
 
 // InspectTemplate loads information about a template stored in AWS
-func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
-	nullAHT := &abstract.HostTemplate{}
+func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
+	nullAHT := abstract.HostTemplate{}
 	if s.IsNull() {
 		return nullAHT, fail.InvalidInstanceError()
 	}
@@ -243,55 +240,34 @@ func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	prods, err := s.PricingService.GetProducts(&pricing.GetProductsInput{
-		Filters: []*pricing.Filter{
-			{
-				Field: aws.String("ServiceCode"),
-				Type:  aws.String("TERM_MATCH"),
-				Value: aws.String("AmazonEC2"),
-			},
-			{
-				Field: aws.String("operatingSystem"),
-				Type:  aws.String("TERM_MATCH"),
-				Value: aws.String("Linux"),
-			},
-			{
-				Field: aws.String("instanceType"),
-				Type:  aws.String("TERM_MATCH"),
-				Value: aws.String(id),
-			},
-		},
-		MaxResults:  aws.Int64(100),
-		ServiceCode: aws.String("AmazonEC2"),
-	})
-	if err != nil {
-		return nullAHT, normalizeError(err)
+	// VPL: price is not a consideration to have at this level (stack)
+	// resp, xerr := s.rpcGetProductByID(aws.String(id))
+	// if xerr != nil {
+	// 	return nullAHT, xerr
+	// }
+	//
+	// price, xerr := NewPriceFromJSONValue(resp)
+	// if xerr != nil {
+	// 	return nullAHT, xerr
+	// }
+	//
+	// tpl := abstract.HostTemplate{
+	// 	ID:        price.Product.Attributes.InstanceType,
+	// 	Name:      price.Product.Attributes.InstanceType,
+	// 	Cores:     price.GetCores(),
+	// 	GPUNumber: price.GetGPUNumber(),
+	// 	DiskSize:  int(price.GetDiskSize()),
+	// 	RAMSize:   float32(price.GetRAMSize()),
+	// }
+	//
+	// return &tpl, nil
+
+	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(id))
+	if xerr != nil {
+		return nullAHT, xerr
 	}
 
-	for _, price := range prods.PriceList {
-		jsonPrice, err := json.Marshal(price)
-		if err != nil {
-			continue
-		}
-		price := Price{}
-		err = json.Unmarshal(jsonPrice, &price)
-		if err != nil {
-			continue
-		}
-
-		tpl := abstract.HostTemplate{
-			ID:        price.Product.Attributes.InstanceType,
-			Name:      price.Product.Attributes.InstanceType,
-			Cores:     ParseNumber(price.Product.Attributes.Vcpu, 1),
-			GPUNumber: ParseNumber(price.Product.Attributes.Gpu, 0),
-			DiskSize:  int(ParseStorage(price.Product.Attributes.Storage)),
-			RAMSize:   float32(ParseMemory(price.Product.Attributes.Memory)),
-		}
-
-		return &tpl, nil
-	}
-
-	return nullAHT, abstract.ResourceNotFoundError("template", id)
+	return toAbstractHostTemplate(*resp), nil
 }
 
 // createFilters ...
@@ -387,51 +363,64 @@ func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Err
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	prods, err := s.PricingService.GetProducts(&pricing.GetProductsInput{
-		Filters: []*pricing.Filter{
-			{
-				Field: aws.String("ServiceCode"),
-				Type:  aws.String("TERM_MATCH"),
-				Value: aws.String("AmazonEC2"),
-			},
-			{
-				Field: aws.String("operatingSystem"),
-				Type:  aws.String("TERM_MATCH"),
-				Value: aws.String("Linux"),
-			},
-		},
-		MaxResults:  aws.Int64(100),
-		ServiceCode: aws.String("AmazonEC2"),
-	})
-	if err != nil {
-		return emptySlice, normalizeError(err)
+	// resp, xerr := s.rpcGetProducts(nil)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+	//
+	// list := make([]abstract.HostTemplate, 0, len(resp))
+	// for _, v := range resp {
+	// 	price, xerr := NewPriceFromJSONValue(v)
+	// 	if xerr != nil {
+	// 		continue
+	// 	}
+	//
+	// 	tpl := abstract.HostTemplate{
+	// 		ID:        price.Product.Attributes.InstanceType,
+	// 		Name:      price.Product.Attributes.InstanceType,
+	// 		Cores:     price.GetCores(),
+	// 		GPUNumber: price.GetGPUNumber(),
+	// 		DiskSize:  int(price.GetDiskSize()),
+	// 		RAMSize:   float32(price.GetRAMSize()),
+	// 	}
+	// 	list = append(list, tpl)
+	// }
+
+	resp, xerr := s.rpcDescribeInstanceTypes(nil)
+	if xerr != nil {
+		return emptySlice, xerr
 	}
 
-	templates = make([]abstract.HostTemplate, 0, len(prods.PriceList))
-	for _, price := range prods.PriceList {
-		jsonPrice, err := json.Marshal(price)
-		if err != nil {
-			continue
-		}
-		price := Price{}
-		err = json.Unmarshal(jsonPrice, &price)
-		if err != nil {
-			continue
-		}
-
-		tpl := abstract.HostTemplate{
-			ID:        price.Product.Attributes.InstanceType,
-			Name:      price.Product.Attributes.InstanceType,
-			Cores:     ParseNumber(price.Product.Attributes.Vcpu, 1),
-			GPUNumber: ParseNumber(price.Product.Attributes.Gpu, 0),
-			DiskSize:  int(ParseStorage(price.Product.Attributes.Storage)),
-			RAMSize:   float32(ParseMemory(price.Product.Attributes.Memory)),
-		}
-
-		templates = append(templates, tpl)
+	list := make([]abstract.HostTemplate, 0, len(resp))
+	for _, v := range resp {
+		list = append(list, toAbstractHostTemplate(*v))
 	}
+	return list, nil
+}
 
-	return templates, nil
+func toAbstractHostTemplate(in ec2.InstanceTypeInfo) abstract.HostTemplate {
+	out := abstract.HostTemplate{
+		ID:   aws.StringValue(in.InstanceType),
+		Name: aws.StringValue(in.InstanceType),
+	}
+	if in.VCpuInfo != nil {
+		out.Cores = int(aws.Int64Value(in.VCpuInfo.DefaultCores))
+	}
+	if in.MemoryInfo != nil {
+		out.RAMSize = float32(aws.Int64Value(in.MemoryInfo.SizeInMiB) / 1024.0)
+	}
+	if in.ProcessorInfo != nil {
+		out.CPUFreq =
+			float32(aws.Float64Value(in.ProcessorInfo.SustainedClockSpeedInGhz))
+	}
+	if in.InstanceStorageInfo != nil {
+		out.DiskSize = int(aws.Int64Value(in.InstanceStorageInfo.TotalSizeInGB))
+	}
+	if in.GpuInfo != nil && len(in.GpuInfo.Gpus) > 0 {
+		out.GPUNumber = len(in.GpuInfo.Gpus)
+		out.GPUType = aws.StringValue(in.GpuInfo.Gpus[0].Manufacturer) + " " + aws.StringValue(in.GpuInfo.Gpus[0].Name)
+	}
+	return out
 }
 
 // WaitHostReady waits an host achieve ready state
@@ -471,8 +460,8 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 			}
 
 			if hostTmp.CurrentState != hoststate.STARTED {
-				// innerXErr = fail.NewError("not in ready state (current state: %s)", ahf.CurrentState.String())
-				logrus.Warn(innerXErr.Error())
+				innerXErr = fail.NewError("not in ready state (current state: %s)", ahf.CurrentState.String())
+				//logrus.Warn(innerXErr.Error())
 				return innerXErr
 			}
 			return nil
@@ -609,7 +598,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Networking.IsGateway = isGateway
 
 	// Adds Host property SizingV1
-	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
+	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
 	// Sets provider parameters to create ahf
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
@@ -620,7 +609,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// --- query provider for ahf creation ---
 
 	logrus.Debugf("requesting host resource creation...")
-	// var desistError error
 
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
@@ -630,9 +618,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				innerXErr fail.Error
 			)
 			if request.Disposable {
-				server, innerXErr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, *template)
+				server, innerXErr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, template)
 			} else {
-				server, innerXErr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, *template)
+				server, innerXErr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, template)
 			}
 			if innerXErr != nil {
 				logrus.Warnf("error creating Host: %+v", innerXErr)
@@ -642,12 +630,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", server.Name))
 					}
 				}
-
-				// if isAWSErr(innerXErr) {
-				// 	desistError = xerr
-				// 	return nil
-				// }
-
 				return innerXErr
 			}
 
@@ -680,9 +662,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			return nullAHF, nullUDC, xerr
 		}
 	}
-	// if desistError != nil {
-	// 	return nullAHF, nullUDC, fail.ForbiddenError("failed to create Host: %s", desistError.Error())
-	// }
 
 	logrus.Debugf("Host resource created.")
 
@@ -709,153 +688,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 }
 
-//// Returns true if the error is of type awserr.Error
-//func isSpecificAWSErr(err error, code string, message string) bool {
-//	if err, ok := err.(awserr.Error); ok {
-//		logrus.Warnf("Received AWS error code: %s", err.Code())
-//		return err.Code() == code && strings.Contains(err.Message(), message)
-//	}
-//	return false
-//}
-
-// /*
-// Returns true if the error matches all these conditions:
-// - err if of type awserr.Error
-// - Error.Code() matches code
-// - Error.Message() contains message
-// */
-// func isAWSErr(err error) bool {
-// 	if err, ok := err.(awserr.Error); ok {
-// 		logrus.Warnf("Received AWS error code: %s", err.Code())
-// 		return true
-// 	}
-//
-// 	return false
-// }
-
-//func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, error) {
-//	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-//		Filters: []*ec2.Filter{{
-//			Name:   aws.String("group-name"),
-//			Values: []*string{aws.String(name)},
-//		}},
-//	})
-//	if err != nil {
-//		return false, err
-//	}
-//
-//	for _, sg := range dgo.SecurityGroups {
-//		if aws.StringValue(sg.VpcId) == vpcID {
-//			return true, nil
-//		}
-//	}
-//
-//	return false, nil
-//}
-
-//func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string, error) {
-//	dgo, err := EC2Service.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-//		Filters: []*ec2.Filter{{
-//			Name:   aws.String("group-name"),
-//			Values: []*string{aws.String(name)},
-//		}},
-//	})
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	for _, sg := range dgo.SecurityGroups {
-//		if aws.StringValue(sg.VpcId) == vpcID {
-//			return aws.StringValue(sg.GroupId), nil
-//		}
-//	}
-//
-//	return "", fail.NotFoundError(fmt.Sprintf("Security group %s not found", name))
-//}
-//
-//func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
-//	logrus.Warnf("Creating security group for vpc %s with name %s", vpcID, name)
-//
-//	// Create the security group with the VPC, name and description.
-//	createRes, err := EC2Service.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
-//		Description: aws.String(fmt.Sprintf("Default group cfg for vpc %s", vpcID)),
-//		GroupName:   aws.String(name),
-//		VpcId:       aws.String(vpcID),
-//	})
-//	if err != nil {
-//		if aerr, ok := err.(awserr.Error); ok {
-//			switch aerr.Code() {
-//			case "InvalidVpcID.NotFound":
-//				return fail.Wrap(err, "unable to find VPC with ID %q", vpcID)
-//			case "InvalidGroup.Duplicate":
-//				return fail.Wrap(err, "security group %q already exists", name)
-//			}
-//		}
-//		return fail.Wrap(err, "unable to create security group %q", name)
-//	}
-//	fmt.Printf("Created security group %s with VPC %s.\n",
-//		aws.StringValue(createRes.GroupId), vpcID)
-//
-//	var ports []portDef
-//
-//	// Add common ports
-//	ports = append(ports, portDef{"tcp", 22, 22})
-//	ports = append(ports, portDef{"tcp", 80, 80})
-//	ports = append(ports, portDef{"tcp", 443, 443})
-//
-//	// Guacamole ports
-//	ports = append(ports, portDef{"tcp", 8080, 8080})
-//	ports = append(ports, portDef{"tcp", 8009, 8009})
-//	ports = append(ports, portDef{"tcp", 9009, 9009})
-//	ports = append(ports, portDef{"tcp", 3389, 3389})
-//	ports = append(ports, portDef{"tcp", 5900, 5900})
-//	ports = append(ports, portDef{"tcp", 63011, 63011})
-//
-//	// Add time server
-//	ports = append(ports, portDef{"udp", 123, 123})
-//
-//	// Add kubernetes see https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports
-//	ports = append(ports, portDef{"tcp", 6443, 6443})
-//	ports = append(ports, portDef{"tcp", 2379, 2380})
-//	ports = append(ports, portDef{"tcp", 10250, 10250})
-//	ports = append(ports, portDef{"tcp", 10251, 10251})
-//	ports = append(ports, portDef{"tcp", 10252, 10252})
-//	ports = append(ports, portDef{"tcp", 10255, 10255})
-//	ports = append(ports, portDef{"tcp", 30000, 32767})
-//
-//	// Add docker swarm ports
-//	ports = append(ports, portDef{"tcp", 2376, 2376})
-//	ports = append(ports, portDef{"tcp", 2377, 2377})
-//	ports = append(ports, portDef{"tcp", 7946, 7946})
-//	ports = append(ports, portDef{"udp", 7946, 7946})
-//	ports = append(ports, portDef{"udp", 4789, 4789})
-//
-//	// ping
-//	ports = append(ports, portDef{"icmp", -1, -1})
-//
-//	var permissions []*ec2.IpPermission
-//	for _, item := range ports {
-//		permissions = append(permissions, (&ec2.IpPermission{}).
-//			SetIpProtocol(item.protocol).
-//			SetFromPort(item.fromPort).
-//			SetToPort(item.toPort).
-//			SetIpRanges([]*ec2.IpRange{
-//				{CidrIp: aws.String("0.0.0.0/0")},
-//			}))
-//	}
-//
-//	// Add permissions to the security group
-//	_, err = EC2Service.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
-//		GroupId:       createRes.GroupId,
-//		IpPermissions: permissions,
-//	})
-//	if err != nil {
-//		return fail.Wrap(err, "unable to set security group %q ingress", name)
-//	}
-//
-//	return nil
-//}
-
 func (s stack) buildAwsSpotMachine(
 	keypairName string,
 	name string,
@@ -865,14 +697,12 @@ func (s stack) buildAwsSpotMachine(
 	data string,
 	isGateway bool,
 	template abstract.HostTemplate,
-	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
 		AssociatePublicIpAddress: aws.Bool(isGateway),
-		//Groups:                   []*string{aws.String(sgID)},
 	}
 	var resp *ec2.DescribeSpotPriceHistoryOutput
 	xerr := stacks.RetryableRemoteCall(
@@ -943,13 +773,10 @@ func (s stack) buildAwsMachine(
 	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
-	//logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
-
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
 		AssociatePublicIpAddress: aws.Bool(isGateway),
-		//Groups:                   []*string{aws.String(sgID)},
 	}
 
 	// Run instance
@@ -1023,7 +850,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&xerr)
 	defer fail.OnPanic(&xerr)
 
 	var resp *ec2.Instance
@@ -1106,7 +932,10 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 		ahf.Networking.PublicIPv4 = ipv4
 	}
 
-	sizing := s.fromMachineTypeToHostEffectiveSizing(instanceType)
+	sizing, xerr := s.fromMachineTypeToHostEffectiveSizing(instanceType)
+	if xerr != nil {
+		return xerr
+	}
 
 	ahf.Sizing.Cores = sizing.Cores
 	ahf.Sizing.RAMSize = sizing.RAMSize
@@ -1114,123 +943,40 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 
 	ahf.Core.Name = instanceName
 
-	if !ahf.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
-	}
+	// if !ahf.OK() {
+	// 	logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
+	// }
 
 	return nil
 }
 
-//func (s stack) inspectReservations(ahf *abstract.HostFull, hostRef string, reservation *ec2.Reservation) (xerr fail.Error) {
-//	instanceName := ""
-//	instanceType := ""
-//
-//	for _, i := range reservation.Instances {
-//		if ahf.Core.LastState, xerr = toHostState(i.State); xerr != nil {
-//			return xerr
-//		}
-//
-//		for _, tag := range i.Tags {
-//			if tag != nil {
-//				if aws.StringValue(tag.Key) == "Name" || aws.StringValue(tag.Key) == "tag:Name" {
-//					if aws.StringValue(tag.Value) != "" {
-//						instanceName = aws.StringValue(tag.Value)
-//						break
-//					}
-//				}
-//			}
-//		}
-//
-//		if aws.StringValue(i.InstanceType) != "" {
-//			instanceType = aws.StringValue(i.InstanceType)
-//			break
-//		}
-//	}
-//
-//	if instanceType == "" {
-//		return fail.NewError(nil, "error recovering instance type of %s", hostRef)
-//	}
-//
-//	var subnets []IPInSubnet
-//
-//	for _, i := range reservation.Instances {
-//		for _, ni := range i.NetworkInterfaces {
-//			newSubnet := IPInSubnet{
-//				Name: getTagOfSubnet(s.EC2Service, ni.SubnetId, "Name"),
-//				ID:   aws.StringValue(ni.SubnetId),
-//				IP:   aws.StringValue(ni.PrivateIpAddress),
-//			}
-//
-//			if ni.Association != nil {
-//				if ni.Association.PublicIp != nil {
-//					newSubnet.PublicIP = aws.StringValue(ni.Association.PublicIp)
-//				}
-//			}
-//
-//			subnets = append(subnets, newSubnet)
-//		}
-//	}
-//
-//	ip4bynetid := make(map[string]string)
-//	subnetnamebyid := make(map[string]string)
-//	subnetidbyname := make(map[string]string)
-//
-//	ipv4 := ""
-//	for _, rn := range subnets {
-//		ip4bynetid[rn.ID] = rn.IP
-//		subnetnamebyid[rn.ID] = rn.Name
-//		subnetidbyname[rn.Name] = rn.ID
-//		if rn.PublicIP != "" {
-//			ipv4 = rn.PublicIP
-//		}
-//	}
-//
-//	ahf.Networking.IPv4Addresses = ip4bynetid
-//	ahf.Networking.IPv6Addresses = make(map[string]string)
-//	ahf.Networking.SubnetsByID = subnetnamebyid
-//	ahf.Networking.SubnetsByName = subnetidbyname
-//	if ahf.Networking.PublicIPv4 == "" {
-//		ahf.Networking.PublicIPv4 = ipv4
-//	}
-//
-//	sizing := s.fromMachineTypeToHostEffectiveSizing(instanceType)
-//
-//	ahf.Sizing.Cores = sizing.Cores
-//	ahf.Sizing.RAMSize = sizing.RAMSize
-//	ahf.Sizing.DiskSize = sizing.DiskSize
-//
-//	ahf.Core.Name = instanceName
-//
-//	if !ahf.OK() {
-//		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
-//	}
-//
-//	return nil
-//}
-//
-
-func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) abstract.HostEffectiveSizing {
+// FIXME: too slow, find a way to speed it up
+func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
 
-	templates, xerr := s.ListTemplates()
+	// resp, xerr := s.rpcGetProductByID(aws.String(machineType))
+	// if xerr != nil {
+	// 	return nullSizing, xerr
+	// }
+	// price, xerr := NewPriceFromJSONValue(resp)
+	// if xerr != nil {
+	// 	return nullSizing, xerr
+	// }
+	// hs := abstract.HostEffectiveSizing{
+	// 	Cores:     price.GetCores(),
+	// 	GPUNumber: price.GetGPUNumber(),
+	// 	CPUFreq:   float32(price.GetCPUFreq()),
+	// 	DiskSize:  int(price.GetDiskSize()),
+	// 	RAMSize:   float32(price.GetRAMSize()),
+	// }
+
+	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(machineType))
 	if xerr != nil {
-		return nullSizing
+		return nullSizing, xerr
 	}
 
-	for _, template := range templates {
-		if template.Name == machineType {
-			hs := abstract.HostEffectiveSizing{
-				Cores:     template.Cores,
-				CPUFreq:   template.CPUFreq,
-				DiskSize:  template.DiskSize,
-				RAMSize:   template.RAMSize,
-				GPUNumber: template.GPUNumber,
-				GPUType:   template.GPUType,
-			}
-			return hs
-		}
-	}
-	return nullSizing
+	hs := converters.HostTemplateToHostEffectiveSizing(toAbstractHostTemplate(*resp))
+	return *hs, nil
 }
 
 func getTagOfSubnet(EC2Service *ec2.EC2, SubnetId *string, s string) string {
@@ -1342,7 +1088,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 	return hosts, nil
 }
 
-// DeleteHost deletes a host
+// DeleteHost deletes a Host
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1387,7 +1133,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		var (
 			keyPairName     string
 			attachedVolumes []string
-			//secGroupId string
 		)
 
 		// register attached volumes
@@ -1405,10 +1150,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 
 		keyPairName = aws.StringValue(vm.KeyName)
-		//if len(inst.SecurityGroups) > 0 {
-		//	sg := inst.SecurityGroups[0]
-		//	secGroupId = aws.StringValue(sg.GroupId)
-		//}
 
 		// Terminate instance
 		if xerr = s.rpcTerminateInstance(aws.String(ahf.GetID())); xerr != nil {
@@ -1422,13 +1163,19 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
-				hostTmp, err := s.InspectHost(ahf)
-				if err != nil {
-					return err
+				hostTmp, innerXErr := s.InspectHost(ahf)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// if Host is not found, consider operation as successful
+						return nil
+					default:
+						return innerXErr
+					}
 				}
 
 				if !(hostTmp.Core.LastState == hoststate.STOPPED || hostTmp.Core.LastState == hoststate.TERMINATED) {
-					return fail.NewError(err, "not in stopped or terminated state (current state: %s)", hostTmp.Core.LastState.String())
+					return fail.NewError(innerXErr, "not in stopped or terminated state (current state: %s)", hostTmp.Core.LastState.String())
 				}
 				return nil
 			},
@@ -1457,21 +1204,14 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				normalizeError,
 			)
 			if xerr != nil {
-				logrus.Warnf("problem cleaning up, deleting volume %s", volume)
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				// A missing volume is considered as a successful deletion
+				default:
+					logrus.Warnf("problem cleaning up, deleting volume %s", volume)
+				}
 			}
 		}
-
-		//// Remove security group
-		//if secGroupId != "" {
-		//	_, err = s.EC2Service.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
-		//		GroupId: aws.String(secGroupId),
-		//	})
-		//	if err != nil {
-		//		return fail.Wrap(err, "error deleting security group")
-		//	}
-		//} else {
-		//	logrus.Warnf("security group %s for host '%s' not found", secGroupId, hostRef)
-		//}
 
 		// Remove keypair
 		if keyPairName != "" {
@@ -1485,10 +1225,13 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				normalizeError,
 			)
 			if xerr != nil {
-				return fail.Wrap(xerr, "error deleting keypair")
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				// A missing keypair is considered as a successful deletion
+				default:
+					return fail.Wrap(xerr, "error deleting keypair")
+				}
 			}
-		} else {
-			logrus.Warnf("keypair '%s' for host '%s' not found", keyPairName, ahf.GetID())
 		}
 	}
 
@@ -1665,19 +1408,112 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 }
 
 // BindSecurityGroupToHost ...
+// Returns:
+// - *fail.ErrNotFound if the Host is not found
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsConsistent() {
+		if ahf, xerr = s.InspectHost(ahf); xerr != nil {
+			return xerr
+		}
+	}
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam) // nolint
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		if asg, xerr = s.InspectSecurityGroup(asg); xerr != nil {
+			return xerr
+		}
+	}
 
-	return fail.NotImplementedError("not yet implemented")
+	resp, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
+	if xerr != nil {
+		return xerr
+	}
+
+	sgs := make([]*string, 0, len(resp.SecurityGroups)+1)
+	sgs = append(sgs, aws.String(asg.ID))
+	for _, v := range resp.SecurityGroups {
+		switch aws.StringValue(v.GroupId) {
+		case asg.ID:
+			continue
+		default:
+			sgs = append(sgs, v.GroupId)
+		}
+	}
+	// If count of Security Groups does not change, do nothing (saves a remote call)
+	if len(sgs) == len(resp.SecurityGroups) {
+		return nil
+	}
+	return s.rpcModifyInstanceSecurityGroups(aws.String(ahf.GetID()), sgs)
 }
 
 // UnbindSecurityGroupFromHost ...
+// Returns:
+// - nil means success
+// - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsConsistent() {
+		ahf, xerr = s.InspectHost(ahf)
+		if xerr != nil {
+			return xerr
+		}
+	}
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam) // nolint
+	if !asg.IsConsistent() {
+		asg, xerr = s.InspectSecurityGroup(asg)
+		if xerr != nil {
+			return xerr
+		}
+	}
 
-	return fail.NotImplementedError("not yet implemented")
+	// query the instance to get its current Security Groups
+	resp, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
+	if xerr != nil {
+		return xerr
+	}
+
+	sgs := make([]*string, 0, len(resp.SecurityGroups)+1)
+
+	// If there is one last Security Group bound to Host, restore bond to default SecurityGroup before removing
+	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
+		defaultSG := abstract.NewSecurityGroup()
+		defaultSG.Name = s.GetDefaultSecurityGroupName()
+		defaultSG.NetworkID = asg.NetworkID
+		defaultSG, xerr := s.InspectSecurityGroup(defaultSG)
+		if xerr != nil {
+			return xerr
+		}
+		sgs = append(sgs, aws.String(defaultSG.ID))
+	}
+
+	// Filter out the Security Group to remove
+	for _, v := range resp.SecurityGroups {
+		switch aws.StringValue(v.GroupId) {
+		case asg.ID:
+			continue
+		default:
+			sgs = append(sgs, v.GroupId)
+		}
+	}
+	// If the Security Group asked for unbind is not present, do nothing (saves one remote call)
+	if len(sgs) == len(resp.SecurityGroups) {
+		return nil
+	}
+
+	return s.rpcModifyInstanceSecurityGroups(aws.String(ahf.GetID()), sgs)
 }
