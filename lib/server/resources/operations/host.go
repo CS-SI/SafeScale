@@ -60,7 +60,7 @@ const (
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
 
-	defaultHostSecurityGroupNamePattern = "host_%s.%s.%s" // host_<hostname>.<subnet name>.<network name> should be unique across a tenant
+	defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
 )
 
 // host ...
@@ -241,7 +241,10 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 				// Secondary gateway may not exist...
 				rgw, xerr = rs.GetGateway(task, false)
 				if xerr != nil {
-					if _, ok := xerr.(*fail.ErrNotFound); !ok {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// continue
+					default:
 						return xerr
 					}
 				} else {
@@ -454,7 +457,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, "failed to create host")
+	defer fail.OnExitTraceError(&xerr, "failed to create host")
 	defer fail.OnPanic(&xerr)
 
 	svc := rh.GetService()
@@ -540,10 +543,8 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
-			derr := svc.DeleteHost(ahf.Core.ID)
-			if derr != nil {
-				logrus.Errorf("cleaning up after failure, failed to delete host '%s': %v", ahf.Core.Name, derr)
-				_ = xerr.AddConsequence(derr)
+			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete host '%s'", ahf.Core.Name))
 			}
 		}
 	}()
@@ -642,19 +643,21 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// A host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
 	// claiming host is created
-	logrus.Infof("Waiting start of SSH service on remote host '%s' ...", rh.GetName())
+	logrus.Infof("Waiting SSH availability on Host '%s' ...", rh.GetName())
 
 	// FIXME: configurable timeout here
 	status, xerr := rh.waitInstallPhase(task, userdata.PHASE1_INIT, time.Duration(0))
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrTimeout); ok {
-			return nil, fail.Wrap(xerr, "timeout creating a host")
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")
+		default:
+			if abstract.IsProvisioningError(xerr) {
+				logrus.Errorf("%+v", xerr)
+				return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
+			}
+			return nil, xerr
 		}
-		if abstract.IsProvisioningError(xerr) {
-			logrus.Errorf("%+v", xerr)
-			return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
-		}
-		return nil, xerr
 	}
 
 	xerr = rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -686,59 +689,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	if xerr = rh.finalizeProvisioning(task, hostReq, userdataContent); xerr != nil {
 		return nil, xerr
 	}
-	//// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure subnet and security
-	//if xerr = rh.runInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent); xerr != nil {
-	//	return nil, xerr
-	//}
-	//
-	//// Reboot host
-	//command := "sudo systemctl reboot"
-	//if _, _, _, xerr = rh.Run(task, command, outputs.COLLECT, 0, 0); xerr != nil {
-	//	return nil, xerr
-	//}
-	//
-	//// if host is a gateway, executes userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY script to configure subnet and security
-	//if !hostReq.IsGateway {
-	//	// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-	//	if xerr = rh.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userdataContent); xerr != nil {
-	//		return nil, xerr
-	//	}
-	//
-	//	// Reboot host
-	//	command = "sudo systemctl reboot"
-	//	if _, _, _, xerr = rh.Run(task, command, outputs.COLLECT, 0, 0); xerr != nil {
-	//		return nil, xerr
-	//	}
-	//
-	//	// execute userdata.PHASE5_FINAL script to final install/configure of the host (no need to reboot)
-	//	if xerr = rh.runInstallPhase(task, userdata.PHASE5_FINAL, userdataContent); xerr != nil {
-	//		return nil, xerr
-	//	}
-	//
-	//	// TODO: configurable timeout here
-	//	if status, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
-	//		if _, ok := xerr.(*fail.ErrTimeout); ok {
-	//			return nil, fail.Wrap(xerr, "timeout creating a host")
-	//		}
-	//		if abstract.IsProvisioningError(xerr) {
-	//			logrus.Errorf("%+v", xerr)
-	//			return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
-	//		}
-	//		return nil, xerr
-	//	}
-	//} else {
-	//	// TODO: configurable timeout here
-	//	if status, xerr = rh.waitInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, time.Duration(0)); xerr != nil {
-	//		if _, ok := xerr.(*fail.ErrTimeout); ok {
-	//			return nil, fail.Wrap(xerr, "timeout creating a host")
-	//		}
-	//		if abstract.IsProvisioningError(xerr) {
-	//			logrus.Errorf("%+v", xerr)
-	//			return nil, fail.Wrap(xerr, "error provisioning the new host, please check safescaled logs", rh.GetName())
-	//		}
-	//		return nil, xerr
-	//	}
-	//}
 
 	logrus.Infof("host '%s' created successfully", rh.GetName())
 	return userdataContent, nil
@@ -761,16 +711,6 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 		subnetCount := len(req.Subnets)
 		isolatedHost := !req.IsGateway && req.PublicIP && (subnetCount == 0 || (subnetCount == 1 && defaultSubnet.GetName() == abstract.SingleHostNetworkName))
 
-		//sgs := []string{}
-		//if !s.cfgOpts.UseFloatingIP {
-		//	if request.IsGateway || (request.PublicIP && (subnetCount == 0 || (subnetCount == 1 && defaultSubnet.Name == abstract.SingleHostNetworkName))) {
-		//		sgs = append(sgs, defaultSubnet.GWSecurityGroupID)
-		//	}
-		//}
-		//// DO NOT add Subnet internal Security Group if host is a Single Host with public IP; this kind of host needs to be isolated (not perfect with Security Group but it's a start)
-		//if request.IsGateway || !request.PublicIP || (subnetCount == 1 && defaultSubnet.Name != abstract.SingleHostNetworkName) || subnetCount > 1 {
-		//	sgs = append(sgs, defaultSubnet.InternalSecurityGroupID)
-		//}
 		if req.IsGateway || isolatedHost {
 			innerXErr = defaultSubnet.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				var ok bool
@@ -833,12 +773,12 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			}()
 
 			for _, v := range req.Subnets {
-				sg, xerr := LoadSecurityGroup(task, svc, v.InternalSecurityGroupID)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to load Subnet '%s' internal Security Group %s", v.Name, v.InternalSecurityGroupID)
+				sg, innerXErr := LoadSecurityGroup(task, svc, v.InternalSecurityGroupID)
+				if innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", v.Name, v.InternalSecurityGroupID)
 				}
-				if xerr = sg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); xerr != nil {
-					return fail.Wrap(xerr, "failed to apply Subnet '%s' internal Security Group '%s' to host '%s'", v.Name, sg.GetName(), req.ResourceName)
+				if innerXErr = sg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to host '%s'", v.Name, sg.GetName(), req.ResourceName)
 				}
 
 				// register security group in properties
@@ -872,12 +812,12 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			return fail.Wrap(innerXErr, "failed to query Network of Subnet '%s'", defaultSubnet.GetName())
 		}
 		sgName := fmt.Sprintf(defaultHostSecurityGroupNamePattern, req.ResourceName, defaultSubnet.GetName(), an.Name)
-		hostSG, xerr := NewSecurityGroup(svc)
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to instantiate a new Security Group")
+		hostSG, innerXErr := NewSecurityGroup(svc)
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to instantiate a new Security Group")
 		}
-		if xerr = hostSG.Create(task, an.ID, sgName, fmt.Sprintf("Host %s default Security Group", req.ResourceName), abstract.SecurityGroupRules{}); xerr != nil {
-			return fail.Wrap(xerr, "failed to create Host '%s' default Security Group '%s'", req.ResourceName, sgName)
+		if innerXErr = hostSG.Create(task, an.ID, sgName, fmt.Sprintf("Host %s default Security Group", req.ResourceName), abstract.SecurityGroupRules{}); innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to create Host '%s' default Security Group '%s'", req.ResourceName, sgName)
 		}
 
 		// Starting from here, delete host Security group if exiting with error
@@ -890,8 +830,8 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 		}()
 
 		// Bind freshly created Security Group to the host as default
-		if xerr = hostSG.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); xerr != nil {
-			return fail.Wrap(xerr, "failed to bind Security Group '%s' to host '%s'", sgName, req.ResourceName)
+		if innerXErr = hostSG.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to bind Security Group '%s' to host '%s'", sgName, req.ResourceName)
 		}
 
 		// Starting from here, unbind hosts security group if exiting with error
@@ -903,6 +843,28 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			}
 		}()
 
+		// Unbind "default" Security Group from Host if it is bound
+		if sgName = svc.GetDefaultSecurityGroupName(); sgName != "" {
+			adsg := abstract.NewSecurityGroup().SetName(sgName)
+			adsg.NetworkID = an.ID
+			adsg, innerXErr := svc.InspectSecurityGroup(adsg)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// ignore this error
+				default:
+					return innerXErr
+				}
+			} else if innerXErr = svc.UnbindSecurityGroupFromHost(adsg, rh.GetID()); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// Consider a security group not found as a successful unbind
+				default:
+					return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
+				}
+			}
+		}
+
 		// register the security group in properties
 		item := &propertiesv1.SecurityGroupBond{
 			ID:         hostSG.GetID(),
@@ -913,26 +875,6 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 		hsgV1.ByID[item.ID] = item
 		hsgV1.ByName[item.Name] = item.ID
 		hsgV1.DefaultID = item.ID
-
-		// Unbind "default" Security Group from Host if it is bound
-		if sgName = svc.GetDefaultSecurityGroupName(); sgName != "" {
-			rsg, innerXErr := svc.InspectSecurityGroup(sgName)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-				// ignore this error
-				default:
-					return innerXErr
-				}
-			} else if innerXErr = svc.UnbindSecurityGroupFromHost(rsg.GetID(), rh.GetID()); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					// Consider a security group not found as a successful unbind
-				default:
-					return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
-				}
-			}
-		}
 
 		return nil
 	})
@@ -1226,7 +1168,7 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 			return xerr
 		}
 
-		// TODO: configurable timeout here
+		// FIXME: configurable timeout here
 		if _, xerr := rh.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
 			if _, ok := xerr.(*fail.ErrTimeout); ok {
 				return fail.Wrap(xerr, "timeout creating a host")
@@ -1363,264 +1305,12 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 			}
 			return nil
 		})
-
-		//// Don't remove a host having shares that are currently remotely mounted
-		//var shares map[string]*propertiesv1.HostShare
-		//innerXErr = properties.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
-		//	sharesV1, ok := clonable.(*propertiesv1.HostShares)
-		//	if !ok {
-		//		return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		//	}
-		//	shares = sharesV1.ByID
-		//	shareCount := len(shares)
-		//	for _, hostShare := range shares {
-		//		count := len(hostShare.ClientsByID)
-		//		if count > 0 {
-		//			// clients found, checks if these clients already exists...
-		//			for _, hostID := range hostShare.ClientsByID {
-		//				_, inErr := LoadHost(task, svc, hostID)
-		//				if inErr == nil {
-		//					return fail.NotAvailableError("exports %d share%s and at least one share is mounted", shareCount, strprocess.Plural(uint(shareCount)))
-		//				}
-		//			}
-		//		}
-		//	}
-		//	return nil
-		//})
-		//if innerXErr != nil {
-		//	return innerXErr
-		//}
-
-		//// Don't remove a host with volumes attached
-		//innerXErr = properties.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
-		//	hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
-		//	if !ok {
-		//		return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		//	}
-		//	nAttached := len(hostVolumesV1.VolumesByID)
-		//	if nAttached > 0 {
-		//		return fail.NotAvailableError("host has %d volume%s attached", nAttached, strprocess.Plural(uint(nAttached)))
-		//	}
-		//	return nil
-		//})
-		//if innerXErr != nil {
-		//	return innerXErr
-		//}
 	})
 	if xerr != nil {
 		return xerr
 	}
 
 	return rh.relaxedDeleteHost(task)
-
-	//	// If host mounted shares, unmounts them before anything else
-	//	var mounts []*propertiesv1.HostShare
-	//	innerXErr = properties.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-	//		hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
-	//		if !ok {
-	//			return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	//		}
-	//		for _, i := range hostMountsV1.RemoteMountsByPath {
-	//			// Retrieve share data
-	//			objs, loopErr := NewShare(svc)
-	//			if loopErr != nil {
-	//				return loopErr
-	//			}
-	//			loopErr = objs.Read(task, i.ShareID)
-	//			if loopErr != nil {
-	//				return loopErr
-	//			}
-	//
-	//			// Retrieve data about the server serving the share
-	//			objserver, loopErr := objs.GetServer(task)
-	//			if loopErr != nil {
-	//				return loopErr
-	//			}
-	//			// Retrieve data about share from its server
-	//			share, loopErr := objserver.GetShare(task, i.ShareID)
-	//			if loopErr != nil {
-	//				return loopErr
-	//			}
-	//			mounts = append(mounts, share)
-	//		}
-	//		return nil
-	//	})
-	//	if innerXErr != nil {
-	//		return innerXErr
-	//	}
-	//
-	//	// Unmounts tier shares mounted on host (done outside the previous host.properties.Reading() section, because
-	//	// Unmount() have to lock for write, and won't succeed while host.properties.Reading() is running,
-	//	// leading to a deadlock)
-	//	for _, item := range mounts {
-	//		objs, loopErr := LoadShare(task, svc, item.ID)
-	//		if loopErr != nil {
-	//			return loopErr
-	//		}
-	//		loopErr = objs.Unmount(task, rh)
-	//		if loopErr != nil {
-	//			return loopErr
-	//		}
-	//	}
-	//
-	//	// if host exports shares, delete them
-	//	for _, share := range shares {
-	//		objs, loopErr := LoadShare(task, svc, share.Name)
-	//		if loopErr != nil {
-	//			return loopErr
-	//		}
-	//		loopErr = objs.Delete(task)
-	//		if loopErr != nil {
-	//			return loopErr
-	//		}
-	//	}
-	//
-	//	// Update networks property propertiesv1.HostNetworking to remove the reference to the host
-	//	innerXErr = properties.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-	//		hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
-	//		if !ok {
-	//			return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	//		}
-	//		hostID := rh.GetID()
-	//		hostName := rh.GetName()
-	//		var errors []error
-	//		for k := range hostNetworkV2.SubnetsByID {
-	//			rn, loopErr := LoadNetwork(task, svc, k)
-	//			if loopErr != nil {
-	//				logrus.Errorf(loopErr.Error())
-	//				errors = append(errors, loopErr)
-	//				continue
-	//			}
-	//			loopErr = rn.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
-	//				return netprops.Alter(task, networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-	//					networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
-	//					if !ok {
-	//						return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	//					}
-	//					delete(networkHostsV1.ByID, hostID)
-	//					delete(networkHostsV1.ByName, hostName)
-	//					return nil
-	//				})
-	//			})
-	//			if loopErr != nil {
-	//				logrus.Errorf(loopErr.Error())
-	//				errors = append(errors, loopErr)
-	//			}
-	//		}
-	//		return fail.NewErrorList(errors)
-	//	})
-	//	if innerXErr != nil {
-	//		return innerXErr
-	//	}
-	//
-	//	// Unbind Security Group from host
-	//	innerXErr = properties.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-	//		hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
-	//		if !ok {
-	//			return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	//		}
-	//
-	//		// Unbind Security Groups from Host
-	//		var errors []error
-	//		for _, v := range hsgV1.ByID {
-	//			rsg, derr := LoadSecurityGroup(task, svc, v.ID)
-	//			if derr == nil {
-	//				derr = rsg.UnbindFromHost(task, rh)
-	//			}
-	//			if derr != nil {
-	//				switch derr.(type) {
-	//				case *fail.ErrNotFound:
-	//					// Consider that a Security Group that cannot be loaded or is not bound as a success
-	//				default:
-	//					errors = append(errors, derr)
-	//				}
-	//			}
-	//		}
-	//		if len(errors) > 0 {
-	//			return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
-	//		}
-	//
-	//		// Delete default Security Group of Host
-	//		if hsgV1.DefaultID != "" {
-	//			rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
-	//			if derr == nil {
-	//				derr = rsg.Delete(task)
-	//			}
-	//			if derr != nil {
-	//				switch derr.(type) {
-	//				case *fail.ErrNotFound:
-	//					// Consider a Security Group that cannot be found as a success
-	//				default:
-	//					return fail.Wrap(derr, "failed to delete default Security Group of Host")
-	//				}
-	//			}
-	//		}
-	//		return nil
-	//	})
-	//	if innerXErr != nil {
-	//		return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
-	//	}
-	//
-	//	// Conditions are met, delete host
-	//	waitForDeletion := true
-	//	delErr := retry.WhileUnsuccessfulDelay1Second(
-	//		func() error {
-	//			// FIXME: need to remove retry from svc.DeleteHost!
-	//			err := svc.DeleteHost(hostID)
-	//			if err != nil {
-	//				if _, ok := err.(*fail.ErrNotFound); !ok {
-	//					return fail.Wrap(err, "cannot delete host")
-	//				}
-	//				// logrus.Warn("host resource not found on provider side, host metadata will be removed for consistency")
-	//				waitForDeletion = false
-	//			}
-	//			return nil
-	//		},
-	//		time.Minute*5,
-	//	)
-	//	if delErr != nil {
-	//		return delErr
-	//	}
-	//
-	//	// wait for effective host deletion
-	//	if waitForDeletion {
-	//		innerXErr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
-	//			func() error {
-	//				// FIXME: need to remove retry from svc.GetHostState if the issues are not communication issues!
-	//				if state, stateErr := svc.GetHostState(rh.GetID()); stateErr == nil {
-	//					logrus.Warnf("While deleting the status was [%s]", state)
-	//					if state == hoststate.ERROR {
-	//						return fail.NotAvailableError("host is in state ERROR")
-	//					}
-	//				} else {
-	//					return stateErr
-	//				}
-	//				return nil
-	//			},
-	//			time.Minute*2, // FIXME: static duration
-	//		)
-	//		if innerXErr != nil {
-	//			return innerXErr
-	//		}
-	//	}
-	//
-	//	return nil
-	//})
-	//if xerr != nil {
-	//	return xerr
-	//}
-	//
-	//// Deletes metadata from Object Storage
-	//if xerr = rh.core.Delete(task); xerr != nil {
-	//	// If entry not found, considered as success
-	//	if _, ok := xerr.(*fail.ErrNotFound); !ok {
-	//		return xerr
-	//	}
-	//}
-	//
-	//newHost := nullHost()
-	//*rh = *newHost
-	//return nil
 }
 
 // relaxedDeleteHost is the method that really deletes a host, being a gateway or not
@@ -1860,7 +1550,8 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
-						// If host is not found anymore, consider this as a success
+							// If host is not found anymore, consider this as a success
+							return nil
 						default:
 							return stateErr
 						}
@@ -2091,14 +1782,6 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.H
 		// ok        bool
 	)
 	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// rh, ok := clonable.(*abstract.Host)
-		// if !ok {
-		// 	return fail.InconsistentError("'*abstract.Host' expected, '%s' provided", reflect.TypeOf(clonable).String()
-		// }
-		// props, inErr := rh.properties(task)
-		// if inErr != nil {
-		// 	return inErr
-		// }
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -2152,56 +1835,6 @@ func (rh host) getVolumes(task concurrency.Task) *propertiesv1.HostVolumes {
 	out, _ := rh.GetVolumes(task)
 	return out
 }
-
-// // GetAttachedVolume returns information about where and how the volume referenced is attached to the host
-// func (objh *host) GetAttachedVolume(task concurrency.Task, volumeRef string) (*propertiesv1.HostLocalMount, fail.Error) {
-// 	if objh.IsNUll() {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-// 	if task == nil {
-// 		return nil, fail.InvalidParameterError("task", "cannot be nil")
-// 	}
-// 	if volumeRef == "" {
-// 		return nil, fail.InvalidParameterError("volumeRef", "cannot be empty string")
-// 	}
-
-// 	var mount *propertiesv1.HostMount
-// 	err := objh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) error {
-// 		var hostVolume *propertiesv1.HostVolume
-// 		innerErr := props.Inspect(hostproperty.HostVolumesV1, func(clonable data.Clonable) error {
-// 			vaV1, ok := clonable.(*propertiesv1.HostVolumes)
-// 			if !ok {
-// 				return fail.InconsistentError("'*propertiesv1.HostVolumess' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 			}
-// 			hostVolume, ok = vaV1.VolumesByID[volumeRef]
-// 			if !ok {
-// 				var ref string
-// 				ref, ok = vaV1.VolumesByName[volumeRef]
-// 				hostVolume, ok = vaV1.VolumesByID[ref]
-// 			}
-// 			if !ok {
-// 				return fail.NotFoundError("failed to find a volume referenced by '%s' attached to host '%s'", volumeRef, objh.GetName())
-// 			}
-// 			return nil
-// 		})
-// 		if innerErr != nil {
-// 			return innerErr
-// 		}
-
-// 		return props.Inspect(hostproperty.HostLocalMountV1, func(clonable data.Clonable) error {
-// 			hlmV1, ok := clonable.(*propertiesv1.HostLocalMount)
-// 			if !ok {
-// 				return fail.InconsistentError("'*propertiesv1.HostMount' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 			}
-// 			mount, ok := hlmV1.ByDevice[hostVolume.Device]
-// 			return nil
-// 		})
-// 	})
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return mount, nil
-// }
 
 // Start starts the host
 func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
@@ -2435,7 +2068,14 @@ func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
 		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	return rh.getPublicIP(task), nil
+	rh.SafeRLock(task)
+	defer rh.SafeRUnlock(task)
+
+	ip = rh.publicIP
+	if ip == "" {
+		return "", fail.NotFoundError("no public IP associated with Host '%s'", rh.GetName())
+	}
+	return ip, nil
 }
 
 // getPublicIP returns the public IP address of the host
@@ -2515,13 +2155,6 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 	return ip, xerr
 }
 
-//// getPrivateIPOnSubnet returns the private IP of the host on request subnet
-//// To be used when rh is notoriously not nil
-//func (rh *host) getPrivateIPOnSubnet(task concurrency.Task, networkID string) string {
-//	ip, _ := rh.GetPrivateIPOnSubnet(task, networkID)
-//	return ip
-//}
-
 // GetAccessIP returns the IP to reach the host
 func (rh *host) GetAccessIP(task concurrency.Task) (ip string, _ fail.Error) {
 	ip = ""
@@ -2548,7 +2181,6 @@ func (rh *host) getAccessIP(task concurrency.Task) string {
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-//
 // satisfies interface install.Targetable
 func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	if rh.IsNull() {
@@ -2626,13 +2258,6 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 	})
 	return shares, xerr
 }
-
-// // Shares returns the information about the shares of the host
-// // Intented to be used when objn is notoriously not nil (because previously checked)
-// func (rh host) getShares(task concurrency.Task) *propertiesv1.HostShares {
-// 	shares, _ := rh.GetShares(task)
-// 	return shares
-// }
 
 // GetMounts returns the information abouts the mounts of the host
 func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, xerr fail.Error) {
@@ -2961,11 +2586,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		//return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-		//	hostNetworkV2, ok = clonable.(*propertiesv2.HostNetworking)
-		//	if !ok {
-		//		return fail.InconsistentError("'*propertiesv1.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String)
-		//	}
+
 		return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
 			hostSizingV1, ok = clonable.(*propertiesv1.HostSizing)
 			if !ok {
@@ -2984,16 +2605,14 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 				return nil
 			})
 		})
-		//})
 	})
 	if xerr != nil {
 		return ph, xerr
 	}
 
 	ph = &protocol.Host{
-		Cpu:  int32(hostSizingV1.AllocatedSize.Cores),
-		Disk: int32(hostSizingV1.AllocatedSize.DiskSize),
-		//GatewayId:           hostNetworkV2.DefaultGatewayID,
+		Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
+		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
 		Id:                  ahc.ID,
 		PublicIp:            publicIP,
 		PrivateIp:           privateIP,

@@ -31,15 +31,14 @@ type SecurityGroupRule struct {
 	EtherType   ipversion.Enum                  `json:"ether_type,omitempty"`  // IPv4 or IPv6
 	Direction   securitygroupruledirection.Enum `json:"direction"`             // ingress (input) or egress (output)
 	Protocol    string                          `json:"protocol,omitempty"`    // concerned protocol
-	PortFrom    uint16                          `json:"port_from,omitempty"`   // first port of the rule
-	PortTo      uint16                          `json:"port_to,omitempty"`     // last port of the rule
-	IPRanges    []string                        `json:"ip_ranges"`             // concerned IPRanges (source or target depending of Direction)
-	//Action      securitygroupruleaction.Enum    `json:"action,omitempty"`      // action of the rule: ALLOW, DENY
+	PortFrom    int32                           `json:"port_from,omitempty"`   // first port of the rule
+	PortTo      int32                           `json:"port_to,omitempty"`     // last port of the rule
+	IPRanges    []string                        `json:"ip_ranges"`             // concerned IPRanges (source or target depending of Direction) or security group ID
 }
 
 // IsNull tells if the Security Group Rule is a null value
 func (sgr *SecurityGroupRule) IsNull() bool {
-	return sgr == nil || (len(sgr.IDs) == 0 && sgr.Protocol == "" && sgr.PortFrom == 0)
+	return sgr == nil || (len(sgr.IPRanges) == 0 /*&& sgr.Protocol == "" && sgr.PortFrom == 0*/)
 }
 
 // EqualTo is a strict equality tester between 2 rules
