@@ -296,8 +296,8 @@ func convertRulesToAbstract(in []secrules.SecGroupRule) ([]abstract.SecurityGrou
 			Description: v.Description,
 			Direction:   direction,
 			Protocol:    v.Protocol,
-			PortFrom:    uint16(v.PortRangeMin),
-			PortTo:      uint16(v.PortRangeMax),
+			PortFrom:    int32(v.PortRangeMin),
+			PortTo:      int32(v.PortRangeMax),
 			IPRanges:    []string{v.RemoteIPPrefix},
 		}
 		out = append(out, n)

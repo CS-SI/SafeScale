@@ -17,7 +17,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -67,24 +66,19 @@ func TryConnection(bucketName, key string) fail.Error {
 
 	hostTemplates := make(map[string]abstract.HostTemplate)
 
-	for _, price := range prods.PriceList {
-		jsonPrice, err := json.Marshal(price)
-		if err != nil {
-			continue
-		}
-		price := ouraws.Price{}
-		err = json.Unmarshal(jsonPrice, &price)
-		if err != nil {
+	for _, v := range prods.PriceList {
+		price, xerr := ouraws.NewPriceFromJSONValue(v)
+		if xerr != nil {
 			continue
 		}
 
 		tpl := abstract.HostTemplate{
 			ID:        price.Product.Attributes.InstanceType,
 			Name:      price.Product.Attributes.InstanceType,
-			Cores:     ouraws.ParseNumber(price.Product.Attributes.Vcpu, 1),
-			GPUNumber: ouraws.ParseNumber(price.Product.Attributes.Gpu, 0),
-			DiskSize:  int(ouraws.ParseStorage(price.Product.Attributes.Storage)),
-			RAMSize:   float32(ouraws.ParseMemory(price.Product.Attributes.Memory)),
+			Cores:     price.GetCores(),
+			GPUNumber: price.GetGPUNumber(),
+			DiskSize:  int(price.GetDiskSize()),
+			RAMSize:   float32(price.GetRAMSize()),
 		}
 
 		hostTemplates[price.Product.Attributes.InstanceType] = tpl

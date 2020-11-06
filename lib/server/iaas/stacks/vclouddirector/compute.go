@@ -988,7 +988,7 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 	if xerr != nil {
 		return hoststate.ERROR, xerr
 	}
-	return ahf.Core.LastState, nil
+	return ahf.CurrentState, nil
 }
 
 // -------------Provider Infos-------------------------------------------------------------------------------------------
