@@ -59,6 +59,7 @@ type Service interface {
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	GetMetadataBucket() abstract.ObjectStorageBucket
 	GetMetadataKey() (*crypt.Key, fail.Error)
+	InspectHostByName(string) (*abstract.HostFull, fail.Error)
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	SelectTemplatesBySize(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
@@ -831,4 +832,12 @@ func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule a
 		}
 	}
 	return true, nil
+}
+
+// InspectHostByName hides the "complexity" of the way to get Host by name
+func (svc service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+	if svc.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	return svc.InspectHost(abstract.NewHostCore().SetName(name))
 }

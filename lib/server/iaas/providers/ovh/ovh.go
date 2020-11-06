@@ -266,16 +266,18 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // InspectTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+func (p provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
+	nullAHT := abstract.HostTemplate{}
 	if p.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return nullAHT, fail.InvalidInstanceError()
 	}
 
-	tpl, err := p.Stack.InspectTemplate(id)
-	if tpl != nil {
-		addGPUCfg(tpl)
+	tpl, xerr := p.Stack.InspectTemplate(id)
+	if xerr != nil {
+		return nullAHT, xerr
 	}
-	return tpl, err
+	addGPUCfg(&tpl)
+	return tpl, nil
 }
 
 func addGPUCfg(tpl *abstract.HostTemplate) {
