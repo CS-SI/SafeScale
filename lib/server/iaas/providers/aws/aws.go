@@ -185,7 +185,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername: operatorUsername,
 		UseNATService:    false,
 		ProviderName:     providerName,
-		BuildSubnets:     false, // FIXME AWS by default don't build subnetworks
+		// BuildSubnets:     false, // FIXME AWS by default don't build subnetworks
+		DefaultSecurityGroupName: "default",
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -197,10 +198,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		tenantParameters: params,
 	}
 
-	//evalid := providers.NewValidatedProvider(&provider{stack, params}, providerName)
-	//etrace := providers.NewErrorTraceProvider(evalid, providerName)
-	//prov := providers.NewLoggedProvider(etrace, providerName)
-	//return etrace, nil
 	return newP, nil
 }
 

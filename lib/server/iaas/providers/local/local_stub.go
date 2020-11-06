@@ -88,8 +88,8 @@ func (provider *provider) InspectImage(id string) (*abstract.Image, fail.Error) 
 	return nil, gReport
 }
 
-func (provider *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-	return nil, gReport
+func (provider *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
+	return abstract.HostTemplate{}, gReport
 }
 func (provider *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	return nil, gReport

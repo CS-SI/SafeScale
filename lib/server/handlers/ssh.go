@@ -171,72 +171,79 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		ok    bool
 	)
 
-	// gets primary gateway information
-	gw, xerr := rs.GetGateway(task, true)
-	if xerr != nil {
+	if _, xerr = host.GetPublicIP(task); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// Primary gateway not found ? let's try with the secondary one later...
+			// gets primary gateway information
+			gw, xerr := rs.GetGateway(task, true)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Primary gateway not found ? let's try with the secondary one later...
+				default:
+					return nil, xerr
+				}
+			} else {
+				xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					gwahc, ok = clonable.(*abstract.HostCore)
+					if !ok {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					return nil
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if ip, xerr = gw.GetAccessIP(task); xerr != nil {
+					return nil, xerr
+				}
+				GatewayConfig := system.SSHConfig{
+					PrivateKey: gwahc.PrivateKey,
+					Port:       22,
+					Host:       ip,
+					User:       user,
+				}
+				sshConfig.GatewayConfig = &GatewayConfig
+			}
+
+			// gets secondary gateway information
+			gw, xerr = rs.GetGateway(task, false)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
+					if sshConfig.GatewayConfig == nil {
+						return nil, fail.NotFoundError("failed to find a gateway to reach Host")
+					}
+				default:
+					return nil, xerr
+				}
+			} else {
+				xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					gwahc, ok = clonable.(*abstract.HostCore)
+					if !ok {
+						return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					return nil
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
+				if ip, xerr = gw.GetAccessIP(task); xerr != nil {
+					return nil, xerr
+				}
+				GatewayConfig := system.SSHConfig{
+					PrivateKey: gwahc.PrivateKey,
+					Port:       22,
+					Host:       ip,
+					User:       user,
+				}
+				sshConfig.SecondaryGatewayConfig = &GatewayConfig
+			}
 		default:
 			return nil, xerr
 		}
-	} else {
-		xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			gwahc, ok = clonable.(*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			return nil
-		})
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		if ip, xerr = gw.GetAccessIP(task); xerr != nil {
-			return nil, xerr
-		}
-		GatewayConfig := system.SSHConfig{
-			PrivateKey: gwahc.PrivateKey,
-			Port:       22,
-			Host:       ip,
-			User:       user,
-		}
-		sshConfig.GatewayConfig = &GatewayConfig
-	}
-
-	// gets secondary gateway information
-	gw, xerr = rs.GetGateway(task, false)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
-			if sshConfig.GatewayConfig == nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
-	} else {
-		xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			gwahc, ok = clonable.(*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			return nil
-		})
-		if xerr != nil {
-			return nil, xerr
-		}
-		if ip, xerr = gw.GetAccessIP(task); xerr != nil {
-			return nil, xerr
-		}
-		GatewayConfig := system.SSHConfig{
-			PrivateKey: gwahc.PrivateKey,
-			Port:       22,
-			Host:       ip,
-			User:       user,
-		}
-		sshConfig.SecondaryGatewayConfig = &GatewayConfig
 	}
 
 	return sshConfig, nil
