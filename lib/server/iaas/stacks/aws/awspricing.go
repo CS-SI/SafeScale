@@ -18,9 +18,14 @@ package aws
 
 import (
 	"bytes"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/aws/aws-sdk-go/aws"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Attributes attributes of a compute instance
@@ -116,20 +121,68 @@ type Price struct {
 	Terms           Terms   `json:"terms,omitempty"`
 }
 
-// TODO: comment
-// ParseNumber ...
-func ParseNumber(str string, failureValue int) int {
-	result := failureValue
-	if okValue, failure := strconv.Atoi(str); failure == nil {
-		result = okValue
+// NewPriceFromJSONValue creates a Price instance from the content of an aws.JSONValue
+func NewPriceFromJSONValue(in aws.JSONValue) (Price, fail.Error) {
+	nullPrice := Price{}
+	jsonPrice, err := json.Marshal(in)
+	if err != nil {
+		return nullPrice, fail.ToError(err)
 	}
-	return result
+	price := Price{}
+	if err = json.Unmarshal(jsonPrice, &price); err != nil {
+		return nullPrice, fail.ToError(err)
+	}
+	return price, nil
+}
+
+func (p Price) GetCores() int {
+	return p.parseInt(p.Product.Attributes.Vcpu, 1)
+}
+
+func (p Price) GetGPUNumber() int {
+	return p.parseInt(p.Product.Attributes.Gpu, 0)
+}
+
+func (p Price) GetRAMSize() float64 {
+	return p.parseFloat(p.Product.Attributes.Memory)
+}
+
+func (p Price) GetCPUFreq() float64 {
+	return p.parseFloat(p.Product.Attributes.ClockSpeed)
+}
+
+func (p Price) GetDiskSize() float64 {
+	return p.parseStorage(p.Product.Attributes.Storage)
 }
 
 // TODO: comment
-// ParseStorage ...
-func ParseStorage(str string) float64 {
-	r, _ := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
+// parseMemory ...
+func (p Price) parseFloat(str string) float64 {
+	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
+	if err != nil {
+		return 0.0
+	}
+
+	b := bytes.Buffer{}
+	b.WriteString(str)
+	tokens := r.FindAllStringSubmatch(str, -1)
+	sizeStr := strings.Replace(tokens[0][1], ",", "", -1)
+	size, err := strconv.ParseFloat(sizeStr, 64)
+	if err != nil {
+		return 0.0
+	}
+
+	return size
+}
+
+// TODO: comment
+// parseStorage ...
+func (p Price) parseStorage(str string) float64 {
+	r, err := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
+	if err != nil {
+		return 0.0
+	}
+
 	b := bytes.Buffer{}
 	b.WriteString(str)
 	tokens := r.FindAllStringSubmatch(str, -1)
@@ -152,20 +205,11 @@ func ParseStorage(str string) float64 {
 }
 
 // TODO: comment
-// ParseMemory ...
-func ParseMemory(str string) float64 {
-	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
-	if err != nil {
-		return 0.0
+// parseNumber ...
+func (p Price) parseInt(str string, failureValue int) int {
+	result := failureValue
+	if okValue, err := strconv.Atoi(str); err == nil {
+		result = okValue
 	}
-	b := bytes.Buffer{}
-	b.WriteString(str)
-	tokens := r.FindAllStringSubmatch(str, -1)
-	sizeStr := strings.Replace(tokens[0][1], ",", "", -1)
-	size, err := strconv.ParseFloat(sizeStr, 64)
-	if err != nil {
-		return 0.0
-	}
-
-	return size
+	return result
 }

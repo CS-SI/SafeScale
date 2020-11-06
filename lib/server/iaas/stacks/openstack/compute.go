@@ -71,7 +71,7 @@ func (s Stack) ListRegions() (list []string, xerr fail.Error) {
 				//ParentRegionID: "RegionOne",
 			}
 			allPages, innerErr = regions.List(s.IdentityClient, listOpts).AllPages()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
 		NormalizeError,
 	)
@@ -106,7 +106,7 @@ func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = az.List(s.ComputeClient).AllPages()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
 		NormalizeError,
 	)
@@ -188,7 +188,7 @@ func (s Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) 
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			img, innerErr = images.Get(s.ComputeClient, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
 		NormalizeError,
 	)
@@ -205,8 +205,8 @@ func (s Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) 
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
-	nullAHT := &abstract.HostTemplate{}
+func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
+	nullAHT := abstract.HostTemplate{}
 	if s.IsNull() {
 		return nullAHT, fail.InvalidInstanceError()
 	}
@@ -224,14 +224,14 @@ func (s Stack) InspectTemplate(id string) (template *abstract.HostTemplate, xerr
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
 		NormalizeError,
 	)
 	if xerr != nil {
 		return nullAHT, xerr
 	}
-	template = &abstract.HostTemplate{
+	template = abstract.HostTemplate{
 		Cores:    flv.VCPUs,
 		RAMSize:  float32(flv.RAM) / 1000.0,
 		DiskSize: flv.Disk,
@@ -257,7 +257,7 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	var flvList []abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := flavors.ListDetail(s.ComputeClient, opts).EachPage(func(page pagination.Page) (bool, error) {
+			return flavors.ListDetail(s.ComputeClient, opts).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := flavors.ExtractFlavors(page)
 				if err != nil {
 					return false, err
@@ -274,7 +274,6 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
 		},
 		NormalizeError,
 	)
@@ -347,8 +346,8 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 
 	var kpList []abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			innerErr = keypairs.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
+		func() error {
+			return keypairs.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := keypairs.ExtractKeyPairs(page)
 				if err != nil {
 					return false, err
@@ -364,7 +363,6 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 				}
 				return true, nil
 			})
-			return NormalizeError(innerErr)
 		},
 		NormalizeError,
 	)
@@ -387,9 +385,8 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			innerErr = keypairs.Delete(s.ComputeClient, id).ExtractErr()
-			return NormalizeError(innerErr)
+		func() error {
+			return keypairs.Delete(s.ComputeClient, id).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -707,7 +704,7 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 			_, r.Err = s.ComputeClient.Get(s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
 				OkCodes: []int{200, 203},
 			})
-			return NormalizeError(r.Err)
+			return r.Err
 		},
 		NormalizeError,
 	)
@@ -830,20 +827,11 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		func() error {
 			server = nil
 			innerXErr := stacks.RetryableRemoteCall(
-				func() (err error) {
-					server, err = servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
+				func() (innerErr error) {
+					server, innerErr = servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
 						CreateOptsBuilder: srvOpts,
 					}).Extract()
-					err = NormalizeError(err)
-					if err != nil {
-						switch err.(type) {
-						case *fail.ErrInvalidRequest: // useless to retry on bad request...
-							return retry.StopRetryError(err)
-						default:
-							return err
-						}
-					}
-					return nil
+					return innerErr
 				},
 				NormalizeError,
 			)
@@ -851,12 +839,13 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
 					innerXErr = fail.ToError(innerXErr.Cause())
+				case *fail.ErrInvalidRequest: // useless to retry on bad request...
+					return retry.StopRetryError(innerXErr)
 				}
 				if server != nil {
 					derr := stacks.RetryableRemoteCall(
 						func() error {
-							err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-							return NormalizeError(err)
+							return servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 						},
 						NormalizeError,
 					)
@@ -876,8 +865,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				if xerr != nil {
 					derr := stacks.RetryableRemoteCall(
 						func() error {
-							err := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-							return NormalizeError(err)
+							return servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 						},
 						NormalizeError,
 					)
@@ -956,7 +944,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// newHost.Networking.DefaultGatewayID = defaultGatewayID
 	// newHost.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	newHost.Networking.IsGateway = request.IsGateway
-	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
 	// if Floating IP are used and public address is requested
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
@@ -967,7 +955,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				ip, innerErr = floatingips.Create(s.ComputeClient, floatingips.CreateOpts{
 					Pool: s.authOpts.FloatingIPPool,
 				}).Extract()
-				return NormalizeError(innerErr)
+				return innerErr
 			},
 			NormalizeError,
 		)
@@ -980,9 +968,8 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if xerr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
 				derr := stacks.RetryableRemoteCall(
-					func() (innerErr error) {
-						innerErr = floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
-						return NormalizeError(innerErr)
+					func() error {
+						return floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
 					},
 					NormalizeError,
 				)
@@ -995,11 +982,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Associate floating IP to host
 		xerr = stacks.RetryableRemoteCall(
-			func() (innerErr error) {
-				innerErr = floatingips.AssociateInstance(s.ComputeClient, newHost.Core.ID, floatingips.AssociateOpts{
+			func() error {
+				return floatingips.AssociateInstance(s.ComputeClient, newHost.Core.ID, floatingips.AssociateOpts{
 					FloatingIP: ip.IP,
 				}).ExtractErr()
-				return NormalizeError(innerErr)
 			},
 			NormalizeError,
 		)
@@ -1184,7 +1170,7 @@ func (s Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			allPages, innerErr = servers.List(s.ComputeClient, nil).AllPages()
-			return NormalizeError(innerErr)
+			return innerErr
 		},
 		NormalizeError,
 	)
@@ -1369,7 +1355,7 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	hostList := abstract.HostList{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			return servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := servers.ExtractServers(page)
 				if err != nil {
 					return false, err
@@ -1392,7 +1378,6 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 				}
 				return true, nil
 			})
-			return innerErr
 		},
 		NormalizeError,
 	)
@@ -1405,7 +1390,7 @@ func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := floatingips.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
+			return floatingips.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := floatingips.ExtractFloatingIPs(page)
 				if err != nil {
 					return false, err
@@ -1419,7 +1404,6 @@ func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 				}
 				return true, nil
 			})
-			return innerErr
 		},
 		NormalizeError,
 	)

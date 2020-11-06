@@ -225,13 +225,7 @@ func (hc *HostCore) IsNull() bool {
 
 // IsConsistent tells if host struct is consistent
 func (hc *HostCore) IsConsistent() bool {
-	result := true
-	result = result && hc.ID != ""
-	result = result && hc.Name != ""
-	// result = result && h.PrivateKey != ""
-	// result = result && h.Password != ""
-	// result = result && h.properties != nil
-	return result
+	return hc.ID != "" || hc.Name != ""
 }
 
 // OK ...
@@ -377,7 +371,7 @@ func (hf *HostFull) IsNull() bool {
 
 // IsConsistent returns true if the struct is consistent
 func (hf *HostFull) IsConsistent() bool {
-	return hf != nil && hf.Core.OK() // && hc.Description.OK() && hc.Sizing.OK() && hc.Networking.OK()
+	return hf != nil && hf.Core.IsConsistent() // && hc.Description.OK() && hc.Sizing.OK() && hc.Networking.OK()
 }
 
 // OK is a synonym to IsConsistent

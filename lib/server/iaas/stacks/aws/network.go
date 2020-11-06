@@ -692,7 +692,7 @@ func (s stack) initEC2DescribeSubnetsInput(networkRef string) (*ec2.DescribeSubn
 }
 
 // listSubnetIDs ...
-func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error) {
+func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error) { // nolint
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 	// defer fail.OnExitLogError(&xerr)
 

@@ -32,50 +32,53 @@ func normalizeError(err error) fail.Error {
 	}
 
 	switch cerr := err.(type) {
-	case awserr.RequestFailure:
-		code := cerr.StatusCode()
-		switch code {
-		case 400:
-			return fail.InvalidRequestError(err.Error())
-		case 401:
-			return fail.NotAuthenticatedError(err.Error())
-		case 403:
-			return fail.ForbiddenError(err.Error())
-		case 404:
-			return fail.NotFoundError(err.Error())
-		case 408:
-			return fail.TimeoutError(err, 0)
-		case 409:
-			return fail.InvalidRequestError(err.Error())
-		case 410:
-			return fail.NotFoundError(err.Error())
-		case 425:
-			return fail.OverloadError(err.Error())
-		case 429:
-			return fail.OverloadError(err.Error())
-		case 500:
-			return fail.ExecutionError(nil, err.Error())
-		case 503:
-			return fail.NotAvailableError(err.Error())
-		case 504:
-			return fail.NotAvailableError(err.Error())
-		default:
-			logrus.Warnf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
-			return fail.NewError("unhandled error received from provider: %s", err.Error())
-		}
 	case awserr.Error:
 		switch cerr.Code() {
 		case "InvalidGroupId.Malformed":
-			return fail.SyntaxError("failed to find Security Group: group id is malformed")
+			return fail.SyntaxError("failed to find Security Group: id is malformed")
 		case "InvalidGroup.NotFound":
 			return fail.NotFoundError("failed to find Security Group")
 		case "InvalidVpcID.NotFound":
-			return fail.NotFoundError("failed to find vpc")
+			return fail.NotFoundError("failed to find Network")
 		case "InvalidGroup.Duplicate":
-			return fail.DuplicateError("a security group already exists with that name")
+			return fail.DuplicateError("a Security Group already exists with that name")
+		case "InvalidVolume.NotFound":
+			return fail.NotFoundError("failed to find Volume")
+		case "InvalidSubnetID.NotFound":
+			return fail.NotFoundError("failed to find Subnet")
 		default:
-			logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
-			return fail.NewError("unhandled error received from provider: %s", err.Error())
+			switch cerr := err.(type) {
+			case awserr.RequestFailure:
+				switch cerr.StatusCode() {
+				case 400:
+					return fail.InvalidRequestError(err.Error())
+				case 401:
+					return fail.NotAuthenticatedError(err.Error())
+				case 403:
+					return fail.ForbiddenError(err.Error())
+				case 404:
+					return fail.NotFoundError(err.Error())
+				case 408:
+					return fail.TimeoutError(err, 0)
+				case 409:
+					return fail.InvalidRequestError(err.Error())
+				case 410:
+					return fail.NotFoundError(err.Error())
+				case 425:
+					return fail.OverloadError(err.Error())
+				case 429:
+					return fail.OverloadError(err.Error())
+				case 500:
+					return fail.ExecutionError(nil, err.Error())
+				case 503:
+					return fail.NotAvailableError(err.Error())
+				case 504:
+					return fail.NotAvailableError(err.Error())
+				}
+			default:
+				logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+				return fail.NewError("unhandled error received from provider: %s", err.Error())
+			}
 		}
 	}
 

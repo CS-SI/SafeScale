@@ -166,13 +166,14 @@ func (s *stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr
 	return templates, nil
 }
 
-// GetTemplate overload OpenStackGcp GetTemplate method to add GPU configuration
-func (s *stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.Error) {
+// InspectTemplate ...
+func (s *stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Error) {
+	nullAHT := abstract.HostTemplate{}
 	if s == nil {
-		return nil, fail.InvalidInstanceError()
+		return nullAHT, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nil, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -180,16 +181,16 @@ func (s *stack) InspectTemplate(id string) (_ *abstract.HostTemplate, xerr fail.
 
 	templates, xerr := s.ListTemplates(true)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHT, xerr
 	}
 
 	for _, template := range templates {
 		if template.ID == id {
-			return &template, nil
+			return template, nil
 		}
 	}
 
-	return nil, fail.NotFoundError("template with id '%s' not found", id)
+	return nullAHT, fail.NotFoundError("template with id '%s' not found", id)
 }
 
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
@@ -420,7 +421,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull
 
 	newHost := abstract.NewHostFull()
 	newHost.Core = hostCore
-	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 	newHost.Networking.IsGateway = isGateway
 	newHost.Networking.DefaultSubnetID = defaultSubnetID
 
@@ -515,7 +516,7 @@ func buildGcpMachine(
 	subnetwork string,
 	userdata string,
 	isPublic bool,
-	template *abstract.HostTemplate,
+	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID

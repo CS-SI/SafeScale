@@ -17,9 +17,11 @@
 package aws
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/sirupsen/logrus"
+	"github.com/aws/aws-sdk-go/service/pricing"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -581,8 +583,16 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description *string) (*st
 	return resp.GroupId, nil
 }
 
-func (s stack) rpcDescribeSecurityGroups(ids []*string) ([]*ec2.SecurityGroup, fail.Error) {
+func (s stack) rpcDescribeSecurityGroups(networkID *string, ids []*string) ([]*ec2.SecurityGroup, fail.Error) {
 	var request ec2.DescribeSecurityGroupsInput
+	if aws.StringValue(networkID) != "" {
+		request.Filters = []*ec2.Filter{
+			{
+				Name:   aws.String("vpc-id"),
+				Values: []*string{networkID},
+			},
+		}
+	}
 	if len(ids) > 0 {
 		request.GroupIds = ids
 	}
@@ -608,7 +618,7 @@ func (s stack) rpcDescribeSecurityGroupByID(id *string) (*ec2.SecurityGroup, fai
 		return &ec2.SecurityGroup{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeSecurityGroups([]*string{id})
+	resp, xerr := s.rpcDescribeSecurityGroups(aws.String(""), []*string{id})
 	if xerr != nil {
 		return &ec2.SecurityGroup{}, xerr
 	}
@@ -748,7 +758,7 @@ func (s stack) rpcAuthorizeSecurityGroupEgress(id *string, egress []*ec2.IpPermi
 	)
 }
 
-func (s stack) rpcDisassociateAddress(id *string) fail.Error {
+func (s stack) rpcDisassociateAddress(id *string) fail.Error { // nolint
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -1117,6 +1127,144 @@ func (s stack) rpcDescribeImageByID(id *string) (*ec2.Image, fail.Error) {
 	}
 	if len(resp) > 1 {
 		return &ec2.Image{}, fail.InconsistentError("found more than one Image with ID %s", aws.StringValue(id))
+	}
+	return resp[0], nil
+}
+
+func (s stack) rpcModifyInstanceSecurityGroups(id *string, sgIDs []*string) fail.Error {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return xerr
+	}
+	if len(sgIDs) == 0 {
+		return fail.InvalidParameterError("sgIDs", "cannot be empty slice")
+	}
+
+	request := ec2.ModifyInstanceAttributeInput{
+		InstanceId: id,
+		Groups:     sgIDs,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.ModifyInstanceAttribute(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcGetProducts(ids []*string) ([]aws.JSONValue, fail.Error) {
+	var emptySlice []aws.JSONValue
+	filters := make([]*pricing.Filter, 0, 2+len(ids))
+	filters = append(filters, []*pricing.Filter{
+		// {
+		// 	Field: aws.String("ServiceCode"),
+		// 	Type:  aws.String("TERM_MATCH"),
+		// 	Value: aws.String("AmazonEC2"),
+		// },
+		{
+			Field: aws.String("operatingSystem"),
+			Type:  aws.String("TERM_MATCH"),
+			Value: aws.String("Linux"),
+		},
+	}...)
+	if len(ids) > 0 {
+		for _, v := range ids {
+			filters = append(filters, &pricing.Filter{
+				Field: aws.String("instanceType"),
+				Type:  aws.String("TERM_MATCH"),
+				Value: v,
+			})
+		}
+	}
+	request := pricing.GetProductsInput{
+		Filters: filters,
+		// MaxResults:  aws.Int64(100),
+		ServiceCode: aws.String("AmazonEC2"),
+	}
+	var resp *pricing.GetProductsOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.PricingService.GetProducts(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	if len(resp.PriceList) == 0 {
+		if len(ids) > 0 {
+			return emptySlice, fail.NotFoundError("failed to find products")
+		}
+		return emptySlice, nil
+	}
+	return resp.PriceList, nil
+}
+
+func (s stack) rpcGetProductByID(id *string) (aws.JSONValue, fail.Error) {
+	nullValue := aws.JSONValue{}
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return nullValue, xerr
+	}
+
+	resp, xerr := s.rpcGetProducts([]*string{id})
+	if xerr != nil {
+		return nullValue, xerr
+	}
+	if len(resp) > 1 {
+		return nullValue, fail.InconsistentError("found more than one product with ID %s", aws.StringValue(id))
+	}
+	return resp[0], nil
+}
+
+func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo, fail.Error) {
+	var emptySlice []*ec2.InstanceTypeInfo
+	request := ec2.DescribeInstanceTypesInput{}
+	if len(ids) > 0 {
+		request.InstanceTypes = ids
+	}
+	var out []*ec2.InstanceTypeInfo
+	for {
+		var resp *ec2.DescribeInstanceTypesOutput
+		xerr := stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.EC2Service.DescribeInstanceTypes(&request)
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+
+		if len(resp.InstanceTypes) == 0 {
+			if len(ids) > 0 {
+				return emptySlice, fail.NotFoundError("failed to find instance types")
+			}
+			return emptySlice, nil
+		}
+		out = append(out, resp.InstanceTypes...)
+
+		if resp.NextToken == nil {
+			break
+		}
+		request.NextToken = resp.NextToken
+	}
+	return out, nil
+}
+
+func (s stack) rpcDescribeInstanceTypeByID(id *string) (*ec2.InstanceTypeInfo, fail.Error) {
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return &ec2.InstanceTypeInfo{}, xerr
+	}
+
+	resp, xerr := s.rpcDescribeInstanceTypes([]*string{id})
+	if xerr != nil {
+		return &ec2.InstanceTypeInfo{}, xerr
+	}
+	if len(resp) > 1 {
+		return &ec2.InstanceTypeInfo{}, fail.InconsistentError("found more than one instance type with ID %s", aws.StringValue(id))
 	}
 	return resp[0], nil
 }
