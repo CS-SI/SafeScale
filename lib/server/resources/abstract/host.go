@@ -228,6 +228,14 @@ func (hc *HostCore) IsConsistent() bool {
 	return hc.ID != "" || hc.Name != ""
 }
 
+// SetName is used to set Name field
+func (hc *HostCore) SetName(name string) *HostCore {
+	if !hc.IsNull() {
+		hc.Name = name
+	}
+	return hc
+}
+
 // OK ...
 func (hc *HostCore) OK() bool {
 	return hc.IsConsistent()
@@ -392,6 +400,14 @@ func (hf *HostFull) GetID() string {
 // satisfies interface data.Identifiable
 func (hf *HostFull) GetName() string {
 	return hf.Core.Name
+}
+
+// SetName is a setter to initialize field 'Name'
+func (hf *HostFull) SetName(name string) *HostFull {
+	if !hf.IsNull() {
+		hf.Core.SetName(name)
+	}
+	return hf
 }
 
 // HostList contains a list of HostFull

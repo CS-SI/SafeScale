@@ -196,10 +196,10 @@ func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (ab
 	out.IDs = in.Ids
 	out.Description = in.Description
 	out.Direction = securitygroupruledirection.Enum(in.Direction)
-	out.Protocol = string(in.Protocol)
+	out.Protocol = in.Protocol
 	out.EtherType = ipversion.Enum(in.EtherType)
-	out.PortFrom = uint16(in.PortFrom)
-	out.PortTo = uint16(in.PortTo)
+	out.PortFrom = in.PortFrom
+	out.PortTo = in.PortTo
 	out.IPRanges = in.IpRanges
 	return out, nil
 }

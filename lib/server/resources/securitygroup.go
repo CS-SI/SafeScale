@@ -50,6 +50,7 @@ type SecurityGroup interface {
 	data.Identifiable
 
 	AddRule(concurrency.Task, abstract.SecurityGroupRule) fail.Error                                                  // returns true if the host is member of a cluster
+	AddRules(concurrency.Task, abstract.SecurityGroupRules) fail.Error                                                // returns true if the host is member of a cluster
 	BindToHost(concurrency.Task, Host, SecurityGroupActivation, SecurityGroupMark) fail.Error                         // binds a security group to a host
 	BindToSubnet(concurrency.Task, Subnet, SecurityGroupActivation, SecurityGroupMark) fail.Error                     // binds a security group to a network
 	Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                       // browses the metadata folder of Security Groups and call the callback on each entry

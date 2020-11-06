@@ -257,10 +257,8 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
-			derr := svc.DeleteSecurityGroup(asg.ID)
-			if derr != nil {
-				logrus.Errorf("cleaning up after failure, failed to delete Security Group '%s': %v", name, derr)
-				_ = xerr.AddConsequence(derr)
+			if derr := svc.DeleteSecurityGroup(asg.ID); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()
@@ -272,10 +270,8 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
-			derr := sg.core.Delete(task)
-			if derr != nil {
-				logrus.Errorf("cleaning up after failure, failed to delete Security Group '%s' metadata: %v", name, derr)
-				_ = xerr.AddConsequence(derr)
+			if derr := sg.core.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s' metadata"))
 			}
 		}
 	}()
@@ -605,7 +601,7 @@ func (sg securityGroup) AddRule(task concurrency.Task, rule abstract.SecurityGro
 		return fail.InvalidInstanceError()
 	}
 	if rule.IsNull() {
-		return fail.InvalidParameterError("rule", "cannot be null value of abstract.SecurityGroupRule")
+		return fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
 
 	return sg.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -622,8 +618,38 @@ func (sg securityGroup) AddRule(task concurrency.Task, rule abstract.SecurityGro
 	})
 }
 
-// DeleteRule deletes a rule identified by its ID from a security group
-// If ruleID is not in the security group, returns *fail.ErrNotFound
+// AddRules adds rules to a Security Group
+func (sg securityGroup) AddRules(task concurrency.Task, rules abstract.SecurityGroupRules) fail.Error {
+	if sg.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if len(rules) == 0 {
+		return fail.InvalidParameterError("rules", "cannot be empty slice")
+	}
+
+	return sg.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+		asg, ok := clonable.(*abstract.SecurityGroup)
+		if !ok {
+			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		// newAsg := asg.Clone().(*abstract.SecurityGroup)
+		for k, v := range rules {
+			if v.IsNull() {
+				return fail.InvalidParameterError("rules", "entry #%d cannot be null value of 'abstract.SecurityGroupRule'", k)
+			}
+
+			if _, innerXErr = sg.GetService().AddRuleToSecurityGroup(asg, v); innerXErr != nil {
+				return innerXErr
+			}
+		}
+		// _ = asg.Replace(newAsg)
+		return nil
+	})
+}
+
+// DeleteRules deletes a rule identified by its ID from a security group
+// If rule is not in the security group, returns *fail.ErrNotFound
 func (sg securityGroup) DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
@@ -724,7 +750,7 @@ func (sg securityGroup) ToProtocol(task concurrency.Task) (*protocol.SecurityGro
 	})
 }
 
-// BindToHost binds the security group to a host.
+// BindToHost binds the security group to a Host.
 // If 'ip' is not empty, applies the Security Group only on the interface hosting this IP address.
 func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*ip string,*/, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) fail.Error {
 	if sg.IsNull() {
