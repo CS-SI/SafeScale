@@ -150,7 +150,7 @@ func (s stack) fromAbstractSecurityGroupRules(asg abstract.SecurityGroup, in abs
 // fromAbstractSecurityGroupRule converts an abstract.SecurityGroupRule to AWS ec2.IpPermission
 func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (*ec2.IpPermission, fail.Error) {
 	var cidrFound, idFound int
-	for _, v := range in.IPRanges {
+	for _, v := range in.Involved {
 		if _, _, err := net.ParseCIDR(v); err != nil {
 			idFound++
 		} else {
@@ -180,13 +180,18 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		}
 	}
 
+	usesGroups, xerr := in.ConcernsGroups()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	var groupPairs []*ec2.UserIdGroupPair
 	var ipranges []*ec2.IpRange
 
 	out := &ec2.IpPermission{}
-	if idFound > 0 {
-		groupPairs = make([]*ec2.UserIdGroupPair, 0, idFound)
-		for _, v := range in.IPRanges {
+	if usesGroups {
+		groupPairs = make([]*ec2.UserIdGroupPair, 0, len(in.Involved))
+		for _, v := range in.Involved {
 			item := ec2.UserIdGroupPair{
 				VpcId:   aws.String(asg.NetworkID),
 				GroupId: aws.String(v),
@@ -195,8 +200,8 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		}
 		out.SetUserIdGroupPairs(groupPairs)
 	} else {
-		ipranges = make([]*ec2.IpRange, 0, cidrFound)
-		for _, v := range in.IPRanges {
+		ipranges = make([]*ec2.IpRange, 0, len(in.Involved))
+		for _, v := range in.Involved {
 			ipranges = append(ipranges, &ec2.IpRange{CidrIp: aws.String(v)})
 		}
 		out.SetIpRanges(ipranges)
@@ -323,9 +328,9 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 	item.PortFrom = int32(aws.Int64Value(in.FromPort))
 	item.PortTo = int32(aws.Int64Value(in.ToPort))
 
-	item.IPRanges = make([]string, 0, len(in.IpRanges))
+	item.Involved = make([]string, 0, len(in.IpRanges))
 	for _, ip := range in.IpRanges {
-		item.IPRanges = append(item.IPRanges, aws.StringValue(ip.CidrIp))
+		item.Involved = append(item.Involved, aws.StringValue(ip.CidrIp))
 	}
 	return out, nil
 }

@@ -76,16 +76,16 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// Checks if IPRanges is valid...
+	// Checks if CIDR is valid...
 	if req.CIDR != "" {
 		_, _, err := net.ParseCIDR(req.CIDR)
 		if err != nil {
 			return nullAN, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 		}
-	} else { // IPRanges is empty, choose the first Class C one possible
-		tracer.Trace("IPRanges is empty, choosing one...")
+	} else { // CIDR is empty, choose the first Class C one possible
+		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("IPRanges chosen for network is '%s'", req.CIDR)
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	// We specify a name and that it should forward packets
@@ -358,16 +358,16 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// Checks if IPRanges is valid...
+	// Checks if CIDR is valid...
 	if req.CIDR != "" {
 		_, _, err := net.ParseCIDR(req.CIDR)
 		if err != nil {
 			return nullAS, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 		}
-	} else { // IPRanges is empty, choose the first Class C possible
-		tracer.Trace("IPRanges is empty, choosing one...")
+	} else { // CIDR is empty, choose the first Class C possible
+		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("IPRanges chosen for subnet is '%s'", req.CIDR)
+		tracer.Trace("CIDR chosen for subnet is '%s'", req.CIDR)
 	}
 
 	// If req.IPVersion contains invalid value, force to IPv4
@@ -382,7 +382,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	}
 
 	// You must associate a new subnet with an existing network - to do this you
-	// need its UUID. You must also provide a well-formed IPRanges value.
+	// need its UUID. You must also provide a well-formed CIDR value.
 	dhcp := true
 	opts := subnets.CreateOpts{
 		NetworkID:  req.NetworkID,

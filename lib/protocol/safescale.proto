@@ -838,12 +838,6 @@ enum SecurityGroupRuleDirection {
 	SGRD_EGRESS = 2;
 }
 
-//enum SecurityGroupRuleAction {
-//	SGRA_UNKNOWN = 0;
-//	SGRA_ALLOW = 1;
-//	SGRA_DENY = 2;
-//}
-
 enum SecurityGroupRuleEtherType {
 	SGRET_UNKNOWN = 0;
 	SGRET_IPV4 = 4;
@@ -864,8 +858,7 @@ message SecurityGroupRule {
 	string protocol = 5;
 	int32 port_from = 6;
 	int32 port_to = 7;
-	repeated string ip_ranges = 8;
-//	SecurityGroupRuleAction action = 9;
+	repeated string involved = 8;
 }
 
 message SecurityGroupRuleRequest {

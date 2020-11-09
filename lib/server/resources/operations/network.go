@@ -176,7 +176,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		return fail.DuplicateError("network '%s' already exists (not managed by SafeScale)", req.Name)
 	}
 
-	// Verify the IPRanges is not routable
+	// Verify the CIDR is not routable
 	if req.CIDR != "" {
 		routable, xerr := net.IsCIDRRoutable(req.CIDR)
 		if xerr != nil {

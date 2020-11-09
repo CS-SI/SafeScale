@@ -845,9 +845,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 
 		// Unbind "default" Security Group from Host if it is bound
 		if sgName = svc.GetDefaultSecurityGroupName(); sgName != "" {
-			adsg := abstract.NewSecurityGroup().SetName(sgName)
-			adsg.NetworkID = an.ID
-			adsg, innerXErr := svc.InspectSecurityGroup(adsg)
+			adsg, innerXErr := svc.InspectSecurityGroupByName(an.ID, sgName)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:

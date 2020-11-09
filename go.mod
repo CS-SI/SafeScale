@@ -27,7 +27,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-critic/go-critic v0.4.3 // indirect
 	github.com/gofrs/flock v0.0.0-20190320160742-5135e617513b // indirect
-	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.2

@@ -320,7 +320,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return xerr
 	}
 
-	// Verify the IPRanges is not routable
+	// Verify the CIDR is not routable
 	if xerr = rs.validateCIDR(&req, *an); xerr != nil {
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
@@ -937,7 +937,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			PortFrom:    22,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "[ingress][ipv6][tcp] Allow SSH",
@@ -945,21 +945,21 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			PortFrom:    22,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 		{
 			Description: "[ingress][ipv4][icmp] Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "[ingress][ipv6][icmp] Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 	}
 
@@ -1000,14 +1000,14 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 			Description: "[egress][ipv4][all] Allow anything",
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.EGRESS,
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 
 		{
 			Description: "[egress][ipv6][all] allow anything",
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.EGRESS,
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 	}
 	var (
@@ -1036,13 +1036,13 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 			Description: "[ingress][ipv4][all] Allow LAN traffic",
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.INGRESS,
-			IPRanges:    []string{sg.GetID()},
+			Involved:    []string{sg.GetID()},
 		},
 		{
 			Description: "[ingress][ipv6][all] Allow LAN traffic",
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.INGRESS,
-			IPRanges:    []string{sg.GetID()},
+			Involved:    []string{sg.GetID()},
 		},
 	}
 	if xerr = sg.AddRules(task, rules); xerr != nil {
@@ -1622,7 +1622,7 @@ func (rs subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, x
 	return vip, nil
 }
 
-// GetCIDR returns the IPRanges of the subnet
+// GetCIDR returns the CIDR of the subnet
 func (rs subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
 	if rs.IsNull() {
 		return "", fail.InvalidInstanceError()
@@ -1643,7 +1643,7 @@ func (rs subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
 	return cidr, xerr
 }
 
-// getCIDR returns the IPRanges of the network
+// getCIDR returns the CIDR of the network
 // Intended to be used when objn is notoriously not nil (because previously checked)
 func (rs subnet) getCIDR(task concurrency.Task) string {
 	cidr, _ := rs.GetCIDR(task)

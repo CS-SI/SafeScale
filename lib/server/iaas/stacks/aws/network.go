@@ -81,7 +81,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 
 	//for _, vpc := range out.Vpcs {
 	//	nets := &abstract.Network{}
-	//	nets.IPRanges = aws.StringValue(vpc.CidrBlock)
+	//	nets.Involved = aws.StringValue(vpc.CidrBlock)
 	//	nets.ID = aws.StringValue(vpc.VpcId)
 	//	for _, tag := range vpc.Tags {
 	//		if aws.StringValue(tag.Key) == tagNameLabel && aws.StringValue(tag.Value) == s.AwsConfig.NetworkName {
@@ -295,7 +295,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	//for _, subn := range subns.Subnets {
 	//	vpcnet := abstract.Network{}
 	//	vpcnet.ID = aws.StringValue(subn.SubnetId)
-	//	vpcnet.IPRanges = aws.StringValue(subn.CidrBlock)
+	//	vpcnet.Involved = aws.StringValue(subn.CidrBlock)
 	//	vpcnet.Subnet = true
 	//	vpcnet.Parent = aws.StringValue(subn.VpcId)
 	//	for _, tag := range subn.Tags {
@@ -448,7 +448,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 	// defer fail.OnExitLogError(&xerr)
 
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
-		return nullAS, fail.Wrap(err, "error parsing requested IPRanges")
+		return nullAS, fail.Wrap(err, "error parsing requested Involved")
 	}
 
 	resp, xerr := s.rpcCreateSubnet(aws.String(req.Name), aws.String(req.NetworkID), aws.String(s.AwsConfig.Zone), aws.String(req.CIDR))
@@ -623,7 +623,7 @@ func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fai
 	//for _, vpc := range out.Vpcs {
 	//	vpcnet := abstract.Network{}
 	//	vpcnet.ID = aws.StringValue(vpc.VpcId)
-	//	vpcnet.IPRanges = aws.StringValue(vpc.CidrBlock)
+	//	vpcnet.Involved = aws.StringValue(vpc.CidrBlock)
 	//	for _, tag := range vpc.Tags {
 	//		if aws.StringValue(tag.Key) == tagNameLabel {
 	//			if aws.StringValue(tag.Value) != "" {

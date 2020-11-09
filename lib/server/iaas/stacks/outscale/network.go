@@ -386,7 +386,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
 
-	// Create a subnet with the same IPRanges than the network
+	// Create a subnet with the same Involved than the network
 	resp, xerr := s.rpcCreateSubnet(req.Name, vpc.ID, req.CIDR)
 	if xerr != nil {
 		return nil, xerr

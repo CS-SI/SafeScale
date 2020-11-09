@@ -144,9 +144,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	ipVersion := req.IPVersion
 	cidr := req.CIDR
 	if cidr == "" {
-		tracer.Trace("IPRanges is empty, choosing one...")
+		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("IPRanges chosen for network is '%s'", req.CIDR)
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 	dns := req.DNSServers
 

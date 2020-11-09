@@ -105,11 +105,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	net.ID = strconv.FormatUint(necreated.Id, 10)
 	net.Name = necreated.Name
 
-	// Checks if IPRanges is valid...
+	// Checks if CIDR is valid...
 	if req.CIDR == "" {
-		tracer.Trace("IPRanges is empty, choosing one...")
+		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("IPRanges chosen for network is '%s'", req.CIDR)
+		tracer.Trace("VIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	//// Create subnetwork
@@ -117,7 +117,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	//theRegion := s.GcpConfig.Region
 	//
 	//subnetReq := compute.Subnetwork{
-	//	IpCidrRange: req.IPRanges,
+	//	IpCidrRange: req.CIDR,
 	//	Name:        req.Name,
 	//	Network:     fmt.Sprintf("projects/%s/global/networks/%s", s.GcpConfig.ProjectID, s.GcpConfig.NetworkName),
 	//	Region:      theRegion,
@@ -149,7 +149,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	//subnet := abstract.NewSubnetk()
 	//subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
 	//subnet.Name = gcpSubNet.Name
-	//subnet.IPRanges = gcpSubNet.IpCidrRange
+	//subnet.CIDR = gcpSubNet.IpCidrRange
 	//subnet.IPVersion = ipversion.IPv4
 	//
 	buildNewRule := true
@@ -592,7 +592,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.
 		return nil, fail.Wrap(xerr, "failed to find Network '%s'", req.NetworkID)
 	}
 
-	// Checks if IPRanges is valid...
+	// Checks if CIDR is valid...
 	if req.CIDR == "" {
 		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"

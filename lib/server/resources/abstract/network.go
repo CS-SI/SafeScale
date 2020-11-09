@@ -89,7 +89,7 @@ func (n *Network) OK() bool {
 	}
 	result = result && (n.CIDR != "")
 	if n.CIDR == "" {
-		logrus.Debug("Networking without IPRanges")
+		logrus.Debug("Networking without CIDR")
 	}
 
 	return result
