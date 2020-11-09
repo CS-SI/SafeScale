@@ -60,6 +60,8 @@ type Service interface {
 	GetMetadataBucket() abstract.ObjectStorageBucket
 	GetMetadataKey() (*crypt.Key, fail.Error)
 	InspectHostByName(string) (*abstract.HostFull, fail.Error)
+	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
+
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	SelectTemplatesBySize(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
@@ -840,4 +842,12 @@ func (svc service) InspectHostByName(name string) (*abstract.HostFull, fail.Erro
 		return nil, fail.InvalidInstanceError()
 	}
 	return svc.InspectHost(abstract.NewHostCore().SetName(name))
+}
+
+// InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
+func (svc service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
+	if svc.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	return svc.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 }

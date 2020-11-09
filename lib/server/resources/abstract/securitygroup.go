@@ -18,6 +18,8 @@ package abstract
 
 import (
 	"encoding/json"
+	"net"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -33,12 +35,12 @@ type SecurityGroupRule struct {
 	Protocol    string                          `json:"protocol,omitempty"`    // concerned protocol
 	PortFrom    int32                           `json:"port_from,omitempty"`   // first port of the rule
 	PortTo      int32                           `json:"port_to,omitempty"`     // last port of the rule
-	IPRanges    []string                        `json:"ip_ranges"`             // concerned IPRanges (source or target depending of Direction) or security group ID
+	Involved    []string                        `json:"involved"`              // concerned source or target (depending of Direction); can be array of IP ranges or array of Security Group IDs (no mix)
 }
 
 // IsNull tells if the Security Group Rule is a null value
 func (sgr *SecurityGroupRule) IsNull() bool {
-	return sgr == nil || (len(sgr.IPRanges) == 0 /*&& sgr.Protocol == "" && sgr.PortFrom == 0*/)
+	return sgr == nil || (len(sgr.Involved) == 0 /*&& sgr.Protocol == "" && sgr.PortFrom == 0*/)
 }
 
 // EqualTo is a strict equality tester between 2 rules
@@ -71,8 +73,8 @@ func (sgr SecurityGroupRule) EqualTo(in SecurityGroupRule) bool {
 		}
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range sgr.IPRanges {
-		if v != in.IPRanges[k] {
+	for k, v := range sgr.Involved {
+		if v != in.Involved[k] {
 			return false
 		}
 	}
@@ -115,9 +117,9 @@ func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
 	}
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for _, v := range sgr.IPRanges {
+	for _, v := range sgr.Involved {
 		found := false
-		for _, w := range in.IPRanges {
+		for _, w := range in.Involved {
 			if v == w {
 				found = true
 				break
@@ -128,6 +130,30 @@ func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
 		}
 	}
 	return true
+}
+
+// ConcernsGroups figures out if rule contains Security Group IDs as sources/targets (in Involved field)
+// By design, CIDR and SG ID cannot be mixed
+func (sgr SecurityGroupRule) ConcernsGroups() (bool, fail.Error) {
+	if sgr.IsNull() {
+		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
+	}
+
+	var cidrFound, idFound int
+	for _, v := range sgr.Involved {
+		if _, _, err := net.ParseCIDR(v); err != nil {
+			idFound++
+		} else {
+			cidrFound++
+		}
+	}
+	if cidrFound > 0 && idFound > 0 {
+		return false, fail.InvalidRequestError("cannot mix CIDRs and Security Group IDs in source/target of rule")
+	}
+	if cidrFound == 0 && idFound == 0 {
+		return false, fail.InvalidRequestError("missing valid sources/targets in rule")
+	}
+	return idFound > 0, nil
 }
 
 // NewSecurityGroupRule creates an abstract.SecurityGroupRule
@@ -216,6 +242,27 @@ func (sg SecurityGroup) IsConsistent() bool {
 		return false
 	}
 	return true
+}
+
+func (sg *SecurityGroup) SetID(id string) *SecurityGroup {
+	if sg != nil {
+		sg.ID = id
+	}
+	return sg
+}
+
+func (sg *SecurityGroup) SetName(name string) *SecurityGroup {
+	if sg != nil {
+		sg.Name = name
+	}
+	return sg
+}
+
+func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
+	if sg != nil {
+		sg.NetworkID = networkID
+	}
+	return sg
 }
 
 // NewSecurityGroup ...

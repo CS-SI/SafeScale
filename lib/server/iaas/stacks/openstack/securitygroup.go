@@ -298,7 +298,7 @@ func convertRulesToAbstract(in []secrules.SecGroupRule) ([]abstract.SecurityGrou
 			Protocol:    v.Protocol,
 			PortFrom:    int32(v.PortRangeMin),
 			PortTo:      int32(v.PortRangeMax),
-			IPRanges:    []string{v.RemoteIPPrefix},
+			Involved:    []string{v.RemoteIPPrefix},
 		}
 		out = append(out, n)
 	}
@@ -388,6 +388,11 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule", rule.Direction)
 	}
 
+	usesGroups, xerr := rule.ConcernsGroups()
+	if xerr != nil {
+		return asg, xerr
+	}
+
 	portFrom := rule.PortFrom
 	portTo := rule.PortTo
 	if portFrom == 0 && portTo != 0 {
@@ -409,8 +414,13 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		PortRangeMax: int(portTo),
 		Protocol:     secrules.RuleProtocol(rule.Protocol),
 	}
-	for _, v := range rule.IPRanges {
-		createOpts.RemoteIPPrefix = v
+
+	for _, v := range rule.Involved {
+		if usesGroups {
+			createOpts.SecGroupID = v
+		} else {
+			createOpts.RemoteIPPrefix = v
+		}
 		createOpts.Description = rule.Description + " (" + v + ")"
 
 		xerr = stacks.RetryableRemoteCall(

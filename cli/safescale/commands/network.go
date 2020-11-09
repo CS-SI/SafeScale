@@ -733,9 +733,9 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			EtherType:   etherType,
 			Direction:   direction,
 			Protocol:    c.String("protocol"),
-			PortFrom:    uint16(c.Int("port-from")),
-			PortTo:      uint16(c.Int("port-to")),
-			IPRanges:    c.StringSlice("cidr"),
+			PortFrom:    int32(c.Int("port-from")),
+			PortTo:      int32(c.Int("port-to")),
+			Involved:    c.StringSlice("cidr"),
 		}
 
 		if err := clientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout()); err != nil {
@@ -822,9 +822,9 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			EtherType: etherType,
 			Direction: direction,
 			Protocol:  c.String("protocol"),
-			PortFrom:  uint16(c.Int("port-from")),
-			PortTo:    uint16(c.Int("port-to")),
-			IPRanges:  c.StringSlice("cidr"),
+			PortFrom:  int32(c.Int("port-from")),
+			PortTo:    int32(c.Int("port-to")),
+			Involved:  c.StringSlice("cidr"),
 		}
 		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
 		if err != nil {

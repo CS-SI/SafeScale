@@ -1057,7 +1057,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
+	var vm osc.Vm
+	if ahf.Core.ID != "" {
+		vm, xerr = s.rpcReadVmByID(ahf.Core.ID)
+	} else {
+		vm, xerr = s.rpcReadVmByName(ahf.Core.Name)
+	}
 	if xerr != nil {
 		return nullAHF, xerr
 	}
@@ -1085,24 +1090,24 @@ func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 	return xerr
 }
 
-// InspectHostByName returns the host identified by name
-func (s stack) InspectHostByName(name string) (ahf *abstract.HostFull, xerr fail.Error) {
-	nullAHF := abstract.NewHostFull()
-	if s.IsNull() {
-		return nullAHF, fail.InvalidInstanceError()
-	}
-
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
-	vm, xerr := s.rpcReadVmByName(name)
-	if xerr != nil {
-		return nullAHF, xerr
-	}
-
-	return ahf, s.complementHost(ahf, vm)
-}
+// // InspectHostByName returns the host identified by name
+// func (s stack) InspectHostByName(name string) (ahf *abstract.HostFull, xerr fail.Error) {
+// 	nullAHF := abstract.NewHostFull()
+// 	if s.IsNull() {
+// 		return nullAHF, fail.InvalidInstanceError()
+// 	}
+//
+// 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
+// 	defer tracer.Exiting()
+// 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+//
+// 	vm, xerr := s.rpcReadVmByName(name)
+// 	if xerr != nil {
+// 		return nullAHF, xerr
+// 	}
+//
+// 	return ahf, s.complementHost(ahf, vm)
+// }
 
 // GetHostState returns the current state of the host identified by id
 func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {

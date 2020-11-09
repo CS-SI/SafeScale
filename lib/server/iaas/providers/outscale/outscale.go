@@ -100,13 +100,13 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 
 	region := get(compute, "Region")
 	if region == "" {
-		return nil, fail.SyntaxError("field 'Region' in section 'compute' not found in tenant file", nil, nil)
+		return nil, fail.SyntaxError("keyword 'Region' in section 'compute' not found in tenant file", nil, nil)
 	}
 	if _, ok := metadata["Bucket"]; !ok {
 		stackName := get(identity, "provider")
 		userID := get(identity, "UserID")
 		if userID == "" {
-			return nil, fail.SyntaxError("field 'UserID' in section 'identity' not found in tenant file")
+			return nil, fail.SyntaxError("keyword 'UserID' in section 'identity' not found in tenant file")
 		}
 		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if xerr != nil {

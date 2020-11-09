@@ -51,7 +51,7 @@ type SubnetRequest struct {
 
 //// FIXME: comment!
 //type SubNetwork struct {
-//	IPRanges string `json:"subnetmask,omitempty"` // FIXME: comment!
+//	Involved string `json:"subnetmask,omitempty"` // FIXME: comment!
 //	ID   string `json:"subnetid,omitempty"`   // FIXME: comment!
 //}
 
@@ -114,7 +114,7 @@ func (s *Subnet) OK() bool {
 	}
 	result = result && (s.CIDR != "")
 	if s.CIDR == "" {
-		logrus.Debug("Subnet without IPRanges")
+		logrus.Debug("Subnet without CIDR")
 	}
 	result = result && len(s.GatewayIDs) == 0
 	if len(s.GatewayIDs) == 0 {

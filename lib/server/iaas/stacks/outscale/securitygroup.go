@@ -74,7 +74,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 		Protocol:  in.IpProtocol,
 		PortFrom:  int32(in.FromPortRange),
 		PortTo:    int32(in.ToPortRange),
-		IPRanges:  in.IpRanges,
+		Involved:  in.IpRanges,
 	}
 	return out
 }
@@ -104,6 +104,18 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules []
 			}
 		}
 	}()
+
+	// clears the default rules
+	if len(resp.OutboundRules) > 0 {
+		if xerr = s.rpcDeleteSecurityGroupRules(resp.SecurityGroupId, "Outbound", resp.OutboundRules); xerr != nil {
+			return asg, xerr
+		}
+	}
+	if len(resp.InboundRules) > 0 {
+		if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, "Inbound", resp.InboundRules); xerr != nil {
+			return asg, xerr
+		}
+	}
 
 	asg = toAbstractSecurityGroup(resp)
 	for k, v := range rules {
@@ -152,7 +164,12 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	group, xerr := s.rpcReadSecurityGroupByID(asg.ID)
+	var group osc.SecurityGroup
+	if asg.ID != "" {
+		group, xerr = s.rpcReadSecurityGroupByID(asg.ID)
+	} else {
+		group, xerr = s.rpcReadSecurityGroupByName(asg.NetworkID, asg.Name)
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -257,13 +274,22 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.S
 		return "", rule, fail.InvalidRequestError("direction of the rule is invalid")
 	}
 
+	usesGroups, xerr := in.ConcernsGroups()
+	if xerr != nil {
+		return "", rule, xerr
+	}
+
+	if in.Protocol == "" {
+		in.Protocol = "-1"
+	}
 	rule.IpProtocol = in.Protocol
 	rule.FromPortRange = int32(in.PortFrom)
 	rule.ToPortRange = int32(in.PortTo)
 	if rule.FromPortRange == 0 && rule.ToPortRange == 0 {
-		if in.Protocol == "icmp" {
-			rule.FromPortRange, rule.ToPortRange = -1, -1
-		} else {
+		switch in.Protocol {
+		case "icmp", "-1":
+			rule.FromPortRange, rule.ToPortRange = 0, 0
+		default:
 			rule.FromPortRange, rule.ToPortRange = 1, 65535
 		}
 	} else {
@@ -274,7 +300,15 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.S
 			rule.FromPortRange, rule.ToPortRange = rule.ToPortRange, rule.FromPortRange
 		}
 	}
-	rule.IpRanges = in.IPRanges
+
+	if usesGroups {
+		rule.SecurityGroupsMembers = make([]osc.SecurityGroupsMember, 0, len(in.Involved))
+		for _, v := range in.Involved {
+			rule.SecurityGroupsMembers = append(rule.SecurityGroupsMembers, osc.SecurityGroupsMember{SecurityGroupId: v})
+		}
+	} else {
+		rule.IpRanges = in.Involved
+	}
 
 	return flow, rule, nil
 }

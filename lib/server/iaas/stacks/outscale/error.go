@@ -66,7 +66,7 @@ func qualifyFromCode(code, details string) fail.Error {
 	case "4019":
 		return fail.InvalidRequestError("invalid device name")
 	case "4045":
-		return fail.InvalidRequestError("invalid IPRanges")
+		return fail.InvalidRequestError("invalid Involved")
 	case "4047":
 		if details == "" {
 			details = "invalid parameter"
@@ -78,12 +78,14 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.NotFoundError("host not found")
 	case "5071":
 		return fail.NotFoundError("keypair not found")
+	case "9005":
+		return fail.InvalidRequestError("an equivalent rule exist for the same CIDR")
 	case "9008":
 		return fail.DuplicateError("a Security Group with this name already exists")
 	case "9011":
 		return fail.DuplicateError("a keypair with this name already exists")
 	case "9044":
-		return fail.InvalidRequestError("not included in VPC IPRanges")
+		return fail.InvalidRequestError("not included in VPC Involved")
 	case "9058":
 		return fail.DuplicateError("network already exist")
 	}

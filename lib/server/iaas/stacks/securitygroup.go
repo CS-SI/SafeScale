@@ -69,7 +69,7 @@ func DefaultTCPRules() []abstract.SecurityGroupRule {
 			//PortTo:      22,
 			EtherType: ipversion.IPv4,
 			Protocol:  "tcp",
-			IPRanges:  []string{"0.0.0.0/0"},
+			Involved:  []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "INGRESS: TCP6: Allow everything",
@@ -78,7 +78,7 @@ func DefaultTCPRules() []abstract.SecurityGroupRule {
 			//PortTo:      22,
 			EtherType: ipversion.IPv6,
 			Protocol:  "tcp",
-			IPRanges:  []string{"::/0"},
+			Involved:  []string{"::/0"},
 		},
 
 		// Egress: allow everything
@@ -89,7 +89,7 @@ func DefaultTCPRules() []abstract.SecurityGroupRule {
 			PortTo:      65535,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "EGRESS: TCP6: Allow everything",
@@ -98,7 +98,7 @@ func DefaultTCPRules() []abstract.SecurityGroupRule {
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 	}
 }
@@ -115,7 +115,7 @@ func DefaultUDPRules() []abstract.SecurityGroupRule {
 			PortTo:      65535,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "udp",
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "EGRESS: UDP4: Allow everything",
@@ -124,7 +124,7 @@ func DefaultUDPRules() []abstract.SecurityGroupRule {
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "udp",
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 	}
 }
@@ -139,14 +139,14 @@ func DefaultICMPRules() []abstract.SecurityGroupRule {
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "INGRESS: ICMP6: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 		// Outbound = egress == going to Outside
 		{
@@ -154,14 +154,14 @@ func DefaultICMPRules() []abstract.SecurityGroupRule {
 			Direction:   securitygroupruledirection.EGRESS,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
-			IPRanges:    []string{"0.0.0.0/0"},
+			Involved:    []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "EGRESS: ICMP6: Allow everything",
 			Direction:   securitygroupruledirection.EGRESS,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			IPRanges:    []string{"::/0"},
+			Involved:    []string{"::/0"},
 		},
 	}
 }

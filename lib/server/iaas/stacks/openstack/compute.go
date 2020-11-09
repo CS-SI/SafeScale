@@ -446,14 +446,11 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		return nullAHF, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if xerr != nil {
 		return nullAHF, xerr
-	}
-	if server == nil {
-		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
 	state := toHostState(server.Status)
@@ -465,67 +462,6 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	return ahf, nil
 }
-
-// func (s Stack) queryServer(id string) (*servers.Server, fail.Error) {
-// 	return s.WaitHostState(id, hoststate.STARTED, 2*temporal.GetBigDelay())
-// }
-
-// // interpretAddresses converts adresses returned by the OpenStack driver
-// // Returns string slice containing the name of the networks, string map of IP addresses
-// // (indexed on network name), public ipv4 and ipv6 (if they exists)
-// func (s Stack) interpretAddresses(
-// 	addresses map[string]interface{},
-// 	hostNets []servers.Network, hostPorts []ports.Port,
-// ) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
-// 	var (
-// 		subnets     []string
-// 		addrs       = map[ipversion.Enum]map[string]string{}
-// 		AcccessIPv4 string
-// 		AcccessIPv6 string
-// 	)
-//
-// 	addrs[ipversion.IPv4] = map[string]string{}
-// 	addrs[ipversion.IPv6] = map[string]string{}
-//
-// 	for n, obj := range addresses {
-// 		for _, subnetAddresses := range obj.([]interface{}) {
-// 			address, ok := subnetAddresses.(map[string]interface{})
-// 			if !ok {
-// 				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid network address")
-// 			}
-// 			version, ok := address["version"].(float64)
-// 			if !ok {
-// 				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid version")
-// 			}
-// 			fixedIP, ok := address["addr"].(string)
-// 			if !ok {
-// 				return subnets, addrs, AcccessIPv4, AcccessIPv6, fail.InconsistentError("invalid addr")
-// 			}
-//
-// 			// Find port having this interface
-//
-// 			if n == s.cfgOpts.ProviderNetwork {
-// 				switch version {
-// 				case 4:
-// 					AcccessIPv4 = fixedIP
-// 				case 6:
-// 					AcccessIPv6 = fixedIP
-// 				}
-// 			} else {
-// 				switch version {
-// 				case 4:
-// 					addrs[ipversion.IPv4][n] = fixedIP
-// 				case 6:
-// 					addrs[ipversion.IPv6][n] = fixedIP
-// 				}
-// 			}
-//
-// 			subnets = append(subnets, n)
-//
-// 		}
-// 	}
-// 	return subnets, addrs, AcccessIPv4, AcccessIPv6, nil
-// }
 
 // complementHost complements Host data with content of server parameter
 func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
@@ -1243,60 +1179,50 @@ func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // WaitHostState waits an host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+	nullServer := &servers.Server{}
 	if s.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return nullServer, fail.InvalidInstanceError()
 	}
 
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullServer, xerr
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering().Exiting()
 
 	retryErr := retry.WhileUnsuccessful(
-		func() error {
-			innerXErr := stacks.RetryableRemoteCall(
-				func() (innerErr error) {
-					server, innerErr = servers.Get(s.ComputeClient, ahf.Core.ID).Extract()
-					return innerErr
-				},
-				NormalizeError,
-			)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
+		func() (innerErr error) {
+			if ahf.Core.ID != "" {
+				server, innerErr = s.rpcGetHostByID(ahf.Core.ID)
+			} else {
+				server, innerErr = s.rpcGetHostByName(ahf.Core.Name)
+			}
+
+			if innerErr != nil {
+				switch innerErr.(type) {
 				case *fail.ErrNotFound:
 					// If error is "resource not found", we want to return error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
 					return retry.StopRetryError(abstract.ResourceNotFoundError("host", ahf.Core.Name), "")
-				case *fail.ErrOverflow:
-					// server timeout, retries
-					return innerXErr
 				case *fail.ErrInvalidRequest:
-					return retry.StopRetryError(innerXErr, "error getting Host %s", hostLabel)
-				case *fail.ErrOverload:
-					// rate limiting defined by provider, retry
-					return innerXErr
-				case *fail.ErrNotAvailable:
-					// Service Unavailable, retry
-					return innerXErr
-				case *fail.ErrExecution:
-					// When the response is "Internal Server Error", retries
-					return innerXErr
-				}
+					// If error is "invalid request", no need to retry, it will always be so
+					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
+				default:
+					if errorMeansServiceUnavailable(innerErr) {
+						return innerErr
+					}
 
-				if errorMeansServiceUnavailable(innerXErr) {
-					return innerXErr
+					// Any other error stops the retry
+					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
 				}
-
-				// Any other error stops the retry
-				return retry.StopRetryError(innerXErr, "error getting Host %s", hostLabel)
 			}
 
 			if server == nil {
 				return fail.NotFoundError("provider did not send information for Host '%s'", hostLabel)
 			}
 
+			ahf.Core.ID = server.ID // makes sure that on next turn we get Host by ID
 			lastState := toHostState(server.Status)
 			// If state matches, we consider this a success no matter what
 			if lastState == state {
@@ -1319,12 +1245,16 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			return nil, fail.TimeoutError(retryErr.Cause(), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
+			retryErr = fail.TimeoutError(retryErr.Cause(), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
 		case *fail.ErrAborted:
-			return nil, retryErr
-		default:
-			return nil, retryErr
+			retryErr = fail.ToError(retryErr.Cause())
 		}
+	}
+	if retryErr != nil {
+		return nullServer, retryErr
+	}
+	if server == nil {
+		return nullServer, fail.NotFoundError("failed to query Host")
 	}
 	return server, nil
 }
@@ -1500,7 +1430,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 								if toHostState(host.Status) == hoststate.ERROR {
 									return nil
 								}
-								return fmt.Errorf("host '%s' state is '%s'", host.Name, host.Status)
+								return fail.NewError("host '%s' state is '%s'", host.Name, host.Status) // Note: uses a fail.Error here not to trigger NormalizeError() unhandled error message...
 							}
 							return err
 						},

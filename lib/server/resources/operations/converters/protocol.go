@@ -200,7 +200,7 @@ func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (ab
 	out.EtherType = ipversion.Enum(in.EtherType)
 	out.PortFrom = in.PortFrom
 	out.PortTo = in.PortTo
-	out.IPRanges = in.IpRanges
+	out.Involved = in.Involved
 	return out, nil
 }
 

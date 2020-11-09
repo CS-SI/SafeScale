@@ -689,21 +689,6 @@ type subnetDeleteResult struct {
 func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.Error) {
 	network, _ /*networkDesc*/, _ := net.ParseCIDR(req.CIDR)
 
-	//// Validates IPRanges regarding the existing subnets
-	//subnetworks, xerr := s.ListSubnets(req.NetworkID)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	//if xerr = wouldOverlap(subnetworks, *networkDesc); xerr != nil {
-	//	return nil, xerr
-	//}
-	//// for _, s := range subnetworks {
-	//// 	_, sDesc, _ := net.ParseCIDR(s.IPRanges)
-	//// 	if utils.CIDROverlap(*networkDesc, *sDesc) {
-	//// 		return nil, fail.Wrap(err, "would intersect with '%s (%s)'", s.Name, s.IPRanges)
-	//// 	}
-	//// }
-
 	// Calculate IP address for gateway
 	n := netretry.IPv4ToUInt32(network)
 	gw := netretry.UInt32ToIPv4(n + 1)

@@ -87,7 +87,7 @@ type AuthenticationOptions struct {
 
 	//// Name of the VPC (Virtual Private Cloud)
 	//DefaultNetworkName string
-	//// IPRanges if the VPC
+	//// CIDR of the VPC
 	//DefaultNetworkCIDR string
 }
 

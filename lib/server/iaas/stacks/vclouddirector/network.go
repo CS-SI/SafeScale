@@ -455,7 +455,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 		}
 	}
 
-	// Checks if IPRanges is valid...
+	// Checks if Involved is valid...
 	_, networkDesc, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to create subnet '%s (%s)'", req.Name, req.CIDR)
