@@ -21,10 +21,9 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // ListOpts to define parameter of list
@@ -152,13 +151,13 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			_, err := s.Stack.Driver.Request("GET", url, &opts)
 			r.Err = err
 			return normalizeError(err)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return nil, commRetryErr
@@ -179,7 +178,7 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 
 	found := false
 	fip := FloatingIP{}
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := s.ListFloatingIPs().EachPage(func(page pagination.Page) (bool, error) {
 				list, err := extractFloatingIPs(page)
@@ -197,7 +196,7 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 			})
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return nil, commRetryErr
@@ -242,12 +241,12 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := s.Stack.Driver.Request("POST", url, &opts)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return nil, commRetryErr
@@ -271,13 +270,13 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			_, r.Err = s.Stack.Driver.Request("DELETE", url, &opts)
 			err := r.ExtractErr()
 			return normalizeError(err)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 }
 
@@ -298,13 +297,13 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 		},
 	}
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			r := servers.ActionResult{}
 			_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 			return normalizeError(r.ExtractErr())
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 }
 
@@ -325,12 +324,12 @@ func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 		},
 	}
 
-	return netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	return stacks.RetryableRemoteCall(
 		func() error {
 			r := servers.ActionResult{}
 			_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 			return normalizeError(r.ExtractErr())
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 }

@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // stack is the implementation for huaweicloud cloud stack
@@ -71,12 +69,12 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 
 	// Identity API
 	var identity *gophercloud.ServiceClient
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			identity, innerErr = gcos.NewIdentityV3(parentStack.Driver, gophercloud.EndpointOpts{})
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return nil, commRetryErr
@@ -88,7 +86,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 		Name:    authOptions.Region,
 	}
 	var allProjects []projects.Project
-	commRetryErr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr = stacks.RetryableRemoteCall(
 		func() error {
 			allPages, innerErr := projects.List(identity, listOpts).AllPages()
 			if innerErr != nil {
@@ -97,7 +95,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			allProjects, innerErr = projects.ExtractProjects(allPages)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return nil, commRetryErr

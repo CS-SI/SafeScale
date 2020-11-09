@@ -24,12 +24,11 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -101,12 +100,12 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 		VolumeType:       s.getVolumeType(request.Speed),
 	}
 	var vol *volumes.Volume
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			vol, innerErr = volumes.Create(s.Stack.VolumeClient, opts).Extract()
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return nullAV, commRetryErr
@@ -133,12 +132,12 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	}
 
 	var vol *volumes.Volume
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			vol, innerErr = volumes.Get(s.Stack.VolumeClient, id).Extract()
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		switch commRetryErr.(type) {
@@ -167,7 +166,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	}
 
 	var vs []abstract.Volume
-	commRetryErr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			innerErr := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumes.ExtractVolumes(page)
@@ -189,7 +188,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 			})
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		normalizeError,
 	)
 	if commRetryErr != nil {
 		return emptySlice, commRetryErr
