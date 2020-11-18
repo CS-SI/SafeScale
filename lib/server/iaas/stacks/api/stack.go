@@ -40,7 +40,7 @@ type Stack interface {
 	ListRegions() ([]string, fail.Error)
 
 	// InspectImage returns the Image referenced by id
-	InspectImage(id string) (*abstract.Image, fail.Error)
+	InspectImage(id string) (abstract.Image, fail.Error)
 
 	// InspectTemplate returns the Template referenced by id
 	InspectTemplate(id string) (abstract.HostTemplate, fail.Error)
@@ -63,13 +63,17 @@ type Stack interface {
 	// ClearSecurityGroup removes rules from group
 	ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// DeleteSecurityGroup deletes a security group and all its rules
-	DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error
+	DeleteSecurityGroup(*abstract.SecurityGroup) fail.Error
 	// AddRuleToSecurityGroup adds a rule to an existing security group
 	AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 	DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName() string
+	// EnableSecurityGroup enables a Security Group
+	EnableSecurityGroup(*abstract.SecurityGroup) fail.Error
+	// DisableSecurityGroup disables a Security Group
+	DisableSecurityGroup(*abstract.SecurityGroup) fail.Error
 
 	// CreateNetwork creates a network named name
 	CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error)

@@ -325,18 +325,6 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 
-	var subnetGWSG, subnetInternalSG resources.SecurityGroup
-
-	if subnetGWSG, xerr = rs.createGWSecurityGroup(task, req, *an); xerr != nil {
-		return xerr
-	}
-	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetGWSG)
-
-	if subnetInternalSG, xerr = rs.createInternalSecurityGroup(task, req, *an); xerr != nil {
-		return xerr
-	}
-	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetInternalSG)
-
 	// Create the subnet
 	svc := rs.GetService()
 	as, xerr := svc.CreateSubnet(req)
@@ -371,6 +359,17 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			}
 		}
 	}()
+
+	var subnetGWSG, subnetInternalSG resources.SecurityGroup
+	if subnetGWSG, xerr = rs.createGWSecurityGroup(task, req, *as, *an); xerr != nil {
+		return xerr
+	}
+	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetGWSG)
+
+	if subnetInternalSG, xerr = rs.createInternalSecurityGroup(task, req, *an, *as); xerr != nil {
+		return xerr
+	}
+	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetInternalSG)
 
 	if xerr = subnetGWSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
 		return xerr
@@ -868,8 +867,7 @@ func (rs subnet) checkUnicity(task concurrency.Task, req abstract.SubnetRequest)
 	if _, xerr := svc.InspectSubnetByName(req.NetworkID, req.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		//case *fail.ErrInvalidRequest, *fail.ErrTimeout:
-		//	return xerr
+			// continue
 		default:
 			return xerr
 		}
@@ -927,9 +925,10 @@ func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequ
 }
 
 // createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
-func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, network abstract.Network) (resources.SecurityGroup, fail.Error) {
+func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (resources.SecurityGroup, fail.Error) {
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name, network.Name)
+	gwTag := "gw-" + subnet.ID
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: "[ingress][ipv4][tcp] Allow SSH",
@@ -937,7 +936,8 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			PortFrom:    22,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
-			Involved:    []string{"0.0.0.0/0"},
+			Sources:     []string{"0.0.0.0/0"},
+			Targets:     []string{gwTag},
 		},
 		{
 			Description: "[ingress][ipv6][tcp] Allow SSH",
@@ -945,21 +945,24 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			PortFrom:    22,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
-			Involved:    []string{"::/0"},
+			Sources:     []string{"::/0"},
+			Targets:     []string{gwTag},
 		},
 		{
 			Description: "[ingress][ipv4][icmp] Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
-			Involved:    []string{"0.0.0.0/0"},
+			Sources:     []string{"0.0.0.0/0"},
+			Targets:     []string{gwTag},
 		},
 		{
 			Description: "[ingress][ipv6][icmp] Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			Involved:    []string{"::/0"},
+			Sources:     []string{"::/0"},
+			Targets:     []string{gwTag},
 		},
 	}
 
@@ -993,21 +996,23 @@ func (rs subnet) undoCreateSecurityGroup(task concurrency.Task, errorPtr *fail.E
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, network abstract.Network) (resources.SecurityGroup, fail.Error) {
+func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, network abstract.Network, subnet abstract.Subnet) (resources.SecurityGroup, fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, req.Name, network.Name)
+	hostTag := "host-from-" + subnet.ID
 	rules := abstract.SecurityGroupRules{
 		{
-			Description: "[egress][ipv4][all] Allow anything",
+			Description: fmt.Sprintf("[egress][ipv4][all] Allow anything from %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.EGRESS,
-			Involved:    []string{"0.0.0.0/0"},
+			Sources:     []string{hostTag},
+			Targets:     []string{"0.0.0.0/0"},
 		},
-
 		{
-			Description: "[egress][ipv6][all] allow anything",
+			Description: fmt.Sprintf("[egress][ipv6][all] allow anything from %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.EGRESS,
-			Involved:    []string{"::/0"},
+			Sources:     []string{hostTag},
+			Targets:     []string{"::/0"},
 		},
 	}
 	var (
@@ -1033,16 +1038,18 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 	// adds rules that depends on Security Group ID
 	rules = abstract.SecurityGroupRules{
 		{
-			Description: "[ingress][ipv4][all] Allow LAN traffic",
+			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic to %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.INGRESS,
-			Involved:    []string{sg.GetID()},
+			Sources:     []string{sg.GetID()},
+			Targets:     []string{sg.GetID()},
 		},
 		{
-			Description: "[ingress][ipv6][all] Allow LAN traffic",
+			Description: fmt.Sprintf("[ingress][ipv6][all] Allow LAN traffic to %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.INGRESS,
-			Involved:    []string{sg.GetID()},
+			Sources:     []string{sg.GetID()},
+			Targets:     []string{sg.GetID()},
 		},
 	}
 	if xerr = sg.AddRules(task, rules); xerr != nil {
@@ -1860,6 +1867,7 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
+	svc := rs.GetService()
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
@@ -1867,11 +1875,22 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			var asg *abstract.SecurityGroup
+			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var ok bool
+				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
+					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				return nil
+			})
+			if xerr != nil {
+				return xerr
+			}
+
 			// First check if the security group is not already registered for the host with the exact same state
 			var found bool
 			for k := range nsgV1.ByID {
-				if k == sgID {
+				if k == asg.ID {
 					found = true
 				}
 			}
@@ -1880,17 +1899,23 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 			}
 
 			// Do security group stuff to enable it
-			if innerXErr := sg.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrDuplicate:
-					// security group already bound to subnet with the same state, consider as a success
-				default:
-					return innerXErr
+			if svc.GetCapabilities().CanDisableSecurityGroup {
+				if xerr = svc.EnableSecurityGroup(asg); xerr != nil {
+					return xerr
+				}
+			} else {
+				if xerr = sg.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrDuplicate:
+						// security group already bound to subnet with the same state, consider as a success
+					default:
+						return xerr
+					}
 				}
 			}
 
 			// update metadata
-			nsgV1.ByID[sgID].Disabled = false
+			nsgV1.ByID[asg.ID].Disabled = false
 			return nil
 		})
 	})
@@ -1908,6 +1933,7 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
+	svc := rs.GetService()
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
@@ -1915,24 +1941,41 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			var asg *abstract.SecurityGroup
+			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var ok bool
+				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
+					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				return nil
+			})
+			if xerr != nil {
+				return xerr
+			}
+
 			// First check if the security group is not already registered for the host with the exact same state
-			if _, ok := nsgV1.ByID[sgID]; !ok {
+			if _, ok := nsgV1.ByID[asg.ID]; !ok {
 				return fail.NotFoundError("security group '%s' is not bound to subnet '%s'", sg.GetName(), rs.GetID())
 			}
 
-			// Do security group stuff to enable it
-			if innerXErr := sg.BindToSubnet(task, rs, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-				// security group not bound to subnet, consider as a success
-				default:
-					return innerXErr
+			if svc.GetCapabilities().CanDisableSecurityGroup {
+				if xerr = svc.DisableSecurityGroup(asg); xerr != nil {
+					return xerr
+				}
+			} else {
+				// Do security group stuff to disable it
+				if xerr = sg.BindToSubnet(task, rs, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// security group not bound to subnet, consider as a success
+					default:
+						return xerr
+					}
 				}
 			}
 
 			// update metadata
-			nsgV1.ByID[sgID].Disabled = true
+			nsgV1.ByID[asg.ID].Disabled = true
 			return nil
 		})
 	})

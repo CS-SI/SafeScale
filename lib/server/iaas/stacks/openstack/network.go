@@ -359,16 +359,15 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
-	if req.CIDR != "" {
-		_, _, err := net.ParseCIDR(req.CIDR)
-		if err != nil {
-			return nullAS, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
-		}
-	} else { // CIDR is empty, choose the first Class C possible
-		tracer.Trace("CIDR is empty, choosing one...")
-		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for subnet is '%s'", req.CIDR)
+	// if req.CIDR != "" {
+	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
+		return nullAS, fail.ToError(err)
 	}
+	// } else { // CIDR is empty, choose the first Class C possible
+	// 	tracer.Trace("CIDR is empty, choosing one...")
+	// 	req.CIDR = "192.168.1.0/24"
+	// 	tracer.Trace("CIDR chosen for subnet is '%s'", req.CIDR)
+	// }
 
 	// If req.IPVersion contains invalid value, force to IPv4
 	var ipVersion gophercloud.IPVersion
@@ -483,6 +482,18 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 		Domain:    req.Domain,
 	}
 	return out, nil
+}
+
+func (s Stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
+	// _, networkDesc, _ := net.ParseCIDR(network.CIDR)
+	_, _ /*subnetDesc*/, err := net.ParseCIDR(req.CIDR)
+	if err != nil {
+		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
+	}
+	// if networkDesc.IP.Equal(subnetDesc.IP) && networkDesc.Mask.String() == subnetDesc.Mask.String() {
+	// 	return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to Network one", req.CIDR)
+	// }
+	return nil
 }
 
 // InspectSubnet returns the subnet identified by id

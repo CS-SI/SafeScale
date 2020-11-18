@@ -238,7 +238,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	asg.NetworkID = networkID
 	if _, xerr = svc.InspectSecurityGroup(asg); xerr != nil {
 		switch xerr.(type) {
-		case *fail.ErrNotFound:
+		case *fail.ErrNotFound, *fail.ErrNotAvailable:
 		// continue
 		default:
 			return fail.Wrap(xerr, "failed to check if Security Group name '%s' is already used", name)
@@ -257,7 +257,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
-			if derr := svc.DeleteSecurityGroup(asg.ID); derr != nil {
+			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s'", name))
 			}
 		}
@@ -311,13 +311,14 @@ func (sg *securityGroup) Delete(task concurrency.Task) fail.Error {
 }
 
 func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
-	// sg.SafeLock(task)
-	// defer sg.SafeUnlock(task)
-
 	svc := sg.GetService()
 
-	securityGroupID := sg.GetID()
-	xerr := sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := sg.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		asg, ok := clonable.(*abstract.SecurityGroup)
+		if !ok {
+			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
 		if !force {
 			// check bonds to hosts
 			innerXErr := props.Inspect(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
@@ -407,9 +408,10 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 		}
 
 		// Conditions are met, delete securityGroup
+		// FIXME: communication failure handled at service level, not necessary anymore to retry here
 		return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 			func() error {
-				if innerXErr := svc.DeleteSecurityGroup(securityGroupID); innerXErr != nil {
+				if innerXErr := svc.DeleteSecurityGroup(asg); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)
@@ -648,7 +650,7 @@ func (sg securityGroup) AddRules(task concurrency.Task, rules abstract.SecurityG
 	})
 }
 
-// DeleteRules deletes a rule identified by its ID from a security group
+// DeleteRule deletes a rule identified by its ID from a security group
 // If rule is not in the security group, returns *fail.ErrNotFound
 func (sg securityGroup) DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error {
 	if sg.IsNull() {
@@ -1039,7 +1041,7 @@ func (sg *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Su
 	})
 }
 
-// UnbindFromSubnet unbinds the security group from a subnet
+// UnbindFromSubnetByReference unbinds the security group from a subnet
 func (sg *securityGroup) UnbindFromSubnetByReference(task concurrency.Task, subnetRef string) fail.Error {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()

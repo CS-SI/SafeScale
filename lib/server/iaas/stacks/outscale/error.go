@@ -66,7 +66,7 @@ func qualifyFromCode(code, details string) fail.Error {
 	case "4019":
 		return fail.InvalidRequestError("invalid device name")
 	case "4045":
-		return fail.InvalidRequestError("invalid Involved")
+		return fail.InvalidRequestError("invalid Targets")
 	case "4047":
 		if details == "" {
 			details = "invalid parameter"
@@ -85,7 +85,7 @@ func qualifyFromCode(code, details string) fail.Error {
 	case "9011":
 		return fail.DuplicateError("a keypair with this name already exists")
 	case "9044":
-		return fail.InvalidRequestError("not included in VPC Involved")
+		return fail.InvalidRequestError("not included in VPC Targets")
 	case "9058":
 		return fail.DuplicateError("network already exist")
 	}

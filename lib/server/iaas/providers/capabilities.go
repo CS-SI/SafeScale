@@ -24,6 +24,8 @@ type Capabilities struct {
 	PrivateVirtualIP bool
 	// Layer3Networking indicates if the provider uses Layer3 networking
 	Layer3Networking bool
+	// CanDisableSecurityGroup indicates if the provider supports to disable a Security Group
+	CanDisableSecurityGroup bool
 	// SubnetSecurityGroup indicates if the provider supports to bind security group to subnet
 	SubnetSecurityGroup bool
 }

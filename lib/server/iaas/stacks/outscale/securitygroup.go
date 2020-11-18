@@ -74,7 +74,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 		Protocol:  in.IpProtocol,
 		PortFrom:  int32(in.FromPortRange),
 		PortTo:    int32(in.ToPortRange),
-		Involved:  in.IpRanges,
+		Targets:   in.IpRanges,
 	}
 	return out
 }
@@ -129,13 +129,12 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules []
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
+	if asg.IsNull() {
+		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -257,26 +256,35 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	return s.InspectSecurityGroup(asg.ID)
 }
 
-func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.SecurityGroupRule, fail.Error) {
+func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (_ string, _ osc.SecurityGroupRule, xerr fail.Error) {
 	rule := osc.SecurityGroupRule{}
 	if in.EtherType == ipversion.IPv6 {
 		// No IPv6 at Outscale (?)
 		return "", rule, fail.InvalidRequestError("IPv6 is not supported")
 	}
 
-	flow := ""
+	var (
+		involved   []string
+		flow       string
+		usesGroups bool
+	)
 	switch in.Direction {
 	case securitygroupruledirection.INGRESS:
 		flow = "Inbound"
+		involved = in.Targets
+		usesGroups, xerr = in.TargetsConcernGroups()
+		if xerr != nil {
+			return "", rule, xerr
+		}
 	case securitygroupruledirection.EGRESS:
 		flow = "Outbound"
+		involved = in.Sources
+		usesGroups, xerr = in.SourcesConcernGroups()
+		if xerr != nil {
+			return "", rule, xerr
+		}
 	default:
-		return "", rule, fail.InvalidRequestError("direction of the rule is invalid")
-	}
-
-	usesGroups, xerr := in.ConcernsGroups()
-	if xerr != nil {
-		return "", rule, xerr
+		return "", rule, fail.InvalidParameterError("in.Direction", "contains an unsupported value")
 	}
 
 	if in.Protocol == "" {
@@ -302,12 +310,12 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, osc.S
 	}
 
 	if usesGroups {
-		rule.SecurityGroupsMembers = make([]osc.SecurityGroupsMember, 0, len(in.Involved))
-		for _, v := range in.Involved {
+		rule.SecurityGroupsMembers = make([]osc.SecurityGroupsMember, 0, len(involved))
+		for _, v := range involved {
 			rule.SecurityGroupsMembers = append(rule.SecurityGroupsMembers, osc.SecurityGroupsMember{SecurityGroupId: v})
 		}
 	} else {
-		rule.IpRanges = in.Involved
+		rule.IpRanges = involved
 	}
 
 	return flow, rule, nil
@@ -354,4 +362,16 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
 func (s stack) GetDefaultSecurityGroupName() string {
 	return ""
+}
+
+// EnableSecurityGroup enables a Security Group
+// Does actually nothing for openstack
+func (s stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("openstack cannot enable a Security Group")
+}
+
+// DisableSecurityGroup disables a Security Group
+// Does actually nothing for openstack
+func (s stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

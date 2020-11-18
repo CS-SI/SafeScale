@@ -36,6 +36,8 @@ type stack struct {
 	GcpConfig   *stacks.GCPConfiguration
 
 	ComputeService *compute.Service
+
+	selfLinkPrefix string
 }
 
 // NullStack is not exposed through API, is needed essentially by testss
@@ -85,6 +87,9 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 	if err != nil {
 		return &stack{}, fail.ToError(err)
 	}
+
+	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
+	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
 	return gcpStack, nil
 }

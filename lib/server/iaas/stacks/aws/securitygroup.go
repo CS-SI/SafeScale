@@ -17,8 +17,6 @@
 package aws
 
 import (
-	"net"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -148,20 +146,26 @@ func (s stack) fromAbstractSecurityGroupRules(asg abstract.SecurityGroup, in abs
 }
 
 // fromAbstractSecurityGroupRule converts an abstract.SecurityGroupRule to AWS ec2.IpPermission
-func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (*ec2.IpPermission, fail.Error) {
-	var cidrFound, idFound int
-	for _, v := range in.Involved {
-		if _, _, err := net.ParseCIDR(v); err != nil {
-			idFound++
-		} else {
-			cidrFound++
+func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abstract.SecurityGroupRule) (_ *ec2.IpPermission, xerr fail.Error) {
+	var (
+		involved   []string
+		usesGroups bool
+	)
+	switch in.Direction {
+	case securitygroupruledirection.INGRESS:
+		involved = in.Targets
+		usesGroups, xerr = in.TargetsConcernGroups()
+		if xerr != nil {
+			return nil, xerr
 		}
-	}
-	if cidrFound > 0 && idFound > 0 {
-		return nil, fail.InvalidRequestError("cannot mix CIDRs and Security Group IDs in source/target of rule")
-	}
-	if cidrFound == 0 && idFound == 0 {
-		return nil, fail.InvalidRequestError("missing source/target in rule")
+	case securitygroupruledirection.EGRESS:
+		involved = in.Sources
+		usesGroups, xerr = in.SourcesConcernGroups()
+		if xerr != nil {
+			return nil, xerr
+		}
+	default:
+		return nil, fail.InvalidParameterError("in.Direction", "contains an unsupported value")
 	}
 
 	if in.Protocol == "" {
@@ -180,18 +184,13 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		}
 	}
 
-	usesGroups, xerr := in.ConcernsGroups()
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	var groupPairs []*ec2.UserIdGroupPair
 	var ipranges []*ec2.IpRange
 
 	out := &ec2.IpPermission{}
 	if usesGroups {
-		groupPairs = make([]*ec2.UserIdGroupPair, 0, len(in.Involved))
-		for _, v := range in.Involved {
+		groupPairs = make([]*ec2.UserIdGroupPair, 0, len(in.Targets))
+		for _, v := range involved {
 			item := ec2.UserIdGroupPair{
 				VpcId:   aws.String(asg.NetworkID),
 				GroupId: aws.String(v),
@@ -200,8 +199,8 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		}
 		out.SetUserIdGroupPairs(groupPairs)
 	} else {
-		ipranges = make([]*ec2.IpRange, 0, len(in.Involved))
-		for _, v := range in.Involved {
+		ipranges = make([]*ec2.IpRange, 0, len(involved))
+		for _, v := range involved {
 			ipranges = append(ipranges, &ec2.IpRange{CidrIp: aws.String(v)})
 		}
 		out.SetIpRanges(ipranges)
@@ -214,13 +213,12 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
+	if asg.IsNull() {
+		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -328,9 +326,9 @@ func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupru
 	item.PortFrom = int32(aws.Int64Value(in.FromPort))
 	item.PortTo = int32(aws.Int64Value(in.ToPort))
 
-	item.Involved = make([]string, 0, len(in.IpRanges))
+	item.Targets = make([]string, 0, len(in.IpRanges))
 	for _, ip := range in.IpRanges {
-		item.Involved = append(item.Involved, aws.StringValue(ip.CidrIp))
+		item.Targets = append(item.Targets, aws.StringValue(ip.CidrIp))
 	}
 	return out, nil
 }
@@ -506,4 +504,16 @@ func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.I
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to Hosts by provider
 func (s stack) GetDefaultSecurityGroupName() string {
 	return s.GetConfigurationOptions().DefaultSecurityGroupName
+}
+
+// EnableSecurityGroup enables a Security Group
+// Does actually nothing for openstack
+func (s stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("aws cannot enable a Security Group")
+}
+
+// DisableSecurityGroup disables a Security Group
+// Does actually nothing for openstack
+func (s stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("aws cannot disable a Security Group")
 }
