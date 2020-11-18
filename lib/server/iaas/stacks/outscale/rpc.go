@@ -390,6 +390,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (osc.Subnet, fail.Error
 	if cidr == "" {
 		return osc.Subnet{}, fail.InvalidParameterError("cidr", "cannot be empty string")
 	}
+
 	createRequest := osc.CreateSubnetOpts{
 		CreateSubnetRequest: optional.NewInterface(osc.CreateSubnetRequest{
 			IpRange:       cidr,

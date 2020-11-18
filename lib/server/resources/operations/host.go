@@ -2757,6 +2757,7 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
+	svc := rh.GetService()
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -2764,11 +2765,22 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			var asg *abstract.SecurityGroup
+			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var ok bool
+				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
+					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				return nil
+			})
+			if xerr != nil {
+				return xerr
+			}
+
 			// First check if the security group is not already registered for the host with the exact same state
 			var found bool
 			for k := range hsgV1.ByID {
-				if k == sgID {
+				if k == asg.ID {
 					found = true
 				}
 			}
@@ -2776,18 +2788,24 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sg.GetName(), rh.GetID())
 			}
 
-			// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
-			if innerXErr := sg.GetService().BindSecurityGroupToHost(sgID, rh.GetID()); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrDuplicate:
-					return nil
-				default:
-					return innerXErr
+			if svc.GetCapabilities().CanDisableSecurityGroup {
+				if xerr = svc.EnableSecurityGroup(asg); xerr != nil {
+					return xerr
+				}
+			} else {
+				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
+				if xerr = sg.GetService().BindSecurityGroupToHost(asg, rh.GetID()); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrDuplicate:
+						// continue
+					default:
+						return xerr
+					}
 				}
 			}
 
 			// found and updated, update metadata
-			hsgV1.ByID[sgID].Disabled = false
+			hsgV1.ByID[asg.ID].Disabled = false
 			return nil
 		})
 	})
@@ -2805,6 +2823,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
+	svc := rh.GetService()
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -2812,11 +2831,22 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			var asg *abstract.SecurityGroup
+			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var ok bool
+				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
+					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				return nil
+			})
+			if xerr != nil {
+				return xerr
+			}
+
 			// First check if the security group is not already registered for the host with the exact same state
 			var found bool
 			for k := range hsgV1.ByID {
-				if k == sgID {
+				if k == asg.ID {
 					found = true
 				}
 			}
@@ -2824,18 +2854,24 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sg.GetName(), sg.GetID())
 			}
 
-			// Bind the security group on provider side; if security group not binded, consider as a success
-			if innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID()); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					return nil
-				default:
-					return innerXErr
+			if svc.GetCapabilities().CanDisableSecurityGroup {
+				if xerr = svc.DisableSecurityGroup(asg); xerr != nil {
+					return xerr
+				}
+			} else {
+				// Bind the security group on provider side; if security group not binded, consider as a success
+				if xerr = svc.UnbindSecurityGroupFromHost(asg, rh.GetID()); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// continue
+					default:
+						return xerr
+					}
 				}
 			}
 
 			// found, update properties
-			hsgV1.ByID[sgID].Disabled = true
+			hsgV1.ByID[asg.ID].Disabled = true
 			return nil
 		})
 	})

@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	cloud.google.com/go v0.41.0 // indirect
+	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Bowery/prompt v0.0.0-20190916142128-fa8279994f75 // indirect
 	github.com/GeertJohan/go.rice v1.0.0
 	github.com/Masterminds/goutils v1.1.0 // indirect

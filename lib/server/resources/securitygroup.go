@@ -67,5 +67,4 @@ type SecurityGroup interface {
 	UnbindFromHostByReference(concurrency.Task, string) fail.Error                                                    // unbinds a Security Group from Host
 	UnbindFromSubnet(concurrency.Task, Subnet) fail.Error                                                             // unbinds a Security Group from Subnet
 	UnbindFromSubnetByReference(concurrency.Task, string) fail.Error                                                  // unbinds a Security group from a Subnet identified by reference (ID or name)
-	//Delete(task concurrency.Task) fail.Error // Delete already defined in Metadata...
 }

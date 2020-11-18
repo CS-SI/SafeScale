@@ -51,7 +51,7 @@ type SubnetRequest struct {
 
 //// FIXME: comment!
 //type SubNetwork struct {
-//	Involved string `json:"subnetmask,omitempty"` // FIXME: comment!
+//	Targets string `json:"subnetmask,omitempty"` // FIXME: comment!
 //	ID   string `json:"subnetid,omitempty"`   // FIXME: comment!
 //}
 

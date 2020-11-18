@@ -53,7 +53,7 @@ type Stack struct {
 	selectedAvailabilityZone string
 }
 
-// NullStacks returns a null value of the stack
+// NullStack returns a null value of the stack
 func NullStack() *Stack {
 	return &Stack{}
 }

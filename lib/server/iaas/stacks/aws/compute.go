@@ -205,8 +205,8 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // InspectImage loads information about an image stored in AWS
-func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
-	nullAI := &abstract.Image{}
+func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+	nullAI := abstract.Image{}
 	if s.IsNull() {
 		return nullAI, fail.InvalidInstanceError()
 	}
@@ -222,8 +222,7 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 		return nullAI, xerr
 	}
 
-	out := toAbstractImage(*resp)
-	return &out, nil
+	return toAbstractImage(*resp), nil
 }
 
 // InspectTemplate loads information about a template stored in AWS

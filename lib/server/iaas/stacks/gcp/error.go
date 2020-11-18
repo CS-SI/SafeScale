@@ -17,7 +17,15 @@
 package gcp
 
 import (
+	"fmt"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+
+	"reflect"
+
 	"google.golang.org/api/googleapi"
 )
 
@@ -28,13 +36,21 @@ func normalizeError(err error) fail.Error {
 	}
 
 	switch cerr := err.(type) {
+	case fail.Error:
+		return cerr
 	case *googleapi.Error:
-
 		switch cerr.Code {
+		case 400:
+			return fail.InvalidRequestError(cerr.Message)
 		case 404:
-			return fail.NotFoundError(err.Error())
+			return fail.NotFoundError(cerr.Message)
+		case 409:
+			return fail.DuplicateError(cerr.Message)
+		default:
+			logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+			return fail.UnknownError("from gcp driver, type='%s', error='%s'", reflect.TypeOf(err), err.Error())
 		}
 	}
-
-	return fail.ToError(err)
+	logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+	return fail.UnknownError("from gcp driver, type='%s', error='%s'", reflect.TypeOf(err), err.Error())
 }

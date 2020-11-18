@@ -320,8 +320,8 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
-	nullImage := &abstract.Image{}
+func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+	nullImage := abstract.Image{}
 	if s.IsNull() {
 		return nullImage, fail.InvalidInstanceError()
 	}
@@ -343,14 +343,18 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, xerr fail.Error) {
 	if xerr != nil {
 		return nullImage, xerr
 	}
-	img := abstract.Image{
-		Description: resp.Description,
-		ID:          resp.ImageId,
-		Name:        resp.ImageName,
-		StorageType: resp.RootDeviceType,
-		URL:         resp.FileLocation,
+
+	return toAbstractImage(resp), nil
+}
+
+func toAbstractImage(in osc.Image) abstract.Image {
+	return abstract.Image{
+		Description: in.Description,
+		ID:          in.ImageId,
+		Name:        in.ImageName,
+		StorageType: in.RootDeviceType,
+		URL:         in.FileLocation,
 	}
-	return &img, nil
 }
 
 // InspectTemplate returns the Template referenced by id
@@ -594,9 +598,10 @@ func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate,
 	var (
 		flexibleGpus []osc.FlexibleGpu
 		createErr    fail.Error
+		resp         osc.FlexibleGpu
 	)
 	for gpu := 0; gpu < tpl.GPUNumber; gpu++ {
-		resp, xerr := s.rpcCreateFlexibleGpu(tpl.GPUType)
+		resp, xerr = s.rpcCreateFlexibleGpu(tpl.GPUType)
 		if xerr != nil {
 			createErr = xerr
 			break
@@ -1325,8 +1330,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// if host is not found, consider operation as a success
-			//return nil
+			// if host is not found, consider operation as a success; continue
 		default:
 			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 		}

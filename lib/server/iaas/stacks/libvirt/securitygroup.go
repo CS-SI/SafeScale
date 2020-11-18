@@ -54,13 +54,12 @@ func (s stack) CreateSecurityGroup(networkRef, name string, description string, 
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
+	if asg.IsNull() {
+		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -132,4 +131,16 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError()
+}
+
+// EnableSecurityGroup enables a Security Group
+// Does actually nothing for openstack
+func (s stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("libvirt cannot enable a Security Group")
+}
+
+// DisableSecurityGroup disables a Security Group
+// Does actually nothing for openstack
+func (s stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("libvirt cannot disable a Security Group")
 }

@@ -359,7 +359,7 @@ func SecurityGroupRuleFromAbstractToProtocol(in abstract.SecurityGroupRule) *pro
 		EtherType:   protocol.SecurityGroupRuleEtherType(in.EtherType),
 		PortFrom:    in.PortFrom,
 		PortTo:      in.PortTo,
-		Involved:    in.Involved,
+		Involved:    in.Targets,
 	}
 	return out
 }

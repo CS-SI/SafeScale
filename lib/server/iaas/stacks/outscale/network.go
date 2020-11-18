@@ -386,7 +386,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
 
-	// Create a subnet with the same Involved than the network
+	// Create a subnet with the same Targets than the network
 	resp, xerr := s.rpcCreateSubnet(req.Name, vpc.ID, req.CIDR)
 	if xerr != nil {
 		return nil, xerr
@@ -608,7 +608,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 }
 
 // BindSecurityGroupToSubnet binds a Security Group to a Subnet
-// Does nothing in outscale stack
+// Acrually does nothing for outscale
 func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -632,7 +632,7 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 }
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-// Does nothing in outscale stack
+// Actually does nothing for outscale
 func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

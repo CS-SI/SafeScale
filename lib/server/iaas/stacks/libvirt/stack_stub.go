@@ -78,8 +78,8 @@ func (s stack) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // InspectImage stub
-func (s stack) InspectImage(id string) (*abstract.Image, fail.Error) {
-	return &abstract.Image{}, gError
+func (s stack) InspectImage(id string) (abstract.Image, fail.Error) {
+	return abstract.Image{}, gError
 }
 
 // InspectTemplate stub
@@ -343,6 +343,18 @@ func (s stack) InspectSecurityGroup(stacks.SecurityGroupParameter) (*abstract.Se
 }
 
 // DeleteSecurityGroup ...
-func (s stack) DeleteSecurityGroup(stacks.SecurityGroupParameter) fail.Error {
+func (s stack) DeleteSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return gError
+}
+
+// EnableSecurityGroup enables a Security Group
+// Does actually nothing for openstack
+func (s stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return gError
+}
+
+// DisableSecurityGroup disables a Security Group
+// Does actually nothing for openstack
+func (s stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
 	return gError
 }

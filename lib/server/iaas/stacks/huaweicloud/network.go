@@ -396,7 +396,7 @@ func (s stack) validateCIDR(req *abstract.SubnetRequest, network *abstract.Netwo
 		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 	if networkDesc.IP.Equal(subnetDesc.IP) && networkDesc.Mask.String() == subnetDesc.Mask.String() {
-		return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to VPC one", req.CIDR)
+		return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to Network one", req.CIDR)
 	}
 	return nil
 }

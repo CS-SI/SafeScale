@@ -35,12 +35,13 @@ type SecurityGroupRule struct {
 	Protocol    string                          `json:"protocol,omitempty"`    // concerned protocol
 	PortFrom    int32                           `json:"port_from,omitempty"`   // first port of the rule
 	PortTo      int32                           `json:"port_to,omitempty"`     // last port of the rule
-	Involved    []string                        `json:"involved"`              // concerned source or target (depending of Direction); can be array of IP ranges or array of Security Group IDs (no mix)
+	Sources     []string                        `json:"sources"`               // concerned sources (depending of Direction); can be array of IP ranges or array of Security Group IDs (no mix)
+	Targets     []string                        `json:"targets"`               // concerned source or target (depending of Direction); can be array of IP ranges or array of Security Group IDs (no mix)
 }
 
 // IsNull tells if the Security Group Rule is a null value
 func (sgr *SecurityGroupRule) IsNull() bool {
-	return sgr == nil || (len(sgr.Involved) == 0 /*&& sgr.Protocol == "" && sgr.PortFrom == 0*/)
+	return sgr == nil || (len(sgr.Sources) == 0 && len(sgr.Targets) == 0 /*&& sgr.Protocol == "" && sgr.PortFrom == 0*/)
 }
 
 // EqualTo is a strict equality tester between 2 rules
@@ -73,8 +74,14 @@ func (sgr SecurityGroupRule) EqualTo(in SecurityGroupRule) bool {
 		}
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range sgr.Involved {
-		if v != in.Involved[k] {
+	for k, v := range sgr.Sources {
+		if v != in.Sources[k] {
+			return false
+		}
+	}
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for k, v := range sgr.Targets {
+		if v != in.Targets[k] {
 			return false
 		}
 	}
@@ -117,9 +124,23 @@ func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
 	}
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for _, v := range sgr.Involved {
+	for _, v := range sgr.Sources {
 		found := false
-		for _, w := range in.Involved {
+		for _, w := range in.Sources {
+			if v == w {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for _, v := range sgr.Targets {
+		found := false
+		for _, w := range in.Targets {
 			if v == w {
 				found = true
 				break
@@ -132,19 +153,31 @@ func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
 	return true
 }
 
-// ConcernsGroups figures out if rule contains Security Group IDs as sources/targets (in Involved field)
+// SourcesConcernGroups figures out if rule contains Security Group IDs as sources
 // By design, CIDR and SG ID cannot be mixed
-func (sgr SecurityGroupRule) ConcernsGroups() (bool, fail.Error) {
+func (sgr SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
 	if sgr.IsNull() {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
+	return concernsGroups(sgr.Sources)
+}
 
+// TargetsConcernGroups figures out if rule contains Security Group IDs as targets
+// By design, CIDR and SG ID cannot be mixed
+func (sgr SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
+	if sgr.IsNull() {
+		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
+	}
+	return concernsGroups(sgr.Targets)
+}
+
+func concernsGroups(in []string) (bool, fail.Error) {
 	var cidrFound, idFound int
-	for _, v := range sgr.Involved {
-		if _, _, err := net.ParseCIDR(v); err != nil {
-			idFound++
-		} else {
+	for _, v := range in {
+		if _, _, err := net.ParseCIDR(v); err == nil {
 			cidrFound++
+		} else {
+			idFound++
 		}
 	}
 	if cidrFound > 0 && idFound > 0 {
@@ -242,6 +275,11 @@ func (sg SecurityGroup) IsConsistent() bool {
 		return false
 	}
 	return true
+}
+
+// IsComplete tells if the content of the security group is complete
+func (sg SecurityGroup) IsComplete() bool {
+	return sg.ID != "" && sg.Name != "" && sg.NetworkID != ""
 }
 
 func (sg *SecurityGroup) SetID(id string) *SecurityGroup {

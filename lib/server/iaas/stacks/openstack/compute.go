@@ -170,8 +170,8 @@ func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) {
-	nullAI := &abstract.Image{}
+func (s Stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+	nullAI := abstract.Image{}
 	if s.IsNull() {
 		return nullAI, fail.InvalidInstanceError()
 	}
@@ -196,7 +196,7 @@ func (s Stack) InspectImage(id string) (image *abstract.Image, xerr fail.Error) 
 		return nullAI, xerr
 	}
 
-	out := &abstract.Image{
+	out := abstract.Image{
 		ID:       img.ID,
 		Name:     img.Name,
 		DiskSize: int64(img.MinDiskGigabytes),

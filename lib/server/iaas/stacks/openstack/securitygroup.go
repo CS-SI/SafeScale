@@ -141,13 +141,12 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules [
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s Stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
+	if asg.IsNull() {
+		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -298,7 +297,7 @@ func convertRulesToAbstract(in []secrules.SecGroupRule) ([]abstract.SecurityGrou
 			Protocol:    v.Protocol,
 			PortFrom:    int32(v.PortRangeMin),
 			PortTo:      int32(v.PortRangeMax),
-			Involved:    []string{v.RemoteIPPrefix},
+			Targets:     []string{v.RemoteIPPrefix},
 		}
 		out = append(out, n)
 	}
@@ -379,18 +378,35 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		}
 	}
 
-	etherType := convertEtherTypeFromAbstract(rule.EtherType)
-	if etherType == "" { // If no valid EtherType is provided, force to IPv4
-		etherType = secrules.EtherType4
-	}
 	direction := convertDirectionFromAbstract(rule.Direction)
 	if direction == "" { // Invalid direction is not permitted
 		return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule", rule.Direction)
 	}
 
-	usesGroups, xerr := rule.ConcernsGroups()
-	if xerr != nil {
-		return asg, xerr
+	var (
+		involved   []string
+		usesGroups bool
+	)
+	switch rule.Direction {
+	case securitygroupruledirection.INGRESS:
+		involved = rule.Targets
+		usesGroups, xerr = rule.TargetsConcernGroups()
+		if xerr != nil {
+			return nil, xerr
+		}
+	case securitygroupruledirection.EGRESS:
+		involved = rule.Sources
+		usesGroups, xerr = rule.SourcesConcernGroups()
+		if xerr != nil {
+			return nil, xerr
+		}
+	default:
+		return nil, fail.InvalidParameterError("in.Direction", "contains an unsupported value")
+	}
+
+	etherType := convertEtherTypeFromAbstract(rule.EtherType)
+	if etherType == "" { // If no valid EtherType is provided, force to IPv4
+		etherType = secrules.EtherType4
 	}
 
 	portFrom := rule.PortFrom
@@ -415,27 +431,44 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		Protocol:     secrules.RuleProtocol(rule.Protocol),
 	}
 
-	for _, v := range rule.Involved {
-		if usesGroups {
+	rule.IDs = make([]string, 0, len(involved))
+	if usesGroups {
+		for _, v := range involved {
 			createOpts.SecGroupID = v
-		} else {
-			createOpts.RemoteIPPrefix = v
+			createOpts.Description = rule.Description + " (" + v + ")"
+			xerr = stacks.RetryableRemoteCall(
+				func() error {
+					r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
+					if innerErr != nil {
+						return innerErr
+					}
+					rule.IDs = append(rule.IDs, r.ID)
+					return nil
+				},
+				NormalizeError,
+			)
+			if xerr != nil {
+				return asg, xerr
+			}
 		}
-		createOpts.Description = rule.Description + " (" + v + ")"
-
-		xerr = stacks.RetryableRemoteCall(
-			func() error {
-				r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
-				if innerErr != nil {
-					return innerErr
-				}
-				rule.IDs = append(rule.IDs, r.ID)
-				return nil
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return asg, xerr
+	} else {
+		for _, v := range involved {
+			createOpts.RemoteIPPrefix = v
+			createOpts.Description = rule.Description + " (" + v + ")"
+			xerr = stacks.RetryableRemoteCall(
+				func() error {
+					r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
+					if innerErr != nil {
+						return innerErr
+					}
+					rule.IDs = append(rule.IDs, r.ID)
+					return nil
+				},
+				NormalizeError,
+			)
+			if xerr != nil {
+				return asg, xerr
+			}
 		}
 	}
 	asg.Rules = append(asg.Rules, rule)
@@ -492,4 +525,16 @@ func (s Stack) GetDefaultSecurityGroupName() string {
 		return ""
 	}
 	return s.GetConfigurationOptions().DefaultSecurityGroupName
+}
+
+// EnableSecurityGroup enables a Security Group
+// Does actually nothing for openstack
+func (s Stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("openstack cannot enable a Security Group")
+}
+
+// DisableSecurityGroup disables a Security Group
+// Does actually nothing for openstack
+func (s Stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

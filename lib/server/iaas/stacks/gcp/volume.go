@@ -38,8 +38,8 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	if s == nil {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -61,22 +61,12 @@ func (s *stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 		Zone:   s.GcpConfig.Zone,
 	}
 
-	service := s.ComputeService
-
 	op, err := s.ComputeService.Disks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, newDisk).Do()
 	if err != nil {
 		return nil, fail.ToError(err)
 	}
 
-	oco := OpContext{
-		Operation:    op,
-		ProjectID:    s.GcpConfig.ProjectID,
-		Service:      service,
-		DesiredState: "DONE",
-	}
-
-	xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-	if xerr != nil {
+	if xerr := s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
 		return nil, xerr
 	}
 
@@ -94,17 +84,16 @@ func (s *stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
-	nvol.State, xerr = volumeStateConvert(gcpDisk.Status)
-	if xerr != nil {
+	if nvol.State, xerr = volumeStateConvert(gcpDisk.Status); xerr != nil {
 		return nil, xerr
 	}
 
 	return nvol, nil
 }
 
-// GetVolume returns the volume identified by id
-func (s *stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
-	if s == nil {
+// InspectVolume returns the volume identified by id
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -154,8 +143,8 @@ func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-	if s == nil {
+func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -193,8 +182,8 @@ func (s *stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *stack) DeleteVolume(ref string) fail.Error {
-	if s == nil {
+func (s stack) DeleteVolume(ref string) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -204,28 +193,20 @@ func (s *stack) DeleteVolume(ref string) fail.Error {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	service := s.ComputeService
 	op, err := s.ComputeService.Disks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
 	if err != nil {
 		return fail.ToError(err)
 	}
 
-	oco := OpContext{
-		Operation:    op,
-		ProjectID:    s.GcpConfig.ProjectID,
-		Service:      service,
-		DesiredState: "DONE",
-	}
-
-	return waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
 }
 
 // CreateVolumeAttachment attaches a volume to an host
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if s == nil {
+func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -233,8 +214,6 @@ func (s *stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	service := s.ComputeService
 
 	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.HostID).Do()
 	if err != nil {
@@ -256,24 +235,16 @@ func (s *stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 		return "", fail.ToError(err)
 	}
 
-	oco := OpContext{
-		Operation:    op,
-		ProjectID:    s.GcpConfig.ProjectID,
-		Service:      service,
-		DesiredState: "DONE",
-	}
-
-	xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-	if xerr != nil {
+	if xerr := s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
 		return "", xerr
 	}
 
 	return newGcpDiskAttachment(gcpInstance.Name, gcpDisk.Name).attachmentID, nil
 }
 
-// GetVolumeAttachment returns the volume attachment identified by id
-func (s *stack) InspectVolumeAttachment(serverID, vaID string) (*abstract.VolumeAttachment, fail.Error) {
-	if s == nil {
+// InspectVolumeAttachment returns the volume attachment identified by id
+func (s stack) InspectVolumeAttachment(serverID, vaID string) (*abstract.VolumeAttachment, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -313,8 +284,8 @@ func (s *stack) InspectVolumeAttachment(serverID, vaID string) (*abstract.Volume
 }
 
 // DeleteVolumeAttachment ...
-func (s *stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
-	if s == nil {
+func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -326,8 +297,6 @@ func (s *stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverID, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	service := s.ComputeService
 
 	gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverID).Do()
 	if err != nil {
@@ -345,19 +314,12 @@ func (s *stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 		return fail.ToError(err)
 	}
 
-	oco := OpContext{
-		Operation:    op,
-		ProjectID:    s.GcpConfig.ProjectID,
-		Service:      service,
-		DesiredState: "DONE",
-	}
-
-	return waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-	if s == nil {
+func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
