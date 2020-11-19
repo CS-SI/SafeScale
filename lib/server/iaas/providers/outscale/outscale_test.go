@@ -224,13 +224,13 @@ func Test_VMWithGPU(t *testing.T) {
 		Subnets:        []*abstract.Subnet{subnet},
 		DefaultRouteIP: "",
 		// DefaultGateway: nil,
-		PublicIP:   true,
-		TemplateID: tpl.ID,
-		ImageID:    img.ID,
-		KeyPair:    nil,
-		Password:   "",
-		DiskSize:   50,
-		Disposable: false,
+		PublicIP:    true,
+		TemplateID:  tpl.ID,
+		ImageID:     img.ID,
+		KeyPair:     nil,
+		Password:    "",
+		DiskSize:    50,
+		Preemptible: false,
 	})
 	assert.NoError(t, err)
 	assert.NotNil(t, h)

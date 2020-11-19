@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	natRuleNameFormat = "%s-%s-nat-allowed"
+	natRouteNameFormat = "%s-%s-nat-allowed"
 )
 
 // ------ network methods ------
@@ -624,25 +624,15 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xer
 	as.IPVersion = ipversion.IPv4
 	as.Network = req.NetworkID
 
-	natRuleName := fmt.Sprintf(natRuleNameFormat, an.Name, as.Name)
-	// if _, xerr = s.rpcGetRouteByName(natRuleName); xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		// continue
-	// 	default:
-	// 		return nullAS, xerr
-	// 	}
-	// } else {
-	// 	return nullAS, fail.DuplicateError("failed to create NAT rule '%s', already exist", natRuleName)
-	// }
-	if _, xerr = s.rpcCreateRoute(an.Name, as.Name, natRuleName); xerr != nil {
+	var route *compute.Route
+	if route, xerr = s.rpcCreateRoute(an.Name, as.Name); xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			if derr := s.rpcDeleteRoute(natRuleName); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", natRuleName))
+			if derr := s.rpcDeleteRoute(route.Name); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", route.Name))
 			}
 		}
 	}()
@@ -847,7 +837,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	// Delete NAT route
 	tmp := strings.Split(subn.Network, "/")
 	networkName := tmp[len(tmp)-1]
-	natRuleName := fmt.Sprintf(natRuleNameFormat, networkName, subn.Name)
+	natRuleName := fmt.Sprintf(natRouteNameFormat, networkName, subn.Name)
 	if xerr = s.rpcDeleteRoute(natRuleName); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

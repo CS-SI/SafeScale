@@ -799,21 +799,23 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := sg.GetService().BindSecurityGroupToHost(sg.GetID(), hostID)
-				switch xerr.(type) {
-				case *fail.ErrDuplicate:
-					// continue
-				default:
-					return xerr
+				if xerr := sg.GetService().BindSecurityGroupToHost(sg.GetID(), hostID); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrDuplicate:
+						// continue
+					default:
+						return xerr
+					}
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				innerXErr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID)
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					// continue
-				default:
-					return innerXErr
+				if xerr := sg.GetService().UnbindSecurityGroupFromHost(sg.GetID(), hostID); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// continue
+					default:
+						return xerr
+					}
 				}
 			}
 			return nil

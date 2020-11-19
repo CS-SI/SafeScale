@@ -160,7 +160,9 @@ type HostRequest struct {
 	// KeepOnFailure tells if resource must be kept on failure
 	KeepOnFailure bool
 	// Use spot-like instance
-	Disposable bool
+	Preemptible bool
+	// List of Security Groups to attach to Host
+	SecurityGroupIDs []string
 }
 
 // HostEffectiveSizing ...
