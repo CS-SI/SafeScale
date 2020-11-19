@@ -395,6 +395,12 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}()
 
+	// IDs of Security Groups to attach to Host
+	sgs := []string{
+		subnetGWSG.GetID(),
+		subnetInternalSG.GetID(),
+	}
+
 	caps := svc.GetCapabilities()
 	failover := req.HA
 	if failover {
@@ -578,11 +584,12 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	gwRequest := abstract.HostRequest{
-		ImageID:       img.ID,
-		Subnets:       []*abstract.Subnet{as},
-		KeyPair:       keypair,
-		TemplateID:    template.ID,
-		KeepOnFailure: req.KeepOnFailure,
+		ImageID:          img.ID,
+		Subnets:          []*abstract.Subnet{as},
+		KeyPair:          keypair,
+		TemplateID:       template.ID,
+		KeepOnFailure:    req.KeepOnFailure,
+		SecurityGroupIDs: sgs,
 	}
 
 	var (
@@ -925,10 +932,28 @@ func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequ
 }
 
 // createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
-func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (resources.SecurityGroup, fail.Error) {
+func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name, network.Name)
-	gwTag := "gw-" + subnet.ID
+
+	var sg resources.SecurityGroup
+	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
+		return nil, xerr
+	}
+	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
+	xerr = sg.Create(task, network.ID, sgName, description, nil)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := sg.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", req.Name))
+			}
+		}
+	}()
+
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: "[ingress][ipv4][tcp] Allow SSH",
@@ -937,7 +962,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
 			Sources:     []string{"0.0.0.0/0"},
-			Targets:     []string{gwTag},
+			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: "[ingress][ipv6][tcp] Allow SSH",
@@ -946,7 +971,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
 			Sources:     []string{"::/0"},
-			Targets:     []string{gwTag},
+			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: "[ingress][ipv4][icmp] Allow everything",
@@ -954,7 +979,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
 			Sources:     []string{"0.0.0.0/0"},
-			Targets:     []string{gwTag},
+			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: "[ingress][ipv6][icmp] Allow everything",
@@ -962,19 +987,10 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
 			Sources:     []string{"::/0"},
-			Targets:     []string{gwTag},
+			Targets:     []string{sg.GetID()},
 		},
 	}
-
-	var (
-		xerr fail.Error
-		sg   resources.SecurityGroup
-	)
-	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr == nil {
-		description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
-		xerr = sg.Create(task, network.ID, sgName, description, rules)
-	}
-	if xerr != nil {
+	if xerr = sg.AddRules(task, rules); xerr != nil {
 		return nil, xerr
 	}
 
@@ -996,34 +1012,16 @@ func (rs subnet) undoCreateSecurityGroup(task concurrency.Task, errorPtr *fail.E
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, network abstract.Network, subnet abstract.Subnet) (resources.SecurityGroup, fail.Error) {
+func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, network abstract.Network, subnet abstract.Subnet) (_ resources.SecurityGroup, xerr fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, req.Name, network.Name)
-	hostTag := "host-from-" + subnet.ID
-	rules := abstract.SecurityGroupRules{
-		{
-			Description: fmt.Sprintf("[egress][ipv4][all] Allow anything from %s", req.CIDR),
-			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.EGRESS,
-			Sources:     []string{hostTag},
-			Targets:     []string{"0.0.0.0/0"},
-		},
-		{
-			Description: fmt.Sprintf("[egress][ipv6][all] allow anything from %s", req.CIDR),
-			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.EGRESS,
-			Sources:     []string{hostTag},
-			Targets:     []string{"::/0"},
-		},
+
+	var sg resources.SecurityGroup
+	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
+		return nil, xerr
 	}
-	var (
-		xerr fail.Error
-		sg   resources.SecurityGroup
-	)
-	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr == nil {
-		description := fmt.Sprintf(subnetInternalSecurityGroupDescriptionPattern, req.Name, network.Name)
-		xerr = sg.Create(task, network.ID, sgName, description, rules)
-	}
-	if xerr != nil {
+
+	description := fmt.Sprintf(subnetInternalSecurityGroupDescriptionPattern, req.Name, network.Name)
+	if xerr = sg.Create(task, network.ID, sgName, description, nil); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1036,7 +1034,22 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 	}()
 
 	// adds rules that depends on Security Group ID
-	rules = abstract.SecurityGroupRules{
+	//hostTag := "host-from-" + subnet.ID
+	rules := abstract.SecurityGroupRules{
+		{
+			Description: fmt.Sprintf("[egress][ipv4][all] Allow anything from %s", req.CIDR),
+			EtherType:   ipversion.IPv4,
+			Direction:   securitygroupruledirection.EGRESS,
+			Sources:     []string{sg.GetID()},
+			Targets:     []string{"0.0.0.0/0"},
+		},
+		{
+			Description: fmt.Sprintf("[egress][ipv6][all] allow anything from %s", req.CIDR),
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.EGRESS,
+			Sources:     []string{sg.GetID()},
+			Targets:     []string{"::/0"},
+		},
 		{
 			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic to %s", req.CIDR),
 			EtherType:   ipversion.IPv4,

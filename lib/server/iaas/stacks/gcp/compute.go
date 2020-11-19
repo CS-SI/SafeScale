@@ -230,7 +230,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// The Default Network is the first of the provided list, by convention
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
-	isGateway := defaultSubnet == nil // || defaultSubnet.Name == abstract.SingleHostNetworkName
 
 	an, xerr := s.InspectNetwork(defaultSubnet.Network)
 	if xerr != nil {
@@ -305,25 +304,15 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUD, xerr
 	}
 
-	// --- Initializes abstract.HostCore ---
-
-	hostCore := abstract.NewHostCore()
-	hostCore.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
-	hostCore.Password = request.Password
-
-	// --- query provider for ahf creation ---
+	// --- query provider for Host creation ---
 
 	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
 
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			var (
-				innerXErr fail.Error
-				server    *abstract.HostCore
-			)
-			server, innerXErr = s.buildGcpMachine(request.ResourceName, an.Name, defaultSubnet.Name, template, rim.URL, string(userDataPhase1), isGateway)
-			if innerXErr != nil {
+			var innerXErr fail.Error
+			if ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), request.IsGateway, request.SecurityGroupIDs); innerXErr != nil {
 				// if !server.IsNull() {
 				// 	// try deleting server
 				// 	if derr := s.DeleteHost(server.ID); derr != nil {
@@ -340,18 +329,15 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				}
 			}
 
-			if server == nil {
-				return fail.NewError("failed to create server")
-			}
-
-			hostCore.ID = server.ID
-			hostCore.Name = server.Name
+			//if server.IsNull() {
+			//	return fail.NewError("failed to create server")
+			//}
 
 			// Wait that Host is ready, not just that the build is started
-			if _, innerXErr = s.WaitHostReady(server.ID, temporal.GetLongOperationTimeout()); innerXErr != nil {
+			if _, innerXErr = s.WaitHostReady(ahf.GetID(), temporal.GetLongOperationTimeout()); innerXErr != nil {
 				if !request.KeepOnFailure {
-					if derr := s.DeleteHost(hostCore.ID); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", hostCore.Name))
+					if derr := s.DeleteHost(ahf.GetID()); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", ahf.GetName()))
 					}
 				}
 				switch innerXErr.(type) {
@@ -376,29 +362,30 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUD, retryErr
 	}
 
-	logrus.Debugf("Host '%s' created.", hostCore.Name)
+	logrus.Debugf("Host '%s' created.", ahf.GetName())
 
-	newHost := abstract.NewHostFull()
-	newHost.Core = hostCore
-	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
-	newHost.Networking.IsGateway = isGateway
-	newHost.Networking.DefaultSubnetID = defaultSubnetID
+	// Add to abstract.HostFull data that does not come with creation data from provider
+	ahf.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
+	ahf.Core.Password = request.Password             // and OperatorUsername's password
+	ahf.Networking.IsGateway = request.IsGateway
+	ahf.Networking.DefaultSubnetID = defaultSubnetID
+	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if xerr != nil && !request.KeepOnFailure {
-			logrus.Infof("Cleanup, deleting host '%s'", hostCore.Name)
-			if derr := s.DeleteHost(hostCore.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", hostCore.Name))
+			logrus.Infof("Cleanup, deleting host '%s'", ahf.GetName())
+			if derr := s.DeleteHost(ahf); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", ahf.GetName()))
 			}
 		}
 	}()
 
-	if !newHost.OK() {
-		logrus.Warnf("Missing data in ahf: %s", spew.Sdump(newHost))
+	if !ahf.OK() {
+		logrus.Warnf("Missing data in ahf: %s", spew.Sdump(ahf))
 	}
 
-	return newHost, userData, nil
+	return ahf, userData, nil
 }
 
 // WaitHostReady waits an host achieve ready state
@@ -441,121 +428,30 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	return ahf.Core, nil
 }
 
-func publicAccess(isPublic bool) []*compute.AccessConfig {
-	if isPublic {
-		return []*compute.AccessConfig{
-			{
-				Type: "ONE_TO_ONE_NAT",
-				Name: "External NAT",
-			},
-		}
-	}
-
-	return []*compute.AccessConfig{}
-}
-
 // buildGcpMachine ...
 func (s stack) buildGcpMachine(
 	instanceName string,
-	networkName string,
-	subnetName string,
+	network *abstract.Network,
+	subnet *abstract.Subnet,
 	template abstract.HostTemplate,
 	imageURL string,
 	userdata string,
 	isPublic bool,
-) (*abstract.HostCore, fail.Error) {
+	sgs []string,
+) (*abstract.HostFull, fail.Error) {
 
-	nullAHC := abstract.NewHostCore()
-	resp, xerr := s.rpcCreateInstance(instanceName, networkName, subnetName, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic)
+	nullAHF := abstract.NewHostFull()
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, sgs)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nullAHF, xerr
 	}
 
-	// tag := "nat"
-	// if !isPublic {
-	// 	tag = fmt.Sprintf("no-ip-%s", subnetName)
-	// }
-	//
-	// instance := &compute.Instance{
-	// 	Name:         instanceName,
-	// 	Description:  "compute sample instance",
-	// 	MachineType:  s.linksPrefix + "/zones/" + zone + "/machineTypes/" + template.Name,
-	// 	CanIpForward: isPublic,
-	// 	Tags: &compute.Tags{
-	// 		Items: []string{tag},
-	// 	},
-	// 	Disks: []*compute.AttachedDisk{
-	// 		{
-	// 			AutoDelete: true,
-	// 			Boot:       true,
-	// 			Type:       "PERSISTENT",
-	// 			InitializeParams: &compute.AttachedDiskInitializeParams{
-	// 				DiskName:    fmt.Sprintf("%s-disk", instanceName),
-	// 				SourceImage: imageURL,
-	// 				DiskSizeGb:  int64(template.DiskSize),
-	// 			},
-	// 		},
-	// 	},
-	// 	NetworkInterfaces: []*compute.NetworkInterface{
-	// 		{
-	// 			AccessConfigs: publicAccess(isPublic),
-	// 			Network:       s.linksPrefix + "/networks/" + networkName,
-	// 			Subnetwork:    s.linksPrefix + "/regions/" + region + "/subnetworks/" + subnetName,
-	// 		},
-	// 	},
-	// 	ServiceAccounts: []*compute.ServiceAccount{
-	// 		{
-	// 			Email: "default",
-	// 			Scopes: []string{
-	// 				compute.DevstorageFullControlScope,
-	// 				compute.ComputeScope,
-	// 			},
-	// 		},
-	// 	},
-	// 	Metadata: &compute.Metadata{
-	// 		Items: []*compute.MetadataItems{
-	// 			{
-	// 				Key:   "startup-script",
-	// 				Value: &userdata,
-	// 			},
-	// 		},
-	// 	},
-	// }
-	//
-	// op, err := service.Instances.Insert(projectID, zone, instance).Do()
-	// if err != nil {
-	// 	return nil, fail.ToError(err)
-	// }
-	//
-	// etag := op.Header.Get("Etag")
-	// oco := opContext{
-	// 	Operation:    op,
-	// 	ProjectID:    projectID,
-	// 	Service:      service,
-	// 	DesiredState: "DONE",
-	// }
-	//
-	// xerr := rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// inst, err := service.Instances.Get(projectID, zone, instanceName).IfNoneMatch(etag).Do()
-	// if err != nil {
-	// 	return nil, fail.ToError(err)
-	// }
-	//
-	// logrus.Tracef("Got compute.Instance, err: %#v, %v", inst, err)
-	//
-	// if googleapi.IsNotModified(err) {
-	// 	logrus.Warnf("Instance not modified since insert.")
-	// }
+	ahf := abstract.NewHostFull()
+	if xerr = s.complementHost(ahf, resp); xerr != nil {
+		return nullAHF, xerr
+	}
 
-	hostCore := abstract.NewHostCore()
-	hostCore.ID = strconv.FormatUint(resp.Id, 10)
-	hostCore.Name = instanceName
-
-	return hostCore, nil
+	return ahf, nil
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
@@ -567,7 +463,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullAHC, xerr
 	}
 	if !ahf.IsConsistent() {
 		return nullAH, fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
@@ -583,7 +479,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		instance  *compute.Instance
 	)
 	if ahf.Core.ID != "" {
-		if instance, xerr = s.rpcGetInstanceByID(ahf.Core.ID); xerr != nil {
+		if instance, xerr = s.rpcGetInstance(ahf.Core.ID); xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
@@ -595,7 +491,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		}
 	}
 	if tryByName && ahf.Core.Name != "" {
-		instance, xerr = s.rpcGetInstanceByName(ahf.Core.Name)
+		instance, xerr = s.rpcGetInstance(ahf.Core.Name)
 	}
 	if xerr != nil {
 		switch xerr.(type) {
@@ -613,6 +509,19 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	// if !ahf.OK() {
 	// 	logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	// }
+
+	return ahf, nil
+}
+
+func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instance) fail.Error {
+	state, xerr := stateConvert(instance.Status)
+	if xerr != nil {
+		return xerr
+	}
+
+	host.CurrentState, host.Core.LastState = state, state
+	host.Core.Name = instance.Name
+	host.Core.ID = fmt.Sprintf("%d", instance.Id)
 
 	return ahf, nil
 }
@@ -764,7 +673,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 
 	xerr = retry.WhileSuccessfulDelay5Seconds(
 		func() error {
-			_, innerXErr := s.rpcGetInstanceByID(ahf.Core.ID)
+			_, innerXErr := s.rpcGetInstance(ahf.Core.ID)
 			return innerXErr
 		},
 		temporal.GetContextTimeout(),
@@ -946,12 +855,14 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	if xerr != nil {
 		return xerr
 	}
-	if !asg.IsConsistent() {
-		return fail.InvalidParameterError("sgParam", "must contain 'ID' field")
-	}
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
+	}
+	if !ahf.IsConsistent() {
+		if ahf, xerr = s.InspectHost(ahf); xerr != nil {
+			return fail.InvalidParameterError("hostParam", "must contain 'ID' field")
+		}
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
