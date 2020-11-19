@@ -456,17 +456,17 @@ func (s stack) buildGcpMachine(
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
-	nullAH := abstract.NewHostFull()
+	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
-		return nullAH, fail.InvalidInstanceError()
+		return nullAHF, fail.InvalidInstanceError()
 	}
 
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return nullAHC, xerr
+		return nullAHF, xerr
 	}
 	if !ahf.IsConsistent() {
-		return nullAH, fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
+		return nullAHF, fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
@@ -484,7 +484,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 			case *fail.ErrNotFound:
 				// continue
 			default:
-				return nullAH, xerr
+				return nullAHF, xerr
 			}
 		} else {
 			tryByName = false
@@ -496,32 +496,19 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nullAH, fail.NotFoundError("failed to find Host %s", hostLabel)
+			return nullAHF, fail.NotFoundError("failed to find Host %s", hostLabel)
 		default:
-			return nullAH, xerr
+			return nullAHF, xerr
 		}
 	}
 
 	if xerr = s.complementHost(ahf, instance); xerr != nil {
-		return nullAH, xerr
+		return nullAHF, xerr
 	}
 
 	// if !ahf.OK() {
 	// 	logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	// }
-
-	return ahf, nil
-}
-
-func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instance) fail.Error {
-	state, xerr := stateConvert(instance.Status)
-	if xerr != nil {
-		return xerr
-	}
-
-	host.CurrentState, host.Core.LastState = state, state
-	host.Core.Name = instance.Name
-	host.Core.ID = fmt.Sprintf("%d", instance.Id)
 
 	return ahf, nil
 }
