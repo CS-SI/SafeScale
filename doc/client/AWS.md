@@ -1,7 +1,7 @@
 ```
 [[tenants]]
     name = "TenantName" 
-    client = "aws"
+    client = "aws" 
 
     # This part defines how to authenticate with the provider
     [tenants.identity]
