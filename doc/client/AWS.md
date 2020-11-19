@@ -1,6 +1,6 @@
 ```
 [[tenants]]
-    name = "TenantName"
+    name = "TenantName" 
     client = "aws"
 
     # This part defines how to authenticate with the provider
