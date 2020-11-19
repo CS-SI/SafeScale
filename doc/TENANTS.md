@@ -267,13 +267,16 @@ It defines the "driver" to communicate with the provider. Valid values are:
 
 > | Providers |
 > | --- |
+> | `"aws"` |
 > | `"cloudferro"` |
+> | `"ebrc"` |
 > | `"flexibleengine"` |
+> | `"gpc"` |
 > | `"local"` |
 > | `"openstack"` |
 > | `"opentelekom"` |
+> | `"outscale"` |
 > | `"ovh"` |
-> | `"gcp"` |
 
 ### AccessKey: alias, see [`Username`](#Username)
 
