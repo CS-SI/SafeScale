@@ -1369,7 +1369,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			return innerXErr
 		}
 		//}
-		tracer.Trace("Subnet '%s' successfully deleted.", as.Name)
+		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups
 		var (
