@@ -520,7 +520,7 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 	}
 
 	host.CurrentState, host.Core.LastState = state, state
-	host.Core.Name = instance.Hostname
+	host.Core.Name = instance.Name
 	host.Core.ID = fmt.Sprintf("%d", instance.Id)
 
 	var subnets []IPInSubnet
@@ -858,7 +858,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	return s.rpcAddTagsToInstance(ahf.GetID(), []string{asg.GetID()})
 }
 
-// UnbindSecurityGroupFromHost ...
+// UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

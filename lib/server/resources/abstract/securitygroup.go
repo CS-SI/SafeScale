@@ -271,7 +271,7 @@ func (sg *SecurityGroup) IsNull() bool {
 
 // IsConsistent tells if the content of the security group is consistent
 func (sg SecurityGroup) IsConsistent() bool {
-	if sg.ID == "" || sg.Name == "" || (sg.Name != "" && sg.NetworkID == "") {
+	if sg.ID == "" && (sg.Name == "" || sg.NetworkID == "") {
 		return false
 	}
 	return true
