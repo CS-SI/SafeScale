@@ -41,7 +41,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	subnet, xerr := s.InspectSubnet(subnetID)
 	if xerr != nil {
@@ -199,7 +199,7 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	if xerr := s.rpcDeleteNic(vip.ID); xerr != nil {
 		return xerr

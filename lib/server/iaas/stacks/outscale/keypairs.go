@@ -97,7 +97,7 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadKeypairs(nil)
 	if xerr != nil {
@@ -126,7 +126,7 @@ func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return s.rpcDeleteKeypair(name)
 }
