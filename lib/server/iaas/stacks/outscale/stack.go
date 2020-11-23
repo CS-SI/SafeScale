@@ -121,7 +121,7 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	client := osc.NewAPIClient(osc.NewConfiguration())
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
@@ -215,7 +215,7 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return []string{
 		"cn-southeast-1",
@@ -234,7 +234,7 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {
