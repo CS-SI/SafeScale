@@ -1368,7 +1368,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		}
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam) // nolint
-	if !asg.IsConsistent() {
+	if !asg.IsComplete() {
 		asg, xerr = s.InspectSecurityGroup(asg)
 		if xerr != nil {
 			return xerr
@@ -1387,7 +1387,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG := abstract.NewSecurityGroup()
 		defaultSG.Name = s.GetDefaultSecurityGroupName()
-		defaultSG.NetworkID = asg.NetworkID
+		defaultSG.Network = asg.Network
 		defaultSG, xerr := s.InspectSecurityGroup(defaultSG)
 		if xerr != nil {
 			return xerr

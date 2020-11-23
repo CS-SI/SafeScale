@@ -121,12 +121,12 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Ta
 		}
 
 		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			sgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
+			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			delete(sgV1.ByID, sgID)
-			delete(sgV1.ByName, sgName)
+			delete(ssgV1.ByID, sgID)
+			delete(ssgV1.ByName, sgName)
 			return nil
 		})
 	})

@@ -290,7 +290,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 //	defer func() {
 //		_ = tester.Service.DeleteNetwork(network1.ID)
 //	}()
-//	fmt.Println(fmt.Sprintf("Created a NetworkID with name %v and id %v", network1.Name, network1.ID))
+//	fmt.Println(fmt.Sprintf("Created a Network with name %v and id %v", network1.Name, network1.ID))
 //
 //	networkFound := false
 //

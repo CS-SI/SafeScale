@@ -69,7 +69,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	asg.ID = fmt.Sprintf("sfsg-%s", uuid)
 	asg.Name = name
 	asg.Description = description + " (" + asg.ID + ")"
-	asg.NetworkID = networkRef
+	asg.Network = networkRef
 	asg.Rules = rules
 
 	defer func() {
@@ -265,7 +265,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	}
 	ruleName := fmt.Sprintf("%s-%d", asg.ID, len(asg.Rules))
 	// description := fmt.Sprintf("SafeScale SG '%s', rule #%d", asg.Name, len(asg.Rules))
-	resp, xerr := s.rpcCreateFirewallRule(ruleName, asg.NetworkID, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
+	resp, xerr := s.rpcCreateFirewallRule(ruleName, asg.Network, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
 	if xerr != nil {
 		return asg, xerr
 	}

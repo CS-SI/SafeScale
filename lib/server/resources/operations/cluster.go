@@ -2478,7 +2478,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 		//		if !ok {
 		//			return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		//		}
-		//		networkID = networkV2.NetworkID
+		//		networkID = networkV2.Network
 		//		return nil
 		//	})
 		//} else {
@@ -2487,7 +2487,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 		//		if !ok {
 		//			return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		//		}
-		//		networkID = networkV1.NetworkID
+		//		networkID = networkV1.Network
 		//		return nil
 		//	})
 		//}

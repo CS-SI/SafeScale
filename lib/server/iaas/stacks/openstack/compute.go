@@ -1076,7 +1076,7 @@ func (s Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr f
 // 		return fail.Wrap(xerr, "failed to list ports attached to host")
 // 	}
 // 	for _, v := range list {
-// 		if v.NetworkID == s.ProviderNetworkID {
+// 		if v.Network == s.ProviderNetworkID {
 // 			xerr = s.updatePort(v.ID, ports.UpdateOpts{SecurityGroups: &sgs})
 // 			if xerr != nil {
 // 				return fail.Wrap(xerr, "failed to update Security Groups of port from Networking '%s'", s.cfgOpts.ProviderNetwork)

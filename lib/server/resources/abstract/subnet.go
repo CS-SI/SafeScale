@@ -68,6 +68,7 @@ type Subnet struct {
 	IPVersion               ipversion.Enum   `json:"ip_version,omitempty"`                 // IPVersion is IPv4 or IPv6 (see IPVersion)
 	State                   subnetstate.Enum `json:"status,omitempty"`                     // indicates the current state of the Subnet
 	GWSecurityGroupID       string           `json:"gw_security_group_id,omitempty"`       // Contains the ID of the Security Group for external access of gateways in Subnet
+	PublicIPSecurityGroupID string           `json:"publicip_security_group_id,omitempty"` // contains the ID of the Security Group for hosts with public IP in Subnet
 	InternalSecurityGroupID string           `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
 }
 
