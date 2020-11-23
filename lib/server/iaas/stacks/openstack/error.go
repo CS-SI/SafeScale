@@ -96,9 +96,10 @@ func NormalizeError(err error) fail.Error {
 	case *gophercloud.ErrDefault408: // request timeout
 		return fail.OverflowError(nil, 0, string(e.Body))
 	case gophercloud.ErrDefault409: // conflict
-		return fail.InvalidRequestError(string(e.Body))
+		return reduceOpenstackError("Duplicate", e.Body)
 	case *gophercloud.ErrDefault409: // conflict
-		return fail.InvalidRequestError(string(e.Body))
+		// It may be a NeutronError, to be parsed
+		return reduceOpenstackError("Duplicate", e.Body)
 	case gophercloud.ErrDefault429: // too many requests
 		return fail.OverloadError(string(e.Body))
 	case *gophercloud.ErrDefault429: // too many requests
@@ -169,9 +170,10 @@ func NormalizeError(err error) fail.Error {
 var errorFuncMap = map[string]func(string) fail.Error{
 	"NotFound":   func(msg string) fail.Error { return fail.NotFoundError(msg) },
 	"BadRequest": func(msg string) fail.Error { return fail.InvalidRequestError(msg) },
+	"Duplicate":  func(msg string) fail.Error { return fail.DuplicateError(msg) },
 }
 
-// reduceOpenstackNotFound ...
+// reduceOpenstackError ...
 func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	// FIXME: check if json.Unmarshal() may panic; if not theses 2 defers are superfluous
 	defer func() {
@@ -196,8 +198,15 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 				msg = lvl2
 			}
 		} else if lvl1, ok := body["NeutronError"].(map[string]interface{}); ok {
-			if lvl2, ok := lvl1["message"].(string); ok {
-				msg = lvl2
+			if t, ok := lvl1["type"].(string); ok {
+				var m string
+				if m, ok = lvl1["message"].(string); ok {
+					msg = m
+					// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
+					switch t {
+					case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
+					}
+				}
 			}
 		} else if lvl1, ok := body["message"].(string); ok {
 			msg = lvl1
@@ -236,44 +245,44 @@ func errorMeansServiceUnavailable(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "service unavailable")
 }
 
-// ParseNeutronError parses neutron json error and returns fields
-// Returns (nil, fail.ErrSyntax) if json syntax error occured (and maybe operation should be retried...)
-// Returns (nil, fail.Error) if any other error occurs
-// Returns (<retval>, nil) if everything is understood
-func ParseNeutronError(neutronError string) (map[string]string, fail.Error) {
-	startIdx := strings.Index(neutronError, "{\"NeutronError\":")
-	jsonError := strings.Trim(neutronError[startIdx:], " ")
-	unjsoned := map[string]map[string]interface{}{}
-	if err := json.Unmarshal([]byte(jsonError), &unjsoned); err != nil {
-		switch err.(type) {
-		case *json.SyntaxError:
-			return nil, fail.SyntaxError(err.Error())
-		default:
-			logrus.Debugf(err.Error())
-			return nil, fail.ToError(err)
-		}
-	}
-	if content, ok := unjsoned["NeutronError"]; ok {
-		retval := map[string]string{
-			"message": "",
-			"type":    "",
-			"code":    "",
-			"detail":  "",
-		}
-		if field, ok := content["message"].(string); ok {
-			retval["message"] = field
-		}
-		if field, ok := content["type"].(string); ok {
-			retval["type"] = field
-		}
-		if field, ok := content["code"].(string); ok {
-			retval["code"] = field
-		}
-		if field, ok := content["detail"].(string); ok {
-			retval["detail"] = field
-		}
-
-		return retval, nil
-	}
-	return nil, nil
-}
+// // ParseNeutronError parses neutron json error and returns fields
+// // Returns (nil, fail.ErrSyntax) if json syntax error occured (and maybe operation should be retried...)
+// // Returns (nil, fail.Error) if any other error occurs
+// // Returns (<retval>, nil) if everything is understood
+// func ParseNeutronError(neutronError string) (map[string]string, fail.Error) {
+// 	startIdx := strings.Index(neutronError, "{\"NeutronError\":")
+// 	jsonError := strings.Trim(neutronError[startIdx:], " ")
+// 	unjsoned := map[string]map[string]interface{}{}
+// 	if err := json.Unmarshal([]byte(jsonError), &unjsoned); err != nil {
+// 		switch err.(type) {
+// 		case *json.SyntaxError:
+// 			return nil, fail.SyntaxError(err.Error())
+// 		default:
+// 			logrus.Debugf(err.Error())
+// 			return nil, fail.ToError(err)
+// 		}
+// 	}
+// 	if content, ok := unjsoned["NeutronError"]; ok {
+// 		retval := map[string]string{
+// 			"message": "",
+// 			"type":    "",
+// 			"code":    "",
+// 			"detail":  "",
+// 		}
+// 		if field, ok := content["message"].(string); ok {
+// 			retval["message"] = field
+// 		}
+// 		if field, ok := content["type"].(string); ok {
+// 			retval["type"] = field
+// 		}
+// 		if field, ok := content["code"].(string); ok {
+// 			retval["code"] = field
+// 		}
+// 		if field, ok := content["detail"].(string); ok {
+// 			retval["detail"] = field
+// 		}
+//
+// 		return retval, nil
+// 	}
+// 	return nil, nil
+// }
