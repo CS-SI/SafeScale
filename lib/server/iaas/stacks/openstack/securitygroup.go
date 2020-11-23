@@ -227,7 +227,7 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	asg.ID = r.ID
 	asg.Name = r.Name
 	asg.Description = r.Description
-	if asg.Rules, xerr = convertRulesToAbstract(r.Rules); xerr != nil {
+	if asg.Rules, xerr = toAbstractSecurityGroupRules(r.Rules); xerr != nil {
 		return nullASG, xerr
 	}
 	return asg, nil
@@ -243,11 +243,9 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	if xerr != nil {
 		return nullASG, xerr
 	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
+	asg, xerr = s.InspectSecurityGroup(asg.ID)
+	if xerr != nil {
+		return asg, xerr
 	}
 
 	// delete security group rules
@@ -276,8 +274,8 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	return asg, nil
 }
 
-// convertRulesToAbstract
-func convertRulesToAbstract(in []secrules.SecGroupRule) ([]abstract.SecurityGroupRule, fail.Error) {
+// toAbstractSecurityGroupRules
+func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) ([]abstract.SecurityGroupRule, fail.Error) {
 	out := make([]abstract.SecurityGroupRule, 0, len(in))
 	for k, v := range in {
 		direction := convertDirectionToAbstract(v.Direction)
@@ -368,11 +366,10 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		}
 	}
 
-	_, xerr = asg.Rules.IndexOfEquivalentRule(rule)
-	if xerr != nil {
+	if _, xerr = asg.Rules.IndexOfEquivalentRule(rule); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		// continue
+			// continue
 		default:
 			return asg, xerr
 		}
@@ -389,14 +386,14 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	)
 	switch rule.Direction {
 	case securitygroupruledirection.INGRESS:
-		involved = rule.Targets
-		usesGroups, xerr = rule.TargetsConcernGroups()
+		involved = rule.Sources
+		usesGroups, xerr = rule.SourcesConcernGroups()
 		if xerr != nil {
 			return nil, xerr
 		}
 	case securitygroupruledirection.EGRESS:
-		involved = rule.Sources
-		usesGroups, xerr = rule.SourcesConcernGroups()
+		involved = rule.Targets
+		usesGroups, xerr = rule.TargetsConcernGroups()
 		if xerr != nil {
 			return nil, xerr
 		}
