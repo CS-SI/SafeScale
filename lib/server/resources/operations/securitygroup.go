@@ -235,7 +235,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	// Check if securityGroup exists but is not managed by SafeScale
 	asg := abstract.NewSecurityGroup()
 	asg.Name = name
-	asg.NetworkID = networkID
+	asg.Network = networkID
 	if _, xerr = svc.InspectSecurityGroup(asg); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *fail.ErrNotAvailable:

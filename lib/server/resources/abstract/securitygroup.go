@@ -257,7 +257,7 @@ func (sgr SecurityGroupRules) RemoveRuleByIndex(index int) (SecurityGroupRules, 
 type SecurityGroup struct {
 	ID               string             `json:"id"`                    // ID of the group
 	Name             string             `json:"name"`                  // name of the group
-	NetworkID        string             `json:"network_id,omitempty"`  // Contains the ID of the Network owning the Security Group
+	Network          string             `json:"network,omitempty"`     // Contains the ID of the Network owning the Security Group
 	Description      string             `json:"description,omitempty"` // description of the group
 	Rules            SecurityGroupRules `json:"rules"`                 // rules of the Security Group
 	DefaultForSubnet string             `json:"default_for_subnets"`   // lists the ID of the subnet for which this SecurityGroup is considered as default (to be able to prevent removal of Subnet default Security Group until removal of the Subnet itself)
@@ -271,7 +271,7 @@ func (sg *SecurityGroup) IsNull() bool {
 
 // IsConsistent tells if the content of the security group is consistent
 func (sg SecurityGroup) IsConsistent() bool {
-	if sg.ID == "" && (sg.Name == "" || sg.NetworkID == "") {
+	if sg.ID == "" && (sg.Name == "" || sg.Network == "") {
 		return false
 	}
 	return true
@@ -279,7 +279,7 @@ func (sg SecurityGroup) IsConsistent() bool {
 
 // IsComplete tells if the content of the security group is complete
 func (sg SecurityGroup) IsComplete() bool {
-	return sg.ID != "" && sg.Name != "" && sg.NetworkID != ""
+	return sg.ID != "" && sg.Name != "" && sg.Network != ""
 }
 
 func (sg *SecurityGroup) SetID(id string) *SecurityGroup {
@@ -298,7 +298,7 @@ func (sg *SecurityGroup) SetName(name string) *SecurityGroup {
 
 func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 	if sg != nil {
-		sg.NetworkID = networkID
+		sg.Network = networkID
 	}
 	return sg
 }

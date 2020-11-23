@@ -702,47 +702,76 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var (
-			sg resources.SecurityGroup
-			as *abstract.Subnet
-		)
 		svc := rh.GetService()
 
 		subnetCount := len(req.Subnets)
 		isolatedHost := !req.IsGateway && req.PublicIP && (subnetCount == 0 || (subnetCount == 1 && defaultSubnet.GetName() == abstract.SingleHostNetworkName))
 
-		if req.IsGateway || isolatedHost {
-			innerXErr = defaultSubnet.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				var ok bool
-				as, ok = clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
+		// get default Subnet core data
+		var as *abstract.Subnet
+		innerXErr = defaultSubnet.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			var ok bool
+			as, ok = clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			sg, innerXErr = LoadSecurityGroup(task, svc, as.GWSecurityGroupID)
-			if innerXErr != nil {
+		var (
+			gwsg, pubipsg, lansg resources.SecurityGroup
+		)
+
+		// Apply Security Group for gateways in default Subnet
+		if req.IsGateway {
+			if gwsg, innerXErr = LoadSecurityGroup(task, svc, as.GWSecurityGroupID); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group '%s'", defaultSubnet.GetName(), as.GWSecurityGroupID)
 			}
-			if innerXErr = sg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to apply Subnet's Security Group for gateway '%s' on host '%s'", sg.GetName(), req.ResourceName)
+			if innerXErr = gwsg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+				return fail.Wrap(innerXErr, "failed to apply Subnet's Security Group for gateway '%s' on host '%s'", gwsg.GetName(), req.ResourceName)
 			}
 
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
-					if derr := sg.UnbindFromHost(task, rh); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", sg.GetName(), rh.GetName()))
+					if derr := gwsg.UnbindFromHost(task, rh); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", gwsg.GetName(), rh.GetName()))
 					}
 				}
 			}()
 
 			item := &propertiesv1.SecurityGroupBond{
-				ID:         sg.GetID(),
-				Name:       sg.GetName(),
+				ID:         gwsg.GetID(),
+				Name:       gwsg.GetName(),
+				Disabled:   false,
+				FromSubnet: true,
+			}
+			hsgV1.ByID[item.ID] = item
+			hsgV1.ByName[item.Name] = item.ID
+		}
+
+		// Apply Security Group for hosts with public IP in default Subnet
+		if req.IsGateway || isolatedHost {
+			if pubipsg, innerXErr = LoadSecurityGroup(task, svc, as.PublicIPSecurityGroupID); innerXErr != nil {
+				return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), as.PublicIPSecurityGroupID)
+			}
+			if innerXErr = pubipsg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+				return fail.Wrap(innerXErr, "failed to apply Subnet's Security Group for gateway '%s' on host '%s'", pubipsg.GetName(), req.ResourceName)
+			}
+
+			defer func() {
+				if innerXErr != nil && !req.KeepOnFailure {
+					if derr := pubipsg.UnbindFromHost(task, rh); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", pubipsg.GetName(), rh.GetName()))
+					}
+				}
+			}()
+
+			item := &propertiesv1.SecurityGroupBond{
+				ID:         pubipsg.GetID(),
+				Name:       pubipsg.GetName(),
 				Disabled:   false,
 				FromSubnet: true,
 			}
@@ -755,6 +784,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					var (
+						sg     resources.SecurityGroup
 						derr   error
 						errors []error
 					)
@@ -773,18 +803,17 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			}()
 
 			for _, v := range req.Subnets {
-				sg, innerXErr := LoadSecurityGroup(task, svc, v.InternalSecurityGroupID)
-				if innerXErr != nil {
+				if lansg, innerXErr = LoadSecurityGroup(task, svc, v.InternalSecurityGroupID); innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", v.Name, v.InternalSecurityGroupID)
 				}
-				if innerXErr = sg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
-					return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to host '%s'", v.Name, sg.GetName(), req.ResourceName)
+				if innerXErr = lansg.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to host '%s'", v.Name, lansg.GetName(), req.ResourceName)
 				}
 
 				// register security group in properties
 				item := &propertiesv1.SecurityGroupBond{
-					ID:         sg.GetID(),
-					Name:       sg.GetName(),
+					ID:         lansg.GetID(),
+					Name:       lansg.GetName(),
 					Disabled:   false,
 					FromSubnet: true,
 				}

@@ -91,7 +91,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	asg := abstract.NewSecurityGroup()
 	asg.Name = name
 	asg.ID = aws.StringValue(resp)
-	asg.NetworkID = network.ID
+	asg.Network = network.ID
 	asg.Description = description
 
 	// clears default rules set at creation
@@ -153,14 +153,14 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 	)
 	switch in.Direction {
 	case securitygroupruledirection.INGRESS:
-		involved = in.Targets
-		usesGroups, xerr = in.TargetsConcernGroups()
+		involved = in.Sources
+		usesGroups, xerr = in.SourcesConcernGroups()
 		if xerr != nil {
 			return nil, xerr
 		}
 	case securitygroupruledirection.EGRESS:
-		involved = in.Sources
-		usesGroups, xerr = in.SourcesConcernGroups()
+		involved = in.Targets
+		usesGroups, xerr = in.TargetsConcernGroups()
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -192,7 +192,7 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		groupPairs = make([]*ec2.UserIdGroupPair, 0, len(in.Targets))
 		for _, v := range involved {
 			item := ec2.UserIdGroupPair{
-				VpcId:   aws.String(asg.NetworkID),
+				VpcId:   aws.String(asg.Network),
 				GroupId: aws.String(v),
 			}
 			groupPairs = append(groupPairs, &item)
@@ -256,10 +256,10 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	}
 
 	if asg.Name != "" {
-		if asg.NetworkID == "" {
-			return nullASG, fail.InvalidParameterError("sgParam", "field 'NetworkID' cannot be empty string when using Security Group name")
+		if asg.Network == "" {
+			return nullASG, fail.InvalidParameterError("sgParam", "field 'Network' cannot be empty string when using Security Group name")
 		}
-		resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(asg.NetworkID), aws.String(asg.Name))
+		resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(asg.Network), aws.String(asg.Name))
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -276,7 +276,7 @@ func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, 
 	}
 	out := &abstract.SecurityGroup{
 		ID:          aws.StringValue(in.GroupId),
-		NetworkID:   aws.StringValue(in.VpcId),
+		Network:     aws.StringValue(in.VpcId),
 		Name:        aws.StringValue(in.GroupName),
 		Description: aws.StringValue(in.Description),
 	}

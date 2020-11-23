@@ -167,7 +167,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if asg.ID != "" {
 		group, xerr = s.rpcReadSecurityGroupByID(asg.ID)
 	} else {
-		group, xerr = s.rpcReadSecurityGroupByName(asg.NetworkID, asg.Name)
+		group, xerr = s.rpcReadSecurityGroupByName(asg.Network, asg.Name)
 	}
 	if xerr != nil {
 		return nil, xerr

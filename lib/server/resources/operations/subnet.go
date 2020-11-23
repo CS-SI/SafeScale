@@ -59,6 +59,8 @@ const (
 	subnetInternalSecurityGroupDescriptionPattern = "SG for internal access in Subnet %s of Network %s"
 	subnetGWSecurityGroupNamePattern              = "safescale-sg_subnet_gateways.%s.%s"
 	subnetGWSecurityGroupDescriptionPattern       = "SG for gateways in Subnet %s of Network %s"
+	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip.%s.%s"
+	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 )
 
 // subnet links Object Storage folder and Subnet
@@ -360,13 +362,13 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}()
 
-	var subnetGWSG, subnetInternalSG resources.SecurityGroup
+	var subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup
 	if subnetGWSG, xerr = rs.createGWSecurityGroup(task, req, *as, *an); xerr != nil {
 		return xerr
 	}
 	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetGWSG)
 
-	if subnetInternalSG, xerr = rs.createInternalSecurityGroup(task, req, *an, *as); xerr != nil {
+	if subnetInternalSG, xerr = rs.createInternalSecurityGroup(task, req, *as, *an); xerr != nil {
 		return xerr
 	}
 	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetInternalSG)
@@ -374,6 +376,11 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	if xerr = subnetGWSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
 		return xerr
 	}
+
+	if subnetPublicIPSG, xerr = rs.createPublicIPSecurityGroup(task, req, *as, *an); xerr != nil {
+		return xerr
+	}
+	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetPublicIPSG)
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
@@ -395,10 +402,11 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}()
 
-	// IDs of Security Groups to attach to Host
+	// IDs of Security Groups to attach to Host used as gateway
 	sgs := []string{
 		subnetGWSG.GetID(),
 		subnetInternalSG.GetID(),
+		subnetPublicIPSG.GetID(),
 	}
 
 	caps := svc.GetCapabilities()
@@ -436,6 +444,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		as.State = subnetstate.GATEWAY_CREATION
 		as.GWSecurityGroupID = subnetGWSG.GetID()
 		as.InternalSecurityGroupID = subnetInternalSG.GetID()
+		as.PublicIPSecurityGroupID = subnetPublicIPSG.GetID()
 
 		// Creates the bind between the subnet default security group and the subnet
 		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -885,7 +894,7 @@ func (rs subnet) checkUnicity(task concurrency.Task, req abstract.SubnetRequest)
 	return nil
 }
 
-// validateNetwork verifies the Network exists and make sure req.NetworkID field is an ID
+// validateNetwork verifies the Network exists and make sure req.Network field is an ID
 func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
 	var an *abstract.Network
 	svc := rs.GetService()
@@ -989,6 +998,67 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			Sources:     []string{"::/0"},
 			Targets:     []string{sg.GetID()},
 		},
+		// VPL: brought by subnet internal SG
+		// {
+		// 	Description: "[egress][ipv4][all] Allow everything",
+		// 	Direction:   securitygroupruledirection.EGRESS,
+		// 	EtherType:   ipversion.IPv4,
+		// 	Sources:     []string{sg.GetID()},
+		// 	Targets:     []string{"0.0.0.0/0"},
+		// },
+		// {
+		// 	Description: "[egress][ipv6][all] Allow everything",
+		// 	Direction:   securitygroupruledirection.EGRESS,
+		// 	EtherType:   ipversion.IPv6,
+		// 	Sources:     []string{sg.GetID()},
+		// 	Targets:     []string{"0.0.0.0/0"},
+		// },
+	}
+	if xerr = sg.AddRules(task, rules); xerr != nil {
+		return nil, xerr
+	}
+
+	return sg, nil
+}
+
+// createPublicIPSecurityGroup creates a Security Group to be applied to host of the Subnet with public IP that is not a gateway
+func (rs subnet) createPublicIPSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
+	// Creates security group for hosts in Subnet to allow internal access
+	sgName := fmt.Sprintf(subnetPublicIPSecurityGroupNamePattern, req.Name, network.Name)
+
+	var sg resources.SecurityGroup
+	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
+		return nil, xerr
+	}
+	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
+	xerr = sg.Create(task, network.ID, sgName, description, nil)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := sg.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", req.Name))
+			}
+		}
+	}()
+
+	rules := abstract.SecurityGroupRules{
+		{
+			Description: "[egress][ipv4][all] Allow everything",
+			Direction:   securitygroupruledirection.EGRESS,
+			EtherType:   ipversion.IPv4,
+			Sources:     []string{sg.GetID()},
+			Targets:     []string{"0.0.0.0/0"},
+		},
+		{
+			Description: "[egress][ipv6][all] Allow everything",
+			Direction:   securitygroupruledirection.EGRESS,
+			EtherType:   ipversion.IPv6,
+			Sources:     []string{sg.GetID()},
+			Targets:     []string{"::0/0"},
+		},
 	}
 	if xerr = sg.AddRules(task, rules); xerr != nil {
 		return nil, xerr
@@ -1012,7 +1082,7 @@ func (rs subnet) undoCreateSecurityGroup(task concurrency.Task, errorPtr *fail.E
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, network abstract.Network, subnet abstract.Subnet) (_ resources.SecurityGroup, xerr fail.Error) {
+func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
@@ -1034,31 +1104,30 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 	}()
 
 	// adds rules that depends on Security Group ID
-	//hostTag := "host-from-" + subnet.ID
 	rules := abstract.SecurityGroupRules{
 		{
-			Description: fmt.Sprintf("[egress][ipv4][all] Allow anything from %s", req.CIDR),
+			Description: fmt.Sprintf("[egress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.EGRESS,
 			Sources:     []string{sg.GetID()},
-			Targets:     []string{"0.0.0.0/0"},
+			Targets:     []string{sg.GetID()},
 		},
 		{
-			Description: fmt.Sprintf("[egress][ipv6][all] allow anything from %s", req.CIDR),
+			Description: fmt.Sprintf("[egress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.EGRESS,
 			Sources:     []string{sg.GetID()},
-			Targets:     []string{"::/0"},
+			Targets:     []string{sg.GetID()},
 		},
 		{
-			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic to %s", req.CIDR),
+			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.INGRESS,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
-			Description: fmt.Sprintf("[ingress][ipv6][all] Allow LAN traffic to %s", req.CIDR),
+			Description: fmt.Sprintf("[ingress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.INGRESS,
 			Sources:     []string{sg.GetID()},
@@ -1073,11 +1142,12 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 }
 
 // unbindHostFromVIP unbinds a VIP from Host
+// Actually does nothing in aws for now
 func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) fail.Error {
 	if xerr := rs.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on failure, failed to unbind gateway '%s' from VIP", host.GetName())
 	}
-	//logrus.Infof("Cleaning up on failure, host '%s' bind removed from VIP", name)
+
 	return nil
 }
 
@@ -1322,7 +1392,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			}
 		}
 
-		// 3rd delete security groups associated to subnet
+		// 3rd delete security groups associated to subnet by users (do not include SG created with subnet, they will be deleted later)
 		innerXErr := props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
@@ -1376,37 +1446,29 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			rsg    resources.SecurityGroup
 			sgName string
 		)
-		if as.GWSecurityGroupID != "" {
-			if rsg, innerXErr = LoadSecurityGroup(task, svc, as.GWSecurityGroupID); innerXErr == nil {
-				sgName = rsg.GetName()
-				logrus.Debugf("Deleting Security Group '%s'...", sgName)
-				innerXErr = rsg.Delete(task)
-			}
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					// Security Group not found, consider this as a success
-				default:
-					return innerXErr
+		sgs := [3]string{as.GWSecurityGroupID, as.PublicIPSecurityGroupID, as.InternalSecurityGroupID}
+		for _, v := range sgs {
+			if v != "" {
+				if rsg, innerXErr = LoadSecurityGroup(task, svc, v); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// Security Group not found, consider this as a success
+					default:
+						return innerXErr
+					}
+				} else {
+					sgName = rsg.GetName()
+					logrus.Debugf("Deleting Security Group '%s'...", sgName)
+					if innerXErr = rsg.Delete(task); innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrNotFound:
+							// Security Group not found, consider this as a success
+						default:
+							return innerXErr
+						}
+					}
 				}
 			}
-			logrus.Debugf("Security Group '%s' successfully deleted.", sgName)
-		}
-		if as.InternalSecurityGroupID != "" {
-			if rsg, innerXErr = LoadSecurityGroup(task, svc, as.InternalSecurityGroupID); innerXErr == nil {
-				sgName = rsg.GetName()
-				logrus.Debugf("Deleting Security Group '%s'...", sgName)
-				innerXErr = rsg.Delete(task)
-			}
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					// Security group not found, consider this as a success
-				default:
-					return innerXErr
-				}
-			}
-			logrus.Debugf("Security Group '%s' successfully deleted.", sgName)
 		}
 
 		// Remove subnet reference from owner Network
@@ -1516,8 +1578,16 @@ func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.
 			default:
 				return xerr
 			}
+		} else {
+			if xerr = rsg.Delete(task); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Consider a Security Group not found as a successful deletion and continue
+				default:
+					return xerr
+				}
+			}
 		}
-
 		delete(sgs.ByID, v)
 		delete(sgs.ByName, k)
 	}

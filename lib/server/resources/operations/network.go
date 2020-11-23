@@ -201,11 +201,11 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	//		if derr != nil {
 	//			switch derr.(type) {
 	//			case *fail.ErrNotFound:
-	//				logrus.Errorf("failed to delete NetworkID: resource not found: %+v", derr)
+	//				logrus.Errorf("failed to delete Network: resource not found: %+v", derr)
 	//			case *fail.ErrTimeout:
-	//				logrus.Errorf("failed to delete NetworkID: timeout: %+v", derr)
+	//				logrus.Errorf("failed to delete Network: timeout: %+v", derr)
 	//			default:
-	//				logrus.Errorf("failed to delete NetworkID: %+v", derr)
+	//				logrus.Errorf("failed to delete Network: %+v", derr)
 	//			}
 	//			_ = xerr.AddConsequence(derr)
 	//		}
