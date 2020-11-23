@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -845,6 +846,26 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 	if xerr != nil {
 		return &compute.Instance{}, xerr
 	}
+
+	// Promote public ephemeral ip to a static one
+	if hasPublicIP {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				_, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &compute.Address{
+					Name:        "staticip-" + name,
+					NetworkTier: "PREMIUM",
+					Address:     resp.NetworkInterfaces[0].AccessConfigs[0].NatIP,
+					Region:      fmt.Sprintf("projects/%s/regions/%s", s.GcpConfig.ProjectID, s.GcpConfig.Region),
+				}).Do()
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return &compute.Instance{}, xerr
+		}
+	}
+
 	return resp, nil
 }
 
@@ -893,7 +914,48 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 		return xerr
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+	xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+	if xerr != nil {
+		return xerr
+	}
+
+	cleanStaticIP := false
+	xerr = stacks.RetryableRemoteCall(
+		func() (err error) {
+			_, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, "staticip-"+ref).Do()
+			if err != nil {
+				if gerr, ok := err.(*googleapi.Error); ok {
+					if gerr.Code == 404 {
+						cleanStaticIP = false
+						return nil
+					}
+					return err
+				}
+			} else {
+				cleanStaticIP = true
+			}
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return xerr
+	}
+
+	if cleanStaticIP {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				_, err = s.ComputeService.Addresses.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, "staticip-"+ref).Do()
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
 }
 
 func (s stack) rpcStopInstance(ref string) fail.Error {
