@@ -17,6 +17,8 @@
 package openstack
 
 import (
+	"strings"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -206,6 +208,54 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		)
 		if xerr != nil {
 			return nil, xerr
+		}
+	}
+
+	validRegions, xerr := s.ListRegions()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return nil, xerr
+		}
+	} else {
+		if len(validRegions) != 0 {
+			regionIsValidInput := false
+			for _, vr := range validRegions {
+				if auth.Region == vr {
+					regionIsValidInput = true
+				}
+			}
+			if !regionIsValidInput {
+				return nil, fail.InvalidRequestError("invalid Region '%s'", auth.Region)
+			}
+		}
+	}
+
+	validAvailabilityZones, xerr := s.ListAvailabilityZones()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return nil, xerr
+		}
+	} else {
+		if len(validAvailabilityZones) != 0 {
+			var validZones []string
+			zoneIsValidInput := false
+			for az, valid := range validAvailabilityZones {
+				if valid {
+					if az == auth.AvailabilityZone {
+						zoneIsValidInput = true
+					}
+					validZones = append(validZones, `'`+az+`'`)
+				}
+			}
+			if !zoneIsValidInput {
+				return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+			}
 		}
 	}
 
