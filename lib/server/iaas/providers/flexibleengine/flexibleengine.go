@@ -166,43 +166,44 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	//	return nil, xerr
 	//}
 
-	validRegions, xerr := stack.ListRegions()
-	if xerr != nil {
-		if len(validRegions) != 0 {
-			return nil, xerr
-		}
-	}
-	if len(validRegions) != 0 {
-		regionIsValidInput := false
-		for _, vr := range validRegions {
-			if region == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
-		}
-	}
-
-	validAvailabilityZones, xerr := stack.ListAvailabilityZones()
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(validAvailabilityZones) != 0 {
-		var validZones []string
-		zoneIsValidInput := false
-		for az, valid := range validAvailabilityZones {
-			if valid {
-				if az == zone {
-					zoneIsValidInput = true
-				}
-				validZones = append(validZones, az)
-			}
-		}
-		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
-		}
-	}
+	// VPL: moved to stacks.openstack.New()
+	// validRegions, xerr := stack.ListRegions()
+	// if xerr != nil {
+	// 	if len(validRegions) != 0 {
+	// 		return nil, xerr
+	// 	}
+	// }
+	// if len(validRegions) != 0 {
+	// 	regionIsValidInput := false
+	// 	for _, vr := range validRegions {
+	// 		if region == vr {
+	// 			regionIsValidInput = true
+	// 		}
+	// 	}
+	// 	if !regionIsValidInput {
+	// 		return nil, fail.InvalidRequestError("invalid Region '%s'", region)
+	// 	}
+	// }
+	//
+	// validAvailabilityZones, xerr := stack.ListAvailabilityZones()
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	// if len(validAvailabilityZones) != 0 {
+	// 	var validZones []string
+	// 	zoneIsValidInput := false
+	// 	for az, valid := range validAvailabilityZones {
+	// 		if valid {
+	// 			if az == zone {
+	// 				zoneIsValidInput = true
+	// 			}
+	// 			validZones = append(validZones, az)
+	// 		}
+	// 	}
+	// 	if !zoneIsValidInput {
+	// 		return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
+	// 	}
+	// }
 
 	newP := &provider{
 		Stack:            stack,

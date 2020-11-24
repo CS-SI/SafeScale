@@ -17,11 +17,12 @@
 package cloudferro
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -64,8 +65,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	password, _ := identity["Password"].(string)
 	domainName, _ := identity["DomainName"].(string)
 
-	region, _ := compute["Region"].(string)
-	zone, _ := compute["AvailabilityZone"].(string)
+	// region, _ := compute["Region"].(string)
+	region := "RegionOne"
+	// zone, _ := compute["AvailabilityZone"].(string)
+	zone := "nova"
 	projectName, _ := compute["ProjectName"].(string)
 	// projectID, _ := compute["ProjectID"].(string)
 	defaultImage, _ := compute["DefaultImage"].(string)
@@ -98,8 +101,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return rxp.Match([]byte(str))
 	})
 
-	_, err := govalidator.ValidateStruct(authOptions)
-	if err != nil {
+	if _, err := govalidator.ValidateStruct(authOptions); err != nil {
 		return nil, fail.ToError(err)
 	}
 
@@ -134,41 +136,54 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	//	return nil, xerr
 	//}
 
-	validRegions, xerr := stack.ListRegions()
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(validRegions) != 0 {
-		regionIsValidInput := false
-		for _, vr := range validRegions {
-			if region == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
-		}
-	}
-
-	validAvailabilityZones, xerr := stack.ListAvailabilityZones()
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(validAvailabilityZones) != 0 {
-		var validZones []string
-		zoneIsValidInput := false
-		for az, valid := range validAvailabilityZones {
-			if valid {
-				if az == zone {
-					zoneIsValidInput = true
-				}
-				validZones = append(validZones, az)
-			}
-		}
-		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
-		}
-	}
+	// VPL: moved to stacks.openstack.New()
+	// validRegions, xerr := stack.ListRegions()
+	// if xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound:
+	// 		// continue
+	// 	default:
+	// 		return nil, xerr
+	// 	}
+	// } else {
+	// 	if len(validRegions) != 0 {
+	// 		regionIsValidInput := false
+	// 		for _, vr := range validRegions {
+	// 			if region == vr {
+	// 				regionIsValidInput = true
+	// 			}
+	// 		}
+	// 		if !regionIsValidInput {
+	// 			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
+	// 		}
+	// 	}
+	// }
+	//
+	// validAvailabilityZones, xerr := stack.ListAvailabilityZones()
+	// if xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound:
+	// 		// continue
+	// 	default:
+	// 		return nil, xerr
+	// 	}
+	// } else {
+	// 	if len(validAvailabilityZones) != 0 {
+	// 		var validZones []string
+	// 		zoneIsValidInput := false
+	// 		for az, valid := range validAvailabilityZones {
+	// 			if valid {
+	// 				if az == zone {
+	// 					zoneIsValidInput = true
+	// 				}
+	// 				validZones = append(validZones, `'`+az+`'`)
+	// 			}
+	// 		}
+	// 		if !zoneIsValidInput {
+	// 			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", zone, strings.Join(validZones, ","))
+	// 		}
+	// 	}
+	// }
 
 	newP := &provider{
 		Stack:            stack,
