@@ -84,7 +84,6 @@ func (n network) Delete(names []string, timeout time.Duration) error { // TODO: 
 		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
-
 }
 
 // Inspect ...

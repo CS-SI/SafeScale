@@ -41,6 +41,7 @@ type Session struct {
 	Image         image
 	JobManager    jobManager
 	Network       network
+	PublicIP      publicIP
 	SecurityGroup securityGroup
 	Share         share
 	SSH           ssh

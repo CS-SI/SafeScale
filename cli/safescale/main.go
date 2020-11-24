@@ -227,6 +227,9 @@ func main() {
 	app.Commands = append(app.Commands, commands.ClusterCommand)
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
+	app.Commands = append(app.Commands, commands.PublicIPCommand)
+	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
+
 	sort.Sort(cli.CommandsByName(app.Commands))
 
 	err := app.RunContext(mainCtx, os.Args)

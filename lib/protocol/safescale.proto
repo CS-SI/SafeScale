@@ -178,8 +178,6 @@ service ImageService{
 	//rpc Delete(Image) returns (google.protobuf.Empty){}
 }
 
-
-// safescale network create net1 --cidr="192.168.0.0/16"
 // safescale network list
 // safescale network delete net1
 // safescale network inspect net1
