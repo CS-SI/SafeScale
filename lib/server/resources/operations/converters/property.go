@@ -23,6 +23,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 )
 
 // ShareFromPropertyToProtocol convert a share from host to protocol message
@@ -133,4 +134,14 @@ func SliceOfSecurityGroupBondFromPropertyToProtocol(in []*propertiesv1.SecurityG
 		out = append(out, item)
 	}
 	return out
+}
+
+// ClusterNodeFromPropertyToProtocol converts a propertiesv2.ClusterNode to a protocol.Host
+func ClusterNodeFromPropertyToProtocol(in propertiesv2.ClusterNode) *protocol.Host {
+	return &protocol.Host{
+		Id:        in.ID,
+		Name:      in.Name,
+		PublicIp:  in.PublicIP,
+		PrivateIp: in.PrivateIP,
+	}
 }

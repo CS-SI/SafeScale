@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package propertiesv2
+package propertiesv3
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
@@ -26,7 +26,7 @@ import (
 // ClusterNetwork contains network information relative to cluster
 // not FROZEN yet
 type ClusterNetwork struct {
-	NetworktID         string           `json:"network_id"`           // contains the ID of the network
+	NetworkID          string           `json:"network_id"`           // contains the ID of the network
 	SubnetID           string           `json:"subnet_id,omitempty"`  // contains the ID of the subnet
 	CIDR               string           `json:"cidr"`                 // the network CIDR
 	GatewayID          string           `json:"gateway_id"`           // contains the ID of the primary gateway

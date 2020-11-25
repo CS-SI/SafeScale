@@ -430,9 +430,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Get parameters
-	rh, ok := p["rh"].(resources.Host)
+	rh, ok := p["host"].(resources.Host)
 	if !ok {
-		return nil, fail.InvalidParameterError("params['rh']", "must be a 'resources.Host'")
+		return nil, fail.InvalidParameterError("params['host']", "must be a 'resources.Host'")
 	}
 	variables, ok := p["variables"].(data.Map)
 	if !ok {
@@ -539,7 +539,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 	cloneV := variables.Clone()
 
 	for k, v := range cloneV {
-		if variable, ok := v.(string); ok {
+		if variable, ok := v.(string); ok && variable != "" {
 			varTemplate, xerr := template.Parse("realize_var", variable)
 			if xerr != nil {
 				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
