@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
@@ -53,14 +54,13 @@ type ComputeConfiguration struct {
 	BlacklistImageRegexp    *regexp.Regexp
 }
 
-// NetworConfiguration outscale network configuration
-type NetworConfiguration struct {
-	VPCName string
-	VPCCIDR string
-	VPCID   string
+// NetworkConfiguration Outscale network configuration
+type NetworkConfiguration struct {
+	DefaultNetworkName string
+	DefaultNetworkCIDR string
 }
 
-// StorageConfiguration outscale storage configuration
+// StorageConfiguration Outscale storage configuration
 type StorageConfiguration struct {
 	Type      string
 	Endpoint  string
@@ -82,13 +82,13 @@ type MetadataConfiguration struct {
 type ConfigurationOptions struct {
 	Identity      Credentials           `json:"identity,omitempty"`
 	Compute       ComputeConfiguration  `json:"compute,omitempty"`
-	Network       NetworConfiguration   `json:"network,omitempty"`
+	Network       NetworkConfiguration  `json:"network,omitempty"`
 	ObjectStorage StorageConfiguration  `json:"objectstorage,omitempty"`
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-// Stack Outscale Stack to adapt outscale IaaS API
-type Stack struct {
+// stack Outscale Stack to adapt outscale IaaS API
+type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
 	auth                 context.Context
@@ -96,6 +96,8 @@ type Stack struct {
 	VolumeSpeedsMap      map[string]volumespeed.Enum
 	configurationOptions *stacks.ConfigurationOptions
 	deviceNames          []string
+
+	vpc *abstract.Network
 
 	// // DefaultSecurityGroupName is the name of the default security groups
 	// DefaultSecurityGroupName string
@@ -105,15 +107,21 @@ type Stack struct {
 	//SecurityGroup     *secgroups.SecGroup
 }
 
-// New creates a new Stack
-func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
+// NullStacks returns a null value of the stack
+func NullStack() *stack {
+	return &stack{}
+}
+
+// New creates a new stack
+//func New(authOpts stacks.AuthenticationOptions, cfgOpts stacks.ConfigurationOptions) (_ api.Stack, xerr fail.Error) {
+func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) {
 	if options == nil {
 		return nil, fail.InvalidParameterError("options", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", options).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	client := osc.NewAPIClient(osc.NewConfiguration())
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
@@ -125,7 +133,7 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
 		"gp2":      volumespeed.HDD,
 		"io1":      volumespeed.SSD,
 	}
-	s := Stack{
+	s := stack{
 		Options:         *options,
 		client:          client,
 		VolumeSpeedsMap: volumeSpeeds,
@@ -142,7 +150,7 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
 			UseLayer3Networking:       false,
 			UseNATService:             false,
 			ProviderName:              "outscale",
-			BuildSubnetworks:          false,
+			BuildSubnets:              false,
 			AutoHostNetworkInterfaces: false,
 			VolumeSpeeds:              volumeSpeeds,
 			DefaultImage:              options.Compute.DefaultImage,
@@ -158,49 +166,57 @@ func New(options *ConfigurationOptions) (_ *Stack, xerr fail.Error) {
 	return &s, s.initDefaultNetwork()
 }
 
-func (s *Stack) initDefaultNetwork() fail.Error {
-	if s.Options.Network.VPCID != "" {
-		return nil
-	}
-	if s.Options.Network.VPCName == "" {
-		s.Options.Network.VPCName = "safescale-vpc"
-	}
-	if s.Options.Network.VPCCIDR == "" {
-		s.Options.Network.VPCCIDR = "192.168.0.0/16"
-	}
-	onet, err := s.getVpcByName(s.Options.Network.VPCName)
-	if err != nil || onet == nil { // Try to create the network
-		onet, err = s.createVpc(s.Options.Network.VPCName, s.Options.Network.VPCCIDR)
-		if err != nil {
-			return err
-		}
-	}
-	s.Options.Network.VPCID = onet.NetId
+// IsNull tells if the instance is a null value of stack
+func (s *stack) IsNull() bool {
+	return s == nil || s.client == nil
+}
 
+// initDefaultNetwork() initializes the instance of the Network/VPC if one is defined in tenant
+func (s *stack) initDefaultNetwork() fail.Error {
+	if s.vpc == nil && s.Options.Network.DefaultNetworkName != "" {
+		an, xerr := s.InspectNetworkByName(s.Options.Network.DefaultNetworkName)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// VPC not found, create it
+				if s.Options.Network.DefaultNetworkCIDR == "" {
+					s.Options.Network.DefaultNetworkCIDR = stacks.DefaultNetworkCIDR
+				}
+				req := abstract.NetworkRequest{
+					Name: s.Options.Network.DefaultNetworkName,
+					CIDR: s.Options.Network.DefaultNetworkCIDR,
+				}
+				an, xerr = s.CreateNetwork(req)
+			default:
+				return xerr
+			}
+		}
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
+		}
+		s.vpc = an
+	}
 	return nil
 }
 
 func deviceNames() []string {
-	var deviceNames []string
-	for i := int('d') - int('a'); i <= int('z')-int('a'); i++ {
-		deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", string('a'+rune(i))))
+	var list []string
+	for i := int('d'); i <= int('z'); i++ {
+		list = append(list, fmt.Sprintf("xvd%s", string(i)))
 	}
-	return deviceNames
+	return list
 }
 
 // ListRegions list available regions
-func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
-	if s == nil {
+func (s stack) ListRegions() (_ []string, xerr fail.Error) {
+	if s.IsNull() {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
 	return []string{
 		"cn-southeast-1",
 		"eu-west-2",
@@ -210,15 +226,15 @@ func (s *Stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s *Stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
-	emptyMap := make(map[string]bool, 0)
-	if s == nil {
+func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
+	emptyMap := make(map[string]bool)
+	if s.IsNull() {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {

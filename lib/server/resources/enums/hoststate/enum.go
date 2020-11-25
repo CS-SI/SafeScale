@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@ package hoststate
 type Enum int
 
 const (
-    STOPPED    Enum = iota // STOPPED when host is stopped
-    STARTING               // STARTING when host is starting
-    STARTED                // STARTED when host is started
-    STOPPING               // STOPPING when host is stopping
-    TERMINATED             // TERMINATED when a host can be enumerated but it's already deleted
+	STOPPED    Enum = iota // STOPPED when host is stopped
+	STARTING               // STARTING when host is starting
+	STARTED                // STARTED when host is started
+	STOPPING               // STOPPING when host is stopping
+	TERMINATED             // TERMINATED when a host can be enumerated but it's already deleted
 
-    ERROR = 254 // when host is in error state
+	ERROR = 254 // when host is in error state
 
-    UNKNOWN = 255 // when the state is undetermined
+	UNKNOWN = 255 // when the state is undetermined
 
 )

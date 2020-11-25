@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -40,7 +42,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	*openstack.Stack
+	api.Stack /**openstack.Stack*/
 
 	tenantParameters map[string]interface{}
 }
@@ -51,6 +53,7 @@ func New() providers.Provider {
 }
 
 // Build build a new Client from configuration parameter
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
@@ -62,8 +65,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	password, _ := identity["Password"].(string)
 	domainName, _ := identity["DomainName"].(string)
 
-	region, _ := compute["Region"].(string)
-	zone, _ := compute["AvailabilityZone"].(string)
+	// region, _ := compute["Region"].(string)
+	region := "RegionOne"
+	// zone, _ := compute["AvailabilityZone"].(string)
+	zone := "nova"
 	projectName, _ := compute["ProjectName"].(string)
 	// projectID, _ := compute["ProjectID"].(string)
 	defaultImage, _ := compute["DefaultImage"].(string)
@@ -96,8 +101,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return rxp.Match([]byte(str))
 	})
 
-	_, err := govalidator.ValidateStruct(authOptions)
-	if err != nil {
+	if _, err := govalidator.ValidateStruct(authOptions); err != nil {
 		return nil, fail.ToError(err)
 	}
 
@@ -132,41 +136,54 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	//	return nil, xerr
 	//}
 
-	validRegions, xerr := stack.ListRegions()
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(validRegions) != 0 {
-		regionIsValidInput := false
-		for _, vr := range validRegions {
-			if region == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
-		}
-	}
-
-	validAvailabilityZones, xerr := stack.ListAvailabilityZones()
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(validAvailabilityZones) != 0 {
-		var validZones []string
-		zoneIsValidInput := false
-		for az, valid := range validAvailabilityZones {
-			if valid {
-				if az == zone {
-					zoneIsValidInput = true
-				}
-				validZones = append(validZones, az)
-			}
-		}
-		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %v", zone, validZones)
-		}
-	}
+	// VPL: moved to stacks.openstack.New()
+	// validRegions, xerr := stack.ListRegions()
+	// if xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound:
+	// 		// continue
+	// 	default:
+	// 		return nil, xerr
+	// 	}
+	// } else {
+	// 	if len(validRegions) != 0 {
+	// 		regionIsValidInput := false
+	// 		for _, vr := range validRegions {
+	// 			if region == vr {
+	// 				regionIsValidInput = true
+	// 			}
+	// 		}
+	// 		if !regionIsValidInput {
+	// 			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
+	// 		}
+	// 	}
+	// }
+	//
+	// validAvailabilityZones, xerr := stack.ListAvailabilityZones()
+	// if xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound:
+	// 		// continue
+	// 	default:
+	// 		return nil, xerr
+	// 	}
+	// } else {
+	// 	if len(validAvailabilityZones) != 0 {
+	// 		var validZones []string
+	// 		zoneIsValidInput := false
+	// 		for az, valid := range validAvailabilityZones {
+	// 			if valid {
+	// 				if az == zone {
+	// 					zoneIsValidInput = true
+	// 				}
+	// 				validZones = append(validZones, `'`+az+`'`)
+	// 			}
+	// 		}
+	// 		if !zoneIsValidInput {
+	// 			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", zone, strings.Join(validZones, ","))
+	// 		}
+	// 	}
+	// }
 
 	newP := &provider{
 		Stack:            stack,
@@ -175,11 +192,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	return newP, nil
 }
 
-// GetAuthOpts returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+// GetAuthenticationOptions returns the auth options
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
-	opts := p.Stack.GetAuthenticationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -188,11 +208,14 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	return cfg, nil
 }
 
-// GetCfgOpts return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+// GetConfigurationOptions return configuration parameters
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
+	if p.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
 
-	opts := p.Stack.GetConfigurationOptions()
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -205,18 +228,26 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.ListTemplates()
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+	}
+
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
 	if xerr != nil {
-		return nil, xerr
+		return []abstract.HostTemplate{}, xerr
 	}
 	return allTemplates, nil
 }
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	allImages, xerr := p.Stack.ListImages()
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
+	}
+
+	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -224,17 +255,25 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // GetName returns the providerName
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "cloudferro"
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-func (p *provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() map[string]interface{} {
+	if p.IsNull() {
+		return map[string]interface{}{}
+	}
+
 	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
+	if p.IsNull() {
+		return providers.Capabilities{}
+	}
+
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,7 @@ package networkproperty
 type Enum string
 
 const (
-	// DescriptionV1 contains optional additional info describing host (purpose, ...)
-	DescriptionV1 = "1"
-	// HostsV1 contains list of hosts attached to the network
-	HostsV1 = "2"
-	// SecurityGroupsV1 contains optional additional information about security groups binded to the host
-	SecurityGroupsV1 = "3"
+	DescriptionV1 = "1" // contains optional additional info describing Networking (purpose, ...)
+	HostsV1       = "2" // OBSOLETE: moved to subnetproperty: contains list of hosts attached to the network
+	SubnetsV1     = "3" // contains the subnets created in the network
 )

@@ -13,12 +13,14 @@
       - [Commands](#commands)
       - [tenant](#tenant)
       - [network](#network)
+      - [subnet](#subnet)
       - [host](#host)
       - [volume](#volume)
       - [share](#share)
       - [bucket](#bucket)
       - [ssh](#ssh)
       - [cluster](#cluster)
+      - [env](#env)
 
 ___
 
@@ -176,6 +178,11 @@ will start the daemon, listening on all interfaces and on port `50000` (instead 
 
 Note: `-d -v` will display far more debugging information than simply `-d` (used to trace what is going on in details)
 
+You can also set some parameters of `safescaled` using environment variables, which are :
+- SAFESCALED_LISTEN: equivalent to `--listen`, allows to tell `safescaled` on what interface and/or what port to listen on
+- SAFESCALE_METADATA_SUFFIX: allows to specify a suffix to add to the name of the Object Storage bucket used to store SafeScale metadata on the tenant.
+  This allows to "isolate" metadata between different users of SafeScale (practical in development for example). There is no equivalent command line parameter.
+ 
 ## safescale
 
 `safescale` is the client part of SafeScale. It consists of a CLI to interact with the safescale daemon to manage cloud infrastructures.
@@ -212,7 +219,7 @@ $ safescale -v network create mynetwork --cidr 192.168.1.0/24
 
 There are 3 categories of commands:
 - the one dealing with tenants (aka cloud providers): [tenant](#tenant)
-- the ones dealing with infrastructure resources: [network](#network), [host](#host), [volume](#volume), [share](#share), [bucket](#bucket), [ssh](#ssh)
+- the ones dealing with infrastructure resources: [network](#network), [subnet](#subnet), [host](#host), [volume](#volume), [share](#share), [bucket](#bucket), [ssh](#ssh)
 - the one dealing with clusters: [cluster](#cluster)
 
 #### tenant
@@ -223,27 +230,228 @@ The following actions are proposed:
 
 | <div style="width:350px">actions</div> | description |
 | --- | --- |
-| `safescale tenant list` | List available tenants i.e. those found in the `tenants.toml` file.<br><br>example:<br><br>`$ safescale tenant list`<br>`{"result":[{"name":"TestOVH"}],"status":"success"}]` |
-| `safescale tenant get` | Display the current tenant used for action commands.<br><br>example:<br><br>`$ safescale tenant get`<br>response when tenant set:<br>`{"result":{"name":"TestOVH"},"status":"success"}`<br>reponse when tenant not set:<br>`{"error":{"exitcode":6,"message":"Cannot get tenant: no tenant set"},"result":null,"status":"failure"}` |
-| `safescale tenant set <tenant_name>` | Set the tenant to use by the next commands. The 'tenant_name' must match one of those present in the `tenants.toml` file (key 'name'). The name is case sensitive.<br><br>example:<br><br> `$ safescale tenant set TestOvh`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Unable to set tenant 'TestOVH': tenant 'TestOVH' not found in configuration"},"result":null,"status":"failure"}` |
+| `safescale tenant list` | List available tenants |
+| `safescale tenant get` | Display the current tenant used for action commands. |
+| `safescale tenant set <tenant_name>` | Set the tenant to use by the next commands |
+<br>
 
-<br><br>
+##### safescale tenant list
+List available tenants i.e. those found in the `tenants.toml` file.<br><br>example:<br><br>`$ safescale tenant list`<br>`{"result":[{"name":"TestOVH"}],"status":"success"}]`
 
+<br>
+
+##### safescale tenant get
+Display the current tenant used for action commands.<br><br>example:<br><br>`$ safescale tenant get`<br>response when tenant set:<br>`{"result":{"name":"TestOVH"},"status":"success"}`<br>reponse when tenant not set:<br>`{"error":{"exitcode":6,"message":"Cannot get tenant: no tenant set"},"result":null,"status":"failure"}`
+
+<br>
+
+##### safescale tenant set <tenant_name>
+Set the tenant to use by the next commands. The 'tenant_name' must match one of those present in the `tenants.toml` file (key 'name'). The name is case sensitive.
+
+Example of use:
+
+```bash
+$ safescale tenant set TestOvh
+```
+response on success:
+```json
+{"result":null,"status":"success"}
+```
+response on failure:
+```json
+{"error":{"exitcode":6,"message":"Unable to set tenant 'TestOVH': tenant 'TestOVH' not found in configuration"},"result":null,"status":"failure"}
+```
+
+<br>
+--- 
 #### network
 
-This command manages networks on the provider side, on which hosts may be attached to (**may** because it's also possible to create a host without attached network but with a public IP address).
-In SafeScale, a host is automatically created to act as the gateway for the network. If not given, default values are used to size this gateway.
+This command manages Networks on the provider side, in which subnets may be created. In some Cloud Providers terminology, Network can be called VPC (FlexibleEngine, AWS, ...).
+
+Before release v20.09, Cloud Provider networks and subnets were melted into a SafeScale Network. Since release v20.09, Subnets are introduced.
+For compatibility reason, default behavior of `safescale network` has been maintain as before, creating by default a Subnet named as the Network with a CIDR derived from the one of the Network.
+For example, `safescale network create --cidr 172.16.0.0/16 my-net` will create a Network with a CIDR of 172.16.0.0/16 AND a Subnet inside the Network with a CIDR of 172.16.0.0/17 (this allows to create additional subnets if needed).
+
+Since v20.09, it's now possible to create a Network empty of Subnet, using `--empty` flag, leaving the responsibility of Subnet creation to the user. If `--empty` is used, the flags `--gwname`, `--os`, `--gw-sizing` and `--failover` are meaningless.
+
 The following actions are proposed:
 
 | <div style="width:350px">actions</div> | description |
 | ----- | ----- |
-| `safescale network create [command_options] <network_name>`|<br>Creates a network with the given name.<br>`command_options`:<ul><li>`--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")</li><li>`--gwname <name>` name of the gateway (`gw-<network_name>` by default)</li><li>`--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li></ul>! DEPRECATED ! uses `--sizing` instead<ul><li>`--cpu <value>` Number of CPU for the host (default: 1)</li><li>`--cpu-freq <value>` CPU frequency (default :0)  -----  [scanner](SCANNER.md) needed</li><li>`--ram value` RAM for the host (default: 1 Go)</li><li>`--disk value` Disk space for the host (default: 100 Mo)</li><li>`--gpu value` Number of GPU for the host (default :0)  ----- [scanner](SCANNER.md) needed</li></ul>example:<br><br>`$ safescale network create example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}` |
+| `safescale network create [command_options] <network_name>`|<br>Creates a network with the given name.<br>`command_options`:<ul><li>`--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")</li><li>`--empty` do not create a default Subnet in the Network</li><li>`--gwname <name>` name of the gateway (`gw-<network_name>` by default)</li><li>`--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li></ul>example:<br><br>`$ safescale network create example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}` |
 | `safescale network list [command_options]` | List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
 | `safescale network inspect <network_name_or_id>`| Get info of a network<br><br>example:<br><br>`$ safescale network inspect example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}` |
 | `safescale network delete <network_name_or_id>`| Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}` |
 
 <br><br>
 
+#### subnet
+
+This command manages Subnets of Network on the provider side, on which hosts may be attached to (**may** because it's also possible to create a host without attached Subnet but with a public IP address).
+In SafeScale, a Host is automatically created to act as the gateway for the Subnet. If not given, default values are used to size this gateway.
+The following actions are proposed:
+
+| <div style="width:350px">actions</div> | description |
+| ----- | ----- |
+| `safescale network create [command_options] <network_name>`|<br>Creates a network with the given name.|
+| `safescale network list [command_options]` | List networks created by SafeScale|
+| `safescale network inspect <network_name_or_id>`| Get info of a network|
+| `safescale network delete <network_name_or_id>`| Delete the network whose name or id is given|
+<br>
+
+##### `safescale network create [command_options] <network_name>`
+
+Creates a network with the given name.
+
+`command_options`:
+  - `--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")
+  
+  - `--empty` do not create a default Subnet in Network (default: creates a Subnet named like the Network with a CIDR included in the one provided for the Network)
+      <br><br>The options below are meaningful only without the use of `--empty`:
+  - `--gwname <name>` name of the gateway (`gw-<network_name>` by default)
+  - `--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")
+  
+  - `-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:
+    - `<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`
+    - `<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):
+      - `=` means exactly `<value>`
+      - `~` means between `<value>` and 2x`<value>`
+      - `<` means strictly lower than `<value>`
+      - `<=` means lower or equal to `<value>`
+      - `>` means strictly greater than `<value>`
+      - `>=` means greater or equal to `<value>`
+    - `<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`
+      - `<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores
+      - `<cpufreq>` is expecting an integer as minimum cpu frequency in MHz
+      - `<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
+      - `<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
+      - `<disk>` is expecting an integer as system disk size in GB
+      
+    examples:<br>
+    
+        --sizing "cpu <= 4, ram <= 10, disk >= 100"
+        --sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
+        --sizing "cpu <= 8, ram ~ 16"
+  - `--failover` creates 2 gateways for the network with a VIP used as internal default route
+<br><br>
+
+##### `safescale network list [command_options]`
+ 
+List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
+
+##### `safescale network inspect <network_name_or_id>`
+Inspect a Network, returning meaningful information about it.
+
+example:
+    
+```bash
+$ safescale network inspect example_network
+```
+response on success:
+```json
+{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}
+```
+    
+response on failure:
+```json
+{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
+```
+
+##### `safescale network delete <network_name_or_id>`
+Delete the network whose name or id is given. If the Network was created with a default Subnet, this Subnet will be deleted also. Otherwise, if the Network still has Subnets in it, deletion will fail.
+
+example:
+
+    `$ safescale network delete example_network`
+    
+response on success:
+
+    `{"result":null,"status":"success"}`
+    
+response on failure (network does not exist):
+
+    `{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`
+    
+response on failure (subnets still attached to network):
+
+    `{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 Subnet is still attached to it"},"result":null,"status":"failure"}`
+
+<br><br>
+--- 
+
+##### `safescale network create [command_options] <network_name>`
+
+Creates a network with the given name.
+
+`command_options`:
+  - `--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")
+  - `--gwname <name>` name of the gateway (`gw-<network_name>` by default)
+  - `--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")
+  - `-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:
+    - `<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`
+    - `<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):
+      - `=` means exactly `<value>`
+      - `~` means between `<value>` and 2x`<value>`
+      - `<` means strictly lower than `<value>`
+      - `<=` means lower or equal to `<value>`
+      - `>` means strictly greater than `<value>`
+      - `>=` means greater or equal to `<value>`
+    - `<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`
+      - `<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores
+      - `<cpufreq>` is expecting an integer as minimum cpu frequency in MHz
+      - `<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
+      - `<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
+      - `<disk>` is expecting an integer as system disk size in GB
+      
+      examples:
+        - --sizing "cpu <= 4, ram <= 10, disk >= 100"
+        - --sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
+        - --sizing "cpu <= 8, ram ~ 16"
+  - `--failover` creates 2 gateways for the network with a VIP used as internal default route
+
+##### `safescale network list [command_options]`
+ 
+List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
+
+##### `safescale network inspect <network_name_or_id>`
+Inspect a Network, returning meaningful information about it.
+
+example:
+    
+```bash
+$ safescale network inspect example_network
+```
+response on success:
+```json
+{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}
+```
+    
+response on failure:
+```json
+{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
+```
+
+##### `safescale network delete <network_name_or_id>`
+Delete the network whose name or id is given. If the Network was created with a default Subnet, this Subnet will be deleted also. Otherwise, if the Network still has Subnets in it, deletion will fail.
+
+example:
+
+    `$ safescale network delete example_network`
+    
+response on success:
+
+    `{"result":null,"status":"success"}`
+    
+response on failure (network does not exist):
+
+    `{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`
+    
+response on failure (subnets still attached to network):
+
+    `{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 Subnet is still attached to it"},"result":null,"status":"failure"}`
+
+<br><br>
+--- 
 #### host
 
 This command family deals with host management: creation, list, connection, deletion...
@@ -354,3 +562,11 @@ The following actions are proposed:
 | `safescale [global_options] cluster delete-feature <cluster_name> <feature_name> [command_options]`|Deletes a feature from a cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>Example:<br><br>`$ safescale cluster delete-feature my-cluster remote-desktop`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure may vary |
 
 <br><br>
+
+#### env
+
+Some parameters of `safescale`can be set using environment variables:
+- SAFESCALED_LISTEN: equivalent to `--server`, allows to tell `safescale` how to reach the daemon `safescaled`.
+- SAFESCALE_METADATA_SUFFIX: allows to specify a suffix to add to the name of the Object Storage bucket used to store SafeScale metadata on the tenant.
+  This allows to "isolate" metadata between different users of SafeScale (practical in development for example). There is no equivalent command line parameter.
+  This environment variable must be on par between `safescale` and `safescaled`, otherwise strange things may happen...

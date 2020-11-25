@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"math"
 	"os"
 	"regexp"
@@ -43,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 //go:generate mockgen -destination=mocks/mock_serviceapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas Service
@@ -50,11 +52,16 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
+	data.NullValue
+
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	GetMetadataBucket() abstract.ObjectStorageBucket
 	GetMetadataKey() (*crypt.Key, fail.Error)
+	InspectHostByName(string) (*abstract.HostFull, fail.Error)
+	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
+
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
 	SelectTemplatesBySize(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
@@ -446,12 +453,15 @@ func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements,
 		if sizing.MinDiskSize > 0 {
 			diskMsg = fmt.Sprintf(" and at least %d GB of disk", sizing.MinDiskSize)
 		}
-
-		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM%s", coreMsg, ramMsg, diskMsg))
+		gpuMsg := ""
+		if sizing.MinGPU >= 0 {
+			gpuMsg = fmt.Sprintf("%d GPU%s", sizing.MinGPU, strprocess.Plural(uint(sizing.MinGPU)))
+		}
+		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg))
 	}
 
 	for _, t := range allTpls {
-		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.DiskSize)
+		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.GPUNumber, t.DiskSize)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
 			logrus.Debugf(msg, "not enough cores")
@@ -473,8 +483,12 @@ func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements,
 			logrus.Debugf(msg, "not enough disk")
 			continue
 		}
+		if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
+			logrus.Debugf(msg, "too many GPU")
+			continue
+		}
 
-		if _, ok := scannerTpls[t.ID]; ok || !askedForSpecificScannerInfo {
+		if _, ok := scannerTpls[t.ID]; (ok || !askedForSpecificScannerInfo) && t.ID != "" {
 			newT := t
 			selectedTpls = append(selectedTpls, &newT)
 		}
@@ -615,7 +629,9 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
-	_, rerr := svc.InspectHostByName(request.ResourceName)
+	ah := abstract.NewHostCore()
+	ah.Name = request.ResourceName
+	_, rerr := svc.InspectHost(ah)
 	if rerr == nil {
 		return nil, nil, nil, abstract.ResourceDuplicateError("Host", request.ResourceName)
 	}
@@ -639,7 +655,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		ImageID:        request.ImageID,
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
-		Networks:       request.Networks,
+		Subnets:        request.Subnets,
 		DefaultRouteIP: request.DefaultRouteIP,
 		// DefaultGateway: request.DefaultGateway,
 		TemplateID: request.TemplateID,
@@ -818,4 +834,20 @@ func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule a
 		}
 	}
 	return true, nil
+}
+
+// InspectHostByName hides the "complexity" of the way to get Host by name
+func (svc service) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+	if svc.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	return svc.InspectHost(abstract.NewHostCore().SetName(name))
+}
+
+// InspectSecurityGroupByName hides the "complexity" of the way to get Security Group by name
+func (svc service) InspectSecurityGroupByName(networkID, name string) (*abstract.SecurityGroup, fail.Error) {
+	if svc.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	return svc.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 }

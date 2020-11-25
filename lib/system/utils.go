@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 package system
 
 import (
-    "sync/atomic"
+	"sync/atomic"
 
-    rice "github.com/GeertJohan/go.rice"
+	rice "github.com/GeertJohan/go.rice"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 //go:generate rice embed-go
@@ -31,22 +31,22 @@ var bashLibraryContent atomic.Value
 
 // GetBashLibrary generates the content of {{.reserved_BashLibrary}}
 func GetBashLibrary() (string, fail.Error) {
-    anon := bashLibraryContent.Load()
-    if anon == nil {
-        box, err := rice.FindBox("../system/scripts")
-        if err != nil {
-            return "", fail.ToError(err)
-        }
+	anon := bashLibraryContent.Load()
+	if anon == nil {
+		box, err := rice.FindBox("../system/scripts")
+		if err != nil {
+			return "", fail.ToError(err)
+		}
 
-        // get file contents as string
-        tmplContent, err := box.String("bash_library.sh")
-        if err != nil {
-            return "", fail.ToError(err)
-        }
-        bashLibraryContent.Store(tmplContent)
-        anon = bashLibraryContent.Load()
-    }
-    return anon.(string), nil
+		// get file contents as string
+		tmplContent, err := box.String("bash_library.sh")
+		if err != nil {
+			return "", fail.ToError(err)
+		}
+		bashLibraryContent.Store(tmplContent)
+		anon = bashLibraryContent.Load()
+	}
+	return anon.(string), nil
 }
 
 // // ExtractRetCode extracts info from the error

@@ -1,4 +1,3 @@
-GO?=go
 
 .PHONY:	test vet
 

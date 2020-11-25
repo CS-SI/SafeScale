@@ -1,7 +1,7 @@
 // +build !libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,10 @@ type AuthOptions struct {
 type CfgOptions struct {
 }
 
+func (provider *provider) IsNull() bool {
+	return false
+}
+
 // WaitHostReady ...
 func (provider *provider) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	return nil, gReport
@@ -80,15 +84,15 @@ func (provider *provider) ListRegions() ([]string, fail.Error) {
 func (provider *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	return nil, gReport
 }
-func (provider *provider) InspectImage(id string) (*abstract.Image, fail.Error) {
-	return nil, gReport
+func (provider *provider) InspectImage(id string) (abstract.Image, fail.Error) {
+	return abstract.Image{}, gReport
 }
 
-func (provider *provider) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
-	return nil, gReport
+func (provider *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
+	return abstract.HostTemplate{}, gReport
 }
 func (provider *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	return nil, gReport
+	return []abstract.HostTemplate{}, gReport
 }
 
 func (provider *provider) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
@@ -102,6 +106,16 @@ func (provider *provider) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 }
 func (provider *provider) DeleteKeyPair(id string) fail.Error {
 	return gReport
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (provider *provider) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (provider *provider) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, gReport
 }
 
 func (provider *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
@@ -120,7 +134,23 @@ func (provider *provider) DeleteNetwork(id string) fail.Error {
 	return gReport
 }
 
-func (provider *provider) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+func (provider *provider) CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
+	return nil, gReport
+}
+func (provider *provider) DeleteSubnet(id string) fail.Error {
+	return gReport
+}
+
+func (provider *provider) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, gReport
 }
 func (provider *provider) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
@@ -143,10 +173,10 @@ func (provider *provider) ResizeHost(hostParam stacks.HostParameter, request abs
 	return nil, gReport
 }
 func (provider *provider) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
-	return nil, gReport
+	return abstract.NewHostFull(), gReport
 }
-func (provider *provider) InspectHostByName(string) (*abstract.HostCore, fail.Error) {
-	return nil, gReport
+func (provider *provider) InspectHostByName(string) (*abstract.HostFull, fail.Error) {
+	return abstract.NewHostFull(), gReport
 }
 func (provider *provider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	return hoststate.ERROR, gReport
@@ -205,58 +235,71 @@ func (provider *provider) GetCapabilities() providers.Capabilities {
 }
 
 // BindSecurityGroupToHost ...
-func (provider *provider) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (provider *provider) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return gReport
 }
 
 // UnbindSecurityGroupFromHost ...
-func (provider *provider) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (provider *provider) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return gReport
 }
 
-// BindSecurityGroupToHost ...
-func (provider *provider) BindSecurityGroupToNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// BindSecurityGroupToSubnet ...
+func (provider *provider) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	return gReport
 }
 
-// UnbindSecurityGroupFromHost ...
-func (provider *provider) UnbindSecurityGroupFromNetwork(ref string, sgParam stacks.SecurityGroupParameter) fail.Error {
+// UnbindSecurityGroupFromSubnet ...
+func (provider *provider) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	return gReport
 }
 
-// ListSecurityGroup lists existing security groups
-func (provider *provider) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
+// ListSecurityGroups lists existing security groups
+func (provider *provider) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // CreateSecurityGroup creates a security group
-func (provider *provider) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (provider *provider) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
+func (provider *provider) DeleteSecurityGroup(*abstract.SecurityGroup) fail.Error {
 	return gReport
 }
 
 // InspectSecurityGroup returns information about a security group
-func (provider *provider) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) InspectSecurityGroup(stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (provider *provider) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) ClearSecurityGroup(stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (provider *provider) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) AddRuleToSecurityGroup(stacks.SecurityGroupParameter, abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // DeleteRuleFromSecurityGroup adds a rule to a security group
-func (provider *provider) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) DeleteRuleFromSecurityGroup(stacks.SecurityGroupParameter, abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
+}
+
+// GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
+func (provider *provider) GetDefaultSecurityGroupName() string {
+	return ""
+}
+
+func (provider *provider) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return gReport
+}
+
+func (provider *provider) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return gReport
 }
 
 func init() {

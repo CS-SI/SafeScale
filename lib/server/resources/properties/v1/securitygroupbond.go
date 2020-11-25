@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import (
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup
 type SecurityGroupBond struct {
-	Name        string `json:"name"`
-	ID          string `json:"id"`
-	Disabled    bool   `json:"disabled"`
-	FromNetwork bool   `json:"from_network"`
+	Name       string `json:"name"`
+	ID         string `json:"id"`
+	Disabled   bool   `json:"disabled"`
+	FromSubnet bool   `json:"from_subnet"`
 }
 
 // NewSecurityGroupBond ...
@@ -39,19 +39,24 @@ func (sgb *SecurityGroupBond) Reset() *SecurityGroupBond {
 		sgb.Name = ""
 		sgb.ID = ""
 		sgb.Disabled = false
-		sgb.FromNetwork = false
+		sgb.FromSubnet = false
 		return sgb
 	}
 	return NewSecurityGroupBond()
 }
 
 // Clone ...
-func (sgb *SecurityGroupBond) Clone() data.Clonable {
-	return NewSecurityGroupBond().Replace(sgb)
+func (sgb SecurityGroupBond) Clone() data.Clonable {
+	return NewSecurityGroupBond().Replace(&sgb)
 }
 
 // Replace ...
 func (sgb *SecurityGroupBond) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if sgb == nil || p == nil {
+		return sgb
+	}
+
 	src := p.(*SecurityGroupBond)
 	*sgb = *src
 	return sgb

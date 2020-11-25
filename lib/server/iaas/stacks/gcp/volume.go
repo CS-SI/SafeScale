@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,19 @@
 package gcp
 
 import (
-    "fmt"
-    "strconv"
-    "strings"
+	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"strconv"
+	"strings"
 
-    "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
-    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // -------------Volumes Management---------------------------------------------------------------------------------------
@@ -38,373 +38,316 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if request.Name == "" {
+		return nullAV, fail.InvalidParameterError("request.Name", "cannot be empty string")
+	}
+	if request.Size <= 0 {
+		return nullAV, fail.InvalidParameterError("request.Size", "cannot be negative integer or 0")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    // TODO: validate content of request
+	// TODO: validate content of request
 
-    selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
-    if request.Speed == volumespeed.SSD {
-        selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
-    }
+	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
+	if request.Speed == volumespeed.SSD {
+		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
+	}
 
-    newDisk := &compute.Disk{
-        Name:   request.Name,
-        Region: s.GcpConfig.Region,
-        SizeGb: int64(request.Size),
-        Type:   selectedType,
-        Zone:   s.GcpConfig.Zone,
-    }
+	resp, xerr := s.rpcCreateDisk(request.Name, selectedType, int64(request.Size))
+	if xerr != nil {
+		return nullAV, xerr
+	}
 
-    service := s.ComputeService
-
-    op, err := s.ComputeService.Disks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, newDisk).Do()
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
-
-    oco := OpContext{
-        Operation:    op,
-        ProjectID:    s.GcpConfig.ProjectID,
-        Service:      service,
-        DesiredState: "DONE",
-    }
-
-    xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-    if xerr != nil {
-        return nil, xerr
-    }
-
-    gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.Name).Do()
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
-
-    nvol := abstract.NewVolume()
-    nvol.Name = gcpDisk.Name
-    if strings.Contains(gcpDisk.Type, "pd-ssd") {
-        nvol.Speed = volumespeed.SSD
-    } else {
-        nvol.Speed = volumespeed.HDD
-    }
-    nvol.Size = int(gcpDisk.SizeGb)
-    nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
-    nvol.State, xerr = volumeStateConvert(gcpDisk.Status)
-    if xerr != nil {
-        return nil, xerr
-    }
-
-    return nvol, nil
+	out, xerr := toAbstractVolume(*resp)
+	if xerr != nil {
+		return nullAV, xerr
+	}
+	return out, nil
 }
 
-// GetVolume returns the volume identified by id
-func (s *Stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if ref == "" {
-        return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-    }
-
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
-    defer tracer.Exiting()
-
-    gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
-
-    nvol := abstract.NewVolume()
-    nvol.State, xerr = volumeStateConvert(gcpDisk.Status)
-    if xerr != nil {
-        return nil, xerr
-    }
-    nvol.Name = gcpDisk.Name
-    if strings.Contains(gcpDisk.Type, "pd-ssd") {
-        nvol.Speed = volumespeed.SSD
-    } else {
-        nvol.Speed = volumespeed.HDD
-    }
-    nvol.Size = int(gcpDisk.SizeGb)
-    nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
-
-    return nvol, nil
+func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
+	out = abstract.NewVolume()
+	out.Name = in.Name
+	if strings.Contains(in.Type, "pd-ssd") {
+		out.Speed = volumespeed.SSD
+	} else {
+		out.Speed = volumespeed.HDD
+	}
+	out.Size = int(in.SizeGb)
+	out.ID = strconv.FormatUint(in.Id, 10)
+	if out.State, xerr = toAbstractVolumeState(in.Status); xerr != nil {
+		return abstract.NewVolume(), xerr
+	}
+	return out, nil
 }
 
-func volumeStateConvert(gcpDriveStatus string) (volumestate.Enum, fail.Error) {
-    switch gcpDriveStatus {
-    case "CREATING":
-        return volumestate.CREATING, nil
-    case "DELETING":
-        return volumestate.DELETING, nil
-    case "FAILED":
-        return volumestate.ERROR, nil
-    case "READY":
-        return volumestate.AVAILABLE, nil
-    case "RESTORING":
-        return volumestate.CREATING, nil
-    default:
-        return -1, fail.NewError("unexpected volume status '%s'", gcpDriveStatus)
-    }
+// InspectVolume returns the volume identified by id
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+	nullAV := abstract.NewVolume()
+	if s.IsNull() {
+		return nullAV, fail.InvalidInstanceError()
+	}
+	if ref == "" {
+		return nullAV, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	resp, xerr := s.rpcGetDisk(ref)
+	if xerr != nil {
+		return nullAV, xerr
+	}
+
+	out, xerr := toAbstractVolume(*resp)
+	if xerr != nil {
+		return nullAV, xerr
+	}
+	return out, nil
+}
+
+func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
+	switch in {
+	case "CREATING":
+		return volumestate.CREATING, nil
+	case "DELETING":
+		return volumestate.DELETING, nil
+	case "FAILED":
+		return volumestate.ERROR, nil
+	case "READY":
+		return volumestate.AVAILABLE, nil
+	case "RESTORING":
+		return volumestate.CREATING, nil
+	default:
+		return -1, fail.NewError("unexpected volume status '%s'", in)
+	}
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
+func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+	var emptySlice []abstract.Volume
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    var volumes []abstract.Volume
+	var out []abstract.Volume
+	resp, xerr := s.rpcListDisks()
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+	for _, v := range resp {
+		item, xerr := toAbstractVolume(*v)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+		out = append(out, *item)
+	}
+	return out, nil
+}
 
-    compuService := s.ComputeService
-
-    token := ""
-    for paginate := true; paginate; {
-        resp, err := compuService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
-        if err != nil {
-            return volumes, fail.Wrap(err, "cannot list volumes")
-        }
-        for _, instance := range resp.Items {
-            nvolume := abstract.NewVolume()
-            nvolume.ID = strconv.FormatUint(instance.Id, 10)
-            nvolume.Name = instance.Name
-            nvolume.Size = int(instance.SizeGb)
-            nvolume.State, _ = volumeStateConvert(instance.Status)
-            if strings.Contains(instance.Type, "pd-ssd") {
-                nvolume.Speed = volumespeed.SSD
-            } else {
-                nvolume.Speed = volumespeed.HDD
-            }
-            volumes = append(volumes, *nvolume)
-        }
-        token := resp.NextPageToken
-        paginate = token != ""
-    }
-
-    return volumes, nil
+func (s stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
+	var (
+		emptySlice, out []*compute.Disk
+		resp            *compute.DiskList
+	)
+	for token := ""; ; {
+		xerr := stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.ComputeService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+		if resp != nil && len(resp.Items) > 0 {
+			out = append(out, resp.Items...)
+		}
+		if token = resp.NextPageToken; token == "" {
+			break
+		}
+	}
+	return out, nil
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(ref string) fail.Error {
-    if s == nil {
-        return fail.InvalidInstanceError()
-    }
-    if ref == "" {
-        return fail.InvalidParameterError("ref", "cannot be empty string")
-    }
+func (s stack) DeleteVolume(ref string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if ref == "" {
+		return fail.InvalidParameterError("ref", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    service := s.ComputeService
-    op, err := s.ComputeService.Disks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
-    if err != nil {
-        return fail.ToError(err)
-    }
-
-    oco := OpContext{
-        Operation:    op,
-        ProjectID:    s.GcpConfig.ProjectID,
-        Service:      service,
-        DesiredState: "DONE",
-    }
-
-    return waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcDeleteDisk(ref)
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-// - 'name' of the volume attachment
-// - 'volume' to attach
-// - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-    if s == nil {
-        return "", fail.InvalidInstanceError()
-    }
+func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+	if s.IsNull() {
+		return "", fail.InvalidInstanceError()
+	}
+	if request.VolumeID == "" {
+		return "", fail.InvalidParameterError("request.VolumeID", "cannot be empty string")
+	}
+	if request.HostID == "" {
+		return "", fail.InvalidParameterError("request.HostID", "cannot be empty string")
+	}
 
-    // TODO: validate request
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-
-    service := s.ComputeService
-
-    gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.HostID).Do()
-    if err != nil {
-        return "", fail.ToError(err)
-    }
-
-    gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, request.VolumeID).Do()
-    if err != nil {
-        return "", fail.ToError(err)
-    }
-
-    cad := &compute.AttachedDisk{
-        DeviceName: gcpDisk.Name,
-        Source:     gcpDisk.SelfLink,
-    }
-
-    op, err := s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, cad).Do()
-    if err != nil {
-        return "", fail.ToError(err)
-    }
-
-    oco := OpContext{
-        Operation:    op,
-        ProjectID:    s.GcpConfig.ProjectID,
-        Service:      service,
-        DesiredState: "DONE",
-    }
-
-    xerr := waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-    if xerr != nil {
-        return "", xerr
-    }
-
-    return newGcpDiskAttachment(gcpInstance.Name, gcpDisk.Name).attachmentID, nil
+	resp, xerr := s.rpcCreateDiskAttachment(request.VolumeID, request.HostID)
+	if xerr != nil {
+		return "", xerr
+	}
+	return resp, nil
 }
 
-// GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) InspectVolumeAttachment(serverID, vaID string) (*abstract.VolumeAttachment, fail.Error) {
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if serverID == "" {
-        return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
-    }
-    if vaID == "" {
-        return nil, fail.InvalidParameterError("vaID", "cannot be empty string")
-    }
+// InspectVolumeAttachment returns the volume attachment identified by id
+func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
+	nullAVA := abstract.NewVolumeAttachment()
+	if s.IsNull() {
+		return nullAVA, fail.InvalidInstanceError()
+	}
+	if hostRef == "" {
+		return nullAVA, fail.InvalidParameterError("hostRef", "cannot be empty string")
+	}
+	if vaID == "" {
+		return nullAVA, fail.InvalidParameterError("vaID", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverID, vaID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    dat := newGcpDiskAttachmentFromID(vaID)
+	serverID, diskID := extractFromAttachmentID(vaID)
+	instance, xerr := s.rpcGetInstance(serverID)
+	if xerr != nil {
+		return nullAVA, xerr
+	}
 
-    gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, dat.hostName).Do()
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
+	disk, xerr := s.rpcGetDisk(diskID)
+	if xerr != nil {
+		return nullAVA, xerr
+	}
 
-    favoriteSlave := dat.diskName
+	for _, v := range instance.Disks {
+		if v != nil {
+			if v.DeviceName == disk.Name {
+				ava := toAbstractVolumeAttachment(instance.Name, disk.Name)
+				return &ava, nil
+			}
+		}
+	}
 
-    for _, disk := range gcpInstance.Disks {
-        if disk != nil {
-            if disk.DeviceName == favoriteSlave {
-                vat := &abstract.VolumeAttachment{
-                    ID:       vaID,
-                    Name:     dat.diskName,
-                    VolumeID: dat.diskName,
-                    ServerID: dat.hostName,
-                }
-                return vat, nil
-            }
-        }
-    }
-
-    return nil, abstract.ResourceNotFoundError("attachment", vaID)
+	return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
 // DeleteVolumeAttachment ...
-func (s *Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
-    if s == nil {
-        return fail.InvalidInstanceError()
-    }
-    if serverID == "" {
-        return fail.InvalidParameterError("serverID", "cannot be empty string")
-    }
-    if vaID == "" {
-        return fail.InvalidParameterError("vaID", "cannot be empty string")
-    }
+func (s stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if vaID == "" {
+		return fail.InvalidParameterError("vaID", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverID, vaID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    service := s.ComputeService
-
-    gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverID).Do()
-    if err != nil {
-        return fail.ToError(err)
-    }
-
-    diskName := newGcpDiskAttachmentFromID(vaID).diskName
-    gcpDisk, err := s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, diskName).Do()
-    if err != nil {
-        return fail.ToError(err)
-    }
-
-    op, err := s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, gcpInstance.Name, gcpDisk.Name).Do()
-    if err != nil {
-        return fail.ToError(err)
-    }
-
-    oco := OpContext{
-        Operation:    op,
-        ProjectID:    s.GcpConfig.ProjectID,
-        Service:      service,
-        DesiredState: "DONE",
-    }
-
-    return waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcDeleteDiskAttachment(vaID)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
-    if s == nil {
-        return nil, fail.InvalidInstanceError()
-    }
-    if serverID == "" {
-        return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
-    }
+func (s stack) ListVolumeAttachments(serverRef string) ([]abstract.VolumeAttachment, fail.Error) {
+	var emptySlice []abstract.VolumeAttachment
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+	if serverRef == "" {
+		return emptySlice, fail.InvalidParameterError("serverRef", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverID).WithStopwatch().Entering()
-    defer tracer.Exiting()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-    var vats []abstract.VolumeAttachment
+	var vats []abstract.VolumeAttachment
 
-    gcpInstance, err := s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverID).Do()
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
+	instance, xerr := s.rpcGetInstance(serverRef)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
 
-    for _, disk := range gcpInstance.Disks {
-        if disk != nil {
-            vat := abstract.VolumeAttachment{
-                ID:       newGcpDiskAttachment(gcpInstance.Name, disk.DeviceName).attachmentID,
-                Name:     disk.DeviceName,
-                VolumeID: disk.DeviceName,
-                ServerID: serverID,
-            }
-            vats = append(vats, vat)
-        }
-    }
+	for _, disk := range instance.Disks {
+		if disk != nil {
+			vats = append(vats, toAbstractVolumeAttachment(instance.Name, disk.DeviceName))
+		}
+	}
 
-    return vats, nil
+	return vats, nil
 }
 
-type gcpDiskAttachment struct {
-    attachmentID string
-    hostName     string
-    diskName     string
+func toAbstractVolumeAttachment(serverName, diskName string) abstract.VolumeAttachment {
+	id := generateDiskAttachmentID(serverName, diskName)
+	return abstract.VolumeAttachment{
+		ID:       id,
+		Name:     id,
+		VolumeID: diskName,
+		ServerID: serverName,
+	}
 }
 
-func newGcpDiskAttachment(hostName string, diskName string) *gcpDiskAttachment {
-    return &gcpDiskAttachment{hostName: hostName, diskName: diskName, attachmentID: fmt.Sprintf("%s---%s", hostName, diskName)}
+//type gcpDiskAttachment struct {
+//	attachmentID string
+//	hostName     string
+//	diskName     string
+//}
+
+//func newGcpDiskAttachment(hostName string, diskName string) gcpDiskAttachment {
+//	return gcpDiskAttachment{
+//		hostName:     hostName,
+//		diskName:     diskName,
+//		attachmentID: generateDiskAttachmentID(hostName, diskName),
+//	}
+//}
+
+const attachmentIDSeparator = "---"
+
+func generateDiskAttachmentID(hostName string, diskName string) string {
+	return fmt.Sprintf("%s%s%s", hostName, attachmentIDSeparator, diskName)
 }
 
-func newGcpDiskAttachmentFromID(theID string) *gcpDiskAttachment {
-    sep := "---"
-    if strings.Contains(theID, sep) {
-        host := strings.Split(theID, sep)[0]
-        drive := strings.Split(theID, sep)[1]
-        return newGcpDiskAttachment(host, drive)
-    }
-    return nil
+func extractFromAttachmentID(theID string) (serverName, diskName string) {
+	if strings.Contains(theID, attachmentIDSeparator) {
+		splitted := strings.Split(theID, attachmentIDSeparator)
+		server := splitted[0]
+		disk := splitted[1]
+		return server, disk
+	}
+	return "", ""
 }
+
+//
+//func newGcpDiskAttachmentFromID(theID string) gcpDiskAttachment {
+//	sep := "---"
+//	if strings.Contains(theID, sep) {
+//		host := strings.Split(theID, sep)[0]
+//		drive := strings.Split(theID, sep)[1]
+//		return newGcpDiskAttachment(host, drive)
+//	}
+//	return gcpDiskAttachment{}
+//}

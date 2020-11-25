@@ -1,7 +1,7 @@
 // +build libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,8 +102,8 @@ var defaultNetworkCIDR = "192.168.122.0/24"
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
-	if s == nil {
+func (s stack) ListImages() (images []abstract.Image, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -144,8 +144,8 @@ func (s *Stack) ListImages() (images []abstract.Image, xerr fail.Error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
-	if s == nil {
+func (s stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -197,8 +197,8 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
-	if s == nil {
+func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -244,8 +244,8 @@ func (s *Stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Er
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
-	if s == nil {
+func (s stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -293,8 +293,8 @@ func (s *Stack) GetTemplate(id string) (template *abstract.HostTemplate, xerr fa
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
-	if s == nil {
+func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -314,17 +314,17 @@ func (s *Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(id string) fail.Error {
+func (s stack) DeleteKeyPair(id string) fail.Error {
 	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME Technical debt
 }
 
@@ -554,8 +554,8 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 
 	return hostSizing, nil
 }
-func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.HostNetwork, fail.Error) {
-	hostNetwork := propertiesv1.NewHostNetwork()
+func (s stack) getNetworkV2FromDomain(domain *libvirt.Domain) (*propertiesv2.HostNetwork, fail.Error) {
+	hostNetwork := propertiesv2.NewHostNetwork()
 
 	domainXML, err := domain.GetXMLDesc(0)
 	if err != nil {
@@ -587,7 +587,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 								if dhcpLease.Mac == iface.MAC.Address {
 									net, err := s.InspectNetwork(iface.Source.Network.Network)
 									if err != nil {
-										return fail.NotFoundError("unknown Network %s", iface.Source.Network.Network)
+										return fail.NotFoundError("unknown Networking %s", iface.Source.Network.Network)
 									}
 									if len(strings.Split(dhcpLease.IPaddr, ".")) == 4 {
 										if name == "default" {
@@ -626,7 +626,7 @@ func (s *Stack) getNetworkV1FromDomain(domain *libvirt.Domain) (*propertiesv1.Ho
 }
 
 // getHostFromDomain build a abstract.Host struct representing a Domain
-func (s *Stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.HostCore, xerr fail.Error) {
+func (s stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	id, err := domain.GetUUIDString()
@@ -677,7 +677,7 @@ func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.HostCore, *libvir
 	return host, domain, nil
 }
 
-func (s *Stack) complementHost(hostCore *abstract.HostCore, newHost *abstract.HostFull) (xerr fail.Error) {
+func (s stack) complementHost(hostCore *abstract.HostCore, newHost *abstract.HostFull) (xerr fail.Error) {
 	if hostCore == nil {
 		return fail.InvalidParameterError("hostCore", "cannot be nil")
 	}
@@ -717,8 +717,8 @@ func verifyVirtResizeCanAccessKernel() (xerr fail.Error) {
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, _ *abstract.HostTemplate, userData *userdata.Content, xerr fail.Error) {
-	if s == nil {
+func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, _ *abstract.HostTemplate, userData *userdata.Content, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
@@ -932,7 +932,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 	hostCore.PrivateKey = keyPair.PrivateKey
 	hostCore.Password = request.Password
 
-	hostNetwork := abstract.NewHostNetwork()
+	hostNetwork := abstract.NewHostSubnet()
 	if bridgedVMs {
 		var vmInfo VMInfo
 		if publicIP {
@@ -948,18 +948,16 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFul
 
 	host = abstract.NewHostFull()
 	host.Core = hostCore
-	host.Network = hostNetwork
-	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
-
-	return host, nil, userData, nil
+	host.Networking = hostNetwork
+	host.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
+	return host, userData, nil
 }
 
 // GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
-	if s == nil {
+func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-
 	ahc, _, err := stacks.ValidateHostParameter(hostParam)
 	if err != nil {
 		return ahc, err
@@ -984,8 +982,8 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.Host
 }
 
 // GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
-	if s == nil {
+func (s stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -997,8 +995,8 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1057,13 +1055,15 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.SizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
 func (s *Stack) ListHosts() (hosts abstract.HostList, xerr fail.Error) {
-	nullList := abstract.HostList{}
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	if s == nil {
 		return nullList, fail.InvalidInstanceError()
 	}
@@ -1088,9 +1088,9 @@ func (s *Stack) ListHosts() (hosts abstract.HostList, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
-		return fail.InvalidInstanceError()
+func (s stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
 	}
 
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1112,8 +1112,8 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
-	if s == nil {
+func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1136,9 +1136,10 @@ func (s *Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 
 // RebootHost reboot the host identified by id
 func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
-	if s == nil {
+	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
@@ -1158,9 +1159,9 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if s == nil {
-		return hoststate.ERROR, fail.InvalidInstanceError()
+func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	if s.IsNull() {
+		return hoststate.UNKNOWN, fail.InvalidInstanceError()
 	}
 
 	host, err := s.InspectHost(hostParam)
@@ -1173,14 +1174,14 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
-	if s == nil {
+func (s stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	return map[string]bool{"local": true}, nil
 }
 
-func (s *Stack) ListRegions() ([]string, fail.Error) {
+func (s stack) ListRegions() ([]string, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1189,12 +1190,12 @@ func (s *Stack) ListRegions() ([]string, fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter, enabled bool) fail.Error {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -193,14 +193,14 @@ func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (ab
 	if in == nil {
 		return out, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	out.ID = in.Id
+	out.IDs = in.Ids
 	out.Description = in.Description
 	out.Direction = securitygroupruledirection.Enum(in.Direction)
-	out.Protocol = string(in.Protocol)
+	out.Protocol = in.Protocol
 	out.EtherType = ipversion.Enum(in.EtherType)
-	out.PortFrom = uint16(in.PortFrom)
-	out.PortTo = uint16(in.PortTo)
-	out.CIDR = in.Cidr
+	out.PortFrom = in.PortFrom
+	out.PortTo = in.PortTo
+	out.Targets = in.Involved
 	return out, nil
 }
 
@@ -210,9 +210,29 @@ func SecurityGroupRulesFromProtocolToAbstract(in []*protocol.SecurityGroupRule) 
 	for _, v := range in {
 		rule, xerr := SecurityGroupRuleFromProtocolToAbstract(v)
 		if xerr != nil {
-			return nil, fail.Prepend(xerr, "failed to convert '*protocol.SecurityGroupRule' to 'abstract.SecurityGroupRule'")
+			return nil, fail.Wrap(xerr, "failed to convert '*protocol.SecurityGroupRule' to 'abstract.SecurityGroupRule'")
 		}
 		out = append(out, rule)
+	}
+	return out, nil
+}
+
+// SecurityGroupFromProtocolToAbstract ...
+func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (abstract.SecurityGroup, fail.Error) {
+	if in == nil {
+		return abstract.SecurityGroup{}, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	rules, xerr := SecurityGroupRulesFromProtocolToAbstract(in.Rules)
+	if xerr != nil {
+		return abstract.SecurityGroup{}, xerr
+	}
+
+	out := abstract.SecurityGroup{
+		ID:          in.GetId(),
+		Name:        in.GetName(),
+		Description: in.GetDescription(),
+		Rules:       rules,
 	}
 	return out, nil
 }

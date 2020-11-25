@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,142 +17,116 @@
 package outscale
 
 import (
-    "encoding/base64"
-    "fmt"
+	"encoding/base64"
 
-    "github.com/antihax/optional"
-    "github.com/outscale/osc-sdk-go/osc"
-
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/utils/debug"
-    "github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
-    nullAkp := &abstract.KeyPair{}
-    if s == nil {
-        return nullAkp, fail.InvalidInstanceError()
-    }
-    if name == "" {
-        return nullAkp, fail.InvalidParameterError("name", "cannot be empty string")
-    }
+func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-    akp, xerr = abstract.NewKeyPair(name)
-    if xerr != nil {
-        return nullAkp, xerr
-    }
-    return akp, s.ImportKeyPair(akp)
+	akp, xerr = abstract.NewKeyPair(name)
+	if xerr != nil {
+		return nullAKP, xerr
+	}
+	return akp, s.ImportKeyPair(akp)
 }
 
 // ImportKeyPair is used to import an existing KeyPair in Outscale
-func (s *Stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
-    if s == nil {
-        return fail.InvalidInstanceError()
-    }
-    if keypair == nil {
-        return fail.InvalidParameterError("keyair", "cannot be nil")
-    }
+func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if keypair == nil {
+		return fail.InvalidParameterError("keyair", "cannot be nil")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-    createKeypairRequest := osc.CreateKeypairRequest{
-        KeypairName: keypair.Name,
-        PublicKey:   base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)),
-    }
-    _, _, err := s.client.KeypairApi.CreateKeypair(s.auth, &osc.CreateKeypairOpts{
-        CreateKeypairRequest: optional.NewInterface(createKeypairRequest),
-    })
-    return normalizeError(err)
+	return s.rpcCreateKeypair(keypair.Name, base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)))
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s *Stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
-    nullAkp := &abstract.KeyPair{}
-    if s == nil {
-        return nullAkp, fail.InvalidInstanceError()
-    }
-    if id == "" {
-        return nullAkp, fail.InvalidParameterError("name", "cannot be empty string")
-    }
+func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error) {
+	nullAKP := &abstract.KeyPair{}
+	if s.IsNull() {
+		return nullAKP, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-    readKeypairsRequest := osc.ReadKeypairsRequest{Filters: osc.FiltersKeypair{
-        KeypairNames: []string{id},
-    }}
-    resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, &osc.ReadKeypairsOpts{
-        ReadKeypairsRequest: optional.NewInterface(readKeypairsRequest),
-    })
-    if err != nil {
-        return nullAkp, normalizeError(err)
-    }
-    if len(resp.Keypairs) > 1 {
-        return nullAkp, fail.InconsistentError("Inconsistent provider response")
-    }
-    if len(resp.Keypairs) == 0 {
-        return nullAkp, fail.NotFoundError(fmt.Sprintf("Keypair %s not found", id))
-    }
-    kp := resp.Keypairs[0]
-    return &abstract.KeyPair{
-        ID:   kp.KeypairName,
-        Name: kp.KeypairName,
-    }, nil
+	resp, xerr := s.rpcReadKeypairByName(id)
+	if xerr != nil {
+		return nullAKP, xerr
+	}
+
+	kp := abstract.KeyPair{
+		ID:   resp.KeypairName,
+		Name: resp.KeypairName,
+	}
+	return &kp, nil
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
-    nullList := make([]abstract.KeyPair, 0)
-    if s == nil {
-        return nullList, fail.InvalidInstanceError()
-    }
+func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
+	var emptySlice []abstract.KeyPair
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-    resp, _, err := s.client.KeypairApi.ReadKeypairs(s.auth, nil)
-    if err != nil {
-        return nullList, normalizeError(err)
-    }
-    var kps []abstract.KeyPair
-    for _, kp := range resp.Keypairs {
-        kps = append(kps, abstract.KeyPair{
-            ID:   kp.KeypairName,
-            Name: kp.KeypairName,
-        })
-    }
-    return kps, nil
+	resp, xerr := s.rpcReadKeypairs(nil)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	var kps []abstract.KeyPair
+	for _, kp := range resp {
+		kps = append(kps, abstract.KeyPair{
+			ID:   kp.KeypairName,
+			Name: kp.KeypairName,
+		})
+	}
+	return kps, nil
 
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(name string) (xerr fail.Error) {
-    if s == nil {
-        return fail.InvalidInstanceError()
-    }
-    if name == "" {
-        return fail.InvalidParameterError("name", "cannot be empty string")
-    }
+func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return fail.InvalidParameterError("name", "cannot be empty string")
+	}
 
-    tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
-    defer tracer.Exiting()
-    defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-    deleteKeypairRequest := osc.DeleteKeypairRequest{
-        KeypairName: name,
-    }
-    _, _, err := s.client.KeypairApi.DeleteKeypair(s.auth, &osc.DeleteKeypairOpts{
-        DeleteKeypairRequest: optional.NewInterface(deleteKeypairRequest),
-    })
-    return normalizeError(err)
+	return s.rpcDeleteKeypair(name)
 }

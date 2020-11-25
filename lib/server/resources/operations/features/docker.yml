@@ -19,6 +19,11 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+    parameters:
+        - CentOSVersion=3:19.03.12-3.el7
+        - ContainerIO=1.2.6-3.3.el7.x86_64
+        - DebianVersion=5:19.03.12~3-0~ubuntu-bionic
+        - FedoraVersion=3:19.03.12-3.fc31
     install:
         bash:
             check:
@@ -78,7 +83,7 @@ feature:
                                     op=-1
                                     yum install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then
-                                        yum install -y curl &>/dev/null && op=$? || true
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y curl &>/dev/null && op=$? || true
                                         if [ $op -ne 0 ]; then
                                             sfFail 194
                                         else
@@ -90,7 +95,7 @@ feature:
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
                                 fedora)
-                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} yum install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
+                                    sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf install -y yum-utils device-mapper-persistent-data lvm2 || sfFail 192
                                     sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo
                                     kop=0
                                     op=-1
@@ -196,7 +201,6 @@ feature:
                             # then firewalld  itself
                             sfService restart firewalld
                             sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
-                            #sfFirewallAdd --zone=trusted --add-service docker-swarm
                             sfFirewallAdd --zone=trusted --add-masquerade
                             sfFirewallReload || sfFail 204 "Firewall problem"
 

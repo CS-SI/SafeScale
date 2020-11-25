@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@
 package propertiesv1
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -27,32 +27,37 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostLocalMount struct {
-    Device     string `json:"device"`            // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
-    Path       string `json:"mountpoint"`        // Path is the mount point of the device
-    FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
-    Options    string `json:"options,omitempty"` // Options contains the mount options
+	Device     string `json:"device"`            // Device is the name of the device (/dev/... for local mount, host:/path for remote mount)
+	Path       string `json:"mountpoint"`        // Path is the mount point of the device
+	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
+	Options    string `json:"options,omitempty"` // Options contains the mount options
 }
 
 // NewHostLocalMount ...
 func NewHostLocalMount() *HostLocalMount {
-    return &HostLocalMount{}
+	return &HostLocalMount{}
 }
 
 // Reset ...
 func (hlm *HostLocalMount) Reset() {
-    *hlm = HostLocalMount{}
+	*hlm = HostLocalMount{}
 }
 
 // Clone ...
-func (hlm *HostLocalMount) Clone() data.Clonable {
-    return NewHostLocalMount().Replace(hlm)
+func (hlm HostLocalMount) Clone() data.Clonable {
+	return NewHostLocalMount().Replace(&hlm)
 }
 
 // Replace ...
 func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
-    src := p.(*HostLocalMount)
-    *hlm = *src
-    return hlm
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hlm == nil || p == nil {
+		return hlm
+	}
+
+	src := p.(*HostLocalMount)
+	*hlm = *src
+	return hlm
 }
 
 // HostRemoteMount stores information about a remote filesystem mount
@@ -60,33 +65,38 @@ func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostRemoteMount struct {
-    ShareID    string `json:"share_id"`          // contains the GetID of the share mounted
-    Export     string `json:"export"`            // contains the path of the export (ie: <host>:/data/shared)
-    Path       string `json:"mountpoint"`        // Path is the mount point of the device
-    FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
-    Options    string `json:"options,omitempty"` // Options contains the mount options
+	ShareID    string `json:"share_id"`          // contains the ID of the share mounted
+	Export     string `json:"export"`            // contains the path of the export (ie: <host>:/data/shared)
+	Path       string `json:"mountpoint"`        // Path is the mount point of the device
+	FileSystem string `json:"file_system"`       // FileSystem tells the filesystem used
+	Options    string `json:"options,omitempty"` // Options contains the mount options
 }
 
 // NewHostRemoteMount ...
 func NewHostRemoteMount() *HostRemoteMount {
-    return &HostRemoteMount{}
+	return &HostRemoteMount{}
 }
 
 // Reset ...
 func (hrm *HostRemoteMount) Reset() {
-    *hrm = HostRemoteMount{}
+	*hrm = HostRemoteMount{}
 }
 
 // Clone ...
-func (hrm *HostRemoteMount) Clone() data.Clonable {
-    return NewHostRemoteMount().Replace(hrm)
+func (hrm HostRemoteMount) Clone() data.Clonable {
+	return NewHostRemoteMount().Replace(&hrm)
 }
 
 // Replace ...
 func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
-    src := p.(*HostRemoteMount)
-    *hrm = *src
-    return hrm
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hrm == nil || p == nil {
+		return hrm
+	}
+
+	src := p.(*HostRemoteMount)
+	*hrm = *src
+	return hrm
 }
 
 // HostMounts contains information about mounts on the host
@@ -94,71 +104,76 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostMounts struct {
-    LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device"`  // contains local mount path, indexed by devices
-    LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path"`    // contains HostLocalMount structs, indexed by path
-    RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device"` // contains local mount path, indexed by Share GetID
-    RemoteMountsByExport  map[string]string           `json:"remote_mounts_by_export"` // contains local mount path, indexed by export
-    RemoteMountsByPath    map[string]*HostRemoteMount `json:"remote_mounts_by_path"`   // contains HostRemoteMount, indexed by path
+	LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device"`  // contains local mount path, indexed by devices
+	LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path"`    // contains HostLocalMount structs, indexed by path
+	RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device"` // contains local mount path, indexed by Share ID
+	RemoteMountsByExport  map[string]string           `json:"remote_mounts_by_export"` // contains local mount path, indexed by export
+	RemoteMountsByPath    map[string]*HostRemoteMount `json:"remote_mounts_by_path"`   // contains HostRemoteMount, indexed by path
 }
 
 // NewHostMounts ...
 func NewHostMounts() *HostMounts {
-    return &HostMounts{
-        LocalMountsByDevice:   map[string]string{},
-        LocalMountsByPath:     map[string]*HostLocalMount{},
-        RemoteMountsByShareID: map[string]string{},
-        RemoteMountsByExport:  map[string]string{},
-        RemoteMountsByPath:    map[string]*HostRemoteMount{},
-    }
+	return &HostMounts{
+		LocalMountsByDevice:   map[string]string{},
+		LocalMountsByPath:     map[string]*HostLocalMount{},
+		RemoteMountsByShareID: map[string]string{},
+		RemoteMountsByExport:  map[string]string{},
+		RemoteMountsByPath:    map[string]*HostRemoteMount{},
+	}
 }
 
 // Reset ...
 func (hm *HostMounts) Reset() {
-    *hm = HostMounts{
-        LocalMountsByDevice:   map[string]string{},
-        LocalMountsByPath:     map[string]*HostLocalMount{},
-        RemoteMountsByShareID: map[string]string{},
-        RemoteMountsByExport:  map[string]string{},
-        RemoteMountsByPath:    map[string]*HostRemoteMount{},
-    }
+	*hm = HostMounts{
+		LocalMountsByDevice:   map[string]string{},
+		LocalMountsByPath:     map[string]*HostLocalMount{},
+		RemoteMountsByShareID: map[string]string{},
+		RemoteMountsByExport:  map[string]string{},
+		RemoteMountsByPath:    map[string]*HostRemoteMount{},
+	}
 }
 
 // Content ...  (data.Clonable interface)
 func (hm *HostMounts) Content() interface{} {
-    return hm
+	return hm
 }
 
 // Clone ...  (data.Clonable interface)
-func (hm *HostMounts) Clone() data.Clonable {
-    return NewHostMounts().Replace(hm)
+func (hm HostMounts) Clone() data.Clonable {
+	return NewHostMounts().Replace(&hm)
 }
 
 // Replace ...  (data.Clonable interface)
 func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
-    src := p.(*HostMounts)
-    hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
-    for k, v := range src.LocalMountsByDevice {
-        hm.LocalMountsByDevice[k] = v
-    }
-    hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
-    for k, v := range src.LocalMountsByPath {
-        hm.LocalMountsByPath[k] = v
-    }
-    hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
-    for k, v := range src.RemoteMountsByShareID {
-        hm.RemoteMountsByShareID[k] = v
-    }
-    hm.RemoteMountsByExport = make(map[string]string, len(src.RemoteMountsByExport))
-    for k, v := range src.RemoteMountsByExport {
-        hm.RemoteMountsByExport[k] = v
-    }
-    hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.RemoteMountsByPath))
-    for k, v := range src.RemoteMountsByPath {
-        hm.RemoteMountsByPath[k] = v
-    }
-    return hm
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hm == nil || p == nil {
+		return hm
+	}
+
+	src := p.(*HostMounts)
+	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
+	for k, v := range src.LocalMountsByDevice {
+		hm.LocalMountsByDevice[k] = v
+	}
+	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
+	for k, v := range src.LocalMountsByPath {
+		hm.LocalMountsByPath[k] = v
+	}
+	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
+	for k, v := range src.RemoteMountsByShareID {
+		hm.RemoteMountsByShareID[k] = v
+	}
+	hm.RemoteMountsByExport = make(map[string]string, len(src.RemoteMountsByExport))
+	for k, v := range src.RemoteMountsByExport {
+		hm.RemoteMountsByExport[k] = v
+	}
+	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.RemoteMountsByPath))
+	for k, v := range src.RemoteMountsByPath {
+		hm.RemoteMountsByPath[k] = v
+	}
+	return hm
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.MountsV1, NewHostMounts())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.MountsV1, NewHostMounts())
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,188 +17,203 @@
 package gcp
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/iaas"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
-    "github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // provider is the provider implementation of the Gcp provider
 type provider struct {
-    *gcp.Stack
+	api.Stack
 
-    tenantParameters map[string]interface{}
+	tenantParameters map[string]interface{}
 }
 
 // New creates a new instance of gcp provider
 func New() providers.Provider {
-    return &provider{}
+	return &provider{}
 }
 
 // Build build a new Client from configuration parameter
+// Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-    // tenantName, _ := params["name"].(string)
+	// tenantName, _ := params["name"].(string)
 
-    identityCfg, ok := params["identity"].(map[string]interface{})
-    if !ok {
-        return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")
-    }
+	identityCfg, ok := params["identity"].(map[string]interface{})
+	if !ok {
+		return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")
+	}
 
-    computeCfg, ok := params["compute"].(map[string]interface{})
-    if !ok {
-        return &provider{}, fail.SyntaxError("section 'compute' not found in tenants.toml")
-    }
+	computeCfg, ok := params["compute"].(map[string]interface{})
+	if !ok {
+		return &provider{}, fail.SyntaxError("section 'compute' not found in tenants.toml")
+	}
 
-    networkName := "safescale"
+	networkName := "safescale"
 
-    networkCfg, ok := params["network"].(map[string]interface{})
-    if ok { // Do not log missing network section, it may happen without issue
-        newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
-        if newNetworkName != "" {
-            networkName = newNetworkName
-        }
-    }
+	networkCfg, ok := params["network"].(map[string]interface{})
+	if ok { // Do not log missing network section, it may happen without issue
+		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
+		if newNetworkName != "" {
+			networkName = newNetworkName
+		}
+	}
 
-    gcpprojectID, _ := identityCfg["project_id"].(string)
-    privateKeyID, _ := identityCfg["private_key_id"].(string)
-    privateKey, _ := identityCfg["private_key"].(string)
-    clientEmail, _ := identityCfg["client_email"].(string)
-    clientID, _ := identityCfg["client_id"].(string)
-    authURI, _ := identityCfg["auth_uri"].(string)
-    tokenURI, _ := identityCfg["token_uri"].(string)
-    authProvider, _ := identityCfg["auth_provider_x509_cert_url"].(string)
-    clientCertURL, _ := identityCfg["client_x509_cert_url"].(string)
-    region, _ := computeCfg["Region"].(string)
-    zone, _ := computeCfg["Zone"].(string)
+	gcpprojectID, _ := identityCfg["project_id"].(string)
+	privateKeyID, _ := identityCfg["private_key_id"].(string)
+	privateKey, _ := identityCfg["private_key"].(string)
+	clientEmail, _ := identityCfg["client_email"].(string)
+	clientID, _ := identityCfg["client_id"].(string)
+	authURI, _ := identityCfg["auth_uri"].(string)
+	tokenURI, _ := identityCfg["token_uri"].(string)
+	authProvider, _ := identityCfg["auth_provider_x509_cert_url"].(string)
+	clientCertURL, _ := identityCfg["client_x509_cert_url"].(string)
+	region, _ := computeCfg["Region"].(string)
+	zone, _ := computeCfg["Zone"].(string)
 
-    gcpConf := stacks.GCPConfiguration{
-        Type:         "service_account",
-        ProjectID:    gcpprojectID,
-        PrivateKeyID: privateKeyID,
-        PrivateKey:   privateKey,
-        ClientEmail:  clientEmail,
-        ClientID:     clientID,
-        AuthURI:      authURI,
-        TokenURI:     tokenURI,
-        AuthProvider: authProvider,
-        ClientCert:   clientCertURL,
-        Region:       region,
-        Zone:         zone,
-        NetworkName:  networkName,
-    }
+	gcpConf := stacks.GCPConfiguration{
+		Type:         "service_account",
+		ProjectID:    gcpprojectID,
+		PrivateKeyID: privateKeyID,
+		PrivateKey:   privateKey,
+		ClientEmail:  clientEmail,
+		ClientID:     clientID,
+		AuthURI:      authURI,
+		TokenURI:     tokenURI,
+		AuthProvider: authProvider,
+		ClientCert:   clientCertURL,
+		Region:       region,
+		Zone:         zone,
+		NetworkName:  networkName,
+	}
 
-    username, _ := identityCfg["Username"].(string)
-    password, _ := identityCfg["Password"].(string)
-    identityEndpoint, _ := identityCfg["auth_uri"].(string)
+	username, _ := identityCfg["Username"].(string)
+	password, _ := identityCfg["Password"].(string)
+	identityEndpoint, _ := identityCfg["auth_uri"].(string)
 
-    projectName, _ := computeCfg["ProjectName"].(string)
-    projectID, _ := computeCfg["ProjectID"].(string)
-    defaultImage, _ := computeCfg["DefaultImage"].(string)
+	projectName, _ := computeCfg["ProjectName"].(string)
+	projectID, _ := computeCfg["ProjectID"].(string)
+	defaultImage, _ := computeCfg["DefaultImage"].(string)
 
-    operatorUsername := abstract.DefaultUser
-    if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
-        operatorUsername = operatorUsernameIf.(string)
-    }
+	operatorUsername := abstract.DefaultUser
+	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
+		operatorUsername = operatorUsernameIf.(string)
+	}
 
-    authOptions := stacks.AuthenticationOptions{
-        IdentityEndpoint: identityEndpoint,
-        Username:         username,
-        Password:         password,
-        Region:           region,
-        ProjectName:      projectName,
-        ProjectID:        projectID,
-        FloatingIPPool:   "public",
-    }
+	authOptions := stacks.AuthenticationOptions{
+		IdentityEndpoint: identityEndpoint,
+		Username:         username,
+		Password:         password,
+		Region:           region,
+		ProjectName:      projectName,
+		ProjectID:        projectID,
+		FloatingIPPool:   "public",
+	}
 
-    providerName := "gcp"
-    metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
-    if err != nil {
-        return nil, err
-    }
+	providerName := "gcp"
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
+	if err != nil {
+		return nil, err
+	}
 
-    cfgOptions := stacks.ConfigurationOptions{
-        DNSList:                   []string{"8.8.8.8", "1.1.1.1"},
-        UseFloatingIP:             true,
-        AutoHostNetworkInterfaces: false,
-        VolumeSpeeds: map[string]volumespeed.Enum{
-            "standard":   volumespeed.COLD,
-            "performant": volumespeed.HDD,
-        },
-        MetadataBucket:   metadataBucketName,
-        DefaultImage:     defaultImage,
-        OperatorUsername: operatorUsername,
-        UseNATService:    true,
-        ProviderName:     providerName,
-    }
+	cfgOptions := stacks.ConfigurationOptions{
+		DNSList:                   []string{"8.8.8.8", "1.1.1.1"},
+		UseFloatingIP:             true,
+		AutoHostNetworkInterfaces: false,
+		VolumeSpeeds: map[string]volumespeed.Enum{
+			"standard":   volumespeed.COLD,
+			"performant": volumespeed.HDD,
+		},
+		MetadataBucket:   metadataBucketName,
+		DefaultImage:     defaultImage,
+		OperatorUsername: operatorUsername,
+		UseNATService:    true,
+		ProviderName:     providerName,
+	}
 
-    gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
-    if xerr != nil {
-        return nil, xerr
-    }
-    newP := &provider{
-        Stack:            gcpStack,
-        tenantParameters: params,
-    }
+	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
+	if xerr != nil {
+		return nil, xerr
+	}
+	newP := &provider{
+		Stack:            gcpStack,
+		tenantParameters: params,
+	}
 
-    //evalid := providers.NewValidatedProvider(p, providerName)
-    //etrace := providers.NewErrorTraceProvider(newP, providerName)
-    //prov := providers.NewLoggedProvider(etrace, providerName)
-    //return prov, nil
-    return newP, nil
+	//evalid := providers.NewValidatedProvider(p, providerName)
+	//etrace := providers.NewErrorTraceProvider(newP, providerName)
+	//prov := providers.NewLoggedProvider(etrace, providerName)
+	//return prov, nil
+	return newP, nil
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-    cfg := providers.ConfigMap{}
+func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
+	cfg := providers.ConfigMap{}
 
-    opts := p.Stack.GetAuthenticationOptions()
-    cfg.Set("TenantName", opts.TenantName)
-    cfg.Set("Login", opts.Username)
-    cfg.Set("Password", opts.Password)
-    cfg.Set("AuthUrl", opts.IdentityEndpoint)
-    cfg.Set("Region", opts.Region)
-    return cfg, nil
+	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	cfg.Set("TenantName", opts.TenantName)
+	cfg.Set("Login", opts.Username)
+	cfg.Set("Password", opts.Password)
+	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("Region", opts.Region)
+	return cfg, nil
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
-    cfg := providers.ConfigMap{}
+func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
+	cfg := providers.ConfigMap{}
 
-    opts := p.Stack.GetConfigurationOptions()
-    cfg.Set("DNSList", opts.DNSList)
-    cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
-    cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
-    cfg.Set("DefaultImage", opts.DefaultImage)
-    cfg.Set("MetadataBucketName", opts.MetadataBucket)
-    cfg.Set("OperatorUsername", opts.OperatorUsername)
-    cfg.Set("ProviderName", p.GetName())
-    return cfg, nil
+	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
+	cfg.Set("DNSList", opts.DNSList)
+	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
+	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
+	cfg.Set("DefaultImage", opts.DefaultImage)
+	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("ProviderName", p.GetName())
+	return cfg, nil
 }
 
 // GetName returns the providerName
-func (p *provider) GetName() string {
-    return "gcp"
+func (p provider) GetName() string {
+	return "gcp"
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-    return p.Stack.ListImages()
+func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
+	if p.IsNull() {
+		return []abstract.Image{}, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListImages()
+}
+
+// ListTemplates ...
+func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+	if p.IsNull() {
+		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
+	}
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
 // GetTenantParameters returns the tenant parameters as-is
 func (p *provider) GetTenantParameters() map[string]interface{} {
-    return p.tenantParameters
+	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider
 func (p *provider) GetCapabilities() providers.Capabilities {
-    return providers.Capabilities{}
+	return providers.Capabilities{
+		CanDisableSecurityGroup: true,
+	}
 }
 
 func init() {
-    iaas.Register("gcp", &provider{})
+	iaas.Register("gcp", &provider{})
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,38 +17,43 @@
 package propertiesv1
 
 import (
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // ClusterComposite ...
 type ClusterComposite struct {
-    // Array of tenants hosting a multu-tenant cluster (multi starting from 1)
-    Tenants []string `json:"tenants"`
+	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
+	Tenants []string `json:"tenants"`
 }
 
 func newClusterComposite() *ClusterComposite {
-    return &ClusterComposite{
-        Tenants: []string{},
-    }
+	return &ClusterComposite{
+		Tenants: []string{},
+	}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (c *ClusterComposite) Clone() data.Clonable {
-    return newClusterComposite().Replace(c)
+func (c ClusterComposite) Clone() data.Clonable {
+	return newClusterComposite().Replace(&c)
 }
 
 // Replace ...
 // satisfies interface data.Clonable
 func (c *ClusterComposite) Replace(p data.Clonable) data.Clonable {
-    src := p.(*ClusterComposite)
-    c.Tenants = make([]string, len(src.Tenants))
-    copy(c.Tenants, src.Tenants)
-    return c
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if c == nil || p == nil {
+		return c
+	}
+
+	src := p.(*ClusterComposite)
+	c.Tenants = make([]string, len(src.Tenants))
+	copy(c.Tenants, src.Tenants)
+	return c
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.CompositeV1, newClusterComposite())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.CompositeV1, newClusterComposite())
 }

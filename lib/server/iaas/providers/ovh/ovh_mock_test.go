@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -277,7 +277,7 @@ func TestMock_Containers_Mock(t *testing.T) {
 	// TODO use Mock object
 	_ = amok
 
-	cli.Containers(t)
+	cli.Buckets(t)
 }
 
 // func TestMock_Objects_Mock(t *testing.T) {
@@ -339,7 +339,7 @@ func TestMock_DeleteKeyPair(t *testing.T) {
 	// TODO use Mock object
 }
 
-// CreateNetwork creates a network named name
+// CreateSubnet creates a network named name
 func TestMock_CreateNetwork(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
@@ -351,13 +351,13 @@ func TestMock_GetNetwork(t *testing.T) {
 	// TODO use Mock object
 }
 
-// ListNetworks lists available networks
+// ListSubnets lists available networks
 func TestMock_ListNetworks(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object
 }
 
-// DeleteNetwork deletes the network identified by id
+// DeleteSubnet deletes the network identified by id
 func TestMock_DeleteNetwork(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object

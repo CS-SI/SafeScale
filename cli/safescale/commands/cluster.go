@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -320,7 +321,7 @@ var clusterCreateCommand = &cli.Command{
 		&cli.StringFlag{
 			Name:    "cidr",
 			Aliases: []string{"N"},
-			Value:   "192.168.0.0/16",
+			Value:   stacks.DefaultNetworkCIDR,
 			Usage:   "Defines the CIDR of the network to use with cluster",
 		},
 		&cli.StringFlag{
@@ -1376,29 +1377,29 @@ var clusterFeatureCommands = &cli.Command{
 	},
 }
 
-// clusterInstalledFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
-var clusterFeatureList = &cli.Command{
-	Name:      "list",
-	Aliases:   []string{"installed"},
-	Usage:     "List features installed on the cluster",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		&cli.BoolFlag{
-			Name:    "all",
-			Aliases: []string{"a"},
-			Value:   false,
-			Usage:   "if used, list all features that are eligible to be installed on the cluster",
-		},
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
-		},
-	},
-
-	Action: clusterFeatureListAction,
-}
+// // clusterInstalledFeaturesCommand handles 'safescale cluster <cluster name or id> list-features'
+// var clusterFeatureList = &cli.Command{
+// 	Name:      "list",
+// 	Aliases:   []string{"installed"},
+// 	Usage:     "List features installed on the cluster",
+// 	ArgsUsage: "",
+//
+// 	Flags: []cli.Flag{
+// 		&cli.BoolFlag{
+// 			Name:    "all",
+// 			Aliases: []string{"a"},
+// 			Value:   false,
+// 			Usage:   "if used, list all features that are eligible to be installed on the cluster",
+// 		},
+// 		&cli.StringSliceFlag{
+// 			Name:    "param",
+// 			Aliases: []string{"p"},
+// 			Usage:   "Allow to define content of feature parameters",
+// 		},
+// 	},
+//
+// 	Action: clusterFeatureListAction,
+// }
 
 func clusterFeatureListAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
@@ -1416,27 +1417,27 @@ func clusterFeatureListAction(c *cli.Context) error {
 	return clitools.SuccessResponse(features)
 }
 
-// clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'
-var clusterFeatureAddCommand = &cli.Command{
-	Name:      "add",
-	Aliases:   []string{"install"},
-	Usage:     "Installs a feature on a cluster",
-	ArgsUsage: "CLUSTERNAME FEATURENAME",
-
-	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameters, in format <name>=<value>",
-		},
-		&cli.BoolFlag{
-			Name:  "skip-proxy",
-			Usage: "Disables reverse proxy rules",
-		},
-	},
-
-	Action: clusterFeatureAddAction,
-}
+// // clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'
+// var clusterFeatureAddCommand = &cli.Command{
+// 	Name:      "add",
+// 	Aliases:   []string{"install"},
+// 	Usage:     "Installs a feature on a cluster",
+// 	ArgsUsage: "CLUSTERNAME FEATURENAME",
+//
+// 	Flags: []cli.Flag{
+// 		&cli.StringSliceFlag{
+// 			Name:    "param",
+// 			Aliases: []string{"p"},
+// 			Usage:   "Define value of feature parameters, in format <name>=<value>",
+// 		},
+// 		&cli.BoolFlag{
+// 			Name:  "skip-proxy",
+// 			Usage: "Disables reverse proxy rules",
+// 		},
+// 	},
+//
+// 	Action: clusterFeatureAddAction,
+// }
 
 func clusterFeatureAddAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Command.Name, c.Args())
@@ -1475,21 +1476,21 @@ func clusterFeatureAddAction(c *cli.Context) error {
 	return clitools.SuccessResponse(nil)
 }
 
-// clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
-var clusterFeatureCheckCommand = &cli.Command{
-	Name:      "check",
-	Aliases:   []string{"verify"},
-	Usage:     "Checks if a eature is already installed on cluster",
-	ArgsUsage: "CLUSTERNAME FEATURENAME",
-	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
-		},
-	},
-	Action: clusterFeatureCheckAction,
-}
+// // clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
+// var clusterFeatureCheckCommand = &cli.Command{
+// 	Name:      "check",
+// 	Aliases:   []string{"verify"},
+// 	Usage:     "Checks if a eature is already installed on cluster",
+// 	ArgsUsage: "CLUSTERNAME FEATURENAME",
+// 	Flags: []cli.Flag{
+// 		&cli.StringSliceFlag{
+// 			Name:    "param",
+// 			Aliases: []string{"p"},
+// 			Usage:   "Allow to define content of feature parameters",
+// 		},
+// 	},
+// 	Action: clusterFeatureCheckAction,
+// }
 
 func clusterFeatureCheckAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Command.Name, c.Args())
@@ -1528,21 +1529,21 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 	return clitools.SuccessResponse(msg)
 }
 
-// clusterFeatureRemoveCommand handles 'safescale cluster feature remove <cluster name> <pkgname>'
-var clusterFeatureRemoveCommand = &cli.Command{
-	Name:      "remove",
-	Aliases:   []string{"destroy", "delete", "rm", "uninstall"},
-	Usage:     "Remove a feature from a cluster",
-	ArgsUsage: "CLUSTERNAME FEATURENAME",
-	Flags: []cli.Flag{
-		&cli.StringSliceFlag{
-			Name:    "param",
-			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
-		},
-	},
-	Action: clusterFeatureRemoveAction,
-}
+// // clusterFeatureRemoveCommand handles 'safescale cluster feature remove <cluster name> <pkgname>'
+// var clusterFeatureRemoveCommand = &cli.Command{
+// 	Name:      "remove",
+// 	Aliases:   []string{"destroy", "delete", "rm", "uninstall"},
+// 	Usage:     "Remove a feature from a cluster",
+// 	ArgsUsage: "CLUSTERNAME FEATURENAME",
+// 	Flags: []cli.Flag{
+// 		&cli.StringSliceFlag{
+// 			Name:    "param",
+// 			Aliases: []string{"p"},
+// 			Usage:   "Allow to define content of feature parameters",
+// 		},
+// 	},
+// 	Action: clusterFeatureRemoveAction,
+// }
 
 func clusterFeatureRemoveAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Command.Name, c.Args())

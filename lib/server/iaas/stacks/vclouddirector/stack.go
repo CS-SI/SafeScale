@@ -1,6 +1,6 @@
 // +build ignore
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,47 +19,66 @@
 package vclouddirector
 
 import (
-    "net/url"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"net/url"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
-    "github.com/vmware/go-vcloud-director/govcd"
+	"github.com/vmware/go-vcloud-director/govcd"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
-type Stack struct {
-    EbrcService *govcd.VCDClient
-    Config      *stacks.ConfigurationOptions
-    AuthOptions *stacks.AuthenticationOptions
+type stack struct {
+	EbrcService *govcd.VCDClient
+	Config      *stacks.ConfigurationOptions
+	AuthOptions *stacks.AuthenticationOptions
 }
 
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-    return *s.Config
+// IsNull tells if the instance corresponds to null value
+func (s *stack) IsNull() bool {
+	return s == nil || s.EbrcService == nil
 }
 
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-    return *s.AuthOptions
+// GetConfigurationOptions ...
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	if s.IsNull() {
+		return stacks.ConfigurationOptions{}
+	}
+	return *s.Config
 }
 
-// Build Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) {
-    stack := &Stack{
-        Config:      &cfg,
-        AuthOptions: &auth,
-    }
+// GetAuthenticationOptions ...
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+	if s.IsNull() {
+		return stacks.AuthenticationOptions{}
+	}
+	return *s.AuthOptions
+}
 
-    u, err := url.ParseRequestURI(auth.IdentityEndpoint)
-    if err != nil {
-        return nil, fail.NewError("unable to pass url")
-    }
+// NullStacks returns a null value of the stack
+func NullStack() *stack {
+	return &stack{}
+}
 
-    vcdclient := govcd.NewVCDClient(*u, localCfg.Insecure)
-    err = vcdclient.Authenticate(auth.Username, auth.Password, auth.ProjectName)
-    if err != nil {
-        return nil, fail.Wrap(normalizeError(err), "Unable to authenticate")
-    }
-    stack.EbrcService = vcdclient
+// New creates and initializes a ClientAPI
+func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (api.Stack, fail.Error) {
+	stack := &stack{
+		Config:      &cfg,
+		AuthOptions: &auth,
+	}
 
-    return stack, nil
+	u, err := url.ParseRequestURI(auth.IdentityEndpoint)
+	if err != nil {
+		return nil, fail.NewError("unable to pass url")
+	}
+
+	vcdclient := govcd.NewVCDClient(*u, localCfg.Insecure)
+	err = vcdclient.Authenticate(auth.Username, auth.Password, auth.ProjectName)
+	if err != nil {
+		return nil, fail.Wrap(normalizeError(err), "Unable to authenticate")
+	}
+	stack.EbrcService = vcdclient
+
+	return stack, nil
 }

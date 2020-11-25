@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ package securitygroupproperty
 type Enum string
 
 const (
-    // HostsV1 contains optional additional info describing host (purpose, ...)
-    HostsV1 = "1"
-    // NetworksV1 contains list of hosts attached to the network
-    NetworksV1 = "2"
+	// HostsV1 contains optional additional info describing host (purpose, ...)
+	HostsV1 = "1"
+	// SubnetsV1 contains list of hosts attached to the network
+	SubnetsV1 = "2"
 )

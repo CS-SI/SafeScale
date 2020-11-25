@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,6 +108,7 @@ func work(c *cli.Context) {
 	protocol.RegisterImageServiceServer(s, &listeners.ImageListener{})
 	protocol.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
 	protocol.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
+	protocol.RegisterSubnetServiceServer(s, &listeners.SubnetListener{})
 	protocol.RegisterSecurityGroupServiceServer(s, &listeners.SecurityGroupListener{})
 	protocol.RegisterShareServiceServer(s, &listeners.ShareListener{})
 	protocol.RegisterSshServiceServer(s, &listeners.SSHListener{})
@@ -179,7 +180,7 @@ func main() {
 	app.Authors = []*cli.Author{
 		{
 			Name:  "CS-SI",
-			Email: "safescale@c-s.fr",
+			Email: "safescale@csgroup.eu",
 		},
 	}
 	cli.VersionFlag = &cli.BoolFlag{

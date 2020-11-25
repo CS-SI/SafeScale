@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,9 +42,9 @@ type consequencer interface {
 type causer interface {
 	CauseFormatter(func(Error) string) // defines a function used to format a causer output to string
 	Cause() error                      // returns the first immediate cause of an error
-	CauseError() string                // returns the cause of an error as an error
-	RootCause() error                  // returns the root cause of an error
-	RootCauseError() string            // returns the root cause of an error as string
+	//CauseError() string                // returns the cause of an error as an error
+	RootCause() error // returns the root cause of an error
+	//RootCauseError() string            // returns the root cause of an error as string
 }
 
 // Error defines the interface of a SafeScale error
@@ -106,21 +106,28 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		consequences = []error{}
 	}
 	r := errorCore{
-		message:      strprocess.FormatStrings(msg...),
-		cause:        cause,
-		consequences: consequences,
-		annotations:  make(data.Annotations),
-		grpcCode:     codes.Unknown,
+		message:             strprocess.FormatStrings(msg...),
+		cause:               cause,
+		consequences:        consequences,
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.Unknown,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		// consequenceFormatter: defaultConsequenceFormatter,
 	}
-	r.causeFormatter = defaultCauseFormatter
-	// r.consequenceFormatter = defaultConsequenceFormatter
-	r.annotationFormatter = defaultAnnotationFormatter
 	return &r
 }
 
-// IsNull tells if the instance is null
+// IsNull tells if the instance is to be considered as null value
 func (e *errorCore) IsNull() bool {
-	return e == nil || (e.message == "" && e.cause == nil)
+	if e == nil {
+		return true
+	}
+	// if there is no message, no cause and causeFormatter is nil, this is not a correctly initialized 'errorCore', so called a null value of 'errorCore'
+	if e.message == "" && e.cause == nil && e.causeFormatter == nil && e.annotationFormatter == nil {
+		return true
+	}
+	return false
 }
 
 // defaultCauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
@@ -155,6 +162,12 @@ func defaultCauseFormatter(e Error) string {
 
 // ForceSetCause sets the cause error even if already set
 func (e *errorCore) ForceSetCause(err error) Error {
+	// e.IsNull() not used here, it's not a mistake
+	//if e == nil {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from nil", 0))
+		return ToError(err)
+	}
 	if e.cause != nil {
 		return e
 	}
@@ -165,6 +178,11 @@ func (e *errorCore) ForceSetCause(err error) Error {
 // TrySetCause sets the cause error if not already set
 // Returns true if cause has been successfully set, false if cause was already set
 func (e *errorCore) TrySetCause(err error) bool {
+	// e.IsNull() not used here, it's not a mistake
+	//if e == nil {
+	if e.IsNull() {
+		return false
+	}
 	if err == nil {
 		return e.cause == nil
 	}
@@ -177,8 +195,10 @@ func (e *errorCore) TrySetCause(err error) bool {
 
 // CauseFormatter defines the func uses to format cause to string
 func (e *errorCore) CauseFormatter(formatter func(Error) string) {
+	// e.IsNull() not used here, it's not a mistake
+	//if e == nil {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from nil", 0))
 		return
 	}
 	if formatter == nil {
@@ -197,16 +217,16 @@ func (e errorCore) Cause() error {
 	return e.cause
 }
 
-// CauseError returns the string of the error cause
-// VPL: is it really necessary ? e.Cause().Error() does the job...
-func (e errorCore) CauseError() string {
-	if !e.IsNull() {
-		if e.cause != nil {
-			return e.cause.Error()
-		}
-	}
-	return ""
-}
+//// CauseError returns the string of the error cause
+//// VPL: is it really necessary ? e.Cause().Error() does the job...
+//func (e errorCore) CauseError() string {
+//	if !e.IsNull() {
+//		if e.cause != nil {
+//			return e.cause.Error()
+//		}
+//	}
+//	return ""
+//}
 
 // RootCause returns the initial error's cause
 func (e errorCore) RootCause() error {
@@ -217,22 +237,22 @@ func (e errorCore) RootCause() error {
 	return RootCause(e)
 }
 
-// RootCauseError returns the string corresponding to the root cause
-// VPL: is it reallyt necessary ? e.RootCause().Error() does the job...
-func (e errorCore) RootCauseError() string {
-	if !e.IsNull() {
-		err := e.RootCause()
-		if err != nil {
-			return err.Error()
-		}
-	}
-	return ""
-}
+//// RootCauseError returns the string corresponding to the root cause
+//// VPL: is it really necessary ? e.RootCause().Error() does the job...
+//func (e errorCore) RootCauseError() string {
+//	if !e.IsNull() {
+//		err := e.RootCause()
+//		if err != nil {
+//			return err.Error()
+//		}
+//	}
+//	return ""
+//}
 
 // defaultAnnotationFormatter ...
 func defaultAnnotationFormatter(a data.Annotations) string {
 	if a == nil {
-		logrus.Errorf(callstack.DecorateWith("invalid parameter:", "'a'", "cannot be nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid parameter: ", "'a'", "cannot be nil", 0))
 		return ""
 	}
 	j, err := json.Marshal(a)
@@ -246,19 +266,11 @@ func defaultAnnotationFormatter(a data.Annotations) string {
 
 // Annotations ...
 func (e errorCore) Annotations() data.Annotations {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotations()", "from null instance", 0))
-		return nil
-	}
 	return e.annotations
 }
 
 // Annotation ...
 func (e errorCore) Annotation(key string) (data.Annotation, bool) {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotation()", "from null instance", 0))
-		return nil, false
-	}
 	r, ok := e.annotations[key]
 	return r, ok
 }
@@ -266,22 +278,27 @@ func (e errorCore) Annotation(key string) (data.Annotation, bool) {
 // Annotate ...
 // satisfies interface data.Annotatable
 func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable {
+	// e.IsNull() not used here, it's not a mistake
+	//if e == nil {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotate()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotate()", "from nil", 0))
 		return e
 	}
 
-	if e.annotations != nil {
-		e.annotations[key] = value
+	if e.annotations == nil {
+		e.annotations = make(data.Annotations)
 	}
+	e.annotations[key] = value
 
 	return e
 }
 
 // AnnotationFormatter defines the func to use to format annotations
 func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string) {
+	// e.IsNull() not used here, it's not a mistake
+	//if e == nil {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AnnotationFormatter()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AnnotationFormatter()", "from nil", 0))
 		return
 	}
 	if formatter == nil {
@@ -293,6 +310,8 @@ func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string)
 
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errorCore) AddConsequence(err error) Error {
+	// e.IsNull() not used here, it's not a mistake
+	//if e == nil {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
 		return e
@@ -839,6 +858,8 @@ type ErrRuntimePanic struct {
 func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
 	r := newError(nil, nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
 	r.grpcCode = codes.Internal
+	// This error is systematically logged
+	logrus.Error(r.Error())
 	return &ErrRuntimePanic{r}
 }
 
@@ -876,6 +897,8 @@ type ErrInvalidInstance struct {
 func InvalidInstanceError() *ErrInvalidInstance {
 	r := newError(nil, nil, callstack.DecorateWith("invalid instance:", "", "calling method from a nil pointer", 0))
 	r.grpcCode = codes.FailedPrecondition
+	// Systematically log this kind of error
+	logrus.Error(r.Error())
 	return &ErrInvalidInstance{r}
 }
 
@@ -910,9 +933,11 @@ type ErrInvalidParameter struct {
 }
 
 // InvalidParameterError creates a ErrInvalidParameter error
-func InvalidParameterError(what, why string) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter:", what, why, 0))
+func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 0))
 	r.grpcCode = codes.FailedPrecondition
+	// Systematically log this kind of error
+	logrus.Error(r.Error())
 	return &ErrInvalidParameter{r}
 }
 
@@ -950,6 +975,8 @@ type ErrInvalidInstanceContent struct {
 func InvalidInstanceContentError(what, why string) *ErrInvalidInstanceContent {
 	r := newError(nil, nil, callstack.DecorateWith("invalid instance content:", what, why, 0))
 	r.grpcCode = codes.FailedPrecondition
+	// Systematically log this kind of error
+	logrus.Error(r.Error())
 	return &ErrInvalidInstanceContent{r}
 }
 
@@ -1033,16 +1060,20 @@ func ExecutionError(exitError error, msg ...interface{}) *ErrExecution {
 		}
 		stderr = string(ee.Stderr)
 	}
-
-	ee := &ErrExecution{errorCore: r}
-	ee.Annotate("retcode", retcode).Annotate("stderr", stderr)
-
-	return ee
+	outErr := &ErrExecution{errorCore: r}
+	_ = outErr.Annotate("retcode", retcode).Annotate("stderr", stderr)
+	return outErr
 }
 
 // IsNull tells if the instance is null
 func (e *ErrExecution) IsNull() bool {
-	return e == nil || e.errorCore.IsNull()
+	if e == nil {
+		return true
+	}
+	if _, ok := e.Annotation("retcode"); ok {
+		return false
+	}
+	return e.errorCore.IsNull()
 }
 
 // AddConsequence ...

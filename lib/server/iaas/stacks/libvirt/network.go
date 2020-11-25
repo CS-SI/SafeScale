@@ -1,7 +1,7 @@
 // +build libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s stack) HasDefaultNetwork() bool {
+	return false
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+	return nil, fail.NotFoundError("no default network in stack")
+}
 
 func infoFromCidr(cidr string) (string, string, string, string, fail.Error) {
 	IP, IPNet, err := net.ParseCIDR(cidr)
@@ -125,14 +135,20 @@ func getNetworkFromLibvirtNetwork(libvirtNetwork *libvirt.Network) (*abstract.Ne
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.libvirt"), true).Entering().Exiting()
+func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 
 	name := req.Name
 	ipVersion := req.IPVersion
 	cidr := req.CIDR
 	if cidr == "" {
+		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 	dns := req.DNSServers
 
@@ -205,8 +221,8 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, f
 }
 
 // InspectNetwork returns the network identified by ref (id or name)
-func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
-	if s == nil {
+func (s stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -239,15 +255,21 @@ func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
 }
 
 // InspectNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) InspectNetworkByName(ref string) (*abstract.Network, fail.Error) {
+func (s stack) InspectNetworkByName(ref string) (*abstract.Network, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.libvirt"), true).Entering().Exiting()
 	return s.InspectNetwork(ref)
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
-	// FIXME: validate parameters
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.libvirt"), true).Entering().Exiting()
+func (s stack) ListNetworks() ([]*abstract.Network, error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 
 	var networks []*abstract.Network
 
@@ -269,42 +291,45 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, error) {
 
 // DeleteNetwork deletes the network identified by id
 func (s *Stack) DeleteNetwork(ref string) fail.Error {
-	// FIXME: validate parameter
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.libvirt"), true).Entering().Exiting()
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 
 	libvirtNetwork, err := getNetworkFromRef(ref, s.LibvirtService)
 	if err != nil {
 		return err
 	}
 
-	isActive, gerr := libvirtNetwork.IsActive()
-	if gerr != nil {
-		return fail.Wrap(gerr, "failed to check if the network is active")
+	isActive, err := libvirtNetwork.IsActive()
+	if err != nil {
+		return fail.Wrap(err, "failed to check if the network is active")
 	}
 	if isActive {
-		ferr := libvirtNetwork.Destroy()
-		if ferr != nil {
-			return fail.Wrap(ferr, "failed to destroy network")
+		err = libvirtNetwork.Destroy()
+		if err != nil {
+			return fail.Wrap(err, "failed to destroy network")
 		}
 	}
 
-	ferr := libvirtNetwork.Undefine()
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to undefine network")
+	err = libvirtNetwork.Undefine()
+	if err != nil {
+		return fail.Wrap(err, "failed to undefine network")
 	}
 
 	return nil
 }
 
 // // CreateGateway creates a public Gateway for a private network
-// func (s *Stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *abstract.HostTemplate, *userdata.Content, error) {
+// func (s *stack) CreateGateway(req abstract.GatewayRequest) (*abstract.HostFull, *abstract.HostTemplate, *userdata.Content, error) {
 // 	if s == nil {
 // 		return nil, nil, nil, fail.InvalidInstanceError()
 // 	}
 //
 // 	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 //
-// 	network := req.Network
+// 	network := req.Networking
 // 	templateID := req.TemplateID
 // 	imageID := req.ImageID
 // 	keyPair := req.KeyPair
@@ -327,7 +352,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 // 		KeyPair:      keyPair,
 // 		ResourceName: gwName,
 // 		TemplateID:   templateID,
-// 		Networks:     []*abstract.Network{network},
+// 		Networks:     []*abstract.Networking{network},
 // 		PublicIP:     true,
 // 	}
 //
@@ -340,7 +365,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 // }
 //
 // // DeleteGateway delete the public gateway referenced by ref (id or name)
-// func (s *Stack) DeleteGateway(ref string) error {
+// func (s *stack) DeleteGateway(ref string) error {
 // 	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 //
 // 	return s.DeleteHost(ref)
@@ -348,26 +373,26 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s *Stack) CreateVIP(networkID string, description string) (*abstract.VirtualIP, fail.Error) {
+func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s *Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
+func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s *Stack) BindHostToVIP(vip *abstract.VirtualIP, host *abstract.HostFull) (string, string, fail.Error) {
-	return "", "", fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
+func (s stack) BindHostToVIP(vip *abstract.VirtualIP, host *abstract.Host) (string, string, fail.Error) {
+	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s *Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.HostFull) fail.Error {
+func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, host *abstract.Host) fail.Error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
+func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
