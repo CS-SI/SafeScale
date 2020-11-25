@@ -491,8 +491,9 @@ var clusterCreateCommand = &cli.Command{
 		// })
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
+			// msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
+			// return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if res == nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, "failed to create cluster: unknown reason"))

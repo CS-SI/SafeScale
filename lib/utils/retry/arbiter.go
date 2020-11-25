@@ -131,7 +131,7 @@ func Successful() Arbiter {
 	}
 }
 
-// ErrTimeout returns Abort after a duration of time passes since the first try.
+// Timeout returns Abort after a duration of time passes since the first try.
 func Timeout(limit time.Duration) Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
