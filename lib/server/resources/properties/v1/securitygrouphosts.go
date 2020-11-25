@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,15 +27,16 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupHosts struct {
-	ByID   map[string]*SecurityGroupBond `json:"by_id"`   // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host ID
-	ByName map[string]*SecurityGroupBond `json:"by_name"` // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host Name
+	DefaultFor string                        `json:"default_for,omitempty"` // contains the ID of the host for which the SecurityGroup is a default
+	ByID       map[string]*SecurityGroupBond `json:"by_id,omitempty"`       // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host ID
+	ByName     map[string]string             `json:"by_name,omitempty"`     // contains the status of a security group (true=active, false=suspended) of hosts using it, indexed on host Name
 }
 
 // NewSecurityGroupHosts ...
 func NewSecurityGroupHosts() *SecurityGroupHosts {
 	return &SecurityGroupHosts{
 		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]*SecurityGroupBond{},
+		ByName: map[string]string{},
 	}
 }
 
@@ -43,7 +44,7 @@ func NewSecurityGroupHosts() *SecurityGroupHosts {
 func (sgh *SecurityGroupHosts) Reset() *SecurityGroupHosts {
 	if sgh != nil {
 		sgh.ByID = map[string]*SecurityGroupBond{}
-		sgh.ByName = map[string]*SecurityGroupBond{}
+		sgh.ByName = map[string]string{}
 		return sgh
 	}
 	return NewSecurityGroupHosts()
@@ -59,9 +60,9 @@ func (sgh *SecurityGroupHosts) Replace(p data.Clonable) data.Clonable {
 	src := p.(*SecurityGroupHosts)
 	sgh.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		sgh.ByID[k] = v
+		sgh.ByID[k] = v.Clone().(*SecurityGroupBond)
 	}
-	sgh.ByName = make(map[string]*SecurityGroupBond, len(src.ByName))
+	sgh.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		sgh.ByName[k] = v
 	}

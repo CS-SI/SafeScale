@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,39 +16,32 @@
 
 package operations
 
-import (
-    "github.com/CS-SI/SafeScale/lib/server/resources"
-    "github.com/CS-SI/SafeScale/lib/utils/concurrency"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
-    "github.com/CS-SI/SafeScale/lib/utils/temporal"
-)
-
-func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, fail.Error) {
-    if task.IsNull() {
-        return nil, fail.InvalidParameterError("task", "cannot be nil")
-    }
-    if host == nil {
-        return nil, fail.InvalidParameterError("host", "cannot be nil")
-    }
-
-    rn, xerr := host.GetDefaultNetwork(task)
-    if xerr != nil {
-        return nil, xerr
-    }
-
-    gw, xerr := rn.GetGateway(task, true)
-    if xerr == nil {
-        _, xerr = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
-    }
-
-    if xerr != nil {
-        if gw, xerr = rn.GetGateway(task, false); xerr == nil {
-            _, xerr = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
-        }
-    }
-
-    if xerr != nil {
-        return nil, fail.NotAvailableError("no gateway available")
-    }
-    return gw, nil
-}
+// func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, fail.Error) {
+// 	if task.IsNull() {
+// 		return nil, fail.InvalidParameterError("task", "cannot be nil")
+// 	}
+// 	if host == nil {
+// 		return nil, fail.InvalidParameterError("host", "cannot be nil")
+// 	}
+//
+// 	rs, xerr := host.GetDefaultSubnet(task)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	gw, xerr := rs.GetGateway(task, true)
+// 	if xerr == nil {
+// 		_, xerr = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
+// 	}
+//
+// 	if xerr != nil {
+// 		if gw, xerr = rs.GetGateway(task, false); xerr == nil {
+// 			_, xerr = gw.WaitSSHReady(task, temporal.GetConnectSSHTimeout())
+// 		}
+// 	}
+//
+// 	if xerr != nil {
+// 		return nil, fail.NotAvailableError("no gateway available")
+// 	}
+// 	return gw, nil
+// }

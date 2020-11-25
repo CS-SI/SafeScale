@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,10 @@ import (
 )
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
-const AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
+const (
+	DefaultNetworkCIDR                          = "192.168.0.0/16" // Contains the CIDR to use when none is provided
+	AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
+)
 
 // AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
 // to be able to carry different but necessary information to stack implementations
@@ -82,10 +85,10 @@ type AuthenticationOptions struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
-	// Name of the VPC (Virtual Private Cloud)
-	VPCName string
-	// CIDR if the VPC
-	VPCCIDR string
+	//// Name of the VPC (Virtual Private Cloud)
+	//DefaultNetworkName string
+	//// CIDR of the VPC
+	//DefaultNetworkCIDR string
 }
 
 // ConfigurationOptions are the stack configuration options
@@ -105,8 +108,8 @@ type ConfigurationOptions struct {
 
 	UseNATService bool
 
-	ProviderName     string
-	BuildSubnetworks bool
+	ProviderName string
+	BuildSubnets bool
 
 	// AutoHostNetworkInterfaces indicates if network interfaces are configured automatically by the provider or needs a post configuration
 	AutoHostNetworkInterfaces bool
@@ -125,6 +128,9 @@ type ConfigurationOptions struct {
 
 	// DefaultSecurityGroupName contains the name of the default security group
 	DefaultSecurityGroupName string
+
+	DefaultNetworkName string // contains the name of the Networking/VPC that is used by default (corresponds to keywords 'DefaultNetworkName' or 'NetworkName' in tenant section 'compute')
+	DefaultNetworkCIDR string // contains the CIDR of the default Networking/VPC
 
 	// Customizations map[string]string
 

@@ -1,5 +1,7 @@
+// +build libvirt
+
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +27,10 @@ import (
 )
 
 // ListSecurityGroups lists existing security groups
-func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -37,10 +39,10 @@ func (s Stack) ListSecurityGroups() ([]*abstract.SecurityGroup, fail.Error) {
 }
 
 // CreateSecurityGroup creates a security group
-func (s Stack) CreateSecurityGroup(name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) CreateSecurityGroup(networkRef, name string, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -52,13 +54,12 @@ func (s Stack) CreateSecurityGroup(name string, description string, rules []abst
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.Error {
-	// if s == nil {
-	//     return fail.InvalidInstanceError()
-	// }
-	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if asg.IsNull() {
+		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
@@ -68,10 +69,10 @@ func (s Stack) DeleteSecurityGroup(sgParam stacks.SecurityGroupParameter) fail.E
 }
 
 // InspectSecurityGroup returns information about a security group
-func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nil, fail.InvalidInstanceError()
-	// }
+func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return asg, xerr
@@ -84,10 +85,10 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nullAsg, fail.InvalidInstanceError()
-	// }
+func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return asg, xerr
@@ -100,10 +101,10 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return nullAsg, fail.InvalidInstanceError()
-	// }
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return asg, xerr
@@ -117,17 +118,29 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, ruleID string) (*abstract.SecurityGroup, fail.Error) {
-	// if s == nil {
-	//     return false, fail.InvalidInstanceError()
-	// }
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	if s.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", asg.ID, ruleID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", asg.ID, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError()
+}
+
+// EnableSecurityGroup enables a Security Group
+// Does actually nothing for openstack
+func (s stack) EnableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("libvirt cannot enable a Security Group")
+}
+
+// DisableSecurityGroup disables a Security Group
+// Does actually nothing for openstack
+func (s stack) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
+	return fail.NotAvailableError("libvirt cannot disable a Security Group")
 }

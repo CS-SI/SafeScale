@@ -1,6 +1,6 @@
 // +build ignore
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -359,7 +359,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	net, err := vdc.FindVDCNetwork(request.Networks[0].Name)
 	if err != nil {
-		return nil, userData, fail.Wrap(normalizeError(err), "failed to find OrgVCD Network")
+		return nil, userData, fail.Wrap(normalizeError(err), "failed to find OrgVCD Networking")
 	}
 	nets := []*types.OrgVDCNetwork{net.OrgVDCNetwork}
 
@@ -560,17 +560,17 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	hostIsAGateway := false
 
-	// TODO: adapt in abstract.HostFull.HostNetwork
-	hostFull.Network.DefaultNetworkID = defaultNetwork.ID
-	hostFull.Network.IsGateway = request.IsGateway
-	if hostFull.Network.IsGateway {
-		hostFull.Network.PublicIPv4 = selectedIP
+	// TODO: adapt in abstract.HostFull.HostNetworking
+	hostFull.Networking.DefaultNetworkID = defaultNetwork.ID
+	hostFull.Networking.IsGateway = request.IsGateway
+	if hostFull.Networking.IsGateway {
+		hostFull.Networking.PublicIPv4 = selectedIP
 	} else {
-		hostFull.Network.PublicIPv4 = capturedIP
+		hostFull.Networking.PublicIPv4 = capturedIP
 	}
 	// retryErr = hostFull.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-	//	hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-	//	hostNetworkV1.DefaultNetworkID = defaultNetwork.ID
+	//	hostNetworkV1 := clonable.(*propsv1.HostNetworking)
+	//	hostNetworkV1.DefaultSubnetID = defaultNetwork.ID
 	//
 	//	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
 	//	if request.DefaultGateway != nil {
@@ -704,14 +704,14 @@ func (s *Stack) complementHost(host *abstract.HostFull, newHost *abstract.HostFu
 	}
 	host.Core.LastState = newHost.Core.LastState
 
-	// TODO: adapt to abstract.HostFull.HostNetwork
+	// TODO: adapt to abstract.HostFull.HostNetworking
 	// err := host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(func(clonable data.Clonable) error {
-	//	newHostNetworkV1 := propsv1.NewHostNetwork()
-	//	hostNetworkV1 := clonable.(*propsv1.HostNetwork)
+	//	newHostNetworkV1 := propsv1.NewHostSubnet()
+	//	hostNetworkV1 := clonable.(*propsv1.HostNetworking)
 	//	hostNetworkV1.IPv4Addresses = newHostNetworkV1.IPv4Addresses
 	//	hostNetworkV1.IPv6Addresses = newHostNetworkV1.IPv6Addresses
-	//	hostNetworkV1.NetworksByID = newHostNetworkV1.NetworksByID
-	//	hostNetworkV1.NetworksByName = newHostNetworkV1.NetworksByName
+	//	hostNetworkV1.SubnetsByID = newHostNetworkV1.SubnetsByID
+	//	hostNetworkV1.SubnetsByName = newHostNetworkV1.SubnetsByName
 	//	return nil
 	// })
 	// if err != nil {
@@ -748,8 +748,8 @@ func stateConvert(stateVcd int) hoststate.Enum {
 	}
 }
 
-// GetHostByName returns the host identified by ref (name or id)
-func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
+// InspectHostByName returns the host identified by ref (name or id)
+func (s *Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -773,14 +773,12 @@ func (s *Stack) GetHostByName(name string) (*abstract.HostCore, fail.Error) {
 		return nil, abstract.ResourceNotFoundError("host", name)
 	}
 
-	// FIXME: Populate this
-	ahc := &abstract.HostCore{
-		ID:        vapp.VApp.ID,
-		Name:      vapp.VApp.Name,
-		LastState: stateConvert(vapp.VApp.Status),
-	}
+	ahf := abstract.NewHostFull()
+	ahf.Core.ID = vapp.VApp.ID
+	ahf.Core.Name = vapp.VApp.Name
+	ahf.Core.LastState = stateConvert(vapp.VApp.Status)
 
-	return ahc, nil
+	return ahf, nil
 }
 
 // DeleteHost deletes the host identified by id
@@ -990,7 +988,7 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 	if xerr != nil {
 		return hoststate.ERROR, xerr
 	}
-	return ahf.Core.LastState, nil
+	return ahf.CurrentState, nil
 }
 
 // -------------Provider Infos-------------------------------------------------------------------------------------------
@@ -1005,11 +1003,11 @@ func (s *Stack) ListRegions() ([]string, fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter, enabled bool) fail.Error {
+func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(hostParam stacks.HostParameter, sgParam stacks.SecurityGroupParameter) fail.Error {
+func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }

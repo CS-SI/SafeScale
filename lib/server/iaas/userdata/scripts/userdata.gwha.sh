@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+# Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 #{{.Revision}}
 
-{{.Header}}
+{{ .Header }}
 
 print_error() {
     read line file <<<$(caller)
@@ -129,13 +129,16 @@ EOF
     fi
 
     sfService enable keepalived && sfService restart keepalived || return 1
+
     return 0
 }
 
 # ---- Main
 
 {{- if .IsGateway }}
+  {{- if .SecondaryGatewayPrivateIP }}
 install_keepalived
+  {{ end }}
 {{ end }}
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.gwha.done

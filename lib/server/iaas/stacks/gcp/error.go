@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,40 @@
 package gcp
 
 import (
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"fmt"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+
+	"reflect"
+
+	"google.golang.org/api/googleapi"
 )
 
 // normalizeError translates AWS error to SafeScale one
 func normalizeError(err error) fail.Error {
-    if err == nil {
-        return nil
-    }
-    return fail.ToError(err)
+	if err == nil {
+		return nil
+	}
+
+	switch cerr := err.(type) {
+	case fail.Error:
+		return cerr
+	case *googleapi.Error:
+		switch cerr.Code {
+		case 400:
+			return fail.InvalidRequestError(cerr.Message)
+		case 404:
+			return fail.NotFoundError(cerr.Message)
+		case 409:
+			return fail.DuplicateError(cerr.Message)
+		default:
+			logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+			return fail.UnknownError("from gcp driver, type='%s', error='%s'", reflect.TypeOf(err), err.Error())
+		}
+	}
+	logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from gcp provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+	return fail.UnknownError("from gcp driver, type='%s', error='%s'", reflect.TypeOf(err), err.Error())
 }

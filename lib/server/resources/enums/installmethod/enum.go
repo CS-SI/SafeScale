@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,79 +17,79 @@
 package installmethod
 
 import (
-    "fmt"
-    "strings"
+	"fmt"
+	"strings"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Enum represents the type of a method
 type Enum uint8
 
 const (
-    _ Enum = iota
+	_ Enum = iota
 
-    // Apt is supported by target
-    Apt
-    // Yum is supported by target
-    Yum
-    // Dnf is supported by target
-    Dnf
-    // Bash is supported by target
-    Bash
-    // Ansible is supported by target
-    Ansible
-    // DCOS packager is supported by cluster target
-    DCOS
-    // Helm is supported by cluster target
-    Helm
+	// Apt is supported by target
+	Apt
+	// Yum is supported by target
+	Yum
+	// Dnf is supported by target
+	Dnf
+	// Bash is supported by target
+	Bash
+	// Ansible is supported by target
+	Ansible
+	// DCOS packager is supported by cluster target
+	DCOS
+	// Helm is supported by cluster target
+	Helm
 
-    // NextEnum marks the next value (or the max, depending the use)
-    NextEnum
+	// NextEnum marks the next value (or the max, depending the use)
+	NextEnum
 )
 
 var (
-    stringMap = map[string]Enum{
-        "apt":     Apt,
-        "yum":     Yum,
-        "dnf":     Dnf,
-        "bash":    Bash,
-        "ansible": Ansible,
-        "dcos":    DCOS,
-        "helm":    Helm,
-    }
+	stringMap = map[string]Enum{
+		"apt":     Apt,
+		"yum":     Yum,
+		"dnf":     Dnf,
+		"bash":    Bash,
+		"ansible": Ansible,
+		"dcos":    DCOS,
+		"helm":    Helm,
+	}
 
-    enumMap = map[Enum]string{
-        Apt:     "Apt",
-        Yum:     "Yum",
-        Dnf:     "Dnf",
-        Bash:    "Bash",
-        Ansible: "Ansible",
-        DCOS:    "DCOS",
-        Helm:    "Helm",
-    }
+	enumMap = map[Enum]string{
+		Apt:     "Apt",
+		Yum:     "Yum",
+		Dnf:     "Dnf",
+		Bash:    "Bash",
+		Ansible: "Ansible",
+		DCOS:    "DCOS",
+		Helm:    "Helm",
+	}
 )
 
 // Parse returns a Enum corresponding to the string parameter
 // If the string doesn't correspond to any Enum, returns an error (nil otherwise)
 // This function is intended to be used to parse user input.
 func Parse(v string) (Enum, error) {
-    var (
-        e  Enum
-        ok bool
-    )
-    lowered := strings.ToLower(v)
-    if e, ok = stringMap[lowered]; !ok {
-        return e, fail.NotFoundError("failed to find a Method.Enum corresponding to '%s'", v)
-    }
-    return e, nil
+	var (
+		e  Enum
+		ok bool
+	)
+	lowered := strings.ToLower(v)
+	if e, ok = stringMap[lowered]; !ok {
+		return e, fail.NotFoundError("failed to find a Method.Enum corresponding to '%s'", v)
+	}
+	return e, nil
 
 }
 
 // String returns a string representation of an Enum
 func (e Enum) String() string {
-    if str, found := enumMap[e]; found {
-        return str
-    }
-    panic(fmt.Sprintf("failed to find a Method.Enum string corresponding to value '%d'!", e))
+	if str, found := enumMap[e]; found {
+		return str
+	}
+	panic(fmt.Sprintf("failed to find a Method.Enum string corresponding to value '%d'!", e))
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ var HostCommand = &cli.Command{
 		hostAddFeatureCommand,    // Legacy, will be deprecated
 		hostRemoveFeatureCommand, // Legacy, will be deprecated
 		hostListFeaturesCommand,  // Legacy, will be deprecated
-		hostSecurityGroupCommands,
+		hostSecurityCommands,
 		hostFeatureCommands,
 	},
 }
@@ -238,6 +238,13 @@ var hostCreate = &cli.Command{
 			Value:   "",
 			Usage:   "network name or network id",
 		},
+		&cli.StringSliceFlag{
+			Name:  "subnet",
+			Value: &cli.StringSlice{},
+			Usage: `subnet name or id.
+If subnet id is used, '--network' is superfluous.
+May be used multiple times, the first occurrence becoming the default subnet by design`,
+		},
 		&cli.StringFlag{
 			Name:  "os",
 			Value: "Ubuntu 18.04",
@@ -288,7 +295,7 @@ var hostCreate = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", hostCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%v", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
@@ -317,7 +324,8 @@ var hostCreate = &cli.Command{
 		req := protocol.HostDefinition{
 			Name:           c.Args().First(),
 			ImageId:        c.String("os"),
-			Network:        c.String("net"),
+			Network:        c.String("network"),
+			Subnets:        c.StringSlice("subnet"),
 			Public:         c.Bool("public"),
 			Force:          c.Bool("force"),
 			SizingAsString: sizing,
@@ -527,10 +535,19 @@ var hostRemoveFeatureCommand = &cli.Command{
 	Action: hostFeatureRemoveAction,
 }
 
+// hostSecurityCommands commands
+var hostSecurityCommands = &cli.Command{
+	Name:  securityCmdLabel,
+	Usage: "Manages host security",
+	Subcommands: []*cli.Command{
+		hostSecurityGroupCommands,
+	},
+}
+
 // networkSecurityGroupCommands commands
 var hostSecurityGroupCommands = &cli.Command{
-	Name:  securityGroupCmdLabel,
-	Usage: "network COMMAND",
+	Name:  groupCmdLabel,
+	Usage: "Manages host Security Groups",
 	Subcommands: []*cli.Command{
 		hostSecurityGroupAddCommand,
 		hostSecurityGroupRemoveCommand,
@@ -553,7 +570,7 @@ var hostSecurityGroupAddCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
@@ -579,7 +596,7 @@ var hostSecurityGroupRemoveCommand = &cli.Command{
 	Usage:     "remove HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
@@ -612,21 +629,21 @@ var hostSecurityGroupListCommand = &cli.Command{
 			Usage:   "List all security groups no matter what is the status (enabled or disabled)",
 		},
 		&cli.StringFlag{
-			Name:  "kind",
+			Name:  "state",
 			Value: "all",
 			Usage: "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')",
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
 		}
 
-		kind := strings.ToLower(c.String("kind"))
+		state := strings.ToLower(c.String("state"))
 		if c.Bool("all") {
-			kind = "all"
+			state = "all"
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -634,7 +651,7 @@ var hostSecurityGroupListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Host.ListSecurityGroups(c.Args().First(), kind, temporal.GetExecutionTimeout())
+		resp, err := clientSession.Host.ListSecurityGroups(c.Args().First(), state, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
@@ -649,7 +666,7 @@ var hostSecurityGroupEnableCommand = &cli.Command{
 	Usage:     "enable NETWORKNAME GROUPNAME",
 	ArgsUsage: "NETWORKNAME GROUPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))
@@ -675,7 +692,7 @@ var hostSecurityGroupDisableCommand = &cli.Command{
 	Usage:     "disable HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, securityGroupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory arguments."))

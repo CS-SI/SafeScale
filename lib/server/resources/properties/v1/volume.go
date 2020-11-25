@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 package propertiesv1
 
 import (
-    "time"
+	"time"
 
-    "github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
-    "github.com/CS-SI/SafeScale/lib/utils/data"
-    "github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
@@ -29,31 +29,36 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type VolumeDescription struct {
-    // Purpose contains the reason of the existence of the volume
-    Purpose string
-    // Created contains the time of creation of the volume
-    Created time.Time
+	// Purpose contains the reason of the existence of the volume
+	Purpose string
+	// Created contains the time of creation of the volume
+	Created time.Time
 }
 
 // NewVolumeDescription ...
 func NewVolumeDescription() *VolumeDescription {
-    return &VolumeDescription{}
+	return &VolumeDescription{}
 }
 
 // Content ...
 func (vd *VolumeDescription) Content() interface{} {
-    return vd
+	return vd
 }
 
 // Clone ...
-func (vd *VolumeDescription) Clone() data.Clonable {
-    return NewVolumeDescription().Replace(vd)
+func (vd VolumeDescription) Clone() data.Clonable {
+	return NewVolumeDescription().Replace(&vd)
 }
 
 // Replace ...
 func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
-    *vd = *p.(*VolumeDescription)
-    return vd
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if vd == nil || p == nil {
+		return vd
+	}
+
+	*vd = *p.(*VolumeDescription)
+	return vd
 }
 
 // VolumeAttachments contains host ids where the volume is attached
@@ -61,46 +66,51 @@ func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type VolumeAttachments struct {
-    Shareable bool              `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
-    Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by host GetID
+	Shareable bool              `json:"shareable,omitempty"` // Tells if the volume can be shared with multiple host
+	Hosts     map[string]string `json:"hosts,omitempty"`     // Contains the name of the hosts mounting the volume, indexed by host ID
 }
 
 // NewVolumeAttachments ...
 func NewVolumeAttachments() *VolumeAttachments {
-    return &VolumeAttachments{
-        Hosts: map[string]string{},
-    }
+	return &VolumeAttachments{
+		Hosts: map[string]string{},
+	}
 }
 
 // Reset resets the content of the property
 func (va *VolumeAttachments) Reset() {
-    *va = VolumeAttachments{
-        Hosts: map[string]string{},
-    }
+	*va = VolumeAttachments{
+		Hosts: map[string]string{},
+	}
 }
 
 // Content ... (data.Clonable interface)
 func (va *VolumeAttachments) Content() interface{} {
-    return va
+	return va
 }
 
 // Clone ... (data.Clonable interface)
-func (va *VolumeAttachments) Clone() data.Clonable {
-    return NewVolumeAttachments().Replace(va)
+func (va VolumeAttachments) Clone() data.Clonable {
+	return NewVolumeAttachments().Replace(&va)
 }
 
 // Replace ... (data.Clonable interface)
 func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
-    src := p.(*VolumeAttachments)
-    *va = *src
-    va.Hosts = make(map[string]string, len(src.Hosts))
-    for k, v := range src.Hosts {
-        va.Hosts[k] = v
-    }
-    return va
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if va == nil || p == nil {
+		return va
+	}
+
+	src := p.(*VolumeAttachments)
+	*va = *src
+	va.Hosts = make(map[string]string, len(src.Hosts))
+	for k, v := range src.Hosts {
+		va.Hosts[k] = v
+	}
+	return va
 }
 
 func init() {
-    serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.DescriptionV1), NewVolumeDescription())
-    serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.AttachedV1), NewVolumeAttachments())
+	serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.DescriptionV1), NewVolumeDescription())
+	serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.AttachedV1), NewVolumeAttachments())
 }

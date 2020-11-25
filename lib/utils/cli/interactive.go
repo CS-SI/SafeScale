@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,17 @@
 package cli
 
 import (
-    "bufio"
-    "fmt"
-    "os"
-    "strings"
+	"bufio"
+	"fmt"
+	"os"
+	"strings"
 )
 
 // UserConfirmed asks user to confirm
 func UserConfirmed(msg string) bool {
-    reader := bufio.NewReader(os.Stdin)
-    fmt.Printf("%s ? (y/N): ", msg)
-    resp, _ := reader.ReadString('\n')
-    resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
-    return resp == "y"
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("%s ? (y/N): ", msg)
+	resp, _ := reader.ReadString('\n')
+	resp = strings.ToLower(strings.TrimSuffix(resp, "\n"))
+	return resp == "y"
 }

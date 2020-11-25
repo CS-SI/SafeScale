@@ -18,48 +18,100 @@
 package outscale
 
 import (
-    "reflect"
+	"encoding/json"
+	"reflect"
 
-    "github.com/outscale/osc-sdk-go/osc"
+	"github.com/outscale/osc-sdk-go/osc"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func normalizeError(err error) fail.Error {
-    if err == nil {
-        return nil
-    }
+	if err == nil {
+		return nil
+	}
 
-    switch realErr := err.(type) {
-    case osc.GenericOpenAPIError:
-        switch model := realErr.Model().(type) {
-        case osc.ErrorResponse:
-            switch model.Errors[0].Code {
-            case "1":
-                return fail.NotAuthenticatedError("user is not authenticated")
-            case "4019":
-                return fail.InvalidRequestError("invalid device name")
-            case "4045":
-                return fail.InvalidRequestError("invalid CIDR")
-            case "5057":
-                return fail.NotFoundError("network not found")
-            case "5071":
-                return fail.NotFoundError("keypair not found")
-            case "9011":
-                return fail.DuplicateError("a keypair with this name already exists")
-            case "9044":
-                return fail.InvalidRequestError("not included in VPC CIDR")
-            case "9058":
-                return fail.DuplicateError("network already exist")
-            default:
-                merr := model.Errors[0]
-                reqId := model.ResponseContext.RequestId
-                return fail.UnknownError("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId)
-            }
-        default:
-            return fail.UnknownError("from outscale driver, model='%s', error='%s'", reflect.TypeOf(realErr), realErr.Error())
-        }
-    default:
-        return fail.ToError(err)
-    }
+	switch realErr := err.(type) {
+	case osc.GenericOpenAPIError:
+		switch model := realErr.Model().(type) {
+		case osc.ErrorResponse:
+			if len(model.Errors) > 0 {
+				merr := model.Errors[0]
+				if out := qualifyFromCode(merr.Code, merr.Details); out != nil {
+					return out
+				}
+
+				reqId := model.ResponseContext.RequestId
+				return fail.UnknownError("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId)
+			}
+			if out := qualifyFromBody(realErr.Body()); out != nil {
+				return out
+			}
+			return fail.UnknownError("from outscale driver, type='%s', error='%s'", reflect.TypeOf(realErr), realErr.Error())
+		default:
+			if out := qualifyFromBody(realErr.Body()); out != nil {
+				return out
+			}
+			return fail.UnknownError("from outscale driver, type='%s', error='%s'", reflect.TypeOf(realErr), realErr.Error())
+		}
+	default:
+		return fail.ToError(err)
+	}
+}
+
+func qualifyFromCode(code, details string) fail.Error {
+	switch code {
+	case "1":
+		return fail.NotAuthenticatedError("user is not authenticated")
+	case "4019":
+		return fail.InvalidRequestError("invalid device name")
+	case "4045":
+		return fail.InvalidRequestError("invalid Targets")
+	case "4047":
+		if details == "" {
+			details = "invalid parameter"
+		}
+		return fail.InvalidRequestError(details)
+	case "5057":
+		return fail.NotFoundError("network not found")
+	case "5063":
+		return fail.NotFoundError("host not found")
+	case "5071":
+		return fail.NotFoundError("keypair not found")
+	case "9005":
+		return fail.InvalidRequestError("an equivalent rule exist for the same CIDR")
+	case "9008":
+		return fail.DuplicateError("a Security Group with this name already exists")
+	case "9011":
+		return fail.DuplicateError("a keypair with this name already exists")
+	case "9029":
+		return fail.NotAvailableError("the Network is still in use")
+	case "9044":
+		return fail.InvalidRequestError("not included in VPC Targets")
+	case "9058":
+		return fail.DuplicateError("network already exist")
+	}
+	return nil
+}
+
+func qualifyFromBody(in []byte) fail.Error {
+	var jsoned map[string]interface{}
+	if err := json.Unmarshal(in, &jsoned); err != nil {
+		return fail.ToError(err)
+	}
+	if errs, ok := jsoned["Errors"].([]interface{}); ok {
+		for _, v := range errs {
+			item := v.(map[string]interface{})
+			var details string
+			if details, ok = item["Details"].(string); !ok {
+				details = ""
+			}
+			if code, ok := item["Code"].(string); ok {
+				if out := qualifyFromCode(code, details); out != nil {
+					return out
+				}
+			}
+		}
+	}
+	return nil
 }

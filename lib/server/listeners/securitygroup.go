@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -79,8 +80,8 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	return out, nil
 }
 
-// Create creates a new host
-func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.SecurityGroupRequest) (_ *protocol.SecurityGroupResponse, err error) {
+// Create creates a new Security Group
+func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.SecurityGroupCreateRequest) (_ *protocol.SecurityGroupResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create security group")
 
@@ -98,27 +99,36 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group create")
+	job, err := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "security-group create")
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
 
 	name := in.GetName()
-	task := job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.New(job.GetService())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
+	rn, xerr := networkfactory.Load(task, svc, networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.Rules)
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = rsg.Create(task, name, in.Description, rules)
+
+	rsg, xerr := securitygroupfactory.New(svc)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = rsg.Create(task, rn.GetID(), name, in.Description, rules)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -318,7 +328,12 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	if xerr != nil {
 		return empty, xerr
 	}
-	xerr = rsg.Remove(task, in.GetForce())
+	switch in.GetForce() {
+	case true:
+		xerr = rsg.ForceDelete(task)
+	case false:
+		xerr = rsg.Delete(task)
+	}
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -410,9 +425,9 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	ruleID := in.GetRuleId()
-	if ruleID == "" {
-		return nil, fail.InvalidRequestError("rule id cannot be empty string")
+	rule, xerr := converters.SecurityGroupRuleFromProtocolToAbstract(in.GetRule())
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group delete-rule")
@@ -422,7 +437,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	defer job.Close()
 	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -431,7 +446,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, xerr
 	}
 
-	xerr = rsg.DeleteRule(task, ruleID)
+	xerr = rsg.DeleteRule(task, rule)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -553,12 +568,12 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 		out.Hosts = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
 	}
 	switch loweredKind {
-	case "all", "network", "networks":
-		bonds, xerr := rsg.GetBoundNetworks(task)
+	case "all", "subnet", "subnets", "network", "networks":
+		bonds, xerr := rsg.GetBoundSubnets(task)
 		if xerr != nil {
 			return nil, xerr
 		}
-		out.Networks = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
+		out.Subnets = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
 	}
 
 	return out, nil

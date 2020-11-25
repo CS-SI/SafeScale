@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,79 +17,95 @@
 package aws
 
 import (
-    "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/credentials"
-    "github.com/aws/aws-sdk-go/aws/endpoints"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/ec2"
-    "github.com/aws/aws-sdk-go/service/pricing"
-    "github.com/aws/aws-sdk-go/service/s3"
-    "github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/pricing"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/ssm"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 )
 
-type Stack struct {
-    Config      *stacks.ConfigurationOptions
-    AuthOptions *stacks.AuthenticationOptions
-    AwsConfig   *stacks.AWSConfiguration
+type stack struct {
+	Config      *stacks.ConfigurationOptions
+	AuthOptions *stacks.AuthenticationOptions
+	AwsConfig   *stacks.AWSConfiguration
 
-    S3Service      *s3.S3
-    EC2Service     *ec2.EC2
-    SSMService     *ssm.SSM
-    PricingService *pricing.Pricing
+	S3Service      *s3.S3
+	EC2Service     *ec2.EC2
+	SSMService     *ssm.SSM
+	PricingService *pricing.Pricing
 }
 
-func (s *Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
-    return *s.Config
+// NullStack is not exposed through API, is needed essentially by testss
+func NullStack() *stack {
+	return &stack{}
 }
 
-func (s *Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-    return *s.AuthOptions
+// IsNull tells if the instance represents a null value
+func (s *stack) IsNull() bool {
+	return s == nil || s.EC2Service == nil
 }
 
-// New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*Stack, error) {
-    stack := &Stack{
-        Config:      &cfg,
-        AuthOptions: &auth,
-        AwsConfig:   &localCfg,
-    }
+// GetConfigurationOptions ...
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+	if s.IsNull() {
+		return stacks.ConfigurationOptions{}
+	}
+	return *s.Config
+}
 
-    accessKeyID := auth.AccessKeyID
-    secretAccessKey := auth.SecretAccessKey
+// GetAuthenticationOptions ...
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+	return *s.AuthOptions
+}
 
-    s := session.Must(session.NewSession(&aws.Config{
-        Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-        S3ForcePathStyle: aws.Bool(true),
-        Region:           aws.String(localCfg.Region),
-        Endpoint:         aws.String(localCfg.S3Endpoint),
-    }))
+// New creates and initializes an AWS stack
+func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (api.Stack, error) {
+	stack := &stack{
+		Config:      &cfg,
+		AuthOptions: &auth,
+		AwsConfig:   &localCfg,
+	}
 
-    sec2 := session.Must(session.NewSession(&aws.Config{
-        Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-        S3ForcePathStyle: aws.Bool(true),
-        Region:           aws.String(localCfg.Region),
-        Endpoint:         aws.String(localCfg.Ec2Endpoint),
-    }))
+	accessKeyID := auth.AccessKeyID
+	secretAccessKey := auth.SecretAccessKey
 
-    sssm := session.Must(session.NewSession(&aws.Config{
-        Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-        S3ForcePathStyle: aws.Bool(true),
-        Region:           aws.String(localCfg.Region),
-        Endpoint:         aws.String(localCfg.SsmEndpoint),
-    }))
+	s := session.Must(session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String(localCfg.Region),
+		Endpoint:         aws.String(localCfg.S3Endpoint),
+	}))
 
-    spricing := session.Must(session.NewSession(&aws.Config{
-        Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-        S3ForcePathStyle: aws.Bool(true),
-        Region:           aws.String(endpoints.UsEast1RegionID),
-    }))
+	sec2 := session.Must(session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String(localCfg.Region),
+		Endpoint:         aws.String(localCfg.Ec2Endpoint),
+	}))
 
-    stack.S3Service = s3.New(s, &aws.Config{})
-    stack.EC2Service = ec2.New(sec2, &aws.Config{})
-    stack.SSMService = ssm.New(sssm, &aws.Config{})
-    stack.PricingService = pricing.New(spricing, &aws.Config{})
+	sssm := session.Must(session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String(localCfg.Region),
+		Endpoint:         aws.String(localCfg.SsmEndpoint),
+	}))
 
-    return stack, nil
+	spricing := session.Must(session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String(endpoints.UsEast1RegionID),
+	}))
+
+	stack.S3Service = s3.New(s, &aws.Config{})
+	stack.EC2Service = ec2.New(sec2, &aws.Config{})
+	stack.SSMService = ssm.New(sssm, &aws.Config{})
+	stack.PricingService = pricing.New(spricing, &aws.Config{})
+
+	return stack, nil
 }

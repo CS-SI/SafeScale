@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,23 +17,25 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"strings"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// Stack contains the needs to operate on stack OpenStack
+// Stack contains the needs to operate on Stack OpenStack
 type Stack struct {
-	ComputeClient *gophercloud.ServiceClient
-	NetworkClient *gophercloud.ServiceClient
-	VolumeClient  *gophercloud.ServiceClient
-	Driver        *gophercloud.ProviderClient
+	ComputeClient  *gophercloud.ServiceClient
+	NetworkClient  *gophercloud.ServiceClient
+	VolumeClient   *gophercloud.ServiceClient
+	IdentityClient *gophercloud.ServiceClient
+	Driver         *gophercloud.ProviderClient
 
 	authOpts stacks.AuthenticationOptions
 	cfgOpts  stacks.ConfigurationOptions
@@ -51,6 +53,11 @@ type Stack struct {
 
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
+}
+
+// NullStack returns a null value of the stack
+func NullStack() *Stack {
+	return &Stack{}
 }
 
 // New authenticates and returns a Stack pointer
@@ -94,29 +101,48 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	}
 
 	// Openstack client
-	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			s.Driver, innerErr = openstack.AuthenticatedClient(gcOpts)
-			return NormalizeError(innerErr)
+			return innerErr
 		},
-		temporal.GetCommunicationTimeout(),
+		NormalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAuthenticated:
+			return nil, fail.NotAuthenticatedError("authentication failed")
+		default:
+			return nil, xerr
+		}
+	}
+
+	// Identity API
+	endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
+	xerr = stacks.RetryableRemoteCall(
+		func() error {
+			var innerErr error
+			s.IdentityClient, innerErr = openstack.NewIdentityV2(s.Driver, endpointOpts)
+			return innerErr
+		},
+		NormalizeError,
 	)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Compute API
-	endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
+	//endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
 	switch s.versions["compute"] {
 	case "v2":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.ComputeClient, innerErr = openstack.NewComputeV2(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	default:
 		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
@@ -128,13 +154,13 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Network API
 	switch s.versions["network"] {
 	case "v2":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.NetworkClient, innerErr = openstack.NewNetworkV2(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	default:
 		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
@@ -146,22 +172,22 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	// Volume API
 	switch s.versions["volume"] {
 	case "v1":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = openstack.NewBlockStorageV1(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	case "v2":
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.VolumeClient, innerErr = openstack.NewBlockStorageV2(s.Driver, endpointOpts)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 	default:
 		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
@@ -172,18 +198,71 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
-		xerr = netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
 				s.ProviderNetworkID, innerErr = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
-				return NormalizeError(innerErr)
+				return innerErr
 			},
-			temporal.GetCommunicationTimeout(),
+			NormalizeError,
 		)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
 
+	validRegions, xerr := s.ListRegions()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return nil, xerr
+		}
+	} else {
+		if len(validRegions) != 0 {
+			regionIsValidInput := false
+			for _, vr := range validRegions {
+				if auth.Region == vr {
+					regionIsValidInput = true
+				}
+			}
+			if !regionIsValidInput {
+				return nil, fail.InvalidRequestError("invalid Region '%s'", auth.Region)
+			}
+		}
+	}
+
+	validAvailabilityZones, xerr := s.ListAvailabilityZones()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return nil, xerr
+		}
+	} else {
+		if len(validAvailabilityZones) != 0 {
+			var validZones []string
+			zoneIsValidInput := false
+			for az, valid := range validAvailabilityZones {
+				if valid {
+					if az == auth.AvailabilityZone {
+						zoneIsValidInput = true
+					}
+					validZones = append(validZones, `'`+az+`'`)
+				}
+			}
+			if !zoneIsValidInput {
+				return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+			}
+		}
+	}
+
 	return &s, nil
+}
+
+// IsNull ...
+func (s *Stack) IsNull() bool {
+	return s == nil || s.Driver == nil
 }

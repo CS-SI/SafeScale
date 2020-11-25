@@ -1,7 +1,7 @@
 // +build libvirt
 
 /*
- * Copyright 2018, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 
 // provider is the provider implementation of the local provider
 type provider struct {
-	*libStack.Stack
+	api.Stack
 
 	tenantParameters map[string]interface{}
 }
@@ -85,7 +85,7 @@ func (p *provider) InspectVolumeAttachment(serverID, id string) (*abstract.Volum
 }
 
 // New creates a new instance of local provider
-func New() *provider {
+func New() providers.Provider {
 	return &provider{}
 }
 
@@ -121,7 +121,8 @@ type CfgOptions struct {
 // }
 
 // Build Create and initialize a ClientAPI
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+// Can be called from nil
+func (p *provider) Build(params map[string]interface{}) (providers.Provider, error) {
 	authOptions := stacks.AuthenticationOptions{}
 	localConfig := stacks.LocalConfiguration{}
 	config := stacks.ConfigurationOptions{}
@@ -174,7 +175,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	libvirtStack, err := libStack.New(authOptions, localConfig, config)
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to create a new libvirt Stack")
+		return nil, fail.Wrap(err, "failed to create a new libvirt stack")
 	}
 
 	localProvider := &provider{
@@ -186,15 +187,22 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 }
 
 // GetAuthOpts returns authentication options as a Config
-func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
-	cfg := abstract.ConfigMap{}
+func (p provider) GetAuthenticationOptions() (providers.Config, error) {
+	cfg := providers.Config{}
+	if s.IsNull() {
+		return cfg, fail.InvalidInstanceError()
+	}
+
 	cfg.Set("Region", "Local")
 	return cfg, nil
 }
 
 // GetCfgOpts returns configuration options as a Config
-func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
-	config := abstract.ConfigMap{}
+func (p provider) GetConfigurationOptions() (providers.Config, error) {
+	config := providers.Config{}
+	if s.IsNull() {
+		return config, fail.InvalidInstanceError()
+	}
 
 	config.Set("AutoHostNetworkInterfaces", p.Config.AutoHostNetworkInterfaces)
 	config.Set("UseLayer3Networking", p.Config.UseLayer3Networking)
@@ -206,32 +214,38 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	return config, nil
 }
 
-func (p *provider) GetName() string {
+func (p provider) GetName() string {
 	return "local"
 }
 
-// ListImages ...
-func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	return p.Stack.ListImages()
-}
+//
+//// ListImages ...
+//func (p provider) ListImages(all bool) ([]abstract.Image, error) {
+//	return p.Stack.ListImages()
+//}
+//
+//// ListTemplates ...
+//func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+//	return p.Stack.ListTemplates()
+//}
+//
+//func (p provider) ListAvailabilityZones() (map[string]bool, error) {
+//	return p.Stack.ListAvailabilityZones()
+//}
+//
+//// GetTenantParameters returns the tenant parameters as-is
+//func (p *provider) GetTenantParameters() map[string]interface{} {
+//	return p.tenantParameters
+//}
+//
+//// GetCapabilities returns the capabilities of the provider
+//func (p *provider) GetCapabilities() providers.Capabilities {
+//	return providers.Capabilities{}
+//}
 
-// ListTemplates ...
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	return p.Stack.ListTemplates()
-}
-
-func (p *provider) ListAvailabilityZones() (map[string]bool, fail.Error) {
-	return p.Stack.ListAvailabilityZones()
-}
-
-// GetTenantParameters returns the tenant parameters as-is
-func (p *provider) GetTenantParameters() map[string]interface{} {
-	return p.tenantParameters
-}
-
-// GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
-	return providers.Capabilities{}
+// AddRuleToSecurityGroup adds a rule to a security group
+func (p *provider) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGroupRule) fail.Error {
+	return fail.NotImplementedError()
 }
 
 func init() {

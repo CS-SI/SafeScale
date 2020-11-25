@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://www.c-s.fr
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,57 +17,57 @@
 package ovh
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/ovh/go-ovh/ovh"
+	"github.com/ovh/go-ovh/ovh"
 
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail.Error) {
-    authOpts, xerr := p.GetAuthenticationOptions()
-    if xerr != nil {
-        return nil, xerr
-    }
+	authOpts, xerr := p.GetAuthenticationOptions()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-    alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
-    if alternateAPIApplicationKey == "" {
-        return nil, fail.SyntaxError("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
-    }
-    alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
-    if alternateAPIApplicationSecret == "" {
-        return nil, fail.SyntaxError("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
-    }
-    alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
-    if alternateAPIConsumerKey == "" {
-        return nil, fail.SyntaxError("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
-    }
+	alternateAPIApplicationKey := authOpts.GetString("AlternateApiConsumerKey")
+	if alternateAPIApplicationKey == "" {
+		return nil, fail.SyntaxError("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
+	}
+	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
+	if alternateAPIApplicationSecret == "" {
+		return nil, fail.SyntaxError("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
+	}
+	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
+	if alternateAPIConsumerKey == "" {
+		return nil, fail.SyntaxError("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
+	}
 
-    client, err := ovh.NewClient(
-        "ovh-eu",
-        alternateAPIApplicationKey,
-        alternateAPIApplicationSecret,
-        alternateAPIConsumerKey,
-    )
-    if err != nil {
-        return nil, fail.ToError(err)
-    }
+	client, err := ovh.NewClient(
+		"ovh-eu",
+		alternateAPIApplicationKey,
+		alternateAPIApplicationSecret,
+		alternateAPIConsumerKey,
+	)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
 
-    var result interface{}
-    switch httpCode {
-    case "GET":
-        if err := client.Get(url, &result); err != nil {
-            return nil, fail.ToError(err)
-        }
-    case "PUT":
-        return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
-    case "POST":
-        return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
-    case "DELETE":
-        return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
-    default:
-        return nil, fail.NewError("unexpected HTTP code: %s", httpCode)
-    }
+	var result interface{}
+	switch httpCode {
+	case "GET":
+		if err := client.Get(url, &result); err != nil {
+			return nil, fail.ToError(err)
+		}
+	case "PUT":
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+	case "POST":
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+	case "DELETE":
+		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))
+	default:
+		return nil, fail.NewError("unexpected HTTP code: %s", httpCode)
+	}
 
-    return result, nil
+	return result, nil
 }
