@@ -315,17 +315,17 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 
 // GetKeyPair returns the key pair identified by id
 func (s stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
-	return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME Technical debt
+	return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
 func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME Technical debt
+	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
 func (s stack) DeleteKeyPair(id string) fail.Error {
-	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME Technical debt
+	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // -------------HOST MANAGEMENT------------------------------------------------------------------------------------------
@@ -526,6 +526,7 @@ func getDescriptionV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.
 
 	return hostDescription, nil
 }
+
 func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Connect) (*propertiesv1.HostSizing, fail.Error) {
 	hostSizing := propertiesv1.NewHostSizing()
 
@@ -653,7 +654,7 @@ func (s stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, xerr
 }
 
 // getHostAndDomainFromRef retrieve the host and the domain associated to an ref (id or name)
-func (s *Stack) getHostAndDomainFromRef(ref string) (*abstract.HostCore, *libvirt.Domain, fail.Error) {
+func (s stack) getHostAndDomainFromRef(ref string) (*abstract.HostCore, *libvirt.Domain, fail.Error) {
 	domain, err := s.LibvirtService.LookupDomainByUUIDString(ref)
 	if err != nil {
 		domain, err = s.LibvirtService.LookupDomainByName(ref)
@@ -999,26 +1000,26 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, domain, err := s.getHostAndDomainFromRef(ahf.GetID())
-	if err != nil {
-		return err
+	_, domain, xerr := s.getHostAndDomainFromRef(ahf.GetID())
+	if xerr != nil {
+		return xerr
 	}
 
-	volumes, err := getVolumesFromDomain(domain, s.LibvirtService)
-	if err != nil {
-		return fail.Wrap(err, "failed to get the volumes from the domain")
+	volumes, xerr := getVolumesFromDomain(domain, s.LibvirtService)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to get the volumes from the domain")
 	}
 
-	isActive, ferr := domain.IsActive()
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to know if the domain is active")
+	isActive, err := domain.IsActive()
+	if err != nil {
+		return fail.Wrap(err, "failed to know if the domain is active")
 	}
+
 	if !isActive {
 		err := s.StartHost(ahf.Core.ID)
 		if err != nil {
@@ -1026,13 +1027,12 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
-	ferr = domain.Destroy()
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to destroy the domain")
+	if err = domain.Destroy(); err != nil {
+		return fail.Wrap(err, "failed to destroy the domain")
 	}
-	ferr = domain.Undefine()
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to undefine the domain")
+
+	if err = domain.Undefine(); err != nil {
+		return fail.Wrap(err, "failed to undefine the domain")
 	}
 
 	for _, volume := range volumes {
@@ -1043,9 +1043,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		if err != nil {
 			return fail.Wrap(err, "failed to get domain name")
 		}
+
 		if domainName == volumeName {
-			err = s.DeleteVolume(volume.Name)
-			if err != nil {
+			if err = s.DeleteVolume(volume.Name); err != nil {
 				return fail.Wrap(err, "failed to delete volume '%s'", volumeName)
 			}
 		}
@@ -1060,22 +1060,20 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.Sizin
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() (hosts abstract.HostList, xerr fail.Error) {
+func (s stack) ListHosts() (hosts abstract.HostList, xerr fail.Error) {
 	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if s == nil {
-		return nullList, fail.InvalidInstanceError()
+
+	domains, xerr := s.LibvirtService.ListAllDomains(16383)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "error listing domains")
 	}
 
-	domains, err := s.LibvirtService.ListAllDomains(16383)
-	if err != nil {
-		return nil, fail.Wrap(err, "error listing domains")
-	}
 	for _, domain := range domains {
-		hostC, err := s.getHostFromDomain(&domain)
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to get host from domain")
+		hostC, xerr := s.getHostFromDomain(&domain)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to get host from domain")
 		}
 
 		host := abstract.NewHostFull()
@@ -1092,7 +1090,6 @@ func (s stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-
 	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
@@ -1103,9 +1100,8 @@ func (s stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 		return fail.Wrap(xerr, "getHostAndDomainFromRef failed")
 	}
 
-	ferr := domain.Shutdown()
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to shutdown the host '%s'", hostRef)
+	if err := domain.Shutdown(); err != nil {
+		return fail.Wrap(err, "failed to shutdown the host '%s'", hostRef)
 	}
 
 	return nil
@@ -1116,7 +1112,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1126,33 +1122,30 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 		return fail.Wrap(err, "getHostAndDomainFromRef")
 	}
 
-	ferr := domain.Create()
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to launch the host '%s'", hostRef)
+	if err := domain.Create(); err != nil {
+		return fail.Wrap(err, "failed to launch the host %s", hostLabel)
 	}
 
 	return nil
 }
 
 // RebootHost reboot the host identified by id
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, domain, err := s.getHostAndDomainFromRef(ahf.Core.GetID())
-	if err != nil {
-		return fail.Wrap(err, "getHostAndDomainFromRef failed")
+	_, domain, xerr := s.getHostAndDomainFromRef(ahf.Core.GetID())
+	if xerr != nil {
+		return fail.Wrap(xerr, "getHostAndDomainFromRef failed")
 	}
 
-	ferr := domain.Reboot(0)
-	if ferr != nil {
-		return fail.Wrap(ferr, "failed to reboot the host '%s'", hostRef)
+	if err := domain.Reboot(0); err != nil {
+		return fail.Wrap(err, "failed to reboot the host '%s'", hostLabel)
 	}
 
 	return nil
@@ -1164,10 +1157,11 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 		return hoststate.UNKNOWN, fail.InvalidInstanceError()
 	}
 
-	host, err := s.InspectHost(hostParam)
-	if err != nil {
-		return hoststate.ERROR, err
+	host, xerr := s.InspectHost(hostParam)
+	if xerr != nil {
+		return hoststate.ERROR, xerr
 	}
+
 	return host.CurrentState, nil
 }
 
@@ -1182,7 +1176,7 @@ func (s stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 }
 
 func (s stack) ListRegions() ([]string, fail.Error) {
-	if s == nil {
+	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1199,6 +1193,6 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	return fail.NotImplementedError("not yet implemented")
 }
 
-func (s *Stack) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+func (s Stack) InspectTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	return &abstract.HostTemplate{}, nil
 }
