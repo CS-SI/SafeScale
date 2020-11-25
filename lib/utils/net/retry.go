@@ -29,28 +29,53 @@ import (
 )
 
 // WhileCommunicationUnsuccessful executes callback inside a retry loop with tolerance for communication errors (relative to net package),
-// waiting 'delay' seconds between each try, with a limit of 'timeout'
-func WhileCommunicationUnsuccessful(callback func() error, delay time.Duration, timeout time.Duration) fail.Error {
-	xerr := retry.WhileUnsuccessful(
+// asking "waitor" to wait between each try, with a duration limit of 'timeout'.
+func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
+	if waitor == nil {
+		return fail.InvalidParameterError("waitor", "cannot be nil")
+	}
+
+	// xerr := retry.WhileUnsuccessful(
+	// 	func() error {
+	// 		return normalizeError(callback())
+	// 	},
+	//  delay,
+	// 	timeout,
+	// )
+
+	var arbiter retry.Arbiter
+	if timeout <= 0 {
+		arbiter = retry.Unsuccessful()
+	} else {
+		arbiter = retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout))
+	}
+
+	xerr := retry.Action(
 		func() error {
 			return normalizeError(callback())
 		},
-		delay,
-		timeout,
+		arbiter,
+		waitor,
+		nil,
+		nil,
+		nil,
 	)
-	switch realErr := xerr.(type) {
-	case *retry.ErrStopRetry:
-		xerr = fail.ToError(realErr.Cause())
-	case *retry.ErrTimeout:
-		xerr = fail.ToError(realErr.Cause())
+	if xerr != nil {
+		switch realErr := xerr.(type) {
+		case *retry.ErrStopRetry:
+			xerr = fail.ToError(realErr.Cause())
+		case *retry.ErrTimeout:
+			xerr = fail.ToError(realErr.Cause())
+		}
+		return xerr
 	}
-	return xerr
+	return nil
 }
 
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileCommunicationUnsuccessful(callback, 1*time.Second, timeout)
+	return WhileCommunicationUnsuccessful(callback, retry.Constant(1*time.Second), timeout)
 }
 
 // normalizeError analyzes the error passed as parameter and rewrite it to be more explicit
