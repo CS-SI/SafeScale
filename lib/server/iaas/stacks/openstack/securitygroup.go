@@ -287,7 +287,7 @@ func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) ([]abstract.Securi
 			return nil, fail.InvalidRequestError("invalid value '%s' to 'EtherType' field in rule #%d", v.EtherType, k+1)
 		}
 
-		n := abstract.SecurityGroupRule{
+		r := abstract.SecurityGroupRule{
 			IDs:         []string{v.ID},
 			EtherType:   etherType,
 			Description: v.Description,
@@ -295,9 +295,22 @@ func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) ([]abstract.Securi
 			Protocol:    v.Protocol,
 			PortFrom:    int32(v.PortRangeMin),
 			PortTo:      int32(v.PortRangeMax),
-			Targets:     []string{v.RemoteIPPrefix},
 		}
-		out = append(out, n)
+		switch direction {
+		case securitygroupruledirection.INGRESS:
+			if v.RemoteGroupID != "" {
+				r.Sources = []string{v.RemoteGroupID}
+			} else {
+				r.Sources = []string{v.RemoteIPPrefix}
+			}
+		case securitygroupruledirection.EGRESS:
+			if v.RemoteGroupID != "" {
+				r.Targets = []string{v.RemoteGroupID}
+			} else {
+				r.Targets = []string{v.RemoteIPPrefix}
+			}
+		}
+		out = append(out, r)
 	}
 	return out, nil
 }
@@ -431,7 +444,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	rule.IDs = make([]string, 0, len(involved))
 	if usesGroups {
 		for _, v := range involved {
-			createOpts.SecGroupID = v
+			createOpts.RemoteGroupID = v
 			createOpts.Description = rule.Description + " (" + v + ")"
 			xerr = stacks.RetryableRemoteCall(
 				func() error {
