@@ -44,6 +44,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -65,7 +66,6 @@ const (
 // Cluster is the implementation of resources.Cluster interface
 type cluster struct {
 	*core
-	concurrency.TaskedLock `json:"-"`
 	abstract.ClusterIdentity
 
 	installMethods      map[uint8]installmethod.Enum
@@ -93,7 +93,11 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 		return nullCluster(), xerr
 	}
 
-	return &cluster{core: core}, nil
+	c := cluster{
+		service: svc,
+		core:    core,
+	}
+	return &c, nil
 }
 
 // LoadCluster ...
@@ -259,24 +263,25 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		return xerr
 	}
 
-	// Create the rn
-	rn, xerr := c.createNetwork(task, req, gatewaysDef)
+	// Create the Network and Subnet
+	rn, rs, xerr := c.createNetworkingResources(task, req, gatewaysDef)
 	if xerr != nil {
 		return xerr
 	}
-	// req.SubnetID = rn.GetID()
+	// req.SubnetID = rs.GetID()
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			derr := rn.Delete(task)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+			if derr := rs.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
+			} else if derr := rn.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
 		}
 	}()
 
 	// Creates and configures hosts
-	if xerr = c.createHosts(task, rn, *mastersDef, *nodesDef, req.KeepOnFailure); xerr != nil {
+	if xerr = c.createHostResources(task, rs, *mastersDef, *nodesDef, req.KeepOnFailure); xerr != nil {
 		return xerr
 	}
 
@@ -320,11 +325,11 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		}
 	}()
 
-	primaryGateway, xerr := rn.GetGateway(task, true)
+	primaryGateway, xerr := rs.GetGateway(task, true)
 	if xerr != nil {
 		return xerr
 	}
-	secondaryGateway, xerr := rn.GetGateway(task, false)
+	secondaryGateway, xerr := rs.GetGateway(task, false)
 	if xerr != nil {
 		return xerr
 	}
@@ -450,7 +455,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 	})
 }
 
-// defineSizings calculates the sizings needed for the hosts of the cluster
+// defineSizingRequirements calculates the sizings needed for the hosts of the cluster
 func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.ClusterRequest) (
 	*abstract.HostSizingRequirements, *abstract.HostSizingRequirements, *abstract.HostSizingRequirements, fail.Error,
 ) {
@@ -466,6 +471,13 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
 	imageID = req.NodesDef.Image
 	if imageID == "" && c.makers.DefaultImage != nil {
 		imageID = c.makers.DefaultImage(task, c)
+	}
+	if imageID == "" {
+		if cfg, xerr := c.GetService().GetConfigurationOptions(); xerr == nil {
+			if anon, ok := cfg.Get("DefaultImage"); ok {
+				imageID = anon.(string)
+			}
+		}
 	}
 	if imageID == "" {
 		imageID = "Ubuntu 18.04"
@@ -541,11 +553,11 @@ func (c *cluster) defineSizingRequirements(task concurrency.Task, req abstract.C
 	return gatewaysDef, mastersDef, nodesDef, nil
 }
 
-// createNetwork creates the network for the cluster
-func (c *cluster) createNetwork(
+// createNetworkingResources creates the network and subnet for the cluster
+func (c *cluster) createNetworkingResources(
 	task concurrency.Task,
 	req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements,
-) (_ resources.Subnet, xerr fail.Error) {
+) (_ resources.Network, _ resources.Subnet, xerr fail.Error) {
 
 	// Determine if getGateway Failover must be set
 	caps := c.service.GetCapabilities()
@@ -557,30 +569,56 @@ func (c *cluster) createNetwork(
 		}
 	}
 
-	// Creates as
-	logrus.Debugf("[cluster %s] creating as 'net-%s'", req.Name, req.Name)
-	req.Name = strings.ToLower(req.Name)
-	subnetName := "subnet-" + req.Name
-	subnetReq := abstract.SubnetRequest{
-		Name:  subnetName,
-		CIDR:  req.CIDR,
-		HA:    !gwFailoverDisabled,
-		Image: gatewaysDef.Image,
+	// Creates Network
+	req.Name = strings.ToLower(strings.TrimSpace(req.Name))
+	networkName := "net-" + req.Name
+	logrus.Debugf("[cluster %s] creating Network '%s'", req.Name, networkName)
+	networkReq := abstract.NetworkRequest{
+		Name:          networkName,
+		CIDR:          req.CIDR,
+		KeepOnFailure: req.KeepOnFailure,
 	}
 
-	as, xerr := NewSubnet(c.service)
+	rn, xerr := NewNetwork(c.service)
 	if xerr != nil {
-		return nil, xerr
+		return nil, nil, xerr
 	}
-	xerr = as.Create(task, subnetReq, "", gatewaysDef)
-	if xerr != nil {
-		return nil, xerr
+
+	if xerr = rn.Create(task, networkReq); xerr != nil {
+		return nil, nil, xerr
 	}
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			derr := as.Delete(task)
-			if derr != nil {
+			if derr := rn.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(derr)
+			}
+		}
+	}()
+
+	// Creates Subnet
+	subnetName := req.Name
+	logrus.Debugf("[cluster %s] creating Subnet '%s'", req.Name, subnetName)
+	subnetReq := abstract.SubnetRequest{
+		Name:      subnetName,
+		NetworkID: rn.GetID(),
+		CIDR:      req.CIDR,
+		HA:        !gwFailoverDisabled,
+		Image:     gatewaysDef.Image,
+	}
+
+	rs, xerr := NewSubnet(c.service)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	if xerr = rs.Create(task, subnetReq, "", gatewaysDef); xerr != nil {
+		return nil, nil, xerr
+	}
+
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := rs.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
 		}
@@ -593,29 +631,29 @@ func (c *cluster) createNetwork(
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			primaryGateway, innerXErr := as.GetGateway(task, true)
+			primaryGateway, innerXErr := rs.GetGateway(task, true)
 			if innerXErr != nil {
 				return innerXErr
 			}
 			var secondaryGateway resources.Host
 			if !gwFailoverDisabled {
-				secondaryGateway, innerXErr = as.GetGateway(task, false)
+				secondaryGateway, innerXErr = rs.GetGateway(task, false)
 				if innerXErr != nil {
 					if _, ok := innerXErr.(*fail.ErrNotFound); !ok {
 						return innerXErr
 					}
 				}
 			}
-			networkV2.NetworkID = as.GetID()
+			networkV2.NetworkID = rs.GetID()
 			networkV2.CIDR = req.CIDR
 			networkV2.GatewayID = primaryGateway.GetID()
 			if networkV2.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(task); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV2.DefaultRouteIP, innerXErr = as.GetDefaultRouteIP(task); innerXErr != nil {
+			if networkV2.DefaultRouteIP, innerXErr = rs.GetDefaultRouteIP(task); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV2.EndpointIP, innerXErr = as.GetEndpointIP(task); innerXErr != nil {
+			if networkV2.EndpointIP, innerXErr = rs.GetEndpointIP(task); innerXErr != nil {
 				return innerXErr
 			}
 			if networkV2.PrimaryPublicIP, innerXErr = primaryGateway.GetPublicIP(task); innerXErr != nil {
@@ -634,15 +672,15 @@ func (c *cluster) createNetwork(
 		})
 	})
 	if xerr != nil {
-		return nil, xerr
+		return nil, nil, xerr
 	}
 
-	logrus.Debugf("[cluster %s] as '%s' creation successful.", req.Name, subnetName)
-	return as, nil
+	logrus.Debugf("[cluster %s] rs '%s' creation successful.", req.Name, subnetName)
+	return rn, rs, nil
 }
 
-// createHosts creates and configures hosts for the cluster
-func (c *cluster) createHosts(
+// createHostResources creates and configures hosts for the cluster
+func (c *cluster) createHostResources(
 	task concurrency.Task,
 	subnet resources.Subnet,
 	mastersDef abstract.HostSizingRequirements,
@@ -2445,7 +2483,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			}
 		}
 
-		// Remove the Masters
+		// Delete the Masters
 		list, innerXErr = c.ListMasters(task)
 		if innerXErr != nil {
 			cleaningErrors = append(cleaningErrors, innerXErr)
@@ -2470,37 +2508,39 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			}
 		}
 
-		// Deletes the rn and gateway
-		networkID, innerXErr := extractNetworkID(task, props)
-		//if props.Lookup(clusterproperty.NetworkV2) {
-		//	innerXErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-		//		networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
-		//		if !ok {
-		//			return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		//		}
-		//		networkID = networkV2.Network
-		//		return nil
-		//	})
-		//} else {
-		//	innerXErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-		//		networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
-		//		if !ok {
-		//			return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		//		}
-		//		networkID = networkV1.Network
-		//		return nil
-		//	})
-		//}
+		// Deletes the Network, Subnet and gateway
+		networkID, subnetID, innerXErr := extractNetworkingInfo(task, props)
 		if innerXErr != nil {
 			cleaningErrors = append(cleaningErrors, innerXErr)
 			return innerXErr
 		}
 
-		rn, innerXErr := LoadNetwork(task, c.GetService(), networkID)
+		rs, innerXErr := LoadSubnet(task, c.GetService(), networkID, subnetID)
 		if innerXErr != nil {
 			cleaningErrors = append(cleaningErrors, innerXErr)
 			return innerXErr
 		}
+
+		var rn resources.Network
+		if networkID != "" {
+			rn, innerXErr = LoadNetwork(task, c.GetService(), networkID)
+		} else {
+			rn, innerXErr = rs.GetNetwork(task)
+		}
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+			func() error {
+				return rs.Delete(task)
+			},
+			temporal.GetHostTimeout(),
+		)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
 		return retry.WhileUnsuccessfulDelay5SecondsTimeout(
 			func() error {
 				return rn.Delete(task)
@@ -2515,15 +2555,26 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 	return c.core.Delete(task)
 }
 
-// extractNetworkID returns the ID of the network from properties, taking care of compatibility
-func extractNetworkID(task concurrency.Task, props *serialize.JSONProperties) (id string, xerr fail.Error) {
-	if props.Lookup(clusterproperty.NetworkV2) {
+// extractNetworkingInfo returns the ID of the network from properties, taking care of ascending compatibility
+func extractNetworkingInfo(task concurrency.Task, props *serialize.JSONProperties) (networkID, subnetID string, xerr fail.Error) {
+	if props.Lookup(clusterproperty.NetworkV3) {
+		xerr = props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			networkID = networkV3.NetworkID
+			subnetID = networkV3.SubnetID
+			return nil
+		})
+	} else if props.Lookup(clusterproperty.NetworkV2) {
 		xerr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			id = networkV2.NetworkID
+			subnetID = networkV2.NetworkID
+			networkID = ""
 			return nil
 		})
 	} else {
@@ -2532,14 +2583,15 @@ func extractNetworkID(task concurrency.Task, props *serialize.JSONProperties) (i
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			id = networkV1.NetworkID
+			subnetID = networkV1.NetworkID
+			networkID = ""
 			return nil
 		})
 	}
 	if xerr != nil {
-		return "", xerr
+		return "", "", xerr
 	}
-	return id, nil
+	return networkID, subnetID, nil
 }
 
 // func deleteNodes(task concurrency.Task, svc iaas.GetService, nodes []*propertiesv2.ClusterNode) {

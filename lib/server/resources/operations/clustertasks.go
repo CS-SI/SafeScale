@@ -154,7 +154,7 @@ func (c *cluster) taskCreateMasters(task concurrency.Task, params concurrency.Ta
 	}
 	var (
 		count  uint
-		def    *protocol.HostDefinition
+		def    abstract.HostSizingRequirements
 		nokeep bool
 	)
 	if count, ok = p["count"].(uint); !ok {
@@ -166,11 +166,8 @@ func (c *cluster) taskCreateMasters(task concurrency.Task, params concurrency.Ta
 	if _, ok = p["masterDef"]; !ok {
 		return nil, fail.InvalidParameterError("params[masterDef]", "is missing")
 	}
-	if def, ok = p["masterDef"].(*protocol.HostDefinition); !ok {
-		return nil, fail.InvalidParameterError("params[masterDef]", "is not a *protocol.HostDefinition")
-	}
-	if def == nil {
-		return nil, fail.InvalidParameterError("params[masterDef]", "cannot be nil")
+	if def, ok = p["masterDef"].(abstract.HostSizingRequirements); !ok {
+		return nil, fail.InvalidParameterError("params[masterDef]", "is not an 'abstract.HostSizingRequirements'")
 	}
 	if nokeep, ok = p["nokeep"].(bool); !ok {
 		nokeep = true
@@ -237,8 +234,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	var (
 		anon  interface{}
 		index uint
-		def   *abstract.HostSizingRequirements
-		image string
+		def   abstract.HostSizingRequirements
 		// timeout time.Duration
 		nokeep bool
 	)
@@ -251,17 +247,8 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	if anon, ok = p["masterDef"]; !ok {
 		return nil, fail.InvalidParameterError("params['masterDef']", "is missing")
 	}
-	if def, ok = anon.(*abstract.HostSizingRequirements); !ok {
-		return nil, fail.InvalidParameterError("params['masterDef']", "is not a *abstract.HostSizingRequirements")
-	}
-	if def == nil {
-		return nil, fail.InvalidParameterError("params['masterDef']", "cannot be nil")
-	}
-	if anon, ok = p["image"]; !ok {
-		return nil, fail.InvalidParameterError("params['image']", "is missing")
-	}
-	if image, ok = anon.(string); !ok {
-		return nil, fail.InvalidParameterError("params['image']", "cannot be an empty string")
+	if def, ok = anon.(abstract.HostSizingRequirements); !ok {
+		return nil, fail.InvalidParameterError("params['masterDef']", "is not an 'abstract.HostSizingRequirements'")
 	}
 	// if anon, ok = p["timeout"]; !ok {
 	// 	timeout = 0
@@ -304,13 +291,13 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	}
 	hostReq.DefaultRouteIP = netCfg.DefaultRouteIP
 	hostReq.PublicIP = false
-	hostReq.ImageID = image
+	// hostReq.ImageID = def.Image
 
 	objh, xerr := NewHost(c.service)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if _, xerr = objh.Create(task, hostReq, *def); xerr != nil {
+	if _, xerr = objh.Create(task, hostReq, def); xerr != nil {
 		return nil, xerr
 	}
 
@@ -494,7 +481,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	var (
 		count  uint
 		public bool
-		def    *protocol.HostDefinition
+		def    abstract.HostSizingRequirements
 		nokeep bool
 	)
 	if count, ok = p["count"].(uint); !ok {
@@ -509,11 +496,8 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	if _, ok = p["nodeDef"]; !ok {
 		return nil, fail.InvalidParameterError("param[nodeDef]", "is missing")
 	}
-	if def, ok = p["nodeDef"].(*protocol.HostDefinition); !ok {
-		return nil, fail.InvalidParameterError("param[nodeDef]", "is not a *protocol.HostDefinition")
-	}
-	if def == nil {
-		return nil, fail.InvalidParameterError("param[nodeDef]", "cannot be nil")
+	if def, ok = p["nodeDef"].(abstract.HostSizingRequirements); !ok {
+		return nil, fail.InvalidParameterError("param[nodeDef]", "is not an 'abstract.HostSizingRequirements'")
 	}
 	if nokeep, ok = p["nokeep"].(bool); !ok {
 		nokeep = true
@@ -577,22 +561,15 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	}
 	var (
 		index uint
-		def   *abstract.HostSizingRequirements
-		image string
+		def   abstract.HostSizingRequirements
 		// timeout time.Duration
 		nokeep bool
 	)
 	if index, ok = p["index"].(uint); !ok {
 		return nil, fail.InvalidParameterError("params[index]", "cannot be an integer less than 1")
 	}
-	if def, ok = p["nodeDef"].(*abstract.HostSizingRequirements); !ok {
+	if def, ok = p["nodeDef"].(abstract.HostSizingRequirements); !ok {
 		return nil, fail.InvalidParameterError("params[def]", "is missing or is not a *propertiesv2.HostEffectiveSizing")
-	}
-	if def == nil {
-		return nil, fail.InvalidParameterError("params[def]", "cannot be nil")
-	}
-	if image, ok = p["image"].(string); !ok {
-		return nil, fail.InvalidParameterError("params[image]", "cannot be an empty string")
 	}
 	// if timeout, ok = p["timeout"].(time.Duration); !ok {
 	// 	return nil, fail.InvalidParameterError("params[timeout]", "is missing ir is not a time.Duration")
@@ -623,6 +600,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -634,11 +612,13 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	if hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(task); xerr != nil {
 		return nil, xerr
 	}
+
 	hostReq.PublicIP = false
-	hostReq.ImageID = image
+	// hostReq.ImageID = def.Image
 
 	// if timeout < temporal.GetLongOperationTimeout() {
 	// 	timeout = temporal.GetLongOperationTimeout()
@@ -648,7 +628,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if xerr != nil {
 		return nil, xerr
 	}
-	if _, xerr = host.Create(task, hostReq, *def); xerr != nil {
+	if _, xerr = host.Create(task, hostReq, def); xerr != nil {
 		return nil, xerr
 	}
 	if host != nil {
@@ -657,8 +637,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	defer func() {
 		if xerr != nil {
-			derr := host.Delete(task)
-			if derr != nil {
+			if derr := host.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
 		}
@@ -694,8 +673,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	})
 	if xerr != nil {
 		if nokeep {
-			derr := host.Delete(task)
-			if derr != nil {
+			if derr := host.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
 		}
@@ -761,6 +739,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, params concurrency.T
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		subtasks = append(subtasks, subtask)
 	}
 

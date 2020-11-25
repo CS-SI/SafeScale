@@ -577,20 +577,27 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 	if xerr != nil {
 		return xerr
 	}
+
 	if !disabled {
 		logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
 
 		adminPassword := identity.AdminPassword
 
-		// Adds remotedesktop feature on master
+		feat, xerr := NewEmbeddedFeature(task, "proxycache-client")
+		if xerr != nil {
+			return xerr
+		}
+
+		// Adds remotedesktop feature on cluster (ie masters)
 		vars := data.Map{
 			"Username": "cladm",
 			"Password": adminPassword,
 		}
-		r, xerr := c.AddFeature(task, "remotedesktop", vars, resources.FeatureSettings{})
+		r, xerr := feat.Add(c, vars, resources.FeatureSettings{})
 		if xerr != nil {
 			return xerr
 		}
+
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
 			return fail.NewError("[cluster %s] failed to add 'remotedesktop' failed: %s", clusterName, msg)
@@ -602,8 +609,8 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 
 // install proxycache-client feature if not disabled
 func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host == nil {
-		return fail.InvalidParameterError("host", "cannot be nil")
+	if host.IsNull() {
+		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
@@ -633,10 +640,12 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		if xerr != nil {
 			return xerr
 		}
-		r, xerr := feat.Add(c, data.Map{}, resources.FeatureSettings{})
+
+		r, xerr := feat.Add(host, data.Map{}, resources.FeatureSettings{})
 		if xerr != nil {
 			return xerr
 		}
+
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
 			return fail.NewError("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
@@ -647,8 +656,8 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 
 // install proxycache-server feature if not disabled
 func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host == nil {
-		return fail.InvalidParameterError("host", "cannot be nil")
+	if host.IsNull() {
+		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
@@ -673,15 +682,18 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 	if xerr != nil {
 		return xerr
 	}
+
 	if !disabled {
 		feat, xerr := NewEmbeddedFeature(task, "proxycache-server")
 		if xerr != nil {
 			return xerr
 		}
-		r, xerr := feat.Add(c, data.Map{}, resources.FeatureSettings{})
+
+		r, xerr := feat.Add(host, data.Map{}, resources.FeatureSettings{})
 		if xerr != nil {
 			return xerr
 		}
+
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
 			return fail.NewError("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
@@ -692,8 +704,8 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 
 // intallDocker installs docker and docker-compose
 func (c *cluster) installDocker(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host == nil {
-		return fail.InvalidParameterError("host", "cannot be nil")
+	if host.IsNull() {
+		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
@@ -708,10 +720,12 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	if xerr != nil {
 		return xerr
 	}
-	r, xerr := feat.Add(c, data.Map{}, resources.FeatureSettings{})
+
+	r, xerr := feat.Add(host, data.Map{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return xerr
 	}
+
 	if !r.Successful() {
 		msg := r.AllErrorMessages()
 		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
