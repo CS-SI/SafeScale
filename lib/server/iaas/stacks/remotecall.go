@@ -1,6 +1,8 @@
 package stacks
 
 import (
+	"time"
+
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -22,7 +24,8 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	}
 
 	// Execute the remote call with tolerance for transient communication failure
-	xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	// xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
+	xerr := netutils.WhileCommunicationUnsuccessful(
 		func() error {
 			if innerErr := callback(); innerErr != nil {
 				innerErr = normalizeError(innerErr)
@@ -34,6 +37,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 			}
 			return nil
 		},
+		retry.Fibonacci(1*time.Second), // waiting time between retries follows Fibonacci numbers x 1s
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
