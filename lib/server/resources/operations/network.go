@@ -312,7 +312,7 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 					return innerXErr
 				}
 			default:
-				logrus.Error("cannot delete Network, other reason (%s: %s)", reflect.TypeOf(innerXErr).String(), innerXErr.Error())
+				logrus.Errorf("cannot delete Network, other reason (%s: %s)", reflect.TypeOf(innerXErr).String(), innerXErr.Error())
 			}
 		}
 		return nil
