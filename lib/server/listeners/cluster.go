@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -26,12 +27,17 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // ClusterListener host service server grpc
@@ -101,6 +107,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	instance, xerr := clusterfactory.New(task, job.GetService())
 	if xerr != nil {
 		return nil, xerr
@@ -313,12 +320,18 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 		return nil, xerr
 	}
 	defer job.Close()
+	task := job.GetTask()
 
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return empty, fail.NotImplementedError()
+	instance, xerr := clusterfactory.New(task, job.GetService())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return empty, instance.Delete(task)
 }
 
 // Expand adds node(s) to a cluster
@@ -365,7 +378,32 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	//	return nil, xerr
 	//}
 	//return converters.ClusterNodeListFromResourceToProtocol(r)
-	return nil, fail.NotImplementedError()
+
+	sizing, _, err := converters.HostSizingRequirementsFromStringToAbstract(in.GetNodeSizing())
+	if err != nil {
+		return nil, err
+	}
+
+	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	resp, xerr := instance.AddNodes(task, int(in.Count), sizing, in.GetImageId())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &protocol.ClusterNodeListResponse{}
+	out.Nodes = make([]*protocol.Host, 0, len(resp))
+	for _, v := range resp {
+		h, xerr := v.ToProtocol(task)
+		if xerr != nil {
+			return nil, xerr
+		}
+		out.Nodes = append(out.Nodes, h)
+	}
+	return out, nil
 }
 
 // Shrink removes node(s) from a cluster
@@ -397,12 +435,80 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 		return nil, xerr
 	}
 	defer job.Close()
+	task := job.GetTask()
 
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	count := int(in.GetCount())
+	var toRemove []*propertiesv2.ClusterNode
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			if len(nodesV2.PrivateNodes) < count {
+				return fail.InvalidRequestError("cannot shrink by %d, only %d nodes available", count, len(nodesV2.PrivateNodes))
+			}
+
+			deleteNode := func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+				err := instance.DeleteSpecificNode(task, params.(string), "")
+				if err != nil {
+					switch err.(type) {
+					case *fail.ErrNotFound:
+						// A missing node must be considered as a successful deletion, continue to update metadata
+					default:
+						return nil, err
+					}
+				}
+				return nil, nil
+			}
+
+			first := len(nodesV2.PrivateNodes) - count
+			toRemove = nodesV2.PrivateNodes[first:]
+			tg, innerXErr := concurrency.NewTaskGroup(task)
+			if innerXErr != nil {
+				return innerXErr
+			}
+			var errors []error
+			for _, v := range toRemove {
+				if _, innerXErr = tg.Start(deleteNode, v.ID); innerXErr != nil {
+					errors = append(errors, innerXErr)
+				}
+			}
+			if _, innerXErr = tg.Wait(); innerXErr != nil {
+				errors = append(errors, innerXErr)
+			}
+			if len(errors) > 0 {
+				return fail.NewErrorList(errors)
+			}
+
+			nodesV2.PrivateNodes = nodesV2.PrivateNodes[:first-1]
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &protocol.ClusterNodeListResponse{}
+	out.Nodes = fromClusterNodes(toRemove)
+	return out, nil
+}
+
+func fromClusterNodes(in []*propertiesv2.ClusterNode) []*protocol.Host {
+	out := make([]*protocol.Host, 0, len(in))
+	for _, v := range in {
+		out = append(out, converters.ClusterNodeFromPropertyToProtocol(*v))
+	}
+	return out
 }
 
 // ListNodes lists node(s) of a cluster
@@ -434,12 +540,32 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 		return nil, err
 	}
 	defer job.Close()
+	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	list, xerr := instance.ListNodes(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &protocol.ClusterNodeListResponse{}
+	out.Nodes = make([]*protocol.Host, 0, len(list))
+	for _, v := range list {
+		h, xerr := v.ToProtocol(task)
+		if xerr != nil {
+			return nil, xerr
+		}
+		out.Nodes = append(out.Nodes, h)
+	}
+	return out, nil
 }
 
 // InspectNode inspects a node of the cluster
