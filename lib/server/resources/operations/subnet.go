@@ -1030,7 +1030,7 @@ func (rs subnet) createPublicIPSecurityGroup(task concurrency.Task, req abstract
 	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
 		return nil, xerr
 	}
-	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
+	description := fmt.Sprintf(subnetPublicIPSecurityGroupDescriptionPattern, req.Name, network.Name)
 	xerr = sg.Create(task, network.ID, sgName, description, nil)
 	if xerr != nil {
 		return nil, xerr
