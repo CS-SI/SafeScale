@@ -200,11 +200,11 @@ func (s *stack) initDefaultNetwork() fail.Error {
 }
 
 func deviceNames() []string {
-	var list []string
-	for i := int('d'); i <= int('z'); i++ {
-		list = append(list, fmt.Sprintf("xvd%s", string(i)))
+	var deviceNames []string
+	for i := int('d') - int('a'); i <= int('z')-int('a'); i++ {
+		deviceNames = append(deviceNames, fmt.Sprintf("xvd%s", string('a'+rune(i))))
 	}
-	return list
+	return deviceNames
 }
 
 // ListRegions list available regions
