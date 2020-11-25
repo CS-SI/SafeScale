@@ -19,6 +19,7 @@ package huaweicloud
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/pengux/check"
@@ -215,14 +216,18 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		normalizeError,
 	)
 	if commRetryErr != nil {
+		switch commRetryErr.(type) {
+		case *fail.ErrInvalidRequest: // In case of VPC, when id does not exist, huaweicloud returns InvalidRequest... which cannot be the case because we validated that id is not empty
+			return nil, fail.NotFoundError("failed to find Network with id %s", id)
+		}
 		return nil, commRetryErr
 	}
 
-	return convertVPCToNetwork(*vpc), nil
+	return toAbstractNetwork(*vpc), nil
 }
 
-//convertVPCToNetwork converts a VPC to an *abstract.Network
-func convertVPCToNetwork(vpc VPC) *abstract.Network {
+// toAbstractNetwork converts a VPC to an *abstract.Network
+func toAbstractNetwork(vpc VPC) *abstract.Network {
 	an := abstract.NewNetwork()
 	an.ID = vpc.ID
 	an.Name = vpc.Name
@@ -311,11 +316,13 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
-		OkCodes:      []int{200, 201},
+		OkCodes:      []int{200, 201, 204},
 	}
 	return stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			_, innerErr = s.Stack.Driver.Request("DELETE", url, &opts)
+			var r *http.Response
+			r, innerErr = s.Stack.Driver.Request("DELETE", url, &opts)
+			_ = r
 			return innerErr
 		},
 		normalizeError,
