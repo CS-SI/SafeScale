@@ -140,7 +140,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, "", true).Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.libvirt") || tracing.ShouldTrace("stacks.network")).Entering().Exiting()
 
 	name := req.Name
 	ipVersion := req.IPVersion
@@ -290,7 +290,7 @@ func (s stack) ListNetworks() ([]*abstract.Network, error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s *Stack) DeleteNetwork(ref string) fail.Error {
+func (s stack) DeleteNetwork(ref string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
