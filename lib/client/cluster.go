@@ -185,8 +185,8 @@ func (c cluster) Delete(clusterName string, timeout time.Duration) error {
 		return xerr
 	}
 
-	service := protocol.NewHostServiceClient(c.session.connection)
-	_, err := service.Delete(ctx, &protocol.Reference{Name: clusterName})
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.Delete(ctx, &protocol.ClusterDeleteRequest{Name: clusterName})
 	return err
 }
 
