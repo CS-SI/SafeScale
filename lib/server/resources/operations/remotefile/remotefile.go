@@ -42,10 +42,10 @@ type Item struct {
 // Upload transfers the local file to the hostname
 func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Error) {
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if host == nil {
-		return fail.InvalidParameterError("host", "cannot be nil")
+	if host.IsNull() {
+		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
 	if rfc.Local == "" {
 		return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
@@ -97,24 +97,24 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 		return retryErr
 	}
 
-	// Updates owner and access rights if asked for
-	cmd := ""
-	if rfc.RemoteOwner != "" {
-		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
-	}
-	if rfc.RemoteRights != "" {
-		if cmd != "" {
-			cmd += " && "
-		}
-		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
-	}
-	retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if err != nil {
-		return err
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to update owner and/or access rights of the remote file")
-	}
+	// // Updates owner and access rights if asked for
+	// cmd := ""
+	// if rfc.RemoteOwner != "" {
+	// 	cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
+	// }
+	// if rfc.RemoteRights != "" {
+	// 	if cmd != "" {
+	// 		cmd += " && "
+	// 	}
+	// 	cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
+	// }
+	// retcode, _, _, err := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	// if err != nil {
+	// 	return err
+	// }
+	// if retcode != 0 {
+	// 	return fail.NewError("failed to update owner and/or access rights of the remote file")
+	// }
 
 	return nil
 }

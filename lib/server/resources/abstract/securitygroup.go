@@ -282,6 +282,7 @@ func (sg SecurityGroup) IsComplete() bool {
 	return sg.ID != "" && sg.Name != "" && sg.Network != ""
 }
 
+// SetID sets the value of field ID in sg
 func (sg *SecurityGroup) SetID(id string) *SecurityGroup {
 	if sg != nil {
 		sg.ID = id
@@ -289,6 +290,7 @@ func (sg *SecurityGroup) SetID(id string) *SecurityGroup {
 	return sg
 }
 
+// SetName sets the value of field Name in sg
 func (sg *SecurityGroup) SetName(name string) *SecurityGroup {
 	if sg != nil {
 		sg.Name = name
@@ -296,6 +298,7 @@ func (sg *SecurityGroup) SetName(name string) *SecurityGroup {
 	return sg
 }
 
+// SetNetworkID sets the value of field NetworkID in sg
 func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 	if sg != nil {
 		sg.Network = networkID

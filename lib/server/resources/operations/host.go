@@ -475,9 +475,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	ahc := abstract.NewHostCore()
-	ahc.Name = hostReq.ResourceName
-	if _, xerr = svc.InspectHost(ahc); xerr != nil {
+	if _, xerr = svc.InspectHost(abstract.NewHostCore().SetName(hostReq.ResourceName)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -485,7 +483,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return nil, fail.Wrap(xerr, "failed to check if host resource name '%s' is already used", hostReq.ResourceName)
 		}
 	} else {
-		return nil, fail.DuplicateError("'%s' already exists (but not managed by SafeScale)", hostReq.ResourceName)
+		return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
 	}
 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
