@@ -272,7 +272,7 @@ type step struct {
 
 // Run executes the step on all the concerned hosts
 func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
-	outcomes = unitResults{}
+	outcomes = &unitResults{}
 
 	tracer := debug.NewTracer(is.Worker.feature.task, true, "").Entering()
 	defer tracer.Exiting()
@@ -323,13 +323,13 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if xerr != nil {
 				return nil, xerr
 			}
-			outcomes.AddSingle(h.GetName(), outcome.(resources.UnitResult))
+			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present: %s",
+					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
 						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
+						temporal.FormatDuration(time.Since(is.Worker.startTime)))
 				} else { // other steps are expected to succeed
 					tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
 						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
@@ -393,13 +393,13 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
 				continue
 			}
-			outcomes.AddSingle(k, outcome.(resources.UnitResult))
+			outcomes.AddOne(k, outcome.(resources.UnitResult))
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present: %s",
+					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present",
 						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
+						temporal.FormatDuration(time.Since(is.Worker.startTime)))
 				} else { // other steps are expected to succeed
 					tracer.Trace(": %s(%s):step(%s)@%s failed in %s: %s",
 						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
@@ -450,7 +450,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		// err := UploadStringToRemoteFile(is.OptionsFileContent, rh, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
 		rfcItem := remotefile.Item{
 			Remote:       utils.TempFolder + "/options.json",
-			RemoteOwner:  "cladm:safescale",
+			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
 		xerr = rfcItem.UploadString(task, is.OptionsFileContent, rh)
@@ -487,13 +487,13 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Executes the script on the remote rh
-	_, outrun, _, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", outrun)
 		return stepResult{err: xerr, output: outrun}, nil
 	}
-	xerr = nil
-	return stepResult{success: ok, completed: true, err: nil, output: outrun}, nil
+
+	return stepResult{success: retcode == 0, completed: true, err: nil, output: outrun}, nil
 }
 
 // func clitools.ReturnValuesFromShellToError(retcode int, stdout string, stderr string, err error, msg string) error {
@@ -544,11 +544,12 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 			if xerr != nil {
 				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
 			}
+
 			buffer := bytes.NewBufferString("")
-			err := varTemplate.Execute(buffer, variables)
-			if err != nil {
+			if err := varTemplate.Execute(buffer, variables); err != nil {
 				return nil, fail.ToError(err)
 			}
+
 			cloneV[k] = buffer.String()
 		}
 	}
@@ -562,10 +563,11 @@ func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
 	if xerr != nil {
 		return "", fail.SyntaxError("failed to parse: %s", xerr.Error())
 	}
+
 	dataBuffer := bytes.NewBufferString("")
-	err := tmpl.Execute(dataBuffer, v)
-	if err != nil {
+	if err := tmpl.Execute(dataBuffer, v); err != nil {
 		return "", fail.Wrap(err, "failed to replace variables")
 	}
+
 	return dataBuffer.String(), nil
 }

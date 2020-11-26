@@ -26,7 +26,7 @@ type UnitResult interface {
 
 // UnitResults ...
 type UnitResults interface {
-	AddSingle(string, UnitResult)
+	AddOne(string, UnitResult)
 	Completed() bool
 	Uncompleted() []string
 	ErrorMessages() string
@@ -36,7 +36,7 @@ type UnitResults interface {
 // Results ...
 type Results interface {
 	Add(string, UnitResults) error
-	AddUnit(string, string, UnitResult) error
+	AddOne(string, string, UnitResult) error
 	Successful() bool
 	AllErrorMessages() string
 	ErrorMessagesOfUnit(name string) string

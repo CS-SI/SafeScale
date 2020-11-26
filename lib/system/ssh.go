@@ -824,7 +824,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 		func() error {
 			taskStatus, _ := task.GetStatus()
 			if taskStatus == concurrency.ABORTED {
-				return retry.StopRetryError(nil, "operation aborted by user")
+				return retry.StopRetryError(nil, "operation aborted")
 			}
 
 			cmd, innerErr := ssh.Command(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
