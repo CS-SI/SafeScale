@@ -232,7 +232,7 @@ func (hc *HostCore) IsConsistent() bool {
 
 // SetName is used to set Name field
 func (hc *HostCore) SetName(name string) *HostCore {
-	if !hc.IsNull() {
+	if hc != nil {
 		hc.Name = name
 	}
 	return hc
@@ -406,7 +406,7 @@ func (hf *HostFull) GetName() string {
 
 // SetName is a setter to initialize field 'Name'
 func (hf *HostFull) SetName(name string) *HostFull {
-	if !hf.IsNull() {
+	if hf != nil && hf.Core != nil {
 		hf.Core.SetName(name)
 	}
 	return hf
