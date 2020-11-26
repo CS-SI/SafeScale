@@ -9,7 +9,7 @@ import (
 type Officer struct {
 	Block func(Try)
 
-	params interface{}
+	variables interface{}
 }
 
 // Constant sleeps for duration duration
@@ -57,17 +57,20 @@ func Exponential(base time.Duration) *Officer {
 // TODO: See if we can use a context to prevent the full calculation for each try...
 func Fibonacci(base time.Duration) *Officer {
 	o := Officer{
-		params: map[string]uint64{"pre": 0, "cur": 1},
+		variables: map[string]uint64{
+			"pre": 0,
+			"cur": 1,
+		},
 	}
 	o.Block = func(t Try) {
-		p := o.params.(map[string]uint64)
-		cur := p["cur"]
-		pre := p["pre"]
-		p["pre"] = cur
+		p := o.variables.(map[string]uint64)
+		var pre, cur uint64
+		pre = p["pre"]
+		cur, p["pre"] = p["cur"], p["cur"]
 		cur += pre
 		p["cur"] = cur
 
-		time.Sleep(base * time.Duration(pre))
+		time.Sleep(base * time.Duration(cur))
 	}
 
 	return &o
