@@ -30,12 +30,12 @@ python3-pip \
 WORKDIR /tmp
 
 # ----------------------
-# Install GO 1.13
+# Install GO 1.14
 # ----------------------
-RUN wget https://dl.google.com/go/go1.13.5.linux-amd64.tar.gz \
-&& tar -C /usr/local -xzf go1.13.5.linux-amd64.tar.gz
+RUN wget https://dl.google.com/go/go1.14.1.linux-amd64.tar.gz \
+&& tar -C /usr/local -xzf go1.14.1.linux-amd64.tar.gz
 ENV PATH $PATH:/usr/local/go/bin:/go/bin
-RUN rm /tmp/go1.13.5.linux-amd64.tar.gz
+RUN rm /tmp/go1.14.1.linux-amd64.tar.gz
 
 # ----------------------
 # Install Protoc
