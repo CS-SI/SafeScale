@@ -397,9 +397,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 	if !ok {
 		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' must be inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
-	if vpc.CIDR == req.CIDR {
-		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
-	}
+	// if vpc.CIDR == req.CIDR {
+	// 	return nullAS, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
+	// }
 
 	// Create a subnet with the same Targets than the network
 	resp, xerr := s.rpcCreateSubnet(req.Name, vpc.ID, req.CIDR)

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
@@ -83,7 +84,6 @@ type TaskCore interface {
 	IgnoreAbortSignal(bool) fail.Error
 	SetID(string) fail.Error
 	GetID() (string, fail.Error)
-	MustGetSignature() (string, fail.Error)
 	GetSignature() string
 	GetStatus() (TaskStatus, fail.Error)
 	GetContext() (context.Context, fail.Error)
@@ -246,26 +246,24 @@ func (t *task) GetID() (string, fail.Error) {
 	return t.id, nil
 }
 
-// MustGetSignature builds the "signature" of the task passed as parameter,
-// ie a string representation of the task ID in the format "{task <id>}".
-func (t *task) MustGetSignature() (string, fail.Error) {
-	if t.IsNull() {
-		return "", fail.InvalidInstanceError()
-	}
-
-	theId, _ := t.GetID()
-
-	return fmt.Sprintf("{task %s}", theId), nil
-}
+// // MustGetSignature builds the "signature" of the task passed as parameter,
+// // ie a string representation of the task ID in the format "{task <id>}".
+// func (t *task) MustGetSignature() (string, fail.Error) {
+// 	if t.IsNull() {
+// 		return "", fail.InvalidInstanceError()
+// 	}
+//
+// 	theId, _ := t.GetID()
+// 	return fmt.Sprintf("{task %s}", theId), nil
+// }
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
 func (t *task) GetSignature() string {
-	theId, xerr := t.MustGetSignature()
-	if xerr != nil {
-		return ""
+	if sig, xerr := t.GetID(); xerr == nil {
+		return `{task ` + sig + "}"
 	}
-	return "{task " + theId + "}"
+	return ""
 }
 
 // GetStatus returns the current task status
@@ -682,6 +680,8 @@ func (t *task) Abort() (err fail.Error) {
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
 	}
+
+	logrus.Debugf("task %s aborted", t.GetSignature())
 
 	if previousErr != nil && previousStatus != TIMEOUT {
 		return fail.AbortedError(previousErr)

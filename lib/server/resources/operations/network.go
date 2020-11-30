@@ -69,7 +69,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 // LoadNetwork loads the metadata of a subnet
 func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
 	if task.IsNull() {
-		return nullNetwork(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullNetwork(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if svc.IsNull() {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
@@ -145,7 +145,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(
@@ -167,8 +167,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	if _, xerr = svc.InspectNetworkByName(req.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		case *fail.ErrInvalidRequest, *fail.ErrTimeout:
-			return xerr
+			// continue
 		default:
 			return xerr
 		}
@@ -227,7 +226,7 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
@@ -331,7 +330,7 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 		return "", fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be nil")
+		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	cidr = ""
@@ -359,7 +358,7 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, true, "").Entering()

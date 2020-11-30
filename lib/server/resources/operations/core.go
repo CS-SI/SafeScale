@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 	"reflect"
+	"strings"
 	"sync/atomic"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -46,7 +47,7 @@ type core struct {
 	kind       string
 	shielded   *concurrency.Shielded
 	properties *serialize.JSONProperties
-	folder     *folder
+	folder     folder
 	loaded     bool
 	committed  bool
 	name       atomic.Value
@@ -59,7 +60,7 @@ func nullCore() *core {
 
 // newCore creates an instance of core
 func newCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, fail.Error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nullCore(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if kind == "" {
@@ -89,19 +90,18 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 
 // IsNull returns true if the core instance represents the null value for core
 func (c *core) IsNull() bool {
-	return c == nil || c.kind == "" || c.kind == "nil"
+	return c == nil || c.kind == "" || c.kind == "nil" || c.folder.IsNull()
 }
 
 // GetService returns the iaas.GetService used to create/load the persistent object
 func (c core) GetService() iaas.Service {
-	if !c.IsNull() && c.folder != nil {
+	if !c.IsNull() {
 		return c.folder.GetService()
 	}
 	return nil
 }
 
 // GetID returns the id of the data protected
-//
 // satisfies interface data.Identifiable
 func (c core) GetID() string {
 	if c.IsNull() {
@@ -114,7 +114,6 @@ func (c core) GetID() string {
 }
 
 // GetName returns the name of the data protected
-//
 // satisfies interface data.Identifiable
 func (c core) GetName() string {
 	if c.IsNull() {
@@ -132,7 +131,7 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -142,8 +141,7 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 	}
 
 	// Reload reloads data from objectstorage to be sure to have the last revision
-	xerr = c.Reload(task)
-	if xerr != nil {
+	if xerr = c.Reload(task); xerr != nil {
 		return fail.Wrap(xerr, "failed to reload")
 	}
 
@@ -158,7 +156,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -180,7 +178,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 
 	// Reload reloads data from objectstorage to be sure to have the last revision
 	if xerr = c.Reload(task); xerr != nil {
-		return xerr
+		return fail.Wrap(xerr, "failed to reload metadata")
 	}
 
 	xerr = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
@@ -206,7 +204,7 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterError("clonable", "cannot be nil")
@@ -239,6 +237,7 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 			if !ok {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			c.name.Store(ident.GetName())
 			c.id.Store(ident.GetID())
 			return nil
@@ -259,9 +258,9 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if ref == "" {
+	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
@@ -311,7 +310,7 @@ func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
 	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if id == "" {
+	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
@@ -356,7 +355,10 @@ func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
 // readByID reads a metadata identified by ID from Object Storage
 func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
-		return c.Deserialize(task, buf)
+		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+		}
+		return nil
 	})
 }
 
@@ -385,7 +387,10 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 // readByName reads a metadata identified by name
 func (c *core) readByName(task concurrency.Task, name string) fail.Error {
 	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Error {
-		return c.Deserialize(task, buf)
+		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+		}
+		return nil
 	})
 }
 
@@ -414,7 +419,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	if c.loaded && !c.committed {
@@ -422,9 +427,6 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 	}
 
 	if xerr := c.readByReference(task, c.GetID()); xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); ok {
-			return fail.NotFoundError("the metadata of %s '%s' vanished", c.kind, c.GetName())
-		}
 		return xerr
 	}
 	c.loaded = true
@@ -438,7 +440,7 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -455,7 +457,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	c.SafeLock(task)
@@ -467,7 +469,7 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 
 	var errors []error
 	// Checks entries exist in Object Storage
-	if xerr := c.folder.Search(byIDFolderName, id); xerr != nil {
+	if xerr := c.folder.Lookup(byIDFolderName, id); xerr != nil {
 		// If not found, consider it not an error
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			errors = append(errors, xerr)
@@ -476,9 +478,11 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 		idFound = true
 	}
 
-	if xerr := c.folder.Search(byNameFolderName, name); xerr != nil {
-		// If entry not found, consider it not an error
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+	if xerr := c.folder.Lookup(byNameFolderName, name); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If entry not found, consider it not an error
+		default:
 			errors = append(errors, xerr)
 		}
 	} else {
@@ -513,7 +517,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	defer func() {
@@ -571,14 +575,14 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	defer func() {
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to deserialize %s resource", c.kind)
-		}
-	}()
+	// defer func() {
+	// 	if xerr != nil {
+	// 		xerr = fail.Wrap(xerr, "failed to deserialize %s resource", c.kind)
+	// 	}
+	// }()
 
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 

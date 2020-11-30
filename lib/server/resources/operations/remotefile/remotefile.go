@@ -126,7 +126,7 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	f, xerr := system.CreateTempFileFromString(content, 0600)

@@ -35,7 +35,7 @@ func New(svc iaas.Service) (resources.Volume, fail.Error) {
 // Load loads the metadata of a volume and returns an instance of resources.Volume
 func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
