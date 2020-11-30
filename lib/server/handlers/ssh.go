@@ -117,9 +117,10 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 	sshConfig = &system.SSHConfig{
-		Port: 22,
-		Host: ip,
-		User: user,
+		Port:      22,
+		IPAddress: ip,
+		Hostname:  host.GetName(),
+		User:      user,
 	}
 
 	var rs resources.Subnet
@@ -201,7 +202,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				GatewayConfig := system.SSHConfig{
 					PrivateKey: gwahc.PrivateKey,
 					Port:       22,
-					Host:       ip,
+					IPAddress:  ip,
+					Hostname:   gw.GetName(),
 					User:       user,
 				}
 				sshConfig.GatewayConfig = &GatewayConfig
@@ -236,7 +238,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				GatewayConfig := system.SSHConfig{
 					PrivateKey: gwahc.PrivateKey,
 					Port:       22,
-					Host:       ip,
+					IPAddress:  ip,
+					Hostname:   gw.GetName(),
 					User:       user,
 				}
 				sshConfig.SecondaryGatewayConfig = &GatewayConfig
@@ -401,7 +404,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return 0, "", "", xerr
 	}
 
-	// Host checks
+	// IPAddress checks
 	if hostFrom != "" && hostTo != "" {
 		return 0, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
 	}

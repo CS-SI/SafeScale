@@ -50,7 +50,7 @@ type bucket struct {
 
 	// GetID         string `json:"id,omitempty"`
 	// GetName       string `json:"name,omitempty"`
-	// Host       string `json:"host,omitempty"`
+	// IPAddress       string `json:"host,omitempty"`
 	// MountPoint string `json:"mountPoint,omitempty"`
 	// // NbItems    int    `json:"nbitems,omitempty"`
 
@@ -217,7 +217,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	// Get Host data
+	// Get IPAddress data
 	rh, xerr := LoadHost(task, b.svc, hostName)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on rh '%s'", b.GetName(), hostName)
@@ -288,7 +288,7 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 		return xerr
 	}
 
-	// Get Host ID
+	// Get IPAddress ID
 	rh, xerr := LoadHost(task, b.svc, hostName)
 	if xerr != nil {
 		return xerr

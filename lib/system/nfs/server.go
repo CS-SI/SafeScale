@@ -39,10 +39,10 @@ func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
 	return &server, nil
 }
 
-// GetHost returns the hostname or IP address of the nfs.getServer
-func (s *Server) GetHost() string {
-	return s.SSHConfig.Host
-}
+// // GetHost returns the hostname or IP address of the nfs.getServer
+// func (s *Server) GetHost() string {
+// 	return s.SSHConfig.IPAddress
+// }
 
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install(task concurrency.Task) fail.Error {
@@ -64,7 +64,7 @@ func (s *Server) AddShare(task concurrency.Task, path string, options string /*s
 	}
 
 	// acl := ExportACL{
-	// 	Host:          "*",
+	// 	IPAddress:          "*",
 	// 	SecurityModes: []securityflavor.Enum{},
 	// 	Options: ExportOptions{
 	// 		ReadOnly:       readOnly,

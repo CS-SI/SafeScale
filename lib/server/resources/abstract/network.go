@@ -95,7 +95,7 @@ func (n *Network) OK() bool {
 	return result
 }
 
-// Serialize serializes Host instance into bytes (output json code)
+// Serialize serializes IPAddress instance into bytes (output json code)
 func (n *Network) Serialize() ([]byte, fail.Error) {
 	if n == nil {
 		return nil, fail.InvalidInstanceError()
@@ -104,7 +104,7 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 	return r, fail.ToError(err)
 }
 
-// Deserialize reads json code and reinstantiates an Host
+// Deserialize reads json code and reinstantiates an IPAddress
 func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
 	if n == nil {
 		return fail.InvalidInstanceError()

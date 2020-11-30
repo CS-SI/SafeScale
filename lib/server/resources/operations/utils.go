@@ -16,7 +16,7 @@
 
 package operations
 
-// func gatewayFromHost(task concurrency.Task, host resources.Host) (resources.Host, fail.Error) {
+// func gatewayFromHost(task concurrency.Task, host resources.IPAddress) (resources.IPAddress, fail.Error) {
 // 	if task.IsNull() {
 // 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 // 	}

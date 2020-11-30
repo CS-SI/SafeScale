@@ -193,7 +193,7 @@ func (s stack) parseTemplateID(id string) (abstract.HostTemplate, fail.Error) {
 }
 
 // ListTemplates lists available host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
@@ -691,11 +691,11 @@ func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Sub
 	state := hostState(vm.State)
 	ahf.CurrentState, ahf.Core.LastState = state, state
 
-	// Updates Host Property propsv1.HostDescription
+	// Updates IPAddress Property propsv1.HostDescription
 	ahf.Description.Created = time.Now()
 	ahf.Description.Updated = ahf.Description.Created
 
-	// Updates Host Property propsv1.HostSizing
+	// Updates IPAddress Property propsv1.HostSizing
 	ahf.Sizing.Cores = vmType.Cores
 	ahf.Sizing.CPUFreq = vmType.CPUFreq
 	ahf.Sizing.DiskSize = vmType.DiskSize
@@ -703,10 +703,10 @@ func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Sub
 	ahf.Sizing.GPUType = vmType.GPUType
 	ahf.Sizing.RAMSize = vmType.RAMSize
 
-	// Updates Host Property propsv1.HostNetworking
+	// Updates IPAddress Property propsv1.HostNetworking
 	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
 	// indexed on network ID. Tries to convert if possible, if we already have correspondance
-	// between network ID and network Name in Host definition
+	// between network ID and network Name in IPAddress definition
 	subnetsByID := map[string]string{}
 	subnetsByName := map[string]string{}
 	ipv4Addresses := map[string]string{}
@@ -767,7 +767,7 @@ func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	// host.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
 	host.Networking.IsGateway = isGateway
 
-	// Adds Host property SizingV1
+	// Adds IPAddress property SizingV1
 	host.Sizing.Cores = template.Cores
 	host.Sizing.CPUFreq = template.CPUFreq
 	host.Sizing.RAMSize = template.RAMSize
@@ -1049,7 +1049,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	return lastErr
 }
 
-// InspectHost returns the host identified by id or updates content of a *abstract.Host
+// InspectHost returns the host identified by id or updates content of a *abstract.IPAddress
 func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
@@ -1306,11 +1306,11 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 		sgs = append(sgs, v.SecurityGroupId)
 	}
 	if found {
-		// Security Group already bound to Host
+		// Security Group already bound to IPAddress
 		return nil
 	}
 
-	// Add new SG to Host
+	// Add new SG to IPAddress
 	sgs = append(sgs, asg.ID)
 	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
 }
@@ -1349,10 +1349,10 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		}
 	}
 	if !found {
-		// Security Group not bound to Host, exit gracefully
+		// Security Group not bound to IPAddress, exit gracefully
 		return nil
 	}
 
-	// Update Security Groups of Host
+	// Update Security Groups of IPAddress
 	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
 }

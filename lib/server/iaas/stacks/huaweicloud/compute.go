@@ -433,9 +433,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(server.ID)
 			if zoneErr != nil {
-				logrus.Tracef("Host successfully created but can't confirm AZ: %s", zoneErr)
+				logrus.Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
-				logrus.Tracef("Host successfully created in requested AZ '%s'", creationZone)
+				logrus.Tracef("Host successfully created in requested Availability Zone '%s'", creationZone)
 				if creationZone != srvOpts.AvailabilityZone {
 					if srvOpts.AvailabilityZone != "" {
 						logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
@@ -592,7 +592,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	return host, nil
 }
 
-// complementHost complements Host data with content of server parameter
+// complementHost complements IPAddress data with content of server parameter
 func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

@@ -119,7 +119,7 @@ func (i ClusterIdentity) OK() bool {
 	return result
 }
 
-// Serialize serializes Host instance into bytes (output json code)
+// Serialize serializes IPAddress instance into bytes (output json code)
 func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	if i.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -132,7 +132,7 @@ func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and reinstantiates an Host
+// Deserialize reads json code and reinstantiates an IPAddress
 func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	// i cannot be nil, but can be null value (which will be filled by this method)
 	if i == nil {

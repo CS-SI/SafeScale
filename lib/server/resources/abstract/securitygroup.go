@@ -311,7 +311,7 @@ func NewSecurityGroup() *SecurityGroup {
 	return &SecurityGroup{}
 }
 
-// Clone does a deep-copy of the Host
+// Clone does a deep-copy of the IPAddress
 //
 // satisfies interface data.Clonable
 func (sg SecurityGroup) Clone() data.Clonable {
@@ -334,7 +334,7 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 	return sg
 }
 
-// Serialize serializes Host instance into bytes (output json code)
+// Serialize serializes IPAddress instance into bytes (output json code)
 func (sg *SecurityGroup) Serialize() ([]byte, fail.Error) {
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()

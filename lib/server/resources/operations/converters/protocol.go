@@ -40,7 +40,8 @@ func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
 	}
 	return &system.SSHConfig{
 		User:          from.User,
-		Host:          from.Host,
+		Hostname:      from.HostName,
+		IPAddress:     from.Host,
 		PrivateKey:    from.PrivateKey,
 		Port:          int(from.Port),
 		GatewayConfig: gw,

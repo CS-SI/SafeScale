@@ -284,7 +284,7 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 	return feat.Remove(c, vars, settings)
 }
 
-// ExecuteScript executes the script template with the parameters on target Host
+// ExecuteScript executes the script template with the parameters on target IPAddress
 func (c *cluster) ExecuteScript(
 	task concurrency.Task, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	host resources.Host,
@@ -437,8 +437,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 				return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
 			}
 		}
-		retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout())
-		if xerr != nil {
+		if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout()); xerr != nil {
 			return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
 		}
 		if retcode != 0 {
@@ -493,8 +492,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	params["getDefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["getEndpointIP"] = netCfg.EndpointIP
 
-	_, _, _, xerr = c.ExecuteScript(task, nil, script, params, host)
-	if xerr != nil {
+	if _, _, _, xerr = c.ExecuteScript(task, nil, script, params, host); xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
 	}
 

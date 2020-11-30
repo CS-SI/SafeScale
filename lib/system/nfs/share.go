@@ -83,7 +83,7 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 func (s *Share) Add(task concurrency.Task) fail.Error {
 	// var acls string
 	// for _, a := range s.ACLs {
-	// 	acl := a.Host + "("
+	// 	acl := a.IPAddress + "("
 	// 	if len(a.SecurityModes) > 0 {
 	// 		acl += "sec="
 	// 		for i, item := range a.SecurityModes {

@@ -383,7 +383,7 @@ func (w *worker) identifyConcernedGateways() (_ []resources.Host, xerr fail.Erro
 	//	if xerr != nil {
 	//		return nil, xerr
 	//	}
-	//	hosts = []resources.Host{host}
+	//	hosts = []resources.IPAddress{host}
 	//} else if w.cluster != nil {
 	hosts, xerr = w.identifyAllGateways()
 	if xerr != nil {

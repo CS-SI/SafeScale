@@ -22,9 +22,10 @@ import (
 
 // ShouldTrace tells if a specific trace is asked for
 func ShouldTrace(key string) bool {
-	if key == "" {
+	if key = strings.TrimSpace(key); key == "" {
 		return false
 	}
+
 	parts := strings.Split(key, ".")
 	// If key.subkey is defined, return its value
 	if len(parts) >= 2 {

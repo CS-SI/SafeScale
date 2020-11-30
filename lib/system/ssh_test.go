@@ -43,7 +43,8 @@ func Test_Command(t *testing.T) {
 
 	sshConf := system.SSHConfig{
 		User:       usr.Name,
-		Host:       "127.0.0.1",
+		IPAddress:  "127.0.0.1",
+		Hostname:   "localhost",
 		Port:       22,
 		PrivateKey: string(content),
 	}

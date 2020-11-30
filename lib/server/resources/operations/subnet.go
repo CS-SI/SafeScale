@@ -402,7 +402,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}()
 
-	// IDs of Security Groups to attach to Host used as gateway
+	// IDs of Security Groups to attach to IPAddress used as gateway
 	sgs := []string{
 		subnetGWSG.GetID(),
 		subnetInternalSG.GetID(),
@@ -1141,7 +1141,7 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 	return sg, nil
 }
 
-// unbindHostFromVIP unbinds a VIP from Host
+// unbindHostFromVIP unbinds a VIP from IPAddress
 // Actually does nothing in aws for now
 func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) fail.Error {
 	if xerr := rs.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
@@ -1238,7 +1238,7 @@ func (rs *subnet) UnbindHost(task concurrency.Task, hostID string) (xerr fail.Er
 	})
 }
 
-// ListHosts returns the list of Host attached to the subnet (excluding gateway)
+// ListHosts returns the list of IPAddress attached to the subnet (excluding gateway)
 func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail.Error) {
 	if rs.IsNull() {
 		return nil, fail.InvalidInstanceError()
