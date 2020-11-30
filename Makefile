@@ -47,7 +47,7 @@ all: begin ground getdevdeps sdk generate lib cli err vet
 common: begin ground getdevdeps sdk generate
 
 versioncut:
-	@(($(GO) version | grep go1.13) || ($(GO) version | grep go1.15) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.13 ! $(NO_COLOR)\n" && /bin/false);
+	@(($(GO) version | grep go1.15) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.14 ! $(NO_COLOR)\n" && /bin/false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
@@ -62,7 +62,8 @@ libvirt:
 	else \
 		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
 	fi
-	$(eval BUILD_TAGS = "--tags=libvirt")
+	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Libvirt doesn't work on develop branch right now!\n"; exit 1;\
+	#$(eval BUILD_TAGS = "--tags=libvirt")
 
 with_git:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
