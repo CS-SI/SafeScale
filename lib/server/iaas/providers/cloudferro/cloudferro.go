@@ -57,15 +57,17 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
-	// network, _ := params["network"].(map[string]interface{})
+	network, _ := params["network"].(map[string]interface{})
 	metadata, _ := params["metadata"].(map[string]interface{})
 
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
 	domainName, _ := identity["DomainName"].(string)
 
-	region, _ := compute["Region"].(string)
-	zone, _ := compute["AvailabilityZone"].(string)
+	// region, _ := compute["Region"].(string)
+	region := "RegionOne"
+	// zone, _ := compute["AvailabilityZone"].(string)
+	zone := "nova"
 	projectName, _ := compute["ProjectName"].(string)
 	// projectID, _ := compute["ProjectID"].(string)
 	defaultImage, _ := compute["DefaultImage"].(string)
@@ -81,6 +83,11 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		}
 	}
 
+	providerNetwork, _ := network["ProviderNetwork"].(string)
+	if providerNetwork == "" {
+		providerNetwork = "external"
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
 		Username:         username,
@@ -89,7 +96,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   "external",
+		FloatingIPPool:   providerNetwork,
 		AllowReauth:      true,
 	}
 
@@ -119,7 +126,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		ProviderNetwork:           "external",
+		ProviderNetwork:           providerNetwork,
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,
