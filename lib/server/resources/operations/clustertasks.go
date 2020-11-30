@@ -44,8 +44,8 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	// FIXME: validate params
@@ -56,8 +56,8 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	// FIXME: validate params
@@ -75,8 +75,8 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	if !ok {
 		return result, fail.InvalidParameterError("params", "must contain a 'resources.Host'")
 	}
-	if gateway == nil {
-		return result, fail.InvalidParameterError("params", "cannot be nil")
+	if gateway.IsNull() {
+		return result, fail.InvalidParameterError("params", "cannot be null value of 'resources.Host'")
 	}
 
 	hostLabel := gateway.GetName()
@@ -262,7 +262,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	}
 
 	hostLabel := fmt.Sprintf("master #%d", index)
-	logrus.Debugf("[%s] starting objh resource creation...", hostLabel)
+	logrus.Debugf("[%s] starting Host creation...", hostLabel)
 
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
@@ -301,19 +301,25 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	// Updates cluster metadata to keep track of created objh, before testing if an error occurred during the creation
+	// Updates cluster metadata to keep track of created Host, before testing if an error occurred during the creation
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// References new node in cluster
 		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
 			nodesV2 := clonable.(*propertiesv2.ClusterNodes)
 			nodesV2.GlobalLastIndex++
-			pubIP, innerErr := objh.GetPublicIP(task)
-			if innerErr != nil {
-				return innerErr
+			pubIP, innerXErr := objh.GetPublicIP(task)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// no public IP, this can happen, continue
+				default:
+					return innerXErr
+				}
 			}
-			privIP, innerErr := objh.GetPrivateIP(task)
-			if innerErr != nil {
-				return innerErr
+
+			privIP, innerXErr := objh.GetPrivateIP(task)
+			if innerXErr != nil {
+				return innerXErr
 			}
 			node := &propertiesv2.ClusterNode{
 				ID:          objh.GetID(),
@@ -333,11 +339,11 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 				_ = xerr.AddConsequence(derr)
 			}
 		}
-		return nil, fail.Wrap(xerr, "[%s] objh resource creation failed")
+		return nil, fail.Wrap(xerr, "[%s] Host creation failed")
 	}
 
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, objh.GetName())
-	logrus.Debugf("[%s] objh resource creation successful", hostLabel)
+	logrus.Debugf("[%s] Host creation successful", hostLabel)
 
 	if xerr = c.installProxyCacheClient(task, objh, hostLabel); xerr != nil {
 		return nil, xerr
@@ -348,7 +354,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	logrus.Debugf("[%s] objh resource creation successful.", hostLabel)
+	logrus.Debugf("[%s] Host creation successful.", hostLabel)
 	return nil, nil
 }
 
@@ -583,7 +589,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	hostLabel := fmt.Sprintf("node #%d", index)
-	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
+	logrus.Debugf("[%s] starting Host creation...", hostLabel)
 
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
@@ -631,9 +637,9 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if _, xerr = host.Create(task, hostReq, def); xerr != nil {
 		return nil, xerr
 	}
-	if host != nil {
-		return nil, fail.InconsistentError("host.Create() reported a success but host is nil")
-	}
+	// if host != nil {
+	// 	return nil, fail.InconsistentError("host.Create() reported a success but host is nil")
+	// }
 
 	defer func() {
 		if xerr != nil {
@@ -652,14 +658,21 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 			}
 			// Registers the new Agent in the swarmCluster struct
 			nodesV2.GlobalLastIndex++
-			pubIP, innerErr := host.GetPublicIP(task)
-			if innerErr != nil {
-				return innerErr
+			pubIP, innerXErr := host.GetPublicIP(task)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// No public IP, this can happen, continue
+				default:
+					return innerXErr
+				}
 			}
-			privIP, innerErr := host.GetPrivateIP(task)
-			if innerErr != nil {
-				return innerErr
+
+			privIP, innerXErr := host.GetPrivateIP(task)
+			if innerXErr != nil {
+				return innerXErr
 			}
+
 			node = &propertiesv2.ClusterNode{
 				ID:          host.GetID(),
 				NumericalID: nodesV2.GlobalLastIndex,

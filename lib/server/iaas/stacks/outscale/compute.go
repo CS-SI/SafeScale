@@ -798,9 +798,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if s.IsNull() {
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
-	if request.KeyPair == nil {
-		return nullAHF, nullUDC, fail.InvalidRequestError("request.KeyPair", "cannot be nil")
-	}
+	// if request.KeyPair == nil {
+	// 	return nullAHF, nullUDC, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+	// }
 	if len(request.Subnets) == 0 && !request.PublicIP {
 		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached subnet")
 	}
@@ -827,17 +827,20 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
+
 	xerr = s.ImportKeyPair(creationKeyPair)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
+
+	request.KeyPair = creationKeyPair
+
 	defer func() {
 		derr := s.DeleteKeyPair(creationKeyPair.Name)
 		if derr != nil {
 			logrus.Errorf("failed to delete creation keypair: %v", derr)
 		}
 	}()
-	request.KeyPair = creationKeyPair
 
 	// Configure userdata content
 	udc = userdata.NewContent()

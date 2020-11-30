@@ -89,8 +89,8 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
-	if task == nil {
-		logrus.Errorf(fail.InvalidParameterError("task", "cannot be nil").Error())
+	if task.IsNull() {
+		logrus.Errorf(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
 		return nil
 	}
 
@@ -123,8 +123,8 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	complexity, xerr := c.GetComplexity(task)
@@ -230,8 +230,8 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -249,8 +249,8 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -269,8 +269,8 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -293,8 +293,8 @@ func (c *cluster) ExecuteScript(
 	if c == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")

@@ -134,7 +134,7 @@ func ListFeatures(task concurrency.Task, suitableFor string) ([]interface{}, fai
 //    - fail.ErrSyntax if feature found contains syntax error
 func NewFeature(task concurrency.Task, name string) (_ resources.Feature, xerr fail.Error) {
 	if task.IsNull() {
-		return nullFeature(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullFeature(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nullFeature(), fail.InvalidParameterError("name", "cannot be empty string")
@@ -187,7 +187,7 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, xerr f
 // with its content
 func NewEmbeddedFeature(task concurrency.Task, name string) (_ resources.Feature, xerr fail.Error) {
 	if task.IsNull() {
-		return nullFeature(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullFeature(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nullFeature(), fail.InvalidParameterError("name", "cannot be empty string")

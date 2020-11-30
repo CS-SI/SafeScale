@@ -147,7 +147,7 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -168,7 +168,7 @@ func (sg *securityGroup) Reload(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	// Read data from metadata storage
@@ -203,7 +203,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
@@ -292,7 +292,7 @@ func (sg *securityGroup) ForceDelete(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	return sg.delete(task, true)
@@ -680,7 +680,7 @@ func (sg securityGroup) GetBoundHosts(task concurrency.Task) ([]*propertiesv1.Se
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -706,7 +706,7 @@ func (sg securityGroup) GetBoundSubnets(task concurrency.Task) (list []*properti
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 

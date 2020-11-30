@@ -49,8 +49,8 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 	if d == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if inspector == nil {
 		return fail.InvalidParameterError("inspector", "cannot be nil")
@@ -84,8 +84,8 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xer
 	if d == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if alterer == nil {
 		return fail.InvalidParameterError("alterer", "cannot be nil")
@@ -123,8 +123,8 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 	if d == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	var jsoned []byte
@@ -145,8 +145,8 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 	if d == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")

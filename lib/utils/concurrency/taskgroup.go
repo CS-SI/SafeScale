@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -111,23 +110,18 @@ func (tg *taskGroup) GetID() (string, fail.Error) {
 	return tg.task.GetID()
 }
 
-// MustGetSignature builds the "signature" of the task passed as parameter,
-// ie a string representation of the task ID in the format "{taskgroup <id>}".
-func (tg *taskGroup) MustGetSignature() (string, fail.Error) {
+// GetSignature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
+func (tg *taskGroup) GetSignature() string {
 	if tg.IsNull() {
-		return "", fail.InvalidInstanceError()
+		return ""
 	}
 
 	tid, err := tg.GetID()
 	if err != nil {
-		return "", err
+		return ""
 	}
 
-	if !tracing.ShouldTrace("concurrency.task") {
-		return "", nil
-	}
-
-	return fmt.Sprintf("{taskgroup %s}", tid), nil
+	return `{taskgroup ` + tid + `}`
 }
 
 // GetStatus returns the current task status
