@@ -301,7 +301,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	// Updates cluster metadata to keep track of created Host, before testing if an error occurred during the creation
+	// Updates cluster metadata to keep track of created IPAddress, before testing if an error occurred during the creation
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// References new node in cluster
 		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {

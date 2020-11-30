@@ -205,7 +205,7 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 // 	return list, err
 // }
 
-// // FindClient returns the client hosted by the Host whose name is given
+// // FindClient returns the client hosted by the IPAddress whose name is given
 // func (m *Nas) FindClient(hostName string) (*resources.Nas, error) {
 // 	var client *resources.Nas
 // 	err := m.item.BrowseInto(*m.id, func(buf []byte) error {
@@ -214,7 +214,7 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 // 		if err != nil {
 // 			return err
 // 		}
-// 		if nas.Host == hostName {
+// 		if nas.IPAddress == hostName {
 // 			client = &nas
 // 			return nil
 // 		}
@@ -316,7 +316,7 @@ func (objs *share) Create(
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if len(serverSharesV1.ByID) == 0 {
-				// Host doesn't have shares yet, so install NFS
+				// IPAddress doesn't have shares yet, so install NFS
 				if xerr = nfsServer.Install(task); xerr != nil {
 					return xerr
 				}
@@ -342,7 +342,7 @@ func (objs *share) Create(
 		}
 	}()
 
-	// Updates Host Property propertiesv1.HostShares
+	// Updates IPAddress Property propertiesv1.HostShares
 	var hostShare *propertiesv1.HostShare
 	xerr = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -402,7 +402,7 @@ func (objs *share) Create(
 	return objs.Carry(task, &si)
 }
 
-// GetServer returns the *Host acting as share server, with error handling
+// GetServer returns the *IPAddress acting as share server, with error handling
 func (objs share) GetServer(task concurrency.Task) (resources.Host, fail.Error) {
 	if objs.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -435,7 +435,7 @@ func (objs share) GetServer(task concurrency.Task) (resources.Host, fail.Error) 
 	return server, nil
 }
 
-// getServer returns the *Host acting as share server, with no error handling
+// getServer returns the *IPAddress acting as share server, with no error handling
 func (objs share) getServer(task concurrency.Task) (rh resources.Host) {
 	rh, _ = objs.GetServer(task)
 	return rh

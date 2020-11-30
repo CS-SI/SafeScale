@@ -96,7 +96,7 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 
 // 	// For now, volume is attachable only to one host...
 // 	a := &protocol.VolumeAttachment{
-// 		Host:      &protocol.Reference{GetID: hostID},
+// 		IPAddress:      &protocol.Reference{GetID: hostID},
 // 		MountPath: hostMount.Path,
 // 		Format:    hostMount.FileSystem,
 // 		Device:    hostMmount.Device,

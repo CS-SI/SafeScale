@@ -309,7 +309,7 @@ func TestMock_GetTemplate(t *testing.T) {
 }
 
 // ListTemplates lists available host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
 func TestMock_ListTemplates(t *testing.T) {
 	// TODO Implement Test
 	// TODO use Mock object

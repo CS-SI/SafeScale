@@ -28,10 +28,10 @@ export VERSION_ID=
 sfFail() {
     if [ $# -eq 1 ]; then
         if [ $1 -ne 0 ]; then
-            echo "An error occurred: $1"
+            echo "Exiting with error $1"
         fi
     elif [ $# -eq 2 -a $1 -ne 0 ]; then
-        echo "An error occurred (errorcode $1): $2"
+        echo "Exiting with error $1: $2"
     fi
     exit $1
 }

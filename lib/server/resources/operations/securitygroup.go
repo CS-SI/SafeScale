@@ -752,7 +752,7 @@ func (sg securityGroup) ToProtocol(task concurrency.Task) (*protocol.SecurityGro
 	})
 }
 
-// BindToHost binds the security group to a Host.
+// BindToHost binds the security group to a IPAddress.
 // If 'ip' is not empty, applies the Security Group only on the interface hosting this IP address.
 func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*ip string,*/, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) fail.Error {
 	if sg.IsNull() {

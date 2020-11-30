@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -127,29 +126,24 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	// First starts the "displayer" routine...
-	var err fail.Error
-	pbc.displayTask, err = concurrency.NewTaskWithParent(task)
-	if err != nil {
-		return err
+	var xerr fail.Error
+	if pbc.displayTask, xerr = concurrency.NewTaskWithParent(task); xerr != nil {
+		return xerr
 	}
+
 	pbc.displayCh = make(chan outputItem, pipeCount)
-	_, err = pbc.displayTask.Start(taskDisplay, pbc.displayCh)
-	if err != nil {
-		return err
+	if _, xerr = pbc.displayTask.Start(taskDisplay, pbc.displayCh); xerr != nil {
+		return xerr
 	}
 
 	// ... then starts the "pipe readers"
-	taskGroup, err := concurrency.NewTaskGroup(task)
-	if err != nil {
-		return err
+	taskGroup, xerr := concurrency.NewTaskGroup(task)
+	if xerr != nil {
+		return xerr
 	}
 	for _, v := range pbc.bridges {
-		_, err = taskGroup.Start(taskRead, data.Map{
-			"bridge":    v,
-			"displayCh": pbc.displayCh,
-		})
-		if err != nil {
-			return err
+		if _, xerr = taskGroup.Start(taskRead, readParameters{bridge: v, ch: pbc.displayCh}); xerr != nil {
+			return xerr
 		}
 	}
 	pbc.readersGroup = taskGroup
@@ -166,30 +160,37 @@ func (oi outputItem) Print() {
 	oi.bridge.Print(oi.data)
 }
 
+// Structure to store taskRead parameters
+type readParameters struct {
+	bridge PipeBridge
+	ch     chan<- outputItem
+}
+
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
 func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if p == nil {
 		return nil, fail.InvalidParameterError("p", "cannot be nil")
 	}
 
-	params, ok := p.(data.Map)
+	params, ok := p.(readParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a 'data.Map'")
+		return nil, fail.InvalidParameterError("p", "must be a 'readParameters'")
 	}
 
-	var (
-		bridge    PipeBridge
-		displayCh chan<- outputItem
-	)
-	if bridge, ok = params["bridge"].(PipeBridge); !ok {
-		return nil, fail.InvalidParameterError("params['bridge']", "must be a PipeBridge")
-	}
-	if bridge == nil {
-		return nil, fail.InvalidParameterError("params['bridge']", "cannot be nil")
-	}
-	if displayCh, ok = params["displayCh"].(chan<- outputItem); !ok {
-		return nil, fail.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
-	}
+	// var (
+	// 	bridge    PipeBridge
+	// 	displayCh chan<- outputItem
+	// )
+	//
+	// if bridge, ok = params["bridge"].(PipeBridge); !ok {
+	// 	return nil, fail.InvalidParameterError("params['bridge']", "must be a PipeBridge")
+	// }
+	// if bridge == nil {
+	// 	return nil, fail.InvalidParameterError("params['bridge']", "cannot be nil")
+	// }
+	// if displayCh, ok = params["displayCh"].(chan<- outputItem); !ok {
+	// 	return nil, fail.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
+	// }
 
 	tracer := debug.NewTracer(t, tracing.ShouldTrace("cli")).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -204,7 +205,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	}()
 	defer fail.OnPanic(&panicErr)
 
-	scanner := bufio.NewScanner(bridge.Reader())
+	scanner := bufio.NewScanner(params.bridge.Reader())
 	scanner.Split(bufio.ScanLines)
 
 	var err error
@@ -215,10 +216,10 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 		}
 		if scanner.Scan() {
 			item := outputItem{
-				bridge: bridge,
+				bridge: params.bridge,
 				data:   scanner.Text() + "\n",
 			}
-			displayCh <- item
+			params.ch <- item
 		} else {
 			err = scanner.Err()
 			break
@@ -243,6 +244,7 @@ func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.
 	if !ok {
 		return nil, fail.InvalidParameterError("p", "must be a '<-chan outputItem'")
 	}
+
 	for item := range displayCh {
 		item.Print()
 	}
@@ -260,14 +262,15 @@ func (pbc *PipeBridgeController) Wait() fail.Error {
 	if pbc.readersGroup == nil {
 		return fail.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
-	_, err := pbc.readersGroup.WaitGroup()
+
+	_, xerr := pbc.readersGroup.WaitGroup()
 	close(pbc.displayCh)
-	if err != nil {
-		return err
+	if xerr != nil {
+		return xerr
 	}
 
-	_, err = pbc.displayTask.Wait()
-	return err
+	_, xerr = pbc.displayTask.Wait()
+	return xerr
 }
 
 // Stop the captures and the display.
@@ -283,18 +286,20 @@ func (pbc *PipeBridgeController) Stop() fail.Error {
 	}
 
 	// Try to wait the end of the task group
-	ok, _, err := pbc.readersGroup.TryWaitGroup()
-	if err != nil {
-		return err
+	ok, _, xerr := pbc.readersGroup.TryWaitGroup()
+	if xerr != nil {
+		return xerr
 	}
 	if !ok {
 		// If not done, abort it and wait until the end
 		_ = pbc.readersGroup.Abort()
-		err = pbc.Wait()
-		if err != nil {
+		if xerr = pbc.Wait(); xerr != nil {
 			// In case of error, report only if error is not aborted error, as we triggered it
-			if _, ok = err.(*fail.ErrAborted); !ok {
-				return err
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+				// do nothing
+			default:
+				return xerr
 			}
 		}
 	}

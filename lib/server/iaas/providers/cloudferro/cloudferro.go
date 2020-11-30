@@ -59,7 +59,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
-	// network, _ := params["network"].(map[string]interface{})
+	network, _ := params["network"].(map[string]interface{})
 
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
@@ -84,6 +84,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	providerNetwork, _ := network["ProviderNetwork"].(string)
+	if providerNetwork == "" {
+		providerNetwork = "external"
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
 		Username:         username,
@@ -92,7 +97,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   "external",
+		FloatingIPPool:   providerNetwork,
 		AllowReauth:      true,
 	}
 
@@ -112,7 +117,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		ProviderNetwork:           "external",
+		ProviderNetwork:           providerNetwork,
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,

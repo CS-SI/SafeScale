@@ -129,7 +129,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	return rh, rh.cacheAccessInformation(task)
 }
 
-// upgradeIfNeeded upgrades Host properties if needed
+// upgradeIfNeeded upgrades IPAddress properties if needed
 func (rh *host) upgradeIfNeeded(task concurrency.Task) fail.Error {
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
@@ -229,7 +229,8 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 					primaryGatewayConfig = &system.SSHConfig{
 						PrivateKey: gwahc.PrivateKey,
 						Port:       22,
-						Host:       ip,
+						IPAddress:  ip,
+						Hostname:   gwahc.Name,
 						User:       abstract.DefaultUser,
 					}
 					return nil
@@ -256,7 +257,8 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       22,
-							Host:       rgw.(*host).getAccessIP(task),
+							IPAddress:  rgw.(*host).getAccessIP(task),
+							Hostname:   rgw.GetName(),
 							User:       abstract.DefaultUser,
 						}
 						return nil
@@ -273,7 +275,8 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 		}
 		rh.sshProfile = &system.SSHConfig{
 			Port:                   22,
-			Host:                   rh.accessIP,
+			IPAddress:              rh.accessIP,
+			Hostname:               rh.GetName(),
 			User:                   abstract.DefaultUser,
 			PrivateKey:             ahc.PrivateKey,
 			GatewayConfig:          primaryGatewayConfig,
@@ -1504,7 +1507,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			// Unbind Security Groups from Host
+			// Unbind Security Groups from IPAddress
 			var errors []error
 			for _, v := range hsgV1.ByID {
 				rsg, derr := LoadSecurityGroup(task, svc, v.ID)
@@ -1524,7 +1527,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
 			}
 
-			// Delete default Security Group of Host
+			// Delete default Security Group of IPAddress
 			if hsgV1.DefaultID != "" {
 				rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
 				if derr == nil {
@@ -1646,6 +1649,7 @@ func (rh host) getSSHConfig(task concurrency.Task) *system.SSHConfig {
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
+
 	return rh.sshProfile
 }
 
@@ -1702,6 +1706,12 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 			}
 		},
 	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			xerr = fail.Wrap(xerr.Cause(), "timeout occurred")
+		}
+	}
 	return retCode, stdOut, stdErr, xerr
 }
 
@@ -2043,7 +2053,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, false /*Trace.Host, */, "(%s)", name).Entering()
+	tracer := debug.NewTracer(task, false /*Trace.IPAddress, */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	feat, xerr := NewFeature(task, name)

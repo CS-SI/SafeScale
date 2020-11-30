@@ -718,15 +718,15 @@ func (c *cluster) createHostResources(
 		}
 	}
 
-	masterCount, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
-	if xerr != nil {
-		return xerr
-	}
+	// masterCount, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	var (
 		primaryGatewayStatus, secondaryGatewayStatus fail.Error
-		mastersStatus, privateNodesStatus            fail.Error
-		primaryGatewayTask, secondaryGatewayTask     concurrency.Task
+		// mastersStatus, privateNodesStatus            fail.Error
+		primaryGatewayTask, secondaryGatewayTask concurrency.Task
 	)
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
@@ -740,43 +740,44 @@ func (c *cluster) createHostResources(
 			return xerr
 		}
 	}
-	mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, data.Map{
-		"count":     masterCount,
-		"masterDef": mastersDef,
-		"nokeep":    !keepOnFailure,
-	})
-	if xerr != nil {
-		return xerr
-	}
 
-	privateNodesTask, xerr := task.StartInSubtask(c.taskCreateNodes, data.Map{
-		"count":   privateNodeCount,
-		"public":  false,
-		"nodeDef": nodesDef,
-		"nokeep":  !keepOnFailure,
-	})
-	if xerr != nil {
-		return xerr
-	}
+	// mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, data.Map{
+	// 	"count":     masterCount,
+	// 	"masterDef": mastersDef,
+	// 	"nokeep":    !keepOnFailure,
+	// })
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	//
+	// privateNodesTask, xerr := task.StartInSubtask(c.taskCreateNodes, data.Map{
+	// 	"count":   privateNodeCount,
+	// 	"public":  false,
+	// 	"nodeDef": nodesDef,
+	// 	"nokeep":  !keepOnFailure,
+	// })
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	// Step 2: awaits gateway installation end and masters installation end
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
-		if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
-			_ = primaryGatewayStatus.AddConsequence(abortMasterErr)
-		}
-		if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
-			_ = primaryGatewayStatus.AddConsequence(abortNodesErr)
-		}
+		// if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
+		// 	_ = primaryGatewayStatus.AddConsequence(abortMasterErr)
+		// }
+		// if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
+		// 	_ = primaryGatewayStatus.AddConsequence(abortNodesErr)
+		// }
 		return primaryGatewayStatus
 	}
 	if haveSecondaryGateway && !secondaryGatewayTask.IsNull() {
 		if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
-			if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
-				_ = secondaryGatewayStatus.AddConsequence(abortMasterErr)
-			}
-			if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
-				_ = secondaryGatewayStatus.AddConsequence(abortNodesErr)
-			}
+			// if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
+			// 	_ = secondaryGatewayStatus.AddConsequence(abortMasterErr)
+			// }
+			// if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
+			// 	_ = secondaryGatewayStatus.AddConsequence(abortNodesErr)
+			// }
 			return secondaryGatewayStatus
 		}
 	}
@@ -804,14 +805,14 @@ func (c *cluster) createHostResources(
 		}
 	}()
 
-	_, mastersStatus = mastersTask.Wait()
-	if mastersStatus != nil {
-		abortNodesErr := privateNodesTask.Abort()
-		if abortNodesErr != nil {
-			_ = mastersStatus.AddConsequence(abortNodesErr)
-		}
-		return mastersStatus
-	}
+	// _, mastersStatus = mastersTask.Wait()
+	// if mastersStatus != nil {
+	// 	abortNodesErr := privateNodesTask.Abort()
+	// 	if abortNodesErr != nil {
+	// 		_ = mastersStatus.AddConsequence(abortNodesErr)
+	// 	}
+	// 	return mastersStatus
+	// }
 
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure getGateway(s) and waits for the result
@@ -840,43 +841,43 @@ func (c *cluster) createHostResources(
 		}
 	}
 
-	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
-	if _, mastersStatus = task.RunInSubtask(c.taskConfigureMasters, nil); mastersStatus != nil {
-		return mastersStatus
-	}
+	// // Step 4: configure masters (if masters created successfully and gateway configure successfully)
+	// if _, mastersStatus = task.RunInSubtask(c.taskConfigureMasters, nil); mastersStatus != nil {
+	// 	return mastersStatus
+	// }
+	//
+	// defer func() {
+	// 	if xerr != nil && !keepOnFailure {
+	// 		list, merr := c.ListNodeIDs(task)
+	// 		if merr != nil {
+	// 			_ = xerr.AddConsequence(merr)
+	// 		} else {
+	// 			tg, tgerr := concurrency.NewTaskGroup(task)
+	// 			if tgerr != nil {
+	// 				_ = xerr.AddConsequence(tgerr)
+	// 			} else {
+	// 				for _, v := range list {
+	// 					_, _ = tg.StartInSubtask(c.taskDeleteHost, data.Map{"host": v})
+	// 				}
+	// 				_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
+	// 				if derr != nil {
+	// 					_ = xerr.AddConsequence(derr)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }()
 
-	defer func() {
-		if xerr != nil && !keepOnFailure {
-			list, merr := c.ListNodeIDs(task)
-			if merr != nil {
-				_ = xerr.AddConsequence(merr)
-			} else {
-				tg, tgerr := concurrency.NewTaskGroup(task)
-				if tgerr != nil {
-					_ = xerr.AddConsequence(tgerr)
-				} else {
-					for _, v := range list {
-						_, _ = tg.StartInSubtask(c.taskDeleteHost, data.Map{"host": v})
-					}
-					_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
-					if derr != nil {
-						_ = xerr.AddConsequence(derr)
-					}
-				}
-			}
-		}
-	}()
+	// // Step 5: awaits nodes creation
+	// if _, privateNodesStatus = privateNodesTask.Wait(); privateNodesStatus != nil {
+	// 	return privateNodesStatus
+	// }
 
-	// Step 5: awaits nodes creation
-	if _, privateNodesStatus = privateNodesTask.Wait(); privateNodesStatus != nil {
-		return privateNodesStatus
-	}
-
-	// Step 6: Starts nodes configuration, if all masters and nodes
-	// have been created and gateway has been configured with success
-	if _, privateNodesStatus = task.RunInSubtask(c.taskConfigureNodes, nil); privateNodesStatus != nil {
-		return privateNodesStatus
-	}
+	// // Step 6: Starts nodes configuration, if all masters and nodes
+	// // have been created and gateway has been configured with success
+	// if _, privateNodesStatus = task.RunInSubtask(c.taskConfigureNodes, nil); privateNodesStatus != nil {
+	// 	return privateNodesStatus
+	// }
 
 	return nil
 }
@@ -2872,7 +2873,7 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 
 // VPL: not used anymore, flavor SWARM has to disappear
 // // leaveNodeFromSwarm unregisters properly a node from docker Swarm
-// func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.Host) (xerr fail.Error) {
+// func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.IPAddress) (xerr fail.Error) {
 // 	if selectedMaster == nil {
 // 		selectedMaster, xerr = c.FindAvailableMaster(task)
 // 		if xerr != nil {

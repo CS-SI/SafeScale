@@ -748,7 +748,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 
 // VPL: has to disappear
 // // CreateGateway creates a public Gateway for a private network
-// func (s *stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.Host, content *userdata.Content, err error) {
+// func (s *stack) CreateGateway(req abstract.GatewayRequest, sizing *abstract.SizingRequirements) (host *abstract.IPAddress, content *userdata.Content, err error) {
 //	logrus.Debug("vclouddirector.Client.CreateGateway() called")
 //	defer logrus.Debug("vclouddirector.Client.CreateGateway() done")
 //
@@ -786,7 +786,7 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //		}
 //	}
 //
-//	// Updates Host Property propsv1.HostSizing
+//	// Updates IPAddress Property propsv1.HostSizing
 //	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 //		hostSizingV1 := clonable.(*propsv1.HostSizing)
 //		hostSizingV1.Template = req.TemplateID

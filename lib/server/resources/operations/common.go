@@ -75,7 +75,7 @@ func GetPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]st
 	if recoverCode == 0 && recoverErr == nil {
 		lines := strings.Split(recoverStdOut, "\n")
 		for _, line := range lines {
-			if strings.Contains(line, "An error occurred") {
+			if strings.Contains(line, "Exiting with error ") {
 				warnings = append(warnings, line)
 			}
 			if strings.Contains(line, "PROVISIONING_ERROR") {

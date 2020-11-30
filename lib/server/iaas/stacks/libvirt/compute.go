@@ -626,7 +626,7 @@ func (s stack) getNetworkV2FromDomain(domain *libvirt.Domain) (*propertiesv2.Hos
 	return hostNetwork, nil
 }
 
-// getHostFromDomain build a abstract.Host struct representing a Domain
+// getHostFromDomain build a abstract.IPAddress struct representing a Domain
 func (s stack) getHostFromDomain(domain *libvirt.Domain) (_ *abstract.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -918,7 +918,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		}
 	}()
 
-	// ----Generate abstract.Host----
+	// ----Generate abstract.IPAddress----
 
 	domain, werr := s.LibvirtService.LookupDomainByName(resourceName)
 	if werr != nil {
@@ -954,7 +954,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	return host, userData, nil
 }
 
-// GetHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
+// GetHost returns the host identified by ref (name or id) or by a *abstract.IPAddress containing an id
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()

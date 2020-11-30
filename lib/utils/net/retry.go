@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -60,6 +61,9 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
+			if v != verdict.Done {
+				spew.Dump(v)
+			}
 			switch v {
 			case verdict.Retry:
 				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())

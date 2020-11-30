@@ -227,7 +227,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	// 	return nil, fail.InvalidRequestError("invalid mount path '%s': '%s'", path, xerr)
 	// }
 	//
-	// var target resources.Host
+	// var target resources.IPAddress
 	// if server.GetName() == hostRef || server.GetID() == hostRef {
 	// 	target = server
 	// } else {
@@ -506,7 +506,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	// 	return xerr
 	// }
 	//
-	// var target resources.Host
+	// var target resources.IPAddress
 	// if server.GetName() == hostRef || server.GetID() == hostRef {
 	// 	target = server
 	// } else {

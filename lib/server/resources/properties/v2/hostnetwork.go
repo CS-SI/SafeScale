@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// HostNetworking contains network information related to Host
+// HostNetworking contains network information related to IPAddress
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields

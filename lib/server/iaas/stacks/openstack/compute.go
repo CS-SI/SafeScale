@@ -241,8 +241,8 @@ func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 	return template, nil
 }
 
-// ListTemplates lists available Host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// ListTemplates lists available IPAddress templates
+// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
 func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
@@ -463,7 +463,7 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	return ahf, nil
 }
 
-// complementHost complements Host data with content of server parameter
+// complementHost complements IPAddress data with content of server parameter
 func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -954,7 +954,7 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 	//		sgs = append(sgs, defaultSubnet.GWSecurityGroupID)
 	//	}
 	//}
-	//// DO NOT add Subnet internal Security Group if host is a Single Host with public IP; this kind of host needs to be isolated (not perfect with Security Group but it's a start)
+	//// DO NOT add Subnet internal Security Group if host is a Single IPAddress with public IP; this kind of host needs to be isolated (not perfect with Security Group but it's a start)
 	//if request.IsGateway || !request.PublicIP || (subnetCount == 1 && defaultSubnet.Name != abstract.SingleHostNetworkName) || subnetCount > 1 {
 	//	sgs = append(sgs, defaultSubnet.InternalSecurityGroupID)
 	//}
@@ -1219,10 +1219,10 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			}
 
 			if server == nil {
-				return fail.NotFoundError("provider did not send information for Host '%s'", hostLabel)
+				return fail.NotFoundError("provider did not send information for Host %s", hostLabel)
 			}
 
-			ahf.Core.ID = server.ID // makes sure that on next turn we get Host by ID
+			ahf.Core.ID = server.ID // makes sure that on next turn we get IPAddress by ID
 			lastState := toHostState(server.Status)
 			// If state matches, we consider this a success no matter what
 			if lastState == state {
@@ -1567,7 +1567,7 @@ func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// TODO: RESIZE Resize Host HERE
+	// TODO: RESIZE Resize IPAddress HERE
 	logrus.Warn("Trying to resize a Host...")
 
 	// TODO: RESIZE Call this
@@ -1577,7 +1577,7 @@ func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 }
 
 // BindSecurityGroupToHost binds a security group to a host
-// If Security Group is already bound to Host, returns *fail.ErrDuplicate
+// If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
 func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

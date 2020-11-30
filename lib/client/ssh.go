@@ -197,7 +197,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 		return -1, "", "", xerr
 	}
 
-	// Host checks
+	// IPAddress checks
 	if hostFrom != "" && hostTo != "" {
 		return -1, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
 	}
@@ -324,13 +324,14 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 	if sshCfg.GatewayConfig == nil {
 		sshCfg.GatewayConfig = &system.SSHConfig{
 			User:          sshCfg.User,
-			Host:          sshCfg.Host,
+			IPAddress:     sshCfg.IPAddress,
+			Hostname:      sshCfg.Hostname,
 			PrivateKey:    sshCfg.PrivateKey,
 			Port:          sshCfg.Port,
 			GatewayConfig: nil,
 		}
 	}
-	sshCfg.Host = "127.0.0.1"
+	sshCfg.IPAddress = "127.0.0.1"
 	sshCfg.Port = remotePort
 	sshCfg.LocalPort = localPort
 
@@ -366,15 +367,16 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 	if sshCfg.GatewayConfig == nil {
 		sshCfg.GatewayConfig = &system.SSHConfig{
 			User:          sshCfg.User,
-			Host:          sshCfg.Host,
+			IPAddress:     sshCfg.IPAddress,
+			Hostname:      sshCfg.Hostname,
 			PrivateKey:    sshCfg.PrivateKey,
 			Port:          sshCfg.Port,
 			GatewayConfig: nil,
 		}
-		sshCfg.Host = "127.0.0.1"
+		sshCfg.IPAddress = "127.0.0.1"
 	}
 
-	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.Host, remotePort, sshCfg.GatewayConfig.User, sshCfg.GatewayConfig.Host)
+	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig.User, sshCfg.GatewayConfig.IPAddress)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err == nil {

@@ -326,7 +326,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.New(task, job.GetService())
+	instance, xerr := clusterfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
