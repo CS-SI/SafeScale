@@ -63,14 +63,20 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
-	tenantName, _ := compute["TenantName"].(string)
+	tenantID, _ := identity["ApplicationKey"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	if zone == "" {
+	    zone = "nova"
+    }
 	providerNetwork, _ := network["ExternalNetwork"].(string)
 	if providerNetwork == "" {
 		providerNetwork = "public"
 	}
+    floatingIPPool, _ := network["FloatingIPPool"].(string)
+    if floatingIPPool == "" {
+        floatingIPPool = providerNetwork
+    }
 	defaultImage, _ := compute["DefaultImage"].(string)
 	dnsServers, _ := network["DNSServers"].([]string)
 	if len(dnsServers) == 0 {
@@ -89,7 +95,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
-		TenantName:       tenantName,
+		TenantID:         tenantID,
 		Region:           region,
 		AvailabilityZone: zone,
 		FloatingIPPool:   floatingIPPool,
@@ -103,7 +109,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		ok                 bool
 	)
 	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
-		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, tenantName, "0")
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, tenantID, "0")
 		if err != nil {
 			return nil, err
 		}
