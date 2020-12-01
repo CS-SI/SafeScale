@@ -88,6 +88,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if providerNetwork == "" {
 		providerNetwork = "external"
 	}
+	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	if floatingIPPool == "" {
+		floatingIPPool = providerNetwork
+	}
 
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
@@ -97,7 +101,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   providerNetwork,
+		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
 		AllowReauth:      true,
 	}
 
