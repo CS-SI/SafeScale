@@ -1,5 +1,5 @@
 [Unit]
-Description=Hello World HTTP
+Description=SafeScale daemon 
 Requires=network.target
 After=multi-user.target
 
