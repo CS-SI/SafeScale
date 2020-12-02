@@ -32,4 +32,6 @@ WantedBy=sockets.target
 
 ```
 systemctl enable safescale.service
+systemctl start safescale
 ```
+
