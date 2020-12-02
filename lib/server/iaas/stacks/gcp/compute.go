@@ -304,7 +304,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUD, xerr
 	}
 
-	// --- query provider for Host creation ---
+	// --- query provider for IPAddress creation ---
 
 	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
 
@@ -333,7 +333,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			//	return fail.NewError("failed to create server")
 			//}
 
-			// Wait that Host is ready, not just that the build is started
+			// Wait that IPAddress is ready, not just that the build is started
 			if _, innerXErr = s.WaitHostReady(ahf.GetID(), temporal.GetLongOperationTimeout()); innerXErr != nil {
 				if !request.KeepOnFailure {
 					if derr := s.DeleteHost(ahf.GetID()); derr != nil {
@@ -858,7 +858,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	return s.rpcAddTagsToInstance(ahf.GetID(), []string{asg.GetID()})
 }
 
-// UnbindSecurityGroupFromHost unbinds a Security Group from a Host
+// UnbindSecurityGroupFromHost unbinds a Security Group from a IPAddress
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

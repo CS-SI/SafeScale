@@ -53,9 +53,9 @@ type Content struct {
 	ExitOnError string
 	// Password for the user safescale (for troubleshoot use, usable only in console)
 	Password string
-	// PublicKey is the public key used to create the Host
+	// PublicKey is the public key used to create the IPAddress
 	PublicKey string
-	// PrivateKey is the private key used to create the Host
+	// PrivateKey is the private key used to create the IPAddress
 	PrivateKey string
 	// ConfIF, if set to true, configure all interfaces to DHCP
 	ConfIF bool

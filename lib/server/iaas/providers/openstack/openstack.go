@@ -61,12 +61,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
 	tenantName, _ := compute["TenantName"].(string)
+	tenantID, _ := compute["TenantID"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	if zone == "" {
+		zone = "nova"
+	}
 	providerNetwork, _ := network["ExternalNetwork"].(string)
 	if providerNetwork == "" {
 		providerNetwork = "public"
+	}
+	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	if floatingIPPool == "" {
+		floatingIPPool = providerNetwork
 	}
 	defaultImage, _ := compute["DefaultImage"].(string)
 	dnsServers, _ := network["DNSServers"].([]string)
@@ -86,14 +93,15 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
+		TenantID:         tenantID,
 		TenantName:       tenantName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool,
+		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
 	}
 
 	providerName := "openstack"
-	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, tenantName, "0")
+	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, tenantID, "0")
 	if xerr != nil {
 		return nil, xerr
 	}

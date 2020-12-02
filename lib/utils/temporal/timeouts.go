@@ -48,6 +48,9 @@ const (
 	// DefaultExecutionTimeout is the default linux command operation timeout
 	DefaultExecutionTimeout = 5 * time.Minute
 
+	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
+	DefaultMetadataReadAfterWriteTimeout = 2 * time.Minute
+
 	// SmallDelay is the predefined small delay
 	SmallDelay = 1 * time.Second
 
@@ -128,6 +131,11 @@ func GetExecutionTimeout() time.Duration {
 // GetCommunicationTimeout ...
 func GetCommunicationTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_COMMUNICATION_TIMEOUT", defaultCommunicationTimeout)
+}
+
+// GetMetadataReadAfterWriteTimeout ...
+func GetMetadataReadAfterWriteTimeout() time.Duration {
+	return GetTimeoutFromEnv("SAFESCALE_METADATA_READ_AFTER_WRITE_TIMEOUT", DefaultMetadataReadAfterWriteTimeout)
 }
 
 // GetLongOperationTimeout ...

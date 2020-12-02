@@ -89,8 +89,8 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
-	if task == nil {
-		logrus.Errorf(fail.InvalidParameterError("task", "cannot be nil").Error())
+	if task.IsNull() {
+		logrus.Errorf(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
 		return nil
 	}
 
@@ -123,8 +123,8 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	complexity, xerr := c.GetComplexity(task)
@@ -230,8 +230,8 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -249,8 +249,8 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -269,8 +269,8 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -284,7 +284,7 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 	return feat.Remove(c, vars, settings)
 }
 
-// ExecuteScript executes the script template with the parameters on target Host
+// ExecuteScript executes the script template with the parameters on target IPAddress
 func (c *cluster) ExecuteScript(
 	task concurrency.Task, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
 	host resources.Host,
@@ -293,8 +293,8 @@ func (c *cluster) ExecuteScript(
 	if c == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
@@ -437,8 +437,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 				return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
 			}
 		}
-		retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout())
-		if xerr != nil {
+		if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout()); xerr != nil {
 			return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
 		}
 		if retcode != 0 {
@@ -493,8 +492,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	params["getDefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["getEndpointIP"] = netCfg.EndpointIP
 
-	_, _, _, xerr = c.ExecuteScript(task, nil, script, params, host)
-	if xerr != nil {
+	if _, _, _, xerr = c.ExecuteScript(task, nil, script, params, host); xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
 	}
 

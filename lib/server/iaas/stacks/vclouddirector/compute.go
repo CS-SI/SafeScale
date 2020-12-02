@@ -647,7 +647,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 	return hostFull, userData, nil
 }
 
-// InspectHost returns the host identified by ref (name or id) or by a *abstract.Host containing an id
+// InspectHost returns the host identified by ref (name or id) or by a *abstract.IPAddress containing an id
 func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
 	ahf = &abstract.HostFull{}
 	if s == nil {

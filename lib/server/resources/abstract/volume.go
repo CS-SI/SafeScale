@@ -78,7 +78,7 @@ func (v *Volume) OK() bool {
 	return result
 }
 
-// Serialize serializes Host instance into bytes (output json code)
+// Serialize serializes IPAddress instance into bytes (output json code)
 func (v *Volume) Serialize() ([]byte, fail.Error) {
 	if v == nil {
 		return nil, fail.InvalidInstanceError()
@@ -87,7 +87,7 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 	return r, fail.ToError(err)
 }
 
-// Deserialize reads json code and restores an Host
+// Deserialize reads json code and restores an IPAddress
 func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
 	if v == nil {
 		return fail.InvalidInstanceError()

@@ -267,7 +267,7 @@ func pollVolume(svc service, volumeID string, state volumestate.Enum, cout chan 
 }
 
 // ListTemplates lists available host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
 func (svc service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -633,7 +633,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 	ah.Name = request.ResourceName
 	_, rerr := svc.InspectHost(ah)
 	if rerr == nil {
-		return nil, nil, nil, abstract.ResourceDuplicateError("Host", request.ResourceName)
+		return nil, nil, nil, abstract.ResourceDuplicateError("host", request.ResourceName)
 	}
 
 	// Create temporary key pair

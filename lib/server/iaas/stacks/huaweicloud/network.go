@@ -617,7 +617,8 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostCleanupTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
-		nil, nil,
+		nil,
+		nil,
 		func(t retry.Try, verdict verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {

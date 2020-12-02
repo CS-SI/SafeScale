@@ -81,7 +81,7 @@ func nullCluster() *cluster {
 // NewCluster ...
 func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	if task.IsNull() {
-		return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullCluster(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if svc == nil {
 		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
@@ -103,7 +103,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 // LoadCluster ...
 func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
 	if task.IsNull() {
-		return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullCluster(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if svc == nil {
 		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
@@ -221,7 +221,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -352,7 +352,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	// FIXME: validate parameters
 
@@ -694,9 +694,15 @@ func (c *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
+
+	haveSecondaryGateway := true
 	secondaryGateway, xerr := subnet.GetGateway(task, false)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// It's a valid state not to have a secondary gateway, so continue
+			haveSecondaryGateway = false
+		default:
 			return xerr
 		}
 	}
@@ -706,21 +712,21 @@ func (c *cluster) createHostResources(
 	}
 
 	// Loads secondary gateway metadata
-	if secondaryGateway != nil {
+	if haveSecondaryGateway {
 		if _, xerr = secondaryGateway.WaitSSHReady(task, temporal.GetExecutionTimeout()); xerr != nil {
 			return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 		}
 	}
 
-	masterCount, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
-	if xerr != nil {
-		return xerr
-	}
+	// masterCount, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	var (
 		primaryGatewayStatus, secondaryGatewayStatus fail.Error
-		mastersStatus, privateNodesStatus            fail.Error
-		primaryGatewayTask, secondaryGatewayTask     concurrency.Task
+		// mastersStatus, privateNodesStatus            fail.Error
+		primaryGatewayTask, secondaryGatewayTask concurrency.Task
 	)
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
@@ -728,48 +734,50 @@ func (c *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	if secondaryGateway != nil {
+
+	if haveSecondaryGateway {
 		if secondaryGatewayTask, xerr = task.StartInSubtask(c.taskInstallGateway, secondaryGateway); xerr != nil {
 			return xerr
 		}
 	}
-	mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, data.Map{
-		"count":     masterCount,
-		"masterDef": mastersDef,
-		"nokeep":    !keepOnFailure,
-	})
-	if xerr != nil {
-		return xerr
-	}
 
-	privateNodesTask, xerr := task.StartInSubtask(c.taskCreateNodes, data.Map{
-		"count":   privateNodeCount,
-		"public":  false,
-		"nodeDef": nodesDef,
-		"nokeep":  !keepOnFailure,
-	})
-	if xerr != nil {
-		return xerr
-	}
+	// mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, data.Map{
+	// 	"count":     masterCount,
+	// 	"masterDef": mastersDef,
+	// 	"nokeep":    !keepOnFailure,
+	// })
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	//
+	// privateNodesTask, xerr := task.StartInSubtask(c.taskCreateNodes, data.Map{
+	// 	"count":   privateNodeCount,
+	// 	"public":  false,
+	// 	"nodeDef": nodesDef,
+	// 	"nokeep":  !keepOnFailure,
+	// })
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	// Step 2: awaits gateway installation end and masters installation end
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
-		if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
-			_ = primaryGatewayStatus.AddConsequence(abortMasterErr)
-		}
-		if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
-			_ = primaryGatewayStatus.AddConsequence(abortNodesErr)
-		}
+		// if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
+		// 	_ = primaryGatewayStatus.AddConsequence(abortMasterErr)
+		// }
+		// if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
+		// 	_ = primaryGatewayStatus.AddConsequence(abortNodesErr)
+		// }
 		return primaryGatewayStatus
 	}
-	if secondaryGateway != nil && secondaryGatewayTask != nil {
+	if haveSecondaryGateway && !secondaryGatewayTask.IsNull() {
 		if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
-			if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
-				_ = secondaryGatewayStatus.AddConsequence(abortMasterErr)
-			}
-			if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
-				_ = secondaryGatewayStatus.AddConsequence(abortNodesErr)
-			}
+			// if abortMasterErr := mastersTask.Abort(); abortMasterErr != nil {
+			// 	_ = secondaryGatewayStatus.AddConsequence(abortMasterErr)
+			// }
+			// if abortNodesErr := privateNodesTask.Abort(); abortNodesErr != nil {
+			// 	_ = secondaryGatewayStatus.AddConsequence(abortNodesErr)
+			// }
 			return secondaryGatewayStatus
 		}
 	}
@@ -797,14 +805,14 @@ func (c *cluster) createHostResources(
 		}
 	}()
 
-	_, mastersStatus = mastersTask.Wait()
-	if mastersStatus != nil {
-		abortNodesErr := privateNodesTask.Abort()
-		if abortNodesErr != nil {
-			_ = mastersStatus.AddConsequence(abortNodesErr)
-		}
-		return mastersStatus
-	}
+	// _, mastersStatus = mastersTask.Wait()
+	// if mastersStatus != nil {
+	// 	abortNodesErr := privateNodesTask.Abort()
+	// 	if abortNodesErr != nil {
+	// 		_ = mastersStatus.AddConsequence(abortNodesErr)
+	// 	}
+	// 	return mastersStatus
+	// }
 
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure getGateway(s) and waits for the result
@@ -827,51 +835,49 @@ func (c *cluster) createHostResources(
 		return primaryGatewayStatus
 	}
 
-	if !gwFailoverDisabled {
-		if secondaryGatewayTask != nil {
-			if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
-				return secondaryGatewayStatus
-			}
+	if !gwFailoverDisabled && !secondaryGatewayTask.IsNull() {
+		if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
+			return secondaryGatewayStatus
 		}
 	}
 
-	// Step 4: configure masters (if masters created successfully and gateway configure successfully)
-	if _, mastersStatus = task.RunInSubtask(c.taskConfigureMasters, nil); mastersStatus != nil {
-		return mastersStatus
-	}
+	// // Step 4: configure masters (if masters created successfully and gateway configure successfully)
+	// if _, mastersStatus = task.RunInSubtask(c.taskConfigureMasters, nil); mastersStatus != nil {
+	// 	return mastersStatus
+	// }
+	//
+	// defer func() {
+	// 	if xerr != nil && !keepOnFailure {
+	// 		list, merr := c.ListNodeIDs(task)
+	// 		if merr != nil {
+	// 			_ = xerr.AddConsequence(merr)
+	// 		} else {
+	// 			tg, tgerr := concurrency.NewTaskGroup(task)
+	// 			if tgerr != nil {
+	// 				_ = xerr.AddConsequence(tgerr)
+	// 			} else {
+	// 				for _, v := range list {
+	// 					_, _ = tg.StartInSubtask(c.taskDeleteHost, data.Map{"host": v})
+	// 				}
+	// 				_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
+	// 				if derr != nil {
+	// 					_ = xerr.AddConsequence(derr)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }()
 
-	defer func() {
-		if xerr != nil && !keepOnFailure {
-			list, merr := c.ListNodeIDs(task)
-			if merr != nil {
-				_ = xerr.AddConsequence(merr)
-			} else {
-				tg, tgerr := concurrency.NewTaskGroup(task)
-				if tgerr != nil {
-					_ = xerr.AddConsequence(tgerr)
-				} else {
-					for _, v := range list {
-						_, _ = tg.StartInSubtask(c.taskDeleteHost, data.Map{"host": v})
-					}
-					_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
-					if derr != nil {
-						_ = xerr.AddConsequence(derr)
-					}
-				}
-			}
-		}
-	}()
+	// // Step 5: awaits nodes creation
+	// if _, privateNodesStatus = privateNodesTask.Wait(); privateNodesStatus != nil {
+	// 	return privateNodesStatus
+	// }
 
-	// Step 5: awaits nodes creation
-	if _, privateNodesStatus = privateNodesTask.Wait(); privateNodesStatus != nil {
-		return privateNodesStatus
-	}
-
-	// Step 6: Starts nodes configuration, if all masters and nodes
-	// have been created and gateway has been configured with success
-	if _, privateNodesStatus = task.RunInSubtask(c.taskConfigureNodes, nil); privateNodesStatus != nil {
-		return privateNodesStatus
-	}
+	// // Step 6: Starts nodes configuration, if all masters and nodes
+	// // have been created and gateway has been configured with success
+	// if _, privateNodesStatus = task.RunInSubtask(c.taskConfigureNodes, nil); privateNodesStatus != nil {
+	// 	return privateNodesStatus
+	// }
 
 	return nil
 }
@@ -936,7 +942,7 @@ func (c *cluster) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 		return []byte{}, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	c.SafeRLock(task)
@@ -953,7 +959,7 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
@@ -974,7 +980,7 @@ func (c *cluster) Bootstrap(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	defer fail.OnPanic(&xerr) // c.Lock()/Unlock() may panic
@@ -1022,7 +1028,7 @@ func (c *cluster) GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, 
 		return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return abstract.ClusterIdentity{}, fail.InvalidParameterError("task", "cannot be nil")
+		return abstract.ClusterIdentity{}, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	c.SafeRLock(task)
@@ -1046,7 +1052,7 @@ func (c *cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, x
 		return 0, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be nil")
+		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1074,7 +1080,7 @@ func (c *cluster) GetComplexity(task concurrency.Task) (complexity clustercomple
 		return 0, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be nil")
+		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1102,7 +1108,7 @@ func (c *cluster) GetAdminPassword(task concurrency.Task) (adminPassword string,
 		return "", fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be nil")
+		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1131,7 +1137,7 @@ func (c *cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, x
 		return keyPair, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return keyPair, fail.InvalidParameterError("task", "cannot be nil")
+		return keyPair, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	c.SafeRLock(task)
@@ -1156,7 +1162,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv2.
 		return config, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return config, fail.InvalidParameterError("task", "cannot be nil")
+		return config, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1218,7 +1224,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 	}
 
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1385,7 +1391,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1541,7 +1547,7 @@ func (c *cluster) State(task concurrency.Task) (state clusterstate.Enum, xerr fa
 		return state, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return state, fail.InvalidParameterError("task", "cannot be nil")
+		return state, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1579,7 +1585,7 @@ func (c *cluster) AddNode(task concurrency.Task, def *abstract.HostSizingRequire
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if def == nil {
 		return nil, fail.InvalidParameterError("def", "cannot be nil")
@@ -1603,7 +1609,7 @@ func (c *cluster) AddNodes(task concurrency.Task, count int, def *abstract.HostS
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if count <= 0 {
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
@@ -1805,7 +1811,7 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv2.Clus
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1844,7 +1850,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
@@ -2198,7 +2204,7 @@ func (c *cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedListOfStr
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	defer fail.OnExitLogError(&xerr, "failed to get list of node IP addresses")
@@ -2229,7 +2235,7 @@ func (c *cluster) FindAvailableNode(task concurrency.Task) (node resources.Host,
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2271,7 +2277,7 @@ func (c *cluster) LookupNode(task concurrency.Task, ref string) (found bool, xer
 	if ref == "" {
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
-	if task == nil {
+	if task.IsNull() {
 		return false, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	defer fail.OnPanic(&xerr)
@@ -2302,7 +2308,7 @@ func (c *cluster) CountNodes(task concurrency.Task) (count uint, xerr fail.Error
 	if c == nil {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2330,7 +2336,7 @@ func (c *cluster) Node(task concurrency.Task, hostID string) (host resources.Hos
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if hostID == "" {
@@ -2426,7 +2432,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2867,7 +2873,7 @@ func (c *cluster) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 
 // VPL: not used anymore, flavor SWARM has to disappear
 // // leaveNodeFromSwarm unregisters properly a node from docker Swarm
-// func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.Host) (xerr fail.Error) {
+// func (c *cluster) leaveNodeFromSwarm(task concurrency.Task, host, selectedMaster resources.IPAddress) (xerr fail.Error) {
 // 	if selectedMaster == nil {
 // 		selectedMaster, xerr = c.FindAvailableMaster(task)
 // 		if xerr != nil {

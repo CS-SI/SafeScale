@@ -286,7 +286,7 @@ func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
 	}
 	return &protocol.SshConfig{
 		User:             in.User,
-		Host:             in.Host,
+		Host:             in.IPAddress,
 		PrivateKey:       in.PrivateKey,
 		Port:             int32(in.Port),
 		Gateway:          pbPrimaryGateway,

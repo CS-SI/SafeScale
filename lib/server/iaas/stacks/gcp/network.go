@@ -258,7 +258,7 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 
 	resp, xerr := s.rpcGetNetworkByName(name)
 	if xerr != nil {
-		return nullAN, nil
+		return nullAN, xerr
 	}
 	return toAbstractNetwork(*resp), nil
 	// nets, xerr := s.ListNetworks()

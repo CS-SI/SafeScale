@@ -68,7 +68,7 @@ import (
 // with its content
 func New(task concurrency.Task, name string) (resources.Feature, error) {
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "can't be empty string!")
@@ -93,7 +93,7 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 // with its content
 func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) {
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "canno't be empty string!")

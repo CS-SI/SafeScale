@@ -69,7 +69,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 		return nil, xerr
 	}
 
-	// Build response mapping resources.Host to protocol.Host
+	// Build response mapping resources.IPAddress to protocol.IPAddress
 	var pbTemplates []*protocol.HostTemplate
 	for _, template := range templates {
 		pbTemplates = append(pbTemplates, converters.HostTemplateFromAbstractToProtocol(template))

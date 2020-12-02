@@ -18,7 +18,7 @@ package abstract
 
 // Default values
 const (
-	// DefaultUser Default Host user
+	// DefaultUser Default IPAddress user
 	DefaultUser = "safescale"
 
 	// DefaultVolumeMountPoint Default mount point for volumes

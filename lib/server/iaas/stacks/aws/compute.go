@@ -586,7 +586,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		logrus.Debugf("Selected Availability Zone: '%s'", az)
 	}
 
-	// --- Initializes resources.Host ---
+	// --- Initializes resources.IPAddress ---
 
 	ahf = abstract.NewHostFull()
 	ahf.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
@@ -595,7 +595,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Networking.IsGateway = isGateway
 
-	// Adds Host property SizingV1
+	// Adds IPAddress property SizingV1
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
 	// Sets provider parameters to create ahf
@@ -638,7 +638,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			ahf.Core.ID = server.ID
 			ahf.Core.Name = server.Name
 
-			// Wait until Host is ready, not just until the build is started
+			// Wait until IPAddress is ready, not just until the build is started
 			if _, innerXErr = s.WaitHostReady(ahf, temporal.GetLongOperationTimeout()); innerXErr != nil {
 				if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
@@ -1003,7 +1003,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 	return hosts, nil
 }
 
-// DeleteHost deletes a Host
+// DeleteHost deletes a IPAddress
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1082,7 +1082,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
-						// if Host is not found, consider operation as successful
+						// if IPAddress is not found, consider operation as successful
 						return nil
 					default:
 						return innerXErr
@@ -1298,7 +1298,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // BindSecurityGroupToHost ...
 // Returns:
-// - *fail.ErrNotFound if the Host is not found
+// - *fail.ErrNotFound if the IPAddress is not found
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1352,7 +1352,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 // UnbindSecurityGroupFromHost ...
 // Returns:
 // - nil means success
-// - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
+// - *fail.ErrNotFound if the IPAddress or the Security Group ID cannot be identified
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1383,7 +1383,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 
 	sgs := make([]*string, 0, len(resp.SecurityGroups)+1)
 
-	// If there is one last Security Group bound to Host, restore bond to default SecurityGroup before removing
+	// If there is one last Security Group bound to IPAddress, restore bond to default SecurityGroup before removing
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG := abstract.NewSecurityGroup()
 		defaultSG.Name = s.GetDefaultSecurityGroupName()

@@ -676,16 +676,17 @@ func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotata
 	return e
 }
 
-// ErrAborted ...
+// ErrAborted is used to signal abortion
 type ErrAborted struct {
 	*errorCore
 }
 
 // AbortedError creates a ErrAborted error
+// If err != nil, this err will become the cause of the abortion that can be retrieved using Error.Cause()
 func AbortedError(err error, msg ...interface{}) *ErrAborted {
 	var message string
 	if len(msg) == 0 {
-		message = "ErrAborted"
+		message = "aborted"
 	} else {
 		message = strprocess.FormatStrings(msg...)
 	}
