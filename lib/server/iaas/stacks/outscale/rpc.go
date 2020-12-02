@@ -553,7 +553,7 @@ func (s stack) rpcReadNics(subnetID, hostID string) ([]osc.Nic, fail.Error) {
 	}
 	if len(resp.Nics) == 0 {
 		if subnetID != "" && hostID != "" {
-			return []osc.Nic{}, fail.NotFoundError("failed to read Nics on Subnet with ID %s of Host with ID", subnetID, hostID)
+			return []osc.Nic{}, fail.NotFoundError("failed to read Nics on Subnet with ID %s of Host with ID %s", subnetID, hostID)
 		}
 		if subnetID != "" {
 			return []osc.Nic{}, fail.NotFoundError("failed to read Nics on Subnet with ID %s", subnetID)

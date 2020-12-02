@@ -128,7 +128,7 @@ func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	tid, err := task.GetID()

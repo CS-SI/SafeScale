@@ -51,7 +51,7 @@ var kongProxyCheckedCache = utils.NewMapCache()
 // KongController allows to control Kong, installed on a host
 type KongController struct {
 	subnet resources.Subnet
-	// host      *pb.Host
+	// host      *pb.IPAddress
 	// safescale safescale.Client
 
 	gateway          resources.Host

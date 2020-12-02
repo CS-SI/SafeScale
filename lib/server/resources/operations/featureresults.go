@@ -52,11 +52,11 @@ import (
 // unitResults contains the errors of the step for each host target
 type unitResults map[string]resources.UnitResult
 
-func (urs unitResults) AddSingle(key string, ur resources.UnitResult) {
-	if _, ok := urs[key]; !ok {
-		urs = map[string]resources.UnitResult{}
+func (urs *unitResults) AddOne(key string, ur resources.UnitResult) {
+	if len(*urs) == 0 {
+		*urs = map[string]resources.UnitResult{}
 	}
-	urs[key] = ur
+	(*urs)[key] = ur
 }
 
 // ErrorMessages returns a string containing all the errors registered
@@ -71,8 +71,7 @@ func (urs unitResults) ErrorMessages() string {
 	return output
 }
 
-// UncompletedEntries returns an array of string of all keys where the script
-// to run action wasn't completed
+// Uncompleted returns an array of string of all keys where the script to run action wasn't completed
 func (urs unitResults) Uncompleted() []string {
 	var output []string
 	for k, v := range urs {
@@ -98,7 +97,7 @@ func (urs unitResults) Successful() bool {
 
 // Completed tells if all the scripts corresponding to action have been completed.
 func (urs unitResults) Completed() bool {
-	if urs == nil || len(urs) == 0 {
+	if len(urs) == 0 {
 		return false
 	}
 	for _, v := range urs {
@@ -113,30 +112,30 @@ func (urs unitResults) Completed() bool {
 type results map[string]resources.UnitResults
 
 // Add ...
-func (r results) Add(key string, urs resources.UnitResults) error {
-	if r == nil {
-		r = results{}
+func (r *results) Add(key string, urs resources.UnitResults) error {
+	if len(*r) == 0 {
+		*r = results{}
 	}
 	if urs == nil {
 		return fail.InvalidParameterError("urs", "cannot be nil")
 	}
 
-	r[key] = urs
+	(*r)[key] = urs
 	return nil
 }
 
-// AddUnit ...
-func (r results) AddUnit(key, unitName string, ur resources.UnitResult) error {
-	if r == nil {
-		r = results{}
+// AddOne ...
+func (r *results) AddOne(key, unitName string, ur resources.UnitResult) error {
+	if *r == nil {
+		*r = results{}
 	}
 	if ur == nil {
 		return fail.InvalidParameterError("ur", "cannot be nil")
 	}
-	if _, ok := r[key]; !ok {
-		r[key] = &unitResults{}
+	if _, ok := (*r)[key]; !ok {
+		(*r)[key] = &unitResults{}
 	}
-	r[key].AddSingle(unitName, ur)
+	(*r)[key].AddOne(unitName, ur)
 	return nil
 }
 
@@ -164,7 +163,7 @@ func (r results) AllErrorMessages() string {
 	return output
 }
 
-// ErrorMessagesOfStep ...
+// ErrorMessagesOfKey ...
 func (r results) ErrorMessagesOfKey(key string) string {
 	if step, ok := r[key]; ok {
 		return step.ErrorMessages()
@@ -172,12 +171,12 @@ func (r results) ErrorMessagesOfKey(key string) string {
 	return ""
 }
 
-// ErrorMessagesOfKey ...
+// ErrorMessagesOfUnit ...
 func (r results) ErrorMessagesOfUnit(unitName string) string {
 	output := ""
 	for _, urs := range r {
-		rurs := urs.(unitResults)
-		for k, v := range rurs {
+		rurs := urs.(*unitResults)
+		for k, v := range *rurs {
 			if k == unitName {
 				val := v.Error().Error()
 				if val != "" {
@@ -193,14 +192,14 @@ func (r results) ErrorMessagesOfUnit(unitName string) string {
 func (r results) ResultsOfUnit(unitName string) resources.UnitResults {
 	newSrs := unitResults{}
 	for _, urs := range r {
-		rurs := urs.(unitResults)
-		for k, v := range rurs {
+		rurs := urs.(*unitResults)
+		for k, v := range *rurs {
 			if k == unitName {
-				newSrs.AddSingle(unitName, v)
+				newSrs.AddOne(unitName, v)
 			}
 		}
 	}
-	return newSrs
+	return &newSrs
 }
 
 // ResultsOfKey ...
@@ -208,7 +207,7 @@ func (r results) ResultsOfKey(key string) resources.UnitResults {
 	if ret, ok := r[key]; ok {
 		return ret
 	}
-	return unitResults{}
+	return &unitResults{}
 }
 
 // Keys returns the keys of the Results

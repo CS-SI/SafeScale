@@ -230,7 +230,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 		return nil, xerr
 	}
 
-	// build response mapping abstract.Host to protocol.Host
+	// build response mapping abstract.IPAddress to protocol.IPAddress
 	var pbhost []*protocol.Host
 	for _, host := range hosts {
 		pbhost = append(pbhost, converters.HostFullFromAbstractToProtocol(host))
@@ -609,7 +609,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 // BindSecurityGroup attaches a Security Group to an host
 func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot bind security group to Host")
+	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -674,7 +674,7 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 // UnbindSecurityGroup detaches a Security Group from an host
 func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot unbind security group from Host")
+	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -731,7 +731,7 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 // EnableSecurityGroup applies a Security Group already attached (if not already applied)
 func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot enable security group on Host")
+	defer fail.OnExitWrapError(&err, "cannot enable Security Group on Host")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {

@@ -95,7 +95,7 @@ func nullHost() *host {
 // LoadHost ...
 func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) {
 	if task.IsNull() {
-		return nullHost(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullHost(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if svc == nil {
 		return nullHost(), fail.InvalidParameterError("svc", "cannot be nil")
@@ -129,7 +129,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	return rh, rh.cacheAccessInformation(task)
 }
 
-// upgradeIfNeeded upgrades Host properties if needed
+// upgradeIfNeeded upgrades IPAddress properties if needed
 func (rh *host) upgradeIfNeeded(task concurrency.Task) fail.Error {
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
@@ -229,7 +229,8 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 					primaryGatewayConfig = &system.SSHConfig{
 						PrivateKey: gwahc.PrivateKey,
 						Port:       22,
-						Host:       ip,
+						IPAddress:  ip,
+						Hostname:   gwahc.Name,
 						User:       abstract.DefaultUser,
 					}
 					return nil
@@ -256,7 +257,8 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       22,
-							Host:       rgw.(*host).getAccessIP(task),
+							IPAddress:  rgw.(*host).getAccessIP(task),
+							Hostname:   rgw.GetName(),
 							User:       abstract.DefaultUser,
 						}
 						return nil
@@ -273,7 +275,8 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 		}
 		rh.sshProfile = &system.SSHConfig{
 			Port:                   22,
-			Host:                   rh.accessIP,
+			IPAddress:              rh.accessIP,
+			Hostname:               rh.GetName(),
 			User:                   abstract.DefaultUser,
 			PrivateKey:             ahc.PrivateKey,
 			GatewayConfig:          primaryGatewayConfig,
@@ -294,7 +297,7 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -316,7 +319,7 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, _ fa
 		return state, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return state, fail.InvalidParameterError("task", "cannot be nil")
+		return state, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	if xerr := rh.Reload(task); xerr != nil {
@@ -340,7 +343,7 @@ func (rh *host) Reload(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	// Read data from metadata storage
@@ -448,7 +451,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	hostname := rh.GetName()
 	if hostname != "" {
@@ -475,9 +478,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	ahc := abstract.NewHostCore()
-	ahc.Name = hostReq.ResourceName
-	if _, xerr = svc.InspectHost(ahc); xerr != nil {
+	if _, xerr = svc.InspectHost(abstract.NewHostCore().SetName(hostReq.ResourceName)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -485,7 +486,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return nil, fail.Wrap(xerr, "failed to check if host resource name '%s' is already used", hostReq.ResourceName)
 		}
 	} else {
-		return nil, fail.DuplicateError("'%s' already exists (but not managed by SafeScale)", hostReq.ResourceName)
+		return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
 	}
 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
@@ -1172,7 +1173,7 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 
 	// Reboot host
 	command := "sudo systemctl reboot"
-	if _, _, _, xerr := rh.Run(task, command, outputs.COLLECT, 0, 0); xerr != nil {
+	if _, _, _, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetContextTimeout(), temporal.GetHostTimeout()); xerr != nil {
 		return xerr
 	}
 
@@ -1195,9 +1196,9 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 			return xerr
 		}
 
-		// FIXME: configurable timeout here
-		if _, xerr := rh.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
-			if _, ok := xerr.(*fail.ErrTimeout); ok {
+		if _, xerr := rh.waitInstallPhase(task, userdata.PHASE5_FINAL, temporal.GetHostTimeout()); xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrTimeout:
 				return fail.Wrap(xerr, "timeout creating a host")
 			}
 			if abstract.IsProvisioningError(xerr) {
@@ -1216,7 +1217,7 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (stri
 		return "", fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be nil")
+		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL, timeout)
@@ -1314,7 +1315,7 @@ func (rh *host) Delete(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	rh.SafeLock(task)
@@ -1345,8 +1346,8 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	rh.SafeLock(task)
@@ -1506,7 +1507,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			// Unbind Security Groups from Host
+			// Unbind Security Groups from IPAddress
 			var errors []error
 			for _, v := range hsgV1.ByID {
 				rsg, derr := LoadSecurityGroup(task, svc, v.ID)
@@ -1526,7 +1527,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
 			}
 
-			// Delete default Security Group of Host
+			// Delete default Security Group of IPAddress
 			if hsgV1.DefaultID != "" {
 				rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
 				if derr == nil {
@@ -1634,7 +1635,7 @@ func (rh host) GetSSHConfig(task concurrency.Task) (*system.SSHConfig, fail.Erro
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	return rh.getSSHConfig(task), nil
@@ -1648,6 +1649,7 @@ func (rh host) getSSHConfig(task concurrency.Task) *system.SSHConfig {
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
+
 	return rh.sshProfile
 }
 
@@ -1656,8 +1658,8 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	if rh.IsNull() {
 		return 0, "", "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return 0, "", "", fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return 0, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if cmd == "" {
 		return 0, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
@@ -1689,8 +1691,11 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 		func() error {
 			var innerXErr fail.Error
 			retCode, stdOut, stdErr, innerXErr = run(task, ssh, cmd, outs, executionTimeout)
-			if _, ok := innerXErr.(*fail.ErrTimeout); ok {
-				innerXErr = fail.NewError("failed to run command in %v delay", executionTimeout)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrTimeout:
+					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to run command in %v delay", executionTimeout)
+				}
 			}
 			return innerXErr
 		},
@@ -1701,10 +1706,17 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 			}
 		},
 	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			xerr = fail.Wrap(xerr.Cause(), "timeout occurred")
+		}
+	}
 	return retCode, stdOut, stdErr, xerr
 }
 
 // run executes command on the host
+// If run fails to connect to remote host, returns *fail.ErrNotAvailable
 func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// Create the command
 	sshCmd, xerr := ssh.Command(task, cmd)
@@ -1714,7 +1726,8 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 
 	retcode, stdout, stderr, xerr := sshCmd.RunWithTimeout(task, outs, timeout)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrExecution); ok {
+		switch xerr.(type) {
+		case *fail.ErrExecution:
 			// Adds stdout annotation to xerr
 			_ = xerr.Annotate("stdout", stdout)
 		}
@@ -1722,7 +1735,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 	}
 	// If retcode == 255, ssh connection failed
 	if retcode == 255 {
-		return -1, "", "", fail.NewError("failed to connect")
+		return -1, "", "", fail.NotAvailableError("failed to connect")
 	}
 	return retcode, stdout, stderr, xerr
 }
@@ -1788,6 +1801,12 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 	}
 	if cmd != "" {
 		retcode, stdout, stderr, xerr = run(task, ssh, cmd, outputs.DISPLAY, timeout)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrTimeout:
+				xerr = fail.Wrap(xerr.Cause(), "failed to update access rights in %v delay", timeout)
+			}
+		}
 	}
 	return retcode, stdout, stderr, xerr
 }
@@ -1797,8 +1816,8 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (*propertiesv1.H
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if shareRef == "" {
 		return nil, fail.InvalidParameterError("shareRef", "cannot be empty string")
@@ -1836,8 +1855,8 @@ func (rh host) GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fai
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	var hvV1 *propertiesv1.HostVolumes
@@ -1868,8 +1887,8 @@ func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	fail.OnPanic(&xerr)
 
@@ -1898,8 +1917,8 @@ func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	hostName := rh.GetName()
@@ -1945,8 +1964,8 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -1994,8 +2013,8 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -2027,14 +2046,14 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, false /*Trace.Host, */, "(%s)", name).Entering()
+	tracer := debug.NewTracer(task, false /*Trace.IPAddress, */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	feat, xerr := NewFeature(task, name)
@@ -2086,34 +2105,31 @@ func (rh host) TargetType() featuretargettype.Enum {
 }
 
 // GetPublicIP returns the public IP address of the host
-func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (rh host) GetPublicIP(task concurrency.Task) (ip string, _ fail.Error) {
 	ip = ""
 	if rh.IsNull() {
-		return "", fail.InvalidInstanceError()
+		return ip, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return "", fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return ip, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	rh.SafeRLock(task)
-	defer rh.SafeRUnlock(task)
-
-	ip = rh.publicIP
-	if ip == "" {
-		return "", fail.NotFoundError("no public IP associated with Host '%s'", rh.GetName())
+	if ip = rh.getPublicIP(task); ip == "" {
+		return ip, fail.NotFoundError("no public IP associated with Host '%s'", rh.GetName())
 	}
 	return ip, nil
 }
 
 // getPublicIP returns the public IP address of the host
-// To be used when rh is notoriously not nil
+// To be used when rh is notoriously not null value
 func (rh host) getPublicIP(task concurrency.Task) string {
-	if rh.IsNull() || task == nil {
+	if task.IsNull() {
 		return ""
 	}
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
+
 	return rh.publicIP
 }
 
@@ -2123,8 +2139,8 @@ func (rh host) GetPrivateIP(task concurrency.Task) (ip string, _ fail.Error) {
 	if rh.IsNull() {
 		return ip, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return ip, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return ip, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	return rh.getPrivateIP(task), nil
@@ -2133,12 +2149,13 @@ func (rh host) GetPrivateIP(task concurrency.Task) (ip string, _ fail.Error) {
 // getPrivateIP returns the private IP of the host on its default Networking
 // To be used when rh is notoriously not nil
 func (rh host) getPrivateIP(task concurrency.Task) string {
-	if rh.IsNull() || task == nil {
+	if task.IsNull() {
 		return ""
 	}
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
+
 	return rh.privateIP
 }
 
@@ -2148,10 +2165,10 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 	if rh.IsNull() {
 		return ip, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if subnetID == "" {
+	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
 		return ip, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
@@ -2183,12 +2200,12 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 }
 
 // GetAccessIP returns the IP to reach the host
-func (rh *host) GetAccessIP(task concurrency.Task) (ip string, _ fail.Error) {
+func (rh host) GetAccessIP(task concurrency.Task) (ip string, _ fail.Error) {
 	ip = ""
 	if rh.IsNull() {
 		return ip, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2197,13 +2214,14 @@ func (rh *host) GetAccessIP(task concurrency.Task) (ip string, _ fail.Error) {
 
 // getAccessIP returns the IP to reach the host
 // To be used when rh is notoriously not nil
-func (rh *host) getAccessIP(task concurrency.Task) string {
-	if rh.IsNull() {
+func (rh host) getAccessIP(task concurrency.Task) string {
+	if task.IsNull() {
 		return ""
 	}
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
+
 	return rh.accessIP
 }
 
@@ -2214,8 +2232,8 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
 	}
-	if task == nil {
-		logrus.Error(fail.InvalidParameterError("task", "cannot be nil").Error())
+	if task.IsNull() {
+		logrus.Error(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
 		return map[uint8]installmethod.Enum{}
 	}
 
@@ -2269,7 +2287,7 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 	if rh.IsNull() {
 		return shares, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return shares, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2292,7 +2310,7 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 	if rh.IsNull() {
 		return mounts, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return mounts, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2330,8 +2348,8 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if v == nil {
 		return fail.InvalidParameterError("v", "cannot be nil")
@@ -2375,14 +2393,16 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 	if xerr != nil {
 		return xerr
 	}
+
 	rgwi := rgw.(*host)
 	v["PrimaryGatewayIP"] = rgwi.getPrivateIP(task)
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
 	v["PrimaryPublicIP"] = rgwi.getPublicIP(task)
-
-	rgw, xerr = rs.GetGateway(task, false)
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+	if rgw, xerr = rs.GetGateway(task, false); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
 			return xerr
 		}
 	} else {
@@ -2394,10 +2414,12 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 	if v["getEndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
 		return xerr
 	}
+
 	v["getPublicIP"] = v["getEndpointIP"]
 	if v["getDefaultRouteIP"], xerr = rs.GetDefaultRouteIP(task); xerr != nil {
 		return xerr
 	}
+
 	return nil
 }
 
@@ -2407,7 +2429,7 @@ func (rh host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error
 	if rh.IsNull() {
 		return yes, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return yes, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2452,7 +2474,7 @@ func (rh host) PushStringToFile(task concurrency.Task, content string, filename 
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if content == "" {
@@ -2543,12 +2565,11 @@ func (rh host) PushStringToFile(task concurrency.Task, content string, filename 
 
 // GetDefaultSubnet returns the Networking instance corresponding to host default subnet
 func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xerr fail.Error) {
-	nullSubnet := nullSubnet()
 	if rh.IsNull() {
-		return nullSubnet, fail.InvalidInstanceError()
+		return nullSubnet(), fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nullSubnet, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return nullSubnet(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var innerXErr fail.Error
@@ -2579,7 +2600,7 @@ func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xer
 		})
 	})
 	if xerr != nil {
-		return nullSubnet, xerr
+		return nullSubnet(), xerr
 	}
 
 	return rs, nil
@@ -2590,7 +2611,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -2658,7 +2679,7 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if sg.IsNull() {
@@ -2707,7 +2728,7 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if sg.IsNull() {
@@ -2753,16 +2774,16 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 }
 
 // ListSecurityGroups returns a slice of security groups binded to host
-func (rh *host) ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, _ fail.Error) {
-	var nullList []*propertiesv1.SecurityGroupBond
+func (rh host) ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, _ fail.Error) {
+	var emptySlice []*propertiesv1.SecurityGroupBond
 	if rh.IsNull() {
-		return nullList, fail.InvalidInstanceError()
+		return emptySlice, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nullList, fail.InvalidParameterError("task", "cannot be nil")
+	if task.IsNull() {
+		return emptySlice, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	return list, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -2772,6 +2793,10 @@ func (rh *host) ListSecurityGroups(task concurrency.Task, state securitygroupsta
 			return nil
 		})
 	})
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+	return list, nil
 }
 
 // EnableSecurityGroup enables a bound security group to host by applying its rules
@@ -2779,7 +2804,7 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if sg.IsNull() {
@@ -2845,7 +2870,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
+	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if sg.IsNull() {

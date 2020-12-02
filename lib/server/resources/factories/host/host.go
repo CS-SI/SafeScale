@@ -17,6 +17,8 @@
 package host
 
 import (
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -28,35 +30,37 @@ import (
 
 // List returns a list of available hosts
 func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+	var nullList abstract.HostList
+	if svc.IsNull() {
+		return nullList, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	if all {
 		return svc.ListHosts(all)
 	}
 
-	objh, err := New(svc)
-	if err != nil {
-		return nil, err
+	rh, xerr := New(svc)
+	if xerr != nil {
+		return nullList, xerr
 	}
-	hosts := abstract.HostList{}
-	err = objh.Browse(task, func(hc *abstract.HostCore) fail.Error {
+	hosts := nullList
+	xerr = rh.Browse(task, func(hc *abstract.HostCore) fail.Error {
 		hf := converters.HostCoreToHostFull(*hc)
 		hosts = append(hosts, hf)
 		return nil
 	})
-	return hosts, err
+	return hosts, xerr
 }
 
 // New creates an instance of resources.Host
 func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
-	if svc == nil {
+	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	host, err := operations.NewHost(svc)
-	if err != nil {
-		return nil, err
+
+	host, xerr := operations.NewHost(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
 	return host, nil
 }
@@ -64,12 +68,12 @@ func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 // Load loads the metadata of host and returns an instance of resources.Host
 func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if svc.IsNull() {
+		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
 	}
-	if ref == "" {
+	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 

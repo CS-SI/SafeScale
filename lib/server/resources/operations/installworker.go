@@ -383,7 +383,7 @@ func (w *worker) identifyConcernedGateways() (_ []resources.Host, xerr fail.Erro
 	//	if xerr != nil {
 	//		return nil, xerr
 	//	}
-	//	hosts = []resources.Host{host}
+	//	hosts = []resources.IPAddress{host}
 	//} else if w.cluster != nil {
 	hosts, xerr = w.identifyAllGateways()
 	if xerr != nil {
@@ -500,8 +500,8 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 			return outcomes, xerr
 		}
 		if tr != nil {
-			outcome := tr.(resources.UnitResults)
-			_ = outcomes.Add(k, outcome)
+			outcome := tr.(*resources.UnitResults)
+			_ = outcomes.Add(k, *outcome)
 		}
 	}
 	return outcomes, nil
@@ -728,8 +728,8 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			logrus.Warnf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted())
 			return &r, fail.NewError(r.ErrorMessages())
 		}
-		// not successful but completed, if action is check means the feature is not install, it's an information not a failure
-		if strings.Contains(w.action.String(), "Check") {
+		// not successful but completed, if action is check means the feature is not installed, it's an information not a failure
+		if w.action == installaction.Check {
 			return &r, nil
 		}
 

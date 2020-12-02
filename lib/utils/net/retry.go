@@ -22,10 +22,12 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 )
 
 // WhileCommunicationUnsuccessful executes callback inside a retry loop with tolerance for communication errors (relative to net package),
@@ -58,7 +60,15 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 		waitor,
 		nil,
 		nil,
-		nil,
+		func(t retry.Try, v verdict.Enum) {
+			if v != verdict.Done {
+				spew.Dump(v)
+			}
+			switch v {
+			case verdict.Retry:
+				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())
+			}
+		},
 	)
 	if xerr != nil {
 		switch realErr := xerr.(type) {

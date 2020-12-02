@@ -309,7 +309,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// volumeName := rv.GetName()
 	// volumeID := rv.GetID()
 	//
-	// // Get Host data
+	// // Get IPAddress data
 	// rh, xerr := hostfactory.Load(task, handler.job.GetService(), hostRef)
 	// if xerr != nil {
 	// 	return xerr
@@ -499,7 +499,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// return nil
 }
 
-// func (handler *volumeHandler) listAttachedDevices(host resources.Host) (set mapset.Set, xerr fail.Error) { // FIXME Make sure ctx is propagated
+// func (handler *volumeHandler) listAttachedDevices(host resources.IPAddress) (set mapset.Set, xerr fail.Error) { // FIXME Make sure ctx is propagated
 // 	if handler == nil {
 // 		return nil, fail.InvalidInstanceError()
 // 	}

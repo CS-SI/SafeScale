@@ -379,6 +379,7 @@ message SshConfig {
 	int32 port = 4;
 	SshConfig gateway = 5;
 	SshConfig secondary_gateway = 6;
+	string host_name = 7;
 }
 
 message HostListRequest {

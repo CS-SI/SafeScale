@@ -126,7 +126,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If retry times out, return fail.ErrTimeout
 func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, fail.Error) {
 	if task.IsNull() {
-		return nullShare(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullShare(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if svc.IsNull() {
 		return nullShare(), fail.InvalidParameterError("svc", "cannot be null value")
@@ -165,7 +165,7 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -205,7 +205,7 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 // 	return list, err
 // }
 
-// // FindClient returns the client hosted by the Host whose name is given
+// // FindClient returns the client hosted by the IPAddress whose name is given
 // func (m *Nas) FindClient(hostName string) (*resources.Nas, error) {
 // 	var client *resources.Nas
 // 	err := m.item.BrowseInto(*m.id, func(buf []byte) error {
@@ -214,7 +214,7 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 // 		if err != nil {
 // 			return err
 // 		}
-// 		if nas.Host == hostName {
+// 		if nas.IPAddress == hostName {
 // 			client = &nas
 // 			return nil
 // 		}
@@ -253,7 +253,7 @@ func (objs *share) Create(
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if shareName == "" {
 		return fail.InvalidParameterError("shareName", "cannot be empty string")
@@ -316,7 +316,7 @@ func (objs *share) Create(
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if len(serverSharesV1.ByID) == 0 {
-				// Host doesn't have shares yet, so install NFS
+				// IPAddress doesn't have shares yet, so install NFS
 				if xerr = nfsServer.Install(task); xerr != nil {
 					return xerr
 				}
@@ -342,7 +342,7 @@ func (objs *share) Create(
 		}
 	}()
 
-	// Updates Host Property propertiesv1.HostShares
+	// Updates IPAddress Property propertiesv1.HostShares
 	var hostShare *propertiesv1.HostShare
 	xerr = server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -402,13 +402,13 @@ func (objs *share) Create(
 	return objs.Carry(task, &si)
 }
 
-// GetServer returns the *Host acting as share server, with error handling
+// GetServer returns the *IPAddress acting as share server, with error handling
 func (objs share) GetServer(task concurrency.Task) (resources.Host, fail.Error) {
 	if objs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	var hostID, hostName string
@@ -435,7 +435,7 @@ func (objs share) GetServer(task concurrency.Task) (resources.Host, fail.Error) 
 	return server, nil
 }
 
-// getServer returns the *Host acting as share server, with no error handling
+// getServer returns the *IPAddress acting as share server, with no error handling
 func (objs share) getServer(task concurrency.Task) (rh resources.Host) {
 	rh, _ = objs.GetServer(task)
 	return rh
@@ -448,7 +448,7 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if target.IsNull() {
 		return nil, fail.InvalidParameterError("target", "cannot be null value")
@@ -687,7 +687,7 @@ func (objs share) Unmount(task concurrency.Task, target resources.Host) fail.Err
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if target == nil {
 		return fail.InvalidParameterError("target", "cannot be nil")
@@ -793,7 +793,7 @@ func (objs *share) Delete(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	var (
@@ -875,7 +875,7 @@ func (objs share) ToProtocol(task concurrency.Task) (*protocol.ShareMountList, f
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	shareID := objs.GetID()
