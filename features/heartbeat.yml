@@ -134,7 +134,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d || sfFail 193
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
+                            sfStandardRetry "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
                             sfExit
 
             remove:

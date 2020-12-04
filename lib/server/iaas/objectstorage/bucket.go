@@ -264,14 +264,17 @@ func (b bucket) WriteObject(objectName string, source io.Reader, sourceSize int6
 	if err != nil {
 		return nil, err
 	}
+
 	err = o.AddMetadata(metadata)
 	if err != nil {
 		return nil, err
 	}
+
 	err = o.Write(source, sourceSize)
 	if err != nil {
 		return nil, err
 	}
+
 	return &o, nil
 }
 

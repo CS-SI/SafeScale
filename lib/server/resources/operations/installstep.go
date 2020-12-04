@@ -52,6 +52,7 @@ const (
 
 type stepResult struct {
 	completed bool // if true, the script has been run to completion
+	retcode   int
 	output    string
 	success   bool  // if true, the script has been run successfully and the result is a success
 	err       error // if an error occurred, contains the err
@@ -71,7 +72,11 @@ func (sr stepResult) Error() error {
 
 func (sr stepResult) ErrorMessage() string {
 	if sr.err != nil {
-		return sr.err.Error()
+		msg := sr.err.Error()
+		if msg == "" && sr.retcode != 0 {
+			msg = fmt.Sprintf("exited with error %d", sr.retcode)
+		}
+		return msg
 	}
 	return ""
 }
@@ -256,8 +261,8 @@ type step struct {
 	Name string
 	// Action is the action of the step (check, add, remove)
 	Action installaction.Enum
-	// Targets contains the host targets to select
-	Targets stepTargets
+	// // Targets contains the host targets to select
+	// Targets stepTargets
 	// Script contains the script to execute
 	Script string
 	// WallTime contains the maximum time the step must run
@@ -319,10 +324,11 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if err != nil {
 				return nil, err
 			}
-			outcome, xerr := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
+			outcome, xerr := subtask.Run(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
 			if xerr != nil {
 				return nil, xerr
 			}
+
 			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
 
 			if !outcomes.Successful() {
@@ -366,8 +372,11 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 					return nil
 				})
 			})
-			cloneV["Hostname"] = h.GetName() + domain
+			if xerr != nil {
+				return nil, xerr
+			}
 
+			cloneV["Hostname"] = h.GetName() + domain
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
 			}
@@ -376,10 +385,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 				return nil, err
 			}
 
-			subtask, xerr = subtask.Start(is.taskRunOnHost, data.Map{
-				"host":      h,
-				"variables": cloneV,
-			})
+			subtask, xerr = subtask.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -415,32 +421,44 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 	return outcomes, nil
 }
 
+type runOnHostParameters struct {
+	Host      resources.Host
+	Variables data.Map
+}
+
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	var (
-		p  = data.Map{}
+		// p  = data.Map{}
 		ok bool
 	)
-	if params != nil {
-		if p, ok = params.(data.Map); !ok {
-			return nil, fail.InvalidParameterError("params", "must be a 'data.Map'")
-		}
-	}
+	// if params != nil {
+	// 	if p, ok = params.(data.Map); !ok {
+	// 		return nil, fail.InvalidParameterError("params", "must be a 'data.Map'")
+	// 	}
+	// }
 
 	// Get parameters
-	rh, ok := p["host"].(resources.Host)
-	if !ok {
-		return nil, fail.InvalidParameterError("params['host']", "must be a 'resources.Host'")
+	// rh, ok := p["host"].(resources.Host)
+	// if !ok {
+	// 	return nil, fail.InvalidParameterError("params['host']", "must be a 'resources.Host'")
+	// }
+	// variables, ok := p["variables"].(data.Map)
+	// if !ok {
+	// 	return nil, fail.InvalidParameterError("params['variables'", "must be a 'data.Map'")
+	// }
+	if params == nil {
+		return nil, fail.InvalidParameterError("params", "cannot be nil")
 	}
-	variables, ok := p["variables"].(data.Map)
+	p, ok := params.(runOnHostParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("params['variables'", "must be a 'data.Map'")
+		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
 
 	// Updates variables in step script
-	command, xerr := replaceVariablesInString(is.Script, variables)
+	command, xerr := replaceVariablesInString(is.Script, p.Variables)
 	if xerr != nil {
 		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, nil
 	}
@@ -453,7 +471,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
-		xerr = rfcItem.UploadString(task, is.OptionsFileContent, rh)
+		xerr = rfcItem.UploadString(task, is.OptionsFileContent, p.Host)
 		_ = os.Remove(rfcItem.Local)
 		if xerr != nil {
 			return stepResult{err: xerr}, nil
@@ -474,7 +492,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
-	xerr = rfcItem.UploadString(task, command, rh)
+	xerr = rfcItem.UploadString(task, command, p.Host)
 	_ = os.Remove(rfcItem.Local)
 	if xerr != nil {
 		return stepResult{err: xerr}, nil
@@ -487,13 +505,13 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Executes the script on the remote rh
-	retcode, outrun, _, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, xerr := p.Host.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", outrun)
-		return stepResult{err: xerr, output: outrun}, nil
+		return stepResult{err: xerr, retcode: retcode, output: outrun}, nil
 	}
 
-	return stepResult{success: retcode == 0, completed: true, err: nil, output: outrun}, nil
+	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil
 }
 
 // func clitools.ReturnValuesFromShellToError(retcode int, stdout string, stderr string, err error, msg string) error {

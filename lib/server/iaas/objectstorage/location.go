@@ -284,6 +284,7 @@ func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
 	if xerr != nil {
 		return bucket{}, xerr
 	}
+
 	b.name = bucketName
 	var err error
 	b.stowContainer, err = l.stowLocation.Container(bucketName)
@@ -291,6 +292,7 @@ func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
 		return bucket{}, fail.ToError(err)
 	}
+
 	return b, nil
 }
 
@@ -499,16 +501,22 @@ func (l location) WriteObject(
 
 	b, err := l.inspectBucket(bucketName)
 	if err != nil {
+		if err.Error() == "not found" {
+			return aosi, fail.NotFoundError("failed to find bucket '%s'", bucketName)
+		}
 		return aosi, err
 	}
+
 	o, err := b.WriteObject(objectName, source, size, metadata)
 	if err != nil {
 		return aosi, err
 	}
+
 	aosi, err = convertObjectToAbstract(o)
 	if err != nil {
 		return aosi, err
 	}
+
 	aosi.BucketName = bucketName
 	return aosi, nil
 }

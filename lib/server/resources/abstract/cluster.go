@@ -37,7 +37,7 @@ type ClusterRequest struct {
 	Complexity clustercomplexity.Enum
 	// Flavor tells what kind of cluster to create
 	Flavor clusterflavor.Enum
-	// NetworkID is the ID of the network to use
+	// NetworkID is the ID of the network to use; may be empty and in this case a new Network will be created
 	NetworkID string
 	// Tenant contains the name of the tenant
 	Tenant string

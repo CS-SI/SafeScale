@@ -89,10 +89,10 @@ type service struct {
 	metadataBucket abstract.ObjectStorageBucket
 	metadataKey    *crypt.Key
 
-	whitelistTemplateRE *regexp.Regexp
-	blacklistTemplateRE *regexp.Regexp
-	whitelistImageRE    *regexp.Regexp
-	blacklistImageRE    *regexp.Regexp
+	whitelistTemplateREs []*regexp.Regexp
+	blacklistTemplateREs []*regexp.Regexp
+	whitelistImageREs    []*regexp.Regexp
+	blacklistImageREs    []*regexp.Regexp
 }
 
 const (
@@ -303,11 +303,11 @@ func (svc service) SelectTemplateByName(name string) (*abstract.HostTemplate, fa
 
 func (svc service) reduceTemplates(tpls []abstract.HostTemplate) []abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
-	if svc.whitelistTemplateRE != nil {
-		finalFilter = templatefilters.NewFilter(filterTemplatesByRegex(svc.whitelistTemplateRE))
+	if len(svc.whitelistTemplateREs) > 0 {
+		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.whitelistTemplateREs))
 	}
-	if svc.blacklistTemplateRE != nil {
-		blackFilter := templatefilters.NewFilter(filterTemplatesByRegex(svc.blacklistTemplateRE))
+	if len(svc.blacklistTemplateREs) > 0 {
+		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.blacklistTemplateREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
 		} else {
@@ -320,9 +320,14 @@ func (svc service) reduceTemplates(tpls []abstract.HostTemplate) []abstract.Host
 	return tpls
 }
 
-func filterTemplatesByRegex(re *regexp.Regexp) templatefilters.Predicate {
+func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate {
 	return func(tpl abstract.HostTemplate) bool {
-		return re.Match([]byte(tpl.Name))
+		for _, re := range res {
+			if re.Match([]byte(tpl.Name)) {
+				return true
+			}
+		}
+		return false
 	}
 }
 
@@ -551,11 +556,11 @@ func (svc service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
 
 func (svc service) reduceImages(imgs []abstract.Image) []abstract.Image {
 	var finalFilter *imagefilters.Filter
-	if svc.whitelistImageRE != nil {
-		finalFilter = imagefilters.NewFilter(filterImagesByRegex(svc.whitelistImageRE))
+	if len(svc.whitelistImageREs) > 0 {
+		finalFilter = imagefilters.NewFilter(filterImagesByRegexSlice(svc.whitelistImageREs))
 	}
-	if svc.blacklistImageRE != nil {
-		blackFilter := imagefilters.NewFilter(filterImagesByRegex(svc.blacklistImageRE))
+	if len(svc.blacklistImageREs) > 0 {
+		blackFilter := imagefilters.NewFilter(filterImagesByRegexSlice(svc.blacklistImageREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
 		} else {
@@ -569,9 +574,15 @@ func (svc service) reduceImages(imgs []abstract.Image) []abstract.Image {
 	return imgs
 }
 
-func filterImagesByRegex(re *regexp.Regexp) imagefilters.Predicate {
+func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 	return func(img abstract.Image) bool {
-		return re.Match([]byte(img.Name))
+		for _, re := range res {
+			if re.Match([]byte(img.Name)) {
+				return true
+			}
+		}
+		return false
+
 	}
 }
 
@@ -794,29 +805,29 @@ func SimilarityScore(ref string, s string) float64 {
 	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
 }
 
-// InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-func InitializeBucket(svc service, location objectstorage.Location) fail.Error {
-	if svc.IsNull() {
-		return fail.InvalidParameterError("svc", "cannot be null value")
-	}
-	if location.IsNull() {
-		return fail.InvalidParameterError("location", "cannot be nil")
-	}
-
-	cfg, err := svc.Provider.GetConfigurationOptions()
-	if err != nil {
-		return fail.Wrap(err, "failed to get client options: %s")
-	}
-	anon, found := cfg.Get("GetMetadataBucket")
-	if !found || anon.(string) == "" {
-		return fail.SyntaxError("failed to get value of option 'GetMetadataBucket'")
-	}
-	_, err = location.CreateBucket(anon.(string))
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
+// func InitializeBucket(svc service, location objectstorage.Location) fail.Error {
+// 	if svc.IsNull() {
+// 		return fail.InvalidParameterError("svc", "cannot be null value")
+// 	}
+// 	if location.IsNull() {
+// 		return fail.InvalidParameterError("location", "cannot be nil")
+// 	}
+//
+// 	cfg, err := svc.Provider.GetConfigurationOptions()
+// 	if err != nil {
+// 		return fail.Wrap(err, "failed to get client options: %s")
+// 	}
+// 	anon, found := cfg.Get("GetMetadataBucket")
+// 	if !found || anon.(string) == "" {
+// 		return fail.SyntaxError("failed to get value of option 'GetMetadataBucket'")
+// 	}
+// 	_, err = location.CreateBucket(anon.(string))
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) {

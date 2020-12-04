@@ -830,7 +830,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || sfFail 199
+                            sfStandardRetry "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || sfFail 199
                             sfExit
 
             remove:

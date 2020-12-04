@@ -22,6 +22,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -113,7 +114,7 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 func (tm *taskedLock) SafeRLock(task Task) {
 	err := tm.RLock(task)
 	if err != nil {
-		logrus.Errorf(fail.Wrap(err, "cannot use SafeRLock() when obviously it's not safe").Error())
+		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRLock() when obviously it's not safe", "", 0)).Error())
 	}
 }
 
@@ -168,7 +169,7 @@ func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
 func (tm *taskedLock) SafeRUnlock(task Task) {
 	err := tm.RUnlock(task)
 	if err != nil {
-		logrus.Errorf(fail.Wrap(err, "cannot use SafeRUnlock() when obviously it's not safe").Error())
+		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRUnLock() when obviously it's not safe", "", 0)).Error())
 	}
 }
 
@@ -217,7 +218,7 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 func (tm *taskedLock) SafeLock(task Task) {
 	err := tm.Lock(task)
 	if err != nil {
-		logrus.Errorf(fail.Wrap(err, "cannot use SafeLock() when obviously it's not safe").Error())
+		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeLock() when obviously it's not safe", "", 0)).Error())
 	}
 }
 
@@ -265,7 +266,7 @@ func (tm *taskedLock) Unlock(task Task) fail.Error {
 func (tm *taskedLock) SafeUnlock(task Task) {
 	err := tm.Unlock(task)
 	if err != nil {
-		logrus.Errorf(fail.Wrap(err, "cannot use SafeUnlock() when obviously it's not safe").Error())
+		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeUnlock() when obviously it's not safe", "", 0)).Error())
 	}
 }
 

@@ -370,6 +370,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		return false, nil, fail.InvalidRequestError("cannot wait task '%s': not running", tid)
 	}
 
+	// FIXME: go routine never ends if timeout occurs!
 	c := make(chan struct{})
 	go func() {
 		results, err = tg.WaitGroup()

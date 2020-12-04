@@ -163,7 +163,7 @@ feature:
                     targets:
                         masters: any
                     run: |
-                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfKubectl wait -n {{ .Namespace }} --timeout=5s --for condition=ready pods -l release=postgresql-infra || sfFail 193
+                        sfStandardRetry sfKubectl wait -n {{ .Namespace }} --timeout=5s --for condition=ready pods -l release=postgresql-infra || sfFail 193
                         sfExit
 
         remove:

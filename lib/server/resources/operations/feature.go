@@ -403,7 +403,12 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 	tracer := debug.NewTracer(f.task, true, "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer temporal.NewStopwatch().OnExitLogInfo(
+		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", featureName, targetType, targetName),
+		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),
+	)()
 
+	// FIXME: change code to make sure this block is called once during all the life of the feature
 	methods := target.InstallMethods(f.task)
 	var (
 		installer Installer
@@ -421,11 +426,6 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 	if installer == nil {
 		return nil, fail.NotAvailableError("failed to find a way to install '%s'", featureName)
 	}
-
-	defer temporal.NewStopwatch().OnExitLogInfo(
-		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", featureName, targetType, targetName),
-		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),
-	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
 	// myV := make(data.Map, len(v))

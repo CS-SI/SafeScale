@@ -124,7 +124,7 @@ sfNetmask2cidr() {
 }
 export -f sfNetmask2cidr
 
-# Convert CIDR to netmask
+# Convert CIDR to netmask
 sfCidr2netmask() {
     local bits=${1#*/}
     local mask=$((0xffffffff << (32-$bits)))
@@ -165,6 +165,30 @@ sfInterfaceWithIP() {
     ifconfig | grep -B1 "$1" | grep -o "^\w*"
 }
 export -f sfInterfaceWithIP
+
+#------ delays and timeouts ------
+
+sfDefaultDelay() {
+    echo {{ default 10 .reserved_DefaultDelay }}
+}
+export -f sfDefaultDelay
+
+sfDefaultTimeout() {
+    echo {{ default "2m" .reserved_DefaultTimeout }}
+}
+export -f sfDefaultTimeout
+
+sfLongTimeout() {
+    echo {{ default "5m" .reserved_LongTimeout }}
+}
+export -f sfLongTimeout
+
+sfDockerImagePullTimeout() {
+    echo {{ default "10m" .reserved_DockerImagePullTimeout }}
+}
+export -f sfDockerImagePullTimeout
+
+#------
 
 # sfAsyncStart <what> <duration> <command>...
 sfAsyncStart() {
@@ -219,7 +243,7 @@ sfRetry() {
         export -f fn
 EOF
     eval "$code"
-      result=$(timeout $timeout bash -c -x fn)
+    result=$(timeout $timeout bash -c -x fn)
     rc=$?
     unset fn
     [ $rc -eq 0 ] && echo $result && return 0
@@ -227,6 +251,11 @@ EOF
     return $rc
 }
 export -f sfRetry
+
+sfStandardRetry() {
+    sfRetry $(sfDefaultTimeout) $(sfDefaultDelay) $@
+}
+export -f sfStandardRetry
 
 # sfFirewall sets a runtime firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
 # rule doesn't need sfFirewallReload to be applied, but isn't save as permanent (except if you add --permanent parameter,

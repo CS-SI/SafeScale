@@ -369,19 +369,13 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	//rc, xerr := clusterfactory.Load(task, job.GetService(), ref)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	//r, xerr := rc.AddNodes(task, int(in.GetCount()), converters.HostSizingRequirementsFromProtocolToAbstract(in.GetNodeSizing()), in.GetImageId())
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	//return converters.ClusterNodeListFromResourceToProtocol(r)
-
 	sizing, _, err := converters.HostSizingRequirementsFromStringToAbstract(in.GetNodeSizing())
 	if err != nil {
 		return nil, err
+	}
+
+	if sizing.Image == "" {
+		sizing.Image = in.GetImageId()
 	}
 
 	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
@@ -389,7 +383,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		return nil, xerr
 	}
 
-	resp, xerr := instance.AddNodes(task, int(in.Count), sizing, in.GetImageId())
+	resp, xerr := instance.AddNodes(task, uint(in.Count), *sizing)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -519,11 +513,11 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -618,11 +612,11 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -644,6 +638,7 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, nodeRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	_ = nodeRef // VPL: waiting for code...
 	return empty, fail.NotImplementedError()
 }

@@ -69,20 +69,20 @@ feature:
                             case $LINUX_KIND in
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
+                                    sfStandardRetry "sfApt update"
                                     apt-cache showpkg software-properties-common && apt-get install -y software-properties-common
                                     apt-cache showpkg python-software-properties && apt-get install -y python-software-properties
                                     apt-add-repository --yes --update ppa:ansible/ansible
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
+                                    sfStandardRetry "sfApt update"
+                                    sfStandardRetry "sfApt install -y ansible"
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
+                                    sfStandardRetry "sfApt update"
                                     echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt update"
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfApt install -y ansible"
+                                    sfStandardRetry "sfApt update"
+                                    sfStandardRetry "sfApt install -y ansible"
                                     ;;
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
