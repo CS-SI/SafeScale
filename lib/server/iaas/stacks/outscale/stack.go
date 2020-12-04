@@ -19,7 +19,6 @@ package outscale
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	"github.com/outscale/osc-sdk-go/osc"
 
@@ -39,19 +38,19 @@ type Credentials struct {
 
 // ComputeConfiguration outscale compute configuration
 type ComputeConfiguration struct {
-	URL                     string
-	Region                  string
-	Subregion               string
-	Service                 string
-	DefaultImage            string
-	DefaultVolumeSpeed      volumespeed.Enum
-	DefaultTenancy          string
-	DNSList                 []string
-	OperatorUsername        string
-	WhitelistTemplateRegexp *regexp.Regexp
-	BlacklistTemplateRegexp *regexp.Regexp
-	WhitelistImageRegexp    *regexp.Regexp
-	BlacklistImageRegexp    *regexp.Regexp
+	URL                string
+	Region             string
+	Subregion          string
+	Service            string
+	DefaultImage       string
+	DefaultVolumeSpeed volumespeed.Enum
+	DefaultTenancy     string
+	DNSList            []string
+	OperatorUsername   string
+	// WhitelistTemplateRegexp *regexp.Regexp
+	// BlacklistTemplateRegexp *regexp.Regexp
+	// WhitelistImageRegexp    *regexp.Regexp
+	// BlacklistImageRegexp    *regexp.Regexp
 }
 
 // NetworkConfiguration Outscale network configuration
@@ -113,7 +112,6 @@ func NullStack() *stack {
 }
 
 // New creates a new stack
-//func New(authOpts stacks.AuthenticationOptions, cfgOpts stacks.ConfigurationOptions) (_ api.Stack, xerr fail.Error) {
 func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) {
 	if options == nil {
 		return nil, fail.InvalidParameterError("options", "cannot be nil")
@@ -156,10 +154,10 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) {
 			DefaultImage:              options.Compute.DefaultImage,
 			MetadataBucket:            options.Metadata.Bucket,
 			OperatorUsername:          options.Compute.OperatorUsername,
-			BlacklistImageRegexp:      options.Compute.BlacklistImageRegexp,
-			BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
-			WhitelistImageRegexp:      options.Compute.WhitelistImageRegexp,
-			WhitelistTemplateRegexp:   options.Compute.WhitelistTemplateRegexp,
+			// BlacklistImageRegexp:      options.Compute.BlacklistImageRegexp,
+			// BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
+			// WhitelistImageRegexp:      options.Compute.WhitelistImageRegexp,
+			// WhitelistTemplateRegexp:   options.Compute.WhitelistTemplateRegexp,
 		},
 		auth: auth,
 	}

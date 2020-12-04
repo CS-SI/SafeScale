@@ -661,8 +661,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 	}
 
-	logrus.Debugf("Host resource created.")
-
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		if xerr != nil && !request.KeepOnFailure { // FIXME: Handle error groups
@@ -674,16 +672,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 	}()
 
-	if ahf.IsNull() {
-		return nullAHF, nullUDC, fail.InconsistentError("unexpected nil ahf")
-	}
-
 	if !ahf.OK() {
 		logrus.Warnf("Missing data in ahf: %v", ahf)
 	}
 
 	return ahf, userData, nil
-
 }
 
 func (s stack) buildAwsSpotMachine(
@@ -733,7 +726,7 @@ func (s stack) buildAwsSpotMachine(
 		return nil, xerr
 	}
 
-	// FIXME: Listen to result.SpotInstanceRequests[0].State
+	// FIXME: Listen to result.SpotInstanceRequests[0].GetState
 
 	host := abstract.HostCore{
 		ID:   aws.StringValue(instance.InstanceId),

@@ -196,12 +196,14 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 	if svc.IsNull() {
 		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
-	if subnetRef == "" {
+	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
 		return nullSubnet(), fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
+	networkRef = strings.TrimSpace(networkRef)
 
-	rs = nil
-	var subnetID string
+	var (
+		subnetID string
+	)
 	switch networkRef {
 	case "":
 		// If networkRef is empty, subnetRef must be subnetID
@@ -278,8 +280,11 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nullSubnet(), fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			if networkRef != "" {
+				// rewrite NotFoundError, user does not bother about metadata stuff
+				return nullSubnet(), fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			}
+			return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 		default:
 			return nullSubnet(), xerr
 		}

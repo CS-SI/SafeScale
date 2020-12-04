@@ -318,7 +318,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfDoesDockerRunStack consul4platform || sfFail 197
+                            sfStandardRetry sfDoesDockerRunStack consul4platform || sfFail 197
                             sfExit
 
             remove:

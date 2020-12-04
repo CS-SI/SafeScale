@@ -188,7 +188,7 @@ feature:
                             {{ else }}
                             PREFIX="elastalert"
                             {{ end -}}
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
+                            sfStandardRetry "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
                             sfExit
 
                     ready:
@@ -197,7 +197,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || sfFail 201
+                            sfStandardRetry "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || sfFail 201
                             sfExit
 
             remove:

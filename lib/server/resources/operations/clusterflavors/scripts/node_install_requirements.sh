@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+rm -f /opt/safescale/var/log/node_install_requirements.log
+exec 1<&-
+exec 2<&-
+exec 1<>/opt/safescale/var/log/k8s_install_node.log
+exec 2>&1
+
+{{ .reserved_BashLibrary }}
+
 #### Installs and configure common tools for any kind of nodes ####
 
 install_common_requirements() {
@@ -82,13 +90,13 @@ EOF
     # Loads overlay module
     modprobe overlay
 
-    echo "Common requirements successfully installed."
+    echo "Node common requirements successfully installed."
 }
 export -f install_common_requirements
 
 case $(sfGetFact "linux_kind") in
     debian|ubuntu)
-        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip" || sfFail 192 "Problem installing k8s requirements"
+        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip" || sfFail 192 "Problem installing node common requirements"
         curl -kqSsL -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cp rclone-*-linux-amd64/rclone /usr/local/bin && \
@@ -101,10 +109,10 @@ case $(sfGetFact "linux_kind") in
         ;;
     redhat|centos)
         yum makecache fast || sfFail 192 "Problem updating sources"
-        yum install -y wget curl time rclone jq unzip || sfFail 192 "Problem installing k8s requirements"
+        yum install -y wget curl time rclone jq unzip || sfFail 192 "Problem installing node common requirements"
         ;;
     fedora)
-        dnf install wget curl time rclone jq unzip || sfFail 192 "Problem installing k8s requirements"
+        dnf install wget curl time rclone jq unzip || sfFail 192 "Problem installing node common requirements"
         ;;
     *)
         sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
@@ -113,3 +121,5 @@ esac
 
 # /usr/bin/time -p bash -c -x install_common_requirements
 install_common_requirements || sfFail $? "Problem installing common requirements"
+
+sfExit

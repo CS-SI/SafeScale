@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -41,8 +40,8 @@ var (
 		DefaultNodeSizing:      nodeSizing,
 		DefaultImage:           defaultImage,
 		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
-		GetNodeInstallationScript: getNodeInstallationScript,
-		ConfigureCluster:          configureCluster,
+		// GetNodeInstallationScript: getNodeInstallationScript,
+		ConfigureCluster: configureCluster,
 	}
 )
 
@@ -117,19 +116,20 @@ func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
 	return nil
 }
 
-// VPL: eventually this part will be removed (some things have to be included in node_install_requirements
-func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
-	script := ""
-	data := data.Map{}
-
-	switch nodeType {
-	case clusternodetype.Gateway:
-	case clusternodetype.Master:
-		script = "k8s_install_master.sh"
-	case clusternodetype.Node:
-		script = "k8s_install_node.sh"
-	}
-	return script, data
-}
+//
+// // VPL: eventually this part will be removed (some things have to be included in node_install_requirements
+// func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
+// 	script := ""
+// 	data := data.Map{}
+//
+// 	switch nodeType {
+// 	case clusternodetype.Gateway:
+// 	case clusternodetype.Master:
+// 		script = "k8s_install_master.sh"
+// 	case clusternodetype.Node:
+// 		script = "k8s_install_node.sh"
+// 	}
+// 	return script, data
+// }
 
 // ENDVPL

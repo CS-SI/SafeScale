@@ -98,8 +98,8 @@ type worker struct {
 	settings  resources.FeatureSettings
 	startTime time.Time
 
-	host    resources.Host
-	node    bool
+	host resources.Host
+	// node    bool
 	cluster resources.Cluster
 
 	availableMaster  resources.Host
@@ -133,9 +133,9 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	switch t.TargetType() {
 	case featuretargettype.CLUSTER:
 		w.cluster = t.(resources.Cluster)
-	case featuretargettype.NODE:
-		w.node = true
-		fallthrough
+	// case featuretargettype.NODE:
+	// 	w.node = true
+	// 	fallthrough
 	case featuretargettype.HOST:
 		w.host = t.(resources.Host)
 	}
@@ -164,10 +164,14 @@ func (w *worker) CanProceed(s resources.FeatureSettings) fail.Error {
 			xerr = w.validateClusterSizing()
 		}
 		return xerr
-	case featuretargettype.NODE:
-		return nil
+	// case featuretargettype.NODE:
+	// 	return nil
 	case featuretargettype.HOST:
-		return w.validateContextForHost()
+		// If the target is a host inside a worker for a cluster, validate unconditionally
+		if w.cluster != nil {
+			return nil
+		}
+		return w.validateContextForHost(s)
 	}
 	return nil
 }
@@ -209,6 +213,7 @@ func (w *worker) identifyConcernedMasters() ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
+
 	if w.concernedMasters == nil {
 		hosts, xerr := w.identifyAllMasters()
 		if xerr != nil {
@@ -230,13 +235,19 @@ func (w *worker) extractHostsFailingCheck(hosts []resources.Host) ([]resources.H
 	var concernedHosts []resources.Host
 	dones := map[resources.Host]chan fail.Error{}
 	res := map[resources.Host]chan resources.Results{}
+
+	settings := w.settings
+	if w.cluster != nil {
+		settings.IgnoreSuitability = true
+	}
+
 	for _, h := range hosts {
 		d := make(chan fail.Error)
 		r := make(chan resources.Results)
 		dones[h] = d
 		res[h] = r
 		go func(host resources.Host, res chan resources.Results, done chan fail.Error) {
-			r2, innerXErr := w.feature.Check(host, w.variables, w.settings)
+			r2, innerXErr := w.feature.Check(host, w.variables, settings)
 			if innerXErr != nil {
 				res <- nil
 				done <- innerXErr
@@ -294,10 +305,12 @@ func (w *worker) identifyConcernedNodes() ([]resources.Host, fail.Error) {
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		concernedHosts, xerr := w.extractHostsFailingCheck(hosts)
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		w.concernedNodes = concernedHosts
 	}
 	return w.concernedNodes, nil
@@ -395,6 +408,7 @@ func (w *worker) identifyConcernedGateways() (_ []resources.Host, xerr fail.Erro
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	w.concernedGateways = concernedHosts
 	return w.concernedGateways, nil
 }
@@ -577,7 +591,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	// Determine list of hosts concerned by the step
 	var hostsList []resources.Host
-	if w.target.TargetType() == featuretargettype.NODE {
+	if w.target.TargetType() == featuretargettype.HOST {
 		hostsList, xerr = w.identifyHosts(map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = stepMap[yamlTargetsKeyword]
@@ -706,10 +720,10 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	stepInstance := step{
-		Worker:             w,
-		Name:               stepName,
-		Action:             w.action,
-		Targets:            stepT,
+		Worker: w,
+		Name:   stepName,
+		Action: w.action,
+		// Targets:            stepT,
 		Script:             templateCommand,
 		WallTime:           wallTime,
 		OptionsFileContent: optionsFileContent,
@@ -765,10 +779,11 @@ func (w *worker) validateContextForCluster() fail.Error {
 }
 
 // validateContextForHost ...
-func (w *worker) validateContextForHost() fail.Error {
-	if w.node {
+func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail.Error {
+	if settings.IgnoreSuitability /* || w.node*/ {
 		return nil
 	}
+
 	ok := false
 	yamlKey := "feature.suitableFor.host"
 	if w.feature.specs.IsSet(yamlKey) {
@@ -778,9 +793,8 @@ func (w *worker) validateContextForHost() fail.Error {
 	if ok {
 		return nil
 	}
-	msg := fmt.Sprintf("feature '%s' not suitable for host", w.feature.GetName())
-	// logrus.Println(msg)
-	return fail.NotAvailableError(msg)
+
+	return fail.NotAvailableError("feature '%s' not suitable for host", w.feature.GetName())
 }
 
 func (w *worker) validateClusterSizing() (xerr fail.Error) {

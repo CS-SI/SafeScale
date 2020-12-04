@@ -19,12 +19,14 @@ package operations
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
@@ -36,7 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -285,12 +286,8 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 }
 
 // ExecuteScript executes the script template with the parameters on target IPAddress
-func (c *cluster) ExecuteScript(
-	task concurrency.Task, funcMap map[string]interface{}, tmplName string, data map[string]interface{},
-	host resources.Host,
-) (_ int, _ string, _ string, xerr fail.Error) {
-
-	if c == nil {
+func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+	if c.IsNull() {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
@@ -300,10 +297,10 @@ func (c *cluster) ExecuteScript(
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
 	}
 	if host.IsNull() {
-		return -1, "", "", fail.InvalidParameterError("host", "cannot be null value")
+		return -1, "", "", fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "("+host.GetName()+")").Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -319,9 +316,21 @@ func (c *cluster) ExecuteScript(
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
+	// Sets delays and timeouts for script
+	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	data["reserved_DefaultTimeout"] = strings.Replace(
+		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["reserved_LongTimeout"] = strings.Replace(
+		temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["reserved_DockerImagePullTimeout"] = strings.Replace(
+		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
+	)
+
 	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return -1, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
 	}
 
 	hidesOutput := strings.Contains(script, "set +x\n")
@@ -332,7 +341,7 @@ func (c *cluster) ExecuteScript(
 		}
 	}
 
-	// err = UploadStringToRemoteFile(script, host, path, "", "")
+	// Uploads the script into remote file
 	rfcItem := remotefile.Item{Remote: path}
 	xerr = rfcItem.UploadString(task, script, host)
 	_ = os.Remove(rfcItem.Local)
@@ -340,11 +349,11 @@ func (c *cluster) ExecuteScript(
 		return -1, "", "", xerr
 	}
 
+	// executes remote file
 	cmd := fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
 	if hidesOutput {
 		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", path, path)
 	}
-
 	return host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 }
 
@@ -366,19 +375,12 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		return xerr
 	}
 
-	// VPL: this part also will be removed
-	// Get installation script based on node type; if == "", do nothing
-	script, params := c.getNodeInstallationScript(task, nodeType)
-	if script == "" {
-		return nil
-	}
-	// ENDVPL
+	// script, xerr := flavors.GetGlobalSystemRequirements(task, c)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
-	params["reserved_CommonRequirements"], xerr = flavors.GetGlobalSystemRequirements(task, c)
-	if xerr != nil {
-		return xerr
-	}
-
+	params := data.Map{}
 	if nodeType == clusternodetype.Master {
 		tp := c.service.GetTenantParameters()
 		content := map[string]interface{}{
@@ -491,8 +493,11 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	params["ClusterAdminPassword"] = identity.AdminPassword
 	params["getDefaultRouteIP"] = netCfg.DefaultRouteIP
 	params["getEndpointIP"] = netCfg.EndpointIP
+	params["IPRanges"] = netCfg.CIDR
+	params["SSHPublicKey"] = identity.Keypair.PublicKey
+	params["SSHPrivateKey"] = identity.Keypair.PrivateKey
 
-	if _, _, _, xerr = c.ExecuteScript(task, nil, script, params, host); xerr != nil {
+	if _, _, _, xerr = c.ExecuteScript(task, "node_install_requirements.sh", params, host); xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
 	}
 
@@ -581,7 +586,7 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 
 		adminPassword := identity.AdminPassword
 
-		feat, xerr := NewEmbeddedFeature(task, "proxycache-client")
+		feat, xerr := NewEmbeddedFeature(task, "remotedesktop")
 		if xerr != nil {
 			return xerr
 		}

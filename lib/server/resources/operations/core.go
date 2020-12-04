@@ -18,18 +18,17 @@ package operations
 
 import (
 	"encoding/json"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
 	"sync/atomic"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
@@ -250,9 +249,6 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 }
 
 // Read gets the data from Object Storage
-// if error is ErrNotFound then read by name; if error is ErrNotFound return this error
-// In case of any other error, abort the retry to propagate the error
-// If retry times out, returns errNotFound
 func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
@@ -271,30 +267,32 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	xerr := retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			if innerErr := c.readByReference(task, ref); innerErr != nil {
-				switch innerErr.(type) {
-				case *fail.ErrNotFound: // If not found, stop immediately
-					return retry.StopRetryError(innerErr)
-				default:
-					return innerErr
-				}
-			}
-			return nil
-		},
-		temporal.GetMinDelay(),
-	)
+	// VPL: because of read-after-write check, no need to retry read
+	// xerr := retry.WhileUnsuccessfulDelay1Second(
+	// 	func() error {
+	// 		if innerErr := c.readByReference(task, ref); innerErr != nil {
+	// 			switch innerErr.(type) {
+	// 			case *fail.ErrNotFound: // If not found, stop immediately
+	// 				return retry.StopRetryError(innerErr)
+	// 			default:
+	// 				return innerErr
+	// 			}
+	// 		}
+	// 		return nil
+	// 	},
+	// 	temporal.GetMinDelay(),
+	// )
+	xerr := c.readByReference(task, ref)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
-		case *retry.ErrStopRetry:
-			// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
-			return fail.ToError(xerr.Cause())
-		default:
-			return xerr
-		}
+		// switch xerr.(type) {
+		// case *retry.ErrTimeout:
+		// 	return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
+		// case *retry.ErrStopRetry:
+		// 	// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
+		// 	return fail.ToError(xerr.Cause())
+		// default:
+		return xerr
+		// }
 	}
 
 	c.loaded = true
@@ -321,30 +319,31 @@ func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	xerr := retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			if innerErr := c.readByID(task, id); innerErr != nil {
-				switch innerErr.(type) {
-				case *fail.ErrNotFound: // If not found, stop immediately
-					return retry.StopRetryError(innerErr)
-				default:
-					return innerErr
-				}
-			}
-			return nil
-		},
-		temporal.GetMinDelay(),
-	)
+	// xerr := retry.WhileUnsuccessfulDelay1Second(
+	// 	func() error {
+	// 		if innerErr := c.readByID(task, id); innerErr != nil {
+	// 			switch innerErr.(type) {
+	// 			case *fail.ErrNotFound: // If not found, stop immediately
+	// 				return retry.StopRetryError(innerErr)
+	// 			default:
+	// 				return innerErr
+	// 			}
+	// 		}
+	// 		return nil
+	// 	},
+	// 	temporal.GetMinDelay(),
+	// )
+	xerr := c.readByID(task, id)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			return fail.NotFoundError("failed to load metadata of %s %s", c.kind, id)
-		case *retry.ErrStopRetry:
-			// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
-			return fail.ToError(xerr.Cause())
-		default:
-			return xerr
-		}
+		// switch xerr.(type) {
+		// case *retry.ErrTimeout:
+		// 	return fail.NotFoundError("failed to load metadata of %s %s", c.kind, id)
+		// case *retry.ErrStopRetry:
+		// 	// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
+		// 	return fail.ToError(xerr.Cause())
+		// default:
+		return xerr
+		// }
 	}
 
 	c.loaded = true
@@ -363,11 +362,11 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 }
 
 // readByReference gets the data from Object Storage
-// if error is ErrNotFound then read by name; if error is still ErrNotFound return this error
+// First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
 func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
 	if xerr = c.readByID(task, ref); xerr != nil {
 		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrTimeout:
+		case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
 			xerr = c.readByName(task, ref)
 		default:
 			return xerr
@@ -375,13 +374,11 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 	}
 	if xerr != nil {
 		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrTimeout:
+		case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
 			return fail.NotFoundError("failed to find %s '%s'", c.kind, ref)
-		default:
-			return xerr
 		}
 	}
-	return nil
+	return xerr
 }
 
 // readByName reads a metadata identified by name
@@ -401,12 +398,15 @@ func (c *core) write(task concurrency.Task) fail.Error {
 		if xerr != nil {
 			return xerr
 		}
+
 		if xerr = c.folder.Write(byNameFolderName, c.GetName(), jsoned); xerr != nil {
 			return xerr
 		}
+
 		if xerr = c.folder.Write(byIDFolderName, c.GetID(), jsoned); xerr != nil {
 			return xerr
 		}
+
 		c.loaded = true
 		c.committed = true
 	}

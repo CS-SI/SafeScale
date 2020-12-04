@@ -40,7 +40,7 @@ const (
 	HostCleanupTimeout = 3 * time.Minute
 
 	// DefaultConnectionTimeout is the default connection timeout
-	DefaultConnectionTimeout = 30 * time.Second
+	DefaultConnectionTimeout = 1 * time.Minute
 
 	// defaultCommunicationTimeout is the default timeout for HTTP communication with Provider
 	defaultCommunicationTimeout = 3 * time.Minute

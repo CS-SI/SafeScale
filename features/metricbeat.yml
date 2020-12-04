@@ -180,7 +180,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d || sfFail 193
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
+                            sfStandardRetry "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
                             sfExit
 
             remove:

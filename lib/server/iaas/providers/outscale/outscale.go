@@ -18,14 +18,13 @@ package outscale
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -120,19 +119,19 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			SecretKey: get(identity, "SecretKey"),
 		},
 		Compute: outscale.ComputeConfiguration{
-			URL:                     get(compute, "URL", "outscale.com/api/latest"),
-			Service:                 get(compute, "Service", "api"),
-			Region:                  region,
-			Subregion:               get(compute, "Subregion"),
-			DNSList:                 getList(compute, "DNSList"),
-			DefaultTenancy:          get(compute, "DefaultTenancy", "default"),
-			DefaultImage:            get(compute, "DefaultImage"),
-			DefaultVolumeSpeed:      volumeSpeed(get(compute, "DefaultVolumeSpeed", "HDD")),
-			OperatorUsername:        get(compute, "OperatorUsername", "safescale"),
-			BlacklistImageRegexp:    regexp.MustCompile(get(compute, "BlacklistImageRegexp")),
-			BlacklistTemplateRegexp: regexp.MustCompile(get(compute, "BlacklistTemplateRegexp")),
-			WhitelistImageRegexp:    regexp.MustCompile(get(compute, "WhitelistImageRegexp")),
-			WhitelistTemplateRegexp: regexp.MustCompile(get(compute, "WhitelistTemplateRegexp")),
+			URL:                get(compute, "URL", "outscale.com/api/latest"),
+			Service:            get(compute, "Service", "api"),
+			Region:             region,
+			Subregion:          get(compute, "Subregion"),
+			DNSList:            getList(compute, "DNSList"),
+			DefaultTenancy:     get(compute, "DefaultTenancy", "default"),
+			DefaultImage:       get(compute, "DefaultImage"),
+			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "HDD")),
+			OperatorUsername:   get(compute, "OperatorUsername", "safescale"),
+			// BlacklistImageRegexp:    regexp.MustCompile(get(compute, "BlacklistImageRegexp")),
+			// BlacklistTemplateRegexp: regexp.MustCompile(get(compute, "BlacklistTemplateRegexp")),
+			// WhitelistImageRegexp:    regexp.MustCompile(get(compute, "WhitelistImageRegexp")),
+			// WhitelistTemplateRegexp: regexp.MustCompile(get(compute, "WhitelistTemplateRegexp")),
 		},
 		Network: outscale.NetworkConfiguration{
 			DefaultNetworkCIDR: get(network, "DefaultNetworkCIDR", get(network, "VPCCIDR")),

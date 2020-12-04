@@ -229,7 +229,7 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
 
-		// GetService is ready
+		// service is ready
 		newS := &service{
 			Provider:       providerInstance,
 			Location:       objectStorageLocation,
@@ -245,46 +245,65 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 
-// validatRegexps validates regexp values from tenants file
+// validateRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
 	compute, ok := tenant["compute"].(map[string]interface{})
 	if !ok {
 		return fail.InvalidParameterError("tenant['compute']", "is not a map")
 	}
 
-	if reStr, ok := compute["WhitelistTemplateRegexp"].(string); ok {
-		// Validate regular expression
-		re, err := regexp.Compile(reStr)
-		if err != nil {
-			return fail.SyntaxError("invalid value '%s' for field 'WhitelistTemplateRegexp': %s", reStr, err.Error())
-		}
-		svc.whitelistTemplateRE = re
+	res, xerr := validateRegexpsOfKeyword("WhilelistTemplateRegexp", compute["WhitelistTemplateRegexp"])
+	if xerr != nil {
+		return xerr
 	}
-	if reStr, ok := compute["BlacklistTemplateRegexp"].(string); ok {
-		// Validate regular expression
-		re, err := regexp.Compile(reStr)
-		if err != nil {
-			return fail.SyntaxError("invalid value '%s' for field 'BlacklistTemplateRegexp': %s", reStr, err.Error())
-		}
-		svc.blacklistTemplateRE = re
+	svc.whitelistTemplateREs = res
+
+	res, xerr = validateRegexpsOfKeyword("BlacklistTemplateRegexp", compute["BlacklistTemplateRegexp"])
+	if xerr != nil {
+		return xerr
 	}
-	if reStr, ok := compute["WhitelistImageRegexp"].(string); ok {
-		// Validate regular expression
-		re, err := regexp.Compile(reStr)
-		if err != nil {
-			return fail.SyntaxError("invalid value '%s' for field 'WhitelistImageRegexp': %s", reStr, err.Error())
-		}
-		svc.whitelistImageRE = re
+	svc.blacklistTemplateREs = res
+
+	res, xerr = validateRegexpsOfKeyword("WhilelistImageRegexp", compute["WhitelistImageRegexp"])
+	if xerr != nil {
+		return xerr
 	}
-	if reStr, ok := compute["BlacklistImageRegexp"].(string); ok {
-		// Validate regular expression
-		re, err := regexp.Compile(reStr)
-		if err != nil {
-			return fail.SyntaxError("invalid value '%s' for field 'BlacklistImageRegexp': %s", reStr, err.Error())
-		}
-		svc.blacklistImageRE = re
+	svc.whitelistImageREs = res
+
+	res, xerr = validateRegexpsOfKeyword("BlacklistImageRegexp", compute["BlacklistImageRegexp"])
+	if xerr != nil {
+		return xerr
 	}
+	svc.blacklistImageREs = res
+
 	return nil
+}
+
+// validateRegexpsOfKeyword reads the content of the keyword passed as parameter and returns an array of compiled regexps
+func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regexp.Regexp, _ fail.Error) {
+	var emptySlice []*regexp.Regexp
+
+	if str, ok := content.(string); ok {
+		re, err := regexp.Compile(str)
+		if err != nil {
+			return emptySlice, fail.SyntaxError("invalid value '%s' for keyword '%s': %s", str, keyword, err.Error())
+		}
+		out = append(out, re)
+		return out, nil
+	}
+
+	if list, ok := content.([]interface{}); ok {
+		for _, v := range list {
+			re, err := regexp.Compile(v.(string))
+			if err != nil {
+				return emptySlice, fail.SyntaxError("invalid value '%s' for keyword '%s': %s", v, keyword, err.Error())
+			}
+			out = append(out, re)
+		}
+		return out, nil
+	}
+
+	return out, nil
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map

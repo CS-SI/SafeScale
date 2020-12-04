@@ -132,7 +132,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	pbc.displayCh = make(chan outputItem, pipeCount)
-	if _, xerr = pbc.displayTask.Start(taskDisplay, pbc.displayCh); xerr != nil {
+	if _, xerr = pbc.displayTask.Start(taskDisplay, taskDisplayParameters{ch: pbc.displayCh}); xerr != nil {
 		return xerr
 	}
 
@@ -142,7 +142,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 		return xerr
 	}
 	for _, v := range pbc.bridges {
-		if _, xerr = taskGroup.Start(taskRead, readParameters{bridge: v, ch: pbc.displayCh}); xerr != nil {
+		if _, xerr = taskGroup.Start(taskRead, taskReadParameters{bridge: v, ch: pbc.displayCh}); xerr != nil {
 			return xerr
 		}
 	}
@@ -161,7 +161,7 @@ func (oi outputItem) Print() {
 }
 
 // Structure to store taskRead parameters
-type readParameters struct {
+type taskReadParameters struct {
 	bridge PipeBridge
 	ch     chan<- outputItem
 }
@@ -172,9 +172,9 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 		return nil, fail.InvalidParameterError("p", "cannot be nil")
 	}
 
-	params, ok := p.(readParameters)
+	params, ok := p.(taskReadParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a 'readParameters'")
+		return nil, fail.InvalidParameterError("p", "must be a 'taskReadParameters'")
 	}
 
 	// var (
@@ -239,13 +239,17 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	return nil, fail.ToError(err)
 }
 
-func taskDisplay(t concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	displayCh, ok := p.(<-chan outputItem)
-	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a '<-chan outputItem'")
-	}
+// Structure to store taskRead parameters
+type taskDisplayParameters struct {
+	ch <-chan outputItem
+}
 
-	for item := range displayCh {
+func taskDisplay(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	p, ok := params.(taskDisplayParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("p", "must be a 'taskDisplayParameters'")
+	}
+	for item := range p.ch {
 		item.Print()
 	}
 	return nil, nil

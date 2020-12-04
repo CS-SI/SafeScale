@@ -118,10 +118,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ebtables socat || sfFail 192
+                                    sfStandardRetry sfApt install -y ebtables socat || sfFail 192
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ebtables socat || sfFail 193
+                                    sfStandardRetry yum install -y ebtables socat || sfFail 193
 
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
@@ -176,11 +176,11 @@ feature:
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
                                     sfApt update
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y auditd quota quotatool || sfFail 195
+                                    sfStandardRetry sfApt install -y auditd quota quotatool || sfFail 195
                                     ;;
 
                                 centos|fedora|redhat|rhel)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum -y install audit audit-libs quota || sfFail 195
+                                    sfStandardRetry yum -y install audit audit-libs quota || sfFail 195
                                     ;;
 
                                 *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
@@ -518,7 +518,7 @@ feature:
                             metricsBindAddress: 0.0.0.0:10249
                             EOF
 
-                            sfRetry {{.TemplatePullImagesTimeout}} {{.TemplateOperationDelay}} kubeadm config images pull || sfFail 202
+                            sfRetry {{.TemplatePullImagesTimeout}} $(sfDefaultDelay) kubeadm config images pull || sfFail 202
                             sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 203
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 204
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 205
@@ -686,9 +686,9 @@ feature:
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 212
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 213
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 214
+                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 212
+                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 213
+                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 214
 
                             echo "cp1 init done"
                             sfExit
@@ -795,15 +795,15 @@ feature:
 
                             [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 227
                             # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
-                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 228
+                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "bash ${SF_TMPDIR}/cp_join_cmd.sh" || sfFail 228
                             [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 229
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 230
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
+                            sfStandardRetry "sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system" || sfFail 228
+                            sfStandardRetry "sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system" || sfFail 229
+                            sfStandardRetry "sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system" || sfFail 230
 
                             # Configure firewall
                             case {{.CNI}} in
@@ -884,10 +884,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 254 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 255 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi

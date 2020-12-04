@@ -24,10 +24,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -38,12 +36,12 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers    func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error)  // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // sizing of gateway(s)
-	DefaultMasterSizing       func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of master(s)
-	DefaultNodeSizing         func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of node(s)
-	DefaultImage              func(task concurrency.Task, c resources.Cluster) string                          // default image of server(s)
-	GetNodeInstallationScript func(task concurrency.Task, c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
+	MinimumRequiredServers func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error)  // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing   func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // sizing of gateway(s)
+	DefaultMasterSizing    func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of master(s)
+	DefaultNodeSizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of node(s)
+	DefaultImage           func(task concurrency.Task, c resources.Cluster) string                          // default image of server(s)
+	// GetNodeInstallationScript func(task concurrency.Task, c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
 	// GetGlobalSystemRequirements func(task concurrency.Task, c resources.Cluster) (string, fail.Error)
 	// GetTemplateBox         func() (*rice.Box, fail.Error)
 	ConfigureGateway       func(task concurrency.Task, c resources.Cluster) fail.Error
@@ -88,6 +86,7 @@ func GetGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (st
 	if xerr != nil {
 		return "", xerr
 	}
+
 	identity, xerr := c.GetIdentity(task)
 	if xerr != nil {
 		return "", xerr
