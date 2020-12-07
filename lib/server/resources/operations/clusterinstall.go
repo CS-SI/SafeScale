@@ -152,18 +152,21 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		return xerr
 	}
 	v["PrimaryGatewayIP"] = networkCfg.GatewayIP
-	v["getDefaultRouteIP"] = networkCfg.DefaultRouteIP
-	v["GatewayIP"] = v["getDefaultRouteIP"] // legacy ...
+	v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
+	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
 	v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
+	v["NetworkUsesVIP"] = networkCfg.SecondaryGatewayIP != ""
 	if networkCfg.SecondaryGatewayIP != "" {
 		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
 		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 	}
-	v["getEndpointIP"] = networkCfg.EndpointIP
-	v["getPublicIP"] = v["getEndpointIP"] // legacy ...
+	v["EndpointIP"] = networkCfg.EndpointIP
+	v["PublicIP"] = v["EndpointIP"] // legacy ...
 	if _, ok := v["IPRanges"]; !ok {
 		v["IPRanges"] = networkCfg.CIDR
 	}
+	v["CIDR"] = networkCfg.CIDR
+
 	var controlPlaneV1 *propertiesv1.ClusterControlplane
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
@@ -179,18 +182,18 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		return xerr
 	}
 	if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
-		v["ClusterControlPlaneUsesVIP"] = true
-		v["ClusterControlPlaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
+		v["ClusterControlplaneUsesVIP"] = true
+		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ControlplaneUsesVIP if there is no VIP... use IP of first available master instead
 		master, xerr := c.FindAvailableMaster(task)
 		if xerr != nil {
 			return xerr
 		}
-		if v["ClusterControlPlaneEndpointIP"], xerr = master.GetPrivateIP(task); xerr != nil {
+		if v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(task); xerr != nil {
 			return xerr
 		}
-		v["ClusterControlPlaneUsesVIP"] = false
+		v["ClusterControlplaneUsesVIP"] = false
 	}
 	if v["ClusterMasters"], xerr = c.ListMasters(task); xerr != nil {
 		return xerr

@@ -51,7 +51,7 @@ feature:
         - AllowPodsOnGateways=false
         - CNI=calico
         - CalicoNetworking=vxlan
-        - ControlplaneEndpointIP
+        - ClusterControlplaneEndpointIP
         - Dashboard=true
         - DisableHelm=false
         - EnableAudit=false
@@ -272,7 +272,7 @@ feature:
                         run: |
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
-                            {{ if .ControlplaneUsesVIP }}
+                            {{ if .ClusterControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
                                     sfApt update && sfApt -y install keepalived haproxy || sfFail 202
@@ -309,7 +309,7 @@ feature:
                                   {{- end }}
                                 }
                                 virtual_ipaddress {
-                                    {{ .ControlplaneEndpointIP }}/${NETMASK}
+                                    {{ .ClusterControlplaneEndpointIP }}/${NETMASK}
                                 }
                             }
                             EOF
@@ -390,7 +390,7 @@ feature:
                                 maxconn                 3000
 
                             listen kube_controlplane
-                                bind {{ .ControlplaneEndpointIP }}:6443
+                                bind {{ .ClusterControlplaneEndpointIP }}:6443
                                 mode tcp
                                 option tcplog
                                 timeout client 10m
@@ -436,9 +436,9 @@ feature:
                             KUBE_VERSION=stable
                             {{ end }}
 
-                            {{ if .ControlplaneUsesVIP }}
+                            {{ if .ClusterControlplaneUsesVIP }}
                             LOCAL_PORT=6444
-                            CP_ENDPOINT_IP={{ .ControlplaneEndpointIP}}
+                            CP_ENDPOINT_IP={{ .ClusterControlplaneEndpointIP}}
                             {{ else }}
                             LOCAL_PORT=6443
                             CP_ENDPOINT_IP={{ .HostIP }}

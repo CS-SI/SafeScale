@@ -149,8 +149,8 @@ feature:
                             cluster_name: "{{ .ClusterName }}"
                             cluster_flavor: "{{ .ClusterFlavor }}"
                             cluster_complexity: "{{ .ClusterComplexity }}"
-                            controlplane_uses_vip: {{ .ControlplaneUsesVIP }}
-                            controlplane_endpoint_ip: "{{ .ControlplaneEndpointIP }}"
+                            controlplane_uses_vip: {{ .ClusterControlplaneUsesVIP }}
+                            controlplane_endpoint_ip: "{{ .ClusterControlplaneEndpointIP }}"
                             cluster_admin_username: "{{ .ClusterAdminUsername }}"
                             EOF
 

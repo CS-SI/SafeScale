@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -43,7 +44,7 @@ type Cluster interface {
 	GetComplexity(task concurrency.Task) (clustercomplexity.Enum, fail.Error)                                        // Complexity returns the complexity of the cluster
 	GetAdminPassword(task concurrency.Task) (string, fail.Error)                                                     // AdminPassword returns the password of the cluster admin account
 	GetKeyPair(task concurrency.Task) (abstract.KeyPair, fail.Error)                                                 // KeyPair returns the key pair used in the cluster
-	GetNetworkConfig(task concurrency.Task) (*propertiesv2.ClusterNetwork, fail.Error)                               // NetworkConfig returns network configuration of the cluster
+	GetNetworkConfig(task concurrency.Task) (*propertiesv3.ClusterNetwork, fail.Error)                               // NetworkConfig returns network configuration of the cluster
 	GetState(task concurrency.Task) (clusterstate.Enum, fail.Error)                                                  // returns the current state of the cluster
 	Start(task concurrency.Task) fail.Error                                                                          // starts the cluster
 	Stop(task concurrency.Task) fail.Error                                                                           // stops the cluster
