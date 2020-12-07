@@ -48,7 +48,7 @@ type network struct {
 	*core
 }
 
-func nullNetwork() *network {
+func nullNetwork() resources.Network {
 	return &network{core: nullCore()}
 }
 

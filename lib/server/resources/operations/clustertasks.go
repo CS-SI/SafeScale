@@ -262,7 +262,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	if xerr != nil {
 		return nil, xerr
 	}
-	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.NetworkID)
+	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -581,7 +581,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.NetworkID)
+	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -674,7 +674,6 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	}
 
 	hostLabel = fmt.Sprintf("node #%d (%s)", p.Index, rh.GetName())
-	logrus.Debugf("[%s] rh resource creation successful.", hostLabel)
 
 	if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
 		return nil, xerr
@@ -684,7 +683,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, xerr
 	}
 
-	logrus.Debugf("[%s] rh resource creation successful.", hostLabel)
+	logrus.Debugf("[%s] Host creation successful.", hostLabel)
 	return rh, nil
 }
 
@@ -818,4 +817,32 @@ func (c *cluster) taskDeleteHost(task concurrency.Task, params concurrency.TaskP
 		return nil, rh.Delete(task)
 	}
 	return nil, fail.InvalidParameterError("params", "must be a 'resources.Host'")
+}
+
+type taskDeleteNodeParameters struct {
+	Node, Master resources.Host
+}
+
+func (c *cluster) taskDeleteNode(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	p, ok := params.(taskDeleteNodeParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
+	}
+	if p.Node.IsNull() {
+		return nil, fail.InvalidParameterError("params.Node", "cannot be null value of 'resources.Host'")
+	}
+	if p.Master.IsNull() {
+		return nil, fail.InvalidParameterError("params.Master", "cannot be null value of 'resources.Host'")
+	}
+
+	return nil, c.deleteNode(t, p.Node, p.Master)
+}
+
+func (c *cluster) taskDeleteMaster(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	rh, ok := params.(resources.Host)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'resources.Host'")
+	}
+
+	return nil, c.deleteMaster(t, rh)
 }

@@ -430,7 +430,7 @@ func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 		if xerr != nil {
 			return nil, xerr
 		}
-		rs, xerr = LoadSubnet(w.feature.task, w.cluster.GetService(), "", netCfg.NetworkID)
+		rs, xerr = LoadSubnet(w.feature.task, w.cluster.GetService(), "", netCfg.SubnetID)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -873,7 +873,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	subnet, xerr := LoadSubnet(w.feature.task, svc, "", netprops.NetworkID)
+	subnet, xerr := LoadSubnet(w.feature.task, svc, "", netprops.SubnetID)
 	if xerr != nil {
 		return xerr
 	}

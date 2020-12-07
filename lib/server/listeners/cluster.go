@@ -29,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	clusterfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/cluster"
+	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
@@ -38,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 // ClusterListener host service server grpc
@@ -430,66 +432,90 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	}
 	defer job.Close()
 	task := job.GetTask()
+	svc := job.GetService()
 
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
+	instance, xerr := clusterfactory.Load(task, svc, in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	count := int(in.GetCount())
+	count := uint(in.GetCount())
 	var toRemove []*propertiesv2.ClusterNode
 	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			if len(nodesV2.PrivateNodes) < count {
-				return fail.InvalidRequestError("cannot shrink by %d, only %d nodes available", count, len(nodesV2.PrivateNodes))
+			length := uint(len(nodesV2.PrivateNodes))
+			if length < count {
+				return fail.InvalidRequestError("cannot shrink by %d node%s, only %d node%s available", count, strprocess.Plural(count), length, strprocess.Plural(length))
 			}
 
-			deleteNode := func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-				err := instance.DeleteSpecificNode(task, params.(string), "")
-				if err != nil {
-					switch err.(type) {
-					case *fail.ErrNotFound:
-						// A missing node must be considered as a successful deletion, continue to update metadata
-					default:
-						return nil, err
-					}
-				}
-				return nil, nil
-			}
-
-			first := len(nodesV2.PrivateNodes) - count
+			first := length - count
 			toRemove = nodesV2.PrivateNodes[first:]
-			tg, innerXErr := concurrency.NewTaskGroup(task)
-			if innerXErr != nil {
-				return innerXErr
-			}
-			var errors []error
-			for _, v := range toRemove {
-				if _, innerXErr = tg.Start(deleteNode, v.ID); innerXErr != nil {
-					errors = append(errors, innerXErr)
-				}
-			}
-			if _, innerXErr = tg.Wait(); innerXErr != nil {
-				errors = append(errors, innerXErr)
-			}
-			if len(errors) > 0 {
-				return fail.NewErrorList(errors)
-			}
-
 			nodesV2.PrivateNodes = nodesV2.PrivateNodes[:first-1]
 			return nil
 		})
 	})
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// Starting from here, if error occurred, restore nodes in instance metadata
+	defer func() {
+		if xerr != nil {
+			xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+					nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, toRemove...)
+					return nil
+				})
+			})
+		}
+	}()
+
+	// Now really delete nodes
+	tg, xerr := concurrency.NewTaskGroup(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	taskDeleteNode := func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+		if xerr := instance.DeleteSpecificNode(task, params.(string), ""); xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// A missing node must be considered as a successful deletion, continue to update metadata
+			default:
+				return nil, xerr
+			}
+		}
+		return nil, nil
+	}
+
+	var errors []error
+	for _, v := range toRemove {
+		rh, xerr := hostfactory.Load(task, svc, v.ID)
+		if xerr != nil {
+			errors = append(errors, xerr)
+			break
+		}
+		if _, xerr = tg.Start(taskDeleteNode, rh); xerr != nil {
+			errors = append(errors, xerr)
+		}
+	}
+	if _, xerr = tg.Wait(); xerr != nil {
+		errors = append(errors, xerr)
+	}
+	if len(errors) > 0 {
+		return nil, fail.NewErrorList(errors)
 	}
 
 	out := &protocol.ClusterNodeListResponse{}
