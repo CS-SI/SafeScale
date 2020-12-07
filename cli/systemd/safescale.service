@@ -1,0 +1,11 @@
+[Unit]
+Description=SafeScale daemon 
+Requires=network.target
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/safescaled
+
+[Install]
+WantedBy=multi-user.target
