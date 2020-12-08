@@ -144,66 +144,71 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 // updateNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
 func (c *cluster) updateNodesPropertyIfNeeded(task concurrency.Task) fail.Error {
 	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		if !props.Lookup(clusterproperty.NodesV2) {
-			var (
-				nodesV1 *propertiesv1.ClusterNodes
-				ok      bool
-			)
+		if props.Lookup(clusterproperty.NodesV2) {
+			return nil
+		}
 
-			innerXErr := props.Inspect(task, clusterproperty.NodesV1, func(clonable data.Clonable) fail.Error {
-				nodesV1, ok = clonable.(*propertiesv1.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
+		var (
+			nodesV1 *propertiesv1.ClusterNodes
+			ok      bool
+		)
+
+		innerXErr := props.Inspect(task, clusterproperty.NodesV1, func(clonable data.Clonable) fail.Error {
+			nodesV1, ok = clonable.(*propertiesv1.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
-				nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+			for _, i := range nodesV1.Masters {
+				nodesV2.GlobalLastIndex++
 
-				for _, i := range nodesV1.Masters {
-					nodesV2.GlobalLastIndex++
-
-					node := &propertiesv2.ClusterNode{
-						ID:          i.ID,
-						NumericalID: nodesV2.GlobalLastIndex,
-						Name:        i.Name,
-						PrivateIP:   i.PrivateIP,
-						PublicIP:    i.PublicIP,
-					}
-					nodesV2.Masters = append(nodesV2.Masters, node)
+				node := &propertiesv2.ClusterNode{
+					ID:          i.ID,
+					NumericalID: nodesV2.GlobalLastIndex,
+					Name:        i.Name,
+					PrivateIP:   i.PrivateIP,
+					PublicIP:    i.PublicIP,
 				}
-				for _, i := range nodesV1.PrivateNodes {
-					nodesV2.GlobalLastIndex++
+				nodesV2.Masters = append(nodesV2.Masters, node)
+			}
+			for _, i := range nodesV1.PrivateNodes {
+				nodesV2.GlobalLastIndex++
 
-					node := &propertiesv2.ClusterNode{
-						ID:          i.ID,
-						NumericalID: nodesV2.GlobalLastIndex,
-						Name:        i.Name,
-						PrivateIP:   i.PrivateIP,
-						PublicIP:    i.PublicIP,
-					}
-					nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
+				node := &propertiesv2.ClusterNode{
+					ID:          i.ID,
+					NumericalID: nodesV2.GlobalLastIndex,
+					Name:        i.Name,
+					PrivateIP:   i.PrivateIP,
+					PublicIP:    i.PublicIP,
 				}
-				nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
-				nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
-				// nodesV1 = &propertiesv1.ClusterNodes{}
-				return nil
-			})
-		}
-		return nil
+				nodesV2.PrivateNodes = append(nodesV2.PrivateNodes, node)
+			}
+			nodesV2.MasterLastIndex = nodesV1.MasterLastIndex
+			nodesV2.PrivateLastIndex = nodesV1.PrivateLastIndex
+			// nodesV1 = &propertiesv1.ClusterNodes{}
+			return nil
+		})
 	})
 }
 
 // updateNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
 func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Error {
 	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+		if props.Lookup(clusterproperty.NetworkV3) {
+			return nil
+		}
+
 		var (
 			config *propertiesv3.ClusterNetwork
 			update bool
@@ -217,17 +222,11 @@ func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Erro
 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				// In v2, NetworkID actually contains the subnet ID, and we need also the network ID created to own it
-				rs, innerXErr := LoadSubnet(task, c.service, "", networkV2.NetworkID)
-				if innerXErr != nil {
-					return innerXErr
-				}
-				rn, innerXErr := rs.GetNetwork(task)
-				if innerXErr != nil {
-					return innerXErr
-				}
+				// In v2, NetworkID actually contains the subnet ID; we do not need ID of the Network owning the Subnet in
+				// the property, meaning that Network would have to be deleted also on cluster deletion because Network
+				// AND Subnet were created forcibly at cluster creation.
 				config = &propertiesv3.ClusterNetwork{
-					NetworkID:          rn.GetID(),
+					NetworkID:          "",
 					SubnetID:           networkV2.NetworkID,
 					CIDR:               networkV2.CIDR,
 					GatewayID:          networkV2.GatewayID,
@@ -246,7 +245,11 @@ func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Erro
 		} else {
 			// Having a clusterproperty.NetworkV1, need to update instance with clusterproperty.NetworkV3
 			innerXErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-				networkV1 := clonable.(*propertiesv1.ClusterNetwork)
+				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
+				if !ok {
+					return fail.InconsistentError()
+				}
+
 				config = &propertiesv3.ClusterNetwork{
 					SubnetID:       networkV1.NetworkID,
 					CIDR:           networkV1.CIDR,
@@ -318,10 +321,12 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	// Starting from here, delete metadata if exiting with error
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			derr := c.core.Delete(task)
-			if derr != nil {
-				logrus.Errorf("after failure, cleanup failed to delete cluster metadata")
+			logrus.Debugf("Cleaning up on failure, deleting metadata of Cluster '%s'...", req.Name)
+			if derr := c.core.Delete(task); derr != nil {
+				logrus.Errorf("cleaning up on failure, failed to delete metadata of Cluster '%s'", req.Name)
 				_ = xerr.AddConsequence(derr)
+			} else {
+				logrus.Debugf("Cleaning up on failure, successfully deleted metadata of Cluster '%s'", req.Name)
 			}
 		}
 	}()
@@ -340,10 +345,21 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
+			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
 			if derr := rs.Delete(task); derr != nil {
+				logrus.Errorf("Cleaning up on failure, failed to delete Subnet '%s'", rs.GetName())
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
-			} else if derr := rn.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+			} else {
+				logrus.Debugf("Cleaning up on failure, successfully deleted Subnet '%s'", rs.GetName())
+				if req.NetworkID == "" {
+					logrus.Debugf("Cleaning up on failure, deleting Network '%s'...", rn.GetName())
+					if derr := rn.Delete(task); derr != nil {
+						logrus.Errorf("cleaning up on failure, failed to delete Network '%s'", rn.GetName())
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+					} else {
+						logrus.Debugf("Cleaning up on failure, successfully deleted Network '%s'", rn.GetName())
+					}
+				}
 			}
 		}
 	}()
@@ -360,25 +376,24 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 			if tgerr != nil {
 				_ = xerr.AddConsequence(tgerr)
 			} else {
+				logrus.Debugf("Cleaning up on failure, deleting Masters...")
 				list, merr := c.ListMasters(task)
 				if merr != nil {
 					_ = xerr.AddConsequence(merr)
 				} else {
 					for _, v := range list {
-						_, tgerr = tg.StartInSubtask(c.taskDeleteHost, v)
-						if tgerr != nil {
+						if _, tgerr = tg.StartInSubtask(c.taskDeleteHost, v); tgerr != nil {
 							_ = xerr.AddConsequence(tgerr)
 						}
 					}
 				}
 
-				list, merr = c.ListNodes(task)
-				if merr != nil {
+				if list, merr = c.ListNodes(task); merr != nil {
 					_ = xerr.AddConsequence(merr)
 				} else {
+					logrus.Debugf("Cleaning up on failure, deleting Nodes...")
 					for _, v := range list {
-						_, tgerr = tg.StartInSubtask(c.taskDeleteHost, v)
-						if tgerr != nil {
+						if _, tgerr = tg.StartInSubtask(c.taskDeleteHost, v); tgerr != nil {
 							_ = xerr.AddConsequence(tgerr)
 						}
 					}
@@ -1669,13 +1684,13 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 	// Starting from here, delete nodes if exiting with error
 	newHosts := hosts
 	defer func() {
-		if xerr != nil {
-			if len(newHosts) > 0 {
-				derr := c.deleteHosts(task, newHosts)
-				if derr != nil {
-					logrus.Errorf("failed to delete nodes after failure to expand cluster")
-				}
+		if xerr != nil && len(newHosts) > 0 {
+			logrus.Debugf("Cleaning up on failure, deleting Nodes...")
+			if derr := c.deleteHosts(task, newHosts); derr != nil {
+				logrus.Errorf("Cleaning up on failure, failed to delete Nodes")
 				_ = xerr.AddConsequence(derr)
+			} else {
+				logrus.Debugf("Cleaning up on failure, successfully deleted Nodes")
 			}
 		}
 	}()
@@ -2668,7 +2683,16 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 	if networkID == "" && !rn.IsNull() {
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 			func() error {
-				return rn.Delete(task)
+				innerXErr := rn.Delete(task)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						return retry.StopRetryError(innerXErr)
+					default:
+						return innerXErr
+					}
+				}
+				return nil
 			},
 			temporal.GetHostTimeout(),
 		)
