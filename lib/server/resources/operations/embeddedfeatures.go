@@ -149,6 +149,21 @@ func ansibleFeature() *feature {
 	}
 }
 
+// certificateAuthorityFeature from official repos ...
+func certificateAuthorityFeature() *feature {
+	name := "certificateauthority"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // postgresql4platformFeature feature. ...
 func postgresql4platformFeature() *feature {
 	name := "postgresql4platform"

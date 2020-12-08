@@ -31,6 +31,7 @@ func init() {
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
+		certificateAuthorityFeature(),
 		postgresql4platformFeature(),
 		nVidiaDockerFeature(),
 		// mpichOsPkgFeature(),

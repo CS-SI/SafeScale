@@ -813,10 +813,20 @@ func (c *cluster) taskDeleteHost(task concurrency.Task, params concurrency.TaskP
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	if rh, ok := params.(resources.Host); ok && !rh.IsNull() {
-		return nil, rh.Delete(task)
+	rh, ok := params.(resources.Host)
+	if !ok || !rh.IsNull() {
+		return nil, fail.InvalidParameterError("params", "must be a non null value of 'resources.Host'")
 	}
-	return nil, fail.InvalidParameterError("params", "must be a 'resources.Host'")
+
+	hostName := rh.GetName()
+	logrus.Debugf("Cleaning up on failure, deleting Host '%s'", hostName)
+	if xerr := rh.Delete(task); xerr != nil {
+		logrus.Errorf("Cleaning up on failure, failed to delete Host '%s'", hostName)
+		return nil, xerr
+	}
+
+	logrus.Debugf("Cleaning up on failure, successfully deleted Host '%s'", hostName)
+	return nil, nil
 }
 
 type taskDeleteNodeParameters struct {
@@ -835,7 +845,15 @@ func (c *cluster) taskDeleteNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, fail.InvalidParameterError("params.Master", "cannot be null value of 'resources.Host'")
 	}
 
-	return nil, c.deleteNode(t, p.Node, p.Master)
+	hostName := p.Node.GetName()
+	logrus.Debugf("Cleaning up on failure, deleting Node '%s'", hostName)
+	if xerr := c.deleteNode(t, p.Node, p.Master); xerr != nil {
+		logrus.Errorf("Cleaning up on failure, failed to delete Node '%s'", hostName)
+		return nil, xerr
+	}
+
+	logrus.Debugf("Cleaning up on failure, successfully deleted Node '%s'", hostName)
+	return nil, nil
 }
 
 func (c *cluster) taskDeleteMaster(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
@@ -844,5 +862,13 @@ func (c *cluster) taskDeleteMaster(t concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterError("params", "must be a 'resources.Host'")
 	}
 
-	return nil, c.deleteMaster(t, rh)
+	hostName := rh.GetName()
+	logrus.Debugf("Cleaning up on failure, deleting Node '%s'", hostName)
+	if xerr := c.deleteMaster(t, rh); xerr != nil {
+		logrus.Errorf("Cleaning up on failure, failed to delete Master '%s'", hostName)
+		return nil, xerr
+	}
+
+	logrus.Debugf("Cleaning up on failure, successfully deleted Master '%s'", hostName)
+	return nil, nil
 }

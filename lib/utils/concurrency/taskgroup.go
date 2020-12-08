@@ -183,12 +183,12 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, fail
 	if err != nil {
 		return tg, err
 	}
-	err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last)))
-	if err != nil {
+
+	if err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last))); err != nil {
 		return tg, err
 	}
-	subtask, err = subtask.Start(action, params)
-	if err != nil {
+
+	if subtask, err = subtask.Start(action, params); err != nil {
 		return tg, err
 	}
 
@@ -324,6 +324,7 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 	if taskStatus != RUNNING {
 		return false, nil, fail.NewError("cannot wait task group '%s': not running", tid)
 	}
+
 	for _, s := range tg.subtasks {
 		ok, _, _ := s.TryWait()
 		if !ok {
