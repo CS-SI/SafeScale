@@ -715,9 +715,9 @@ feature:
 
                                     {{ if eq .CalicoNetworking "vxlan" }}
                                     # Disable IP in IP
-                                    sed -i '3554s/Always/Never/' ${SF_TMPDIR}/calico.yaml
+                                    sed -i '/.*- name: CALICO_IPV4POOL_IPIP/,//s/.*value: "Always"/              value: "Never"/' ${SF_TMPDIR}/calico.yaml
                                     # Enable VXLAN
-                                    sed -i '3557s/Never/Always/' ${SF_TMPDIR}/calico.yaml
+                                    sed -i '/.*- name: CALICO_IPV4POOL_VXLAN/,//s/.*value: "Never"/              value: "Always"/' ${SF_TMPDIR}/calico.yaml
                                     {{ end }}
 
                                     # Apply Calico yaml
