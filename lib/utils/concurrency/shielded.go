@@ -45,7 +45,7 @@ func (d *Shielded) Clone() *Shielded {
 }
 
 // Inspect is used to lock a clonable for read
-func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fail.Error) (err fail.Error) {
+func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
 	if d == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -59,17 +59,17 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
-	err = d.lock.RLock(task)
-	if err != nil {
-		return err
+	if xerr = d.lock.RLock(task); xerr != nil {
+		return xerr
 	}
+
 	defer func() {
 		unlockErr := d.lock.RUnlock(task)
 		if unlockErr != nil {
 			logrus.Warn(unlockErr)
 		}
-		if err == nil && unlockErr != nil {
-			err = unlockErr
+		if xerr == nil && unlockErr != nil {
+			xerr = unlockErr
 		}
 	}()
 

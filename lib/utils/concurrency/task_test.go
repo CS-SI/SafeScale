@@ -479,13 +479,14 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 		for forever {
 			time.Sleep(time.Duration(10) * time.Millisecond)
 			status, xerr := t.GetStatus()
+			if xerr != nil {
+				return "Big failure...", nil
+			}
 			if status == ABORTED || status == TIMEOUT {
 				// forever = false
 				break
 			}
-			if xerr != nil {
-				return "Big failure...", nil
-			}
+
 			fmt.Println("Forever young...")
 		}
 		return "I want to be forever young", nil
