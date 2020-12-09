@@ -260,7 +260,7 @@ func (t *task) GetID() (string, fail.Error) {
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (t task) GetSignature() string {
+func (t *task) GetSignature() string {
 	if t.IsNull() {
 		return ""
 	}
@@ -271,7 +271,7 @@ func (t task) GetSignature() string {
 	return t.getSignature()
 }
 
-func (t task) getSignature() string {
+func (t *task) getSignature() string {
 	if t.id != "" {
 		return `{task ` + t.id + `}`
 	}
@@ -279,7 +279,7 @@ func (t task) getSignature() string {
 }
 
 // GetStatus returns the current task status
-func (t task) GetStatus() (TaskStatus, fail.Error) {
+func (t *task) GetStatus() (TaskStatus, fail.Error) {
 	if t.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -291,7 +291,7 @@ func (t task) GetStatus() (TaskStatus, fail.Error) {
 }
 
 // GetContext returns the context associated to the task
-func (t task) GetContext() (context.Context, fail.Error) {
+func (t *task) GetContext() (context.Context, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}

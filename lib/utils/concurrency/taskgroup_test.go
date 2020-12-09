@@ -335,14 +335,13 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 	begin := time.Now()
 	go func() {
 		time.Sleep(310 * time.Millisecond)
-		xerr = overlord.Abort()
+		xerr := overlord.Abort()
 		if xerr != nil {
 			t.Fail()
 		}
 	}()
 
-	_, xerr = overlord.WaitGroup()
-	if xerr != nil {
+	if _, xerr := overlord.WaitGroup(); xerr != nil {
 		t.Fail()
 	}
 

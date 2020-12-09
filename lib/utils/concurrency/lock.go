@@ -46,6 +46,9 @@ type TaskedLock interface {
 	IsRLocked(Task) (bool, fail.Error)
 	IsLocked(Task) (bool, fail.Error)
 
+	GetReadLockCount(task Task) (uint64, fail.Error)
+	GetWriteLockCount(task Task) (uint64, fail.Error)
+
 	TaskedLockHelpers
 }
 
@@ -307,4 +310,48 @@ func (tm *taskedLock) IsLocked(task Task) (bool, fail.Error) {
 	defer tm.rwmutex.RUnlock()
 	_, ok := tm.writeLocks[tid]
 	return ok, nil
+}
+
+func (tm *taskedLock) GetReadLockCount(task Task) (uint64, fail.Error) {
+	if tm == nil {
+		return 0, fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return 0, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tid, xerr := task.GetID()
+	if xerr != nil {
+		return 0, xerr
+	}
+
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	if c, ok := tm.readLocks[tid]; ok {
+		return c, nil
+	}
+	return 0, nil
+}
+
+func (tm *taskedLock) GetWriteLockCount(task Task) (uint64, fail.Error) {
+	if tm == nil {
+		return 0, fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return 0, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	tid, xerr := task.GetID()
+	if xerr != nil {
+		return 0, xerr
+	}
+
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	if c, ok := tm.writeLocks[tid]; ok {
+		return c, nil
+	}
+	return 0, nil
 }
