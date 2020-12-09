@@ -706,7 +706,7 @@ func (t *task) Abort() (err fail.Error) {
 
 // Aborted tells if the task is aborted
 func (t *task) Aborted() bool {
-	if !t.IsNull() {
+	if t.IsNull() {
 		return false
 	}
 
