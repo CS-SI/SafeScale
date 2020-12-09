@@ -68,8 +68,8 @@ func NewTaskedLock() TaskedLock {
 }
 
 // RLock locks for read in the context if:
-// 1. registers the mu for read only if a mu for write is already registered in the context
-// 2. registers the mu for read AND effectively mu for read otherwise
+// 1. registers the lock for read only if a lock for write is already registered in the context
+// 2. registers the lock for read AND effectively lock for read otherwise
 func (tm *taskedLock) RLock(task Task) fail.Error {
 	if tm == nil {
 		return fail.InvalidInstanceError()
@@ -78,7 +78,7 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 		return fail.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
+	traceR := newTracer(task, true /*tracing.ShouldTrace("concurrency.lock")*/).entering()
 	defer traceR.exiting()
 
 	tid, err := task.GetID()
@@ -106,7 +106,7 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 		access = true
 		return nil
 	}
-	traceR.trace("using running write mu...")
+	traceR.trace("using running write lock...")
 	return nil
 }
 
@@ -202,7 +202,7 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 		tm.writeLocks[tid]++
 		return nil
 	}
-	// If already mu for read, returns an error
+	// If already locked for read, returns an error
 	if _, ok := tm.readLocks[tid]; ok {
 		traceR.trace("Cannot Lock, already RLocked")
 		taskID, _ := task.GetID()

@@ -219,6 +219,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 	return &t, nil
 }
 
+// IsNull ...
 func (t *task) IsNull() bool {
 	return t == nil || t.id == ""
 }
@@ -259,32 +260,45 @@ func (t *task) GetID() (string, fail.Error) {
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (t *task) GetSignature() string {
-	if sig, xerr := t.GetID(); xerr == nil {
-		return `{task ` + sig + "}"
+func (t task) GetSignature() string {
+	if t.IsNull() {
+		return ""
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	return t.getSignature()
+}
+
+func (t task) getSignature() string {
+	if t.id != "" {
+		return `{task ` + t.id + `}`
 	}
 	return ""
 }
 
 // GetStatus returns the current task status
-func (t *task) GetStatus() (TaskStatus, fail.Error) {
+func (t task) GetStatus() (TaskStatus, fail.Error) {
 	if t.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	return t.status, nil
 }
 
 // GetContext returns the context associated to the task
-func (t *task) GetContext() (context.Context, fail.Error) {
+func (t task) GetContext() (context.Context, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	return t.ctx, nil
 }
 
@@ -681,7 +695,7 @@ func (t *task) Abort() (err fail.Error) {
 		t.err = fail.AbortedError(t.err)
 	}
 
-	logrus.Debugf("task %s aborted", t.GetSignature())
+	logrus.Debugf("task %s aborted", t.getSignature())
 
 	if previousErr != nil && previousStatus != TIMEOUT {
 		return fail.AbortedError(previousErr)
@@ -695,8 +709,10 @@ func (t *task) Aborted() bool {
 	if !t.IsNull() {
 		return false
 	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	return t.status == ABORTED
 }
 
@@ -708,6 +724,7 @@ func (t *task) Abortable() (bool, fail.Error) {
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
 	return !t.abortDisengaged, nil
 }
 

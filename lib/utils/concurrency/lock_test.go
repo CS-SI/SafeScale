@@ -19,6 +19,7 @@ package concurrency
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -47,21 +48,33 @@ func TestNewTaskedLock(t *testing.T) {
 
 	tawri, _ := NewUnbreakableTask()
 
+	gocalls := uint32(0)
+	rlockcalls := uint32(0)
+	runlockcalls := uint32(0)
+	lockcalls := uint32(0)
+	unlockcalls := uint32(0)
+
 	num := 100
 	wg := sync.WaitGroup{}
 	wg.Add(num)
+
 	for j := 0; j < num; j++ {
 		go func() {
 			defer wg.Done()
+			_ = atomic.AddUint32(&gocalls, 1)
 			fmt.Println("Ask 4 Reading...")
 			err := talo.RLock(tawri)
 			assert.Nil(t, err)
+			_ = atomic.AddUint32(&rlockcalls, 1)
+
 			defer func() {
 				err = talo.RUnlock(tawri)
 				assert.Nil(t, err)
+				_ = atomic.AddUint32(&runlockcalls, 1)
 			}()
+
 			fmt.Println("Reading...")
-			time.Sleep(time.Duration(tools.RandomInt(30, 90)) * time.Millisecond)
+			time.Sleep(time.Duration(tools.RandomInt(30, 60)) * time.Millisecond)
 			fmt.Println("Finished reading...")
 		}()
 	}
@@ -76,6 +89,7 @@ func TestNewTaskedLock(t *testing.T) {
 			for {
 				err = talo.Lock(tawri)
 				if err == nil {
+					_ = atomic.AddUint32(&lockcalls, 1)
 					break
 				}
 			}
@@ -85,6 +99,7 @@ func TestNewTaskedLock(t *testing.T) {
 				for {
 					unlockerr = talo.Unlock(tawri)
 					if unlockerr == nil {
+						_ = atomic.AddUint32(&unlockcalls, 1)
 						break
 					}
 				}
@@ -95,10 +110,20 @@ func TestNewTaskedLock(t *testing.T) {
 		}()
 	}
 
-	runOutOfTime := waitTimeout(&wg, time.Duration(8*time.Second))
+	runOutOfTime := waitTimeout(&wg, time.Duration(20*time.Second))
 	if runOutOfTime {
 		t.Errorf("Failure: timeout")
 	}
+
+	fmt.Printf("go calls: %d\n", gocalls)
+	fmt.Printf("RLock calls: %d\n", rlockcalls)
+	fmt.Printf("RUnlock calls: %d\n", runlockcalls)
+	fmt.Printf("Lock calls: %d\n", lockcalls)
+	fmt.Printf("Unlock calls: %d\n", unlockcalls)
+	assert.EqualValues(t, uint32(num), rlockcalls)
+	assert.EqualValues(t, uint32(num), runlockcalls)
+	assert.EqualValues(t, uint32(monum), lockcalls)
+	assert.EqualValues(t, uint32(monum), unlockcalls)
 }
 
 func TestNewTaskedLockWait(t *testing.T) {
