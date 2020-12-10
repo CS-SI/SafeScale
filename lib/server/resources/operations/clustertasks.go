@@ -389,7 +389,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	for i, hostID := range masters {
 		host, xerr := LoadHost(task, c.GetService(), hostID)
 		if xerr != nil {
-			logrus.Warnf("failed to get metadata of host: %s", xerr.Error())
+			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			errors = append(errors, xerr)
 			continue
 		}
@@ -446,7 +446,7 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 		return nil, fail.InvalidParameterError("params.Index", "cannot be an integer less than 1")
 	}
 	if p.Host.IsNull() {
-		return nil, fail.InvalidParameterError("params[host]", "cannot be null value of 'resources.Host'")
+		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
 	}
 
 	started := time.Now()
@@ -547,7 +547,7 @@ type taskCreateNodeParameters struct {
 	NoKeep  bool
 }
 
-// taskCreateNode creates a Node in the Cluster
+// taskCreateNode creates a node in the Cluster
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	if c.IsNull() {
@@ -726,7 +726,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 	for _, hostID = range list {
 		i++
 		if host, xerr = LoadHost(task, svc, hostID); xerr != nil {
-			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of host '%s'", hostID))
+			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", hostID))
 			continue
 		}
 		subtask, xerr := task.StartInSubtask(c.taskConfigureNode, taskConfigureNodeParameters{
@@ -768,7 +768,7 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	// Convert and validate parameters
+	// Convert and validate params
 	p, ok := params.(taskConfigureNodeParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskConfigureNodeParameters'")
@@ -777,7 +777,7 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 		return nil, fail.InvalidParameterError("params.Index", "cannot be an integer less than 1")
 	}
 	if p.Host.IsNull() {
-		return nil, fail.InvalidParameterError("params[host]", "cannot be null value of 'resources.Host'")
+		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
@@ -804,8 +804,8 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	return nil, nil
 }
 
-// taskDeleteHost deletes a host
-func (c *cluster) taskDeleteHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+// taskDeleteHostOnFailure deletes a host
+func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -813,62 +813,83 @@ func (c *cluster) taskDeleteHost(task concurrency.Task, params concurrency.TaskP
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
+	// Convert and validate params
 	rh, ok := params.(resources.Host)
-	if !ok || !rh.IsNull() {
-		return nil, fail.InvalidParameterError("params", "must be a non null value of 'resources.Host'")
+	if !ok || rh.IsNull() {
+		return nil, fail.InvalidParameterError("params", "must be a valid 'resources.Host")
 	}
 
+	prefix := "Cleaning up on failure, "
 	hostName := rh.GetName()
-	logrus.Debugf("Cleaning up on failure, deleting Host '%s'", hostName)
+	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 	if xerr := rh.Delete(task); xerr != nil {
-		logrus.Errorf("Cleaning up on failure, failed to delete Host '%s'", hostName)
+		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
 		return nil, xerr
 	}
 
-	logrus.Debugf("Cleaning up on failure, successfully deleted Host '%s'", hostName)
+	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
 	return nil, nil
 }
 
 type taskDeleteNodeParameters struct {
-	Node, Master resources.Host
+	node, master resources.Host
 }
 
-func (c *cluster) taskDeleteNode(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	if c.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+
+	// Convert and validate params
 	p, ok := params.(taskDeleteNodeParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
 	}
-	if p.Node.IsNull() {
-		return nil, fail.InvalidParameterError("params.Node", "cannot be null value of 'resources.Host'")
+	if p.node.IsNull() {
+		return nil, fail.InvalidParameterError("params.node", "cannot be null value of 'resources.Host'")
 	}
-	if p.Master.IsNull() {
-		return nil, fail.InvalidParameterError("params.Master", "cannot be null value of 'resources.Host'")
+	if p.master.IsNull() {
+		return nil, fail.InvalidParameterError("params.master", "cannot be null value of 'resources.Host'")
 	}
 
-	hostName := p.Node.GetName()
-	logrus.Debugf("Cleaning up on failure, deleting Node '%s'", hostName)
-	if xerr := c.deleteNode(t, p.Node, p.Master); xerr != nil {
-		logrus.Errorf("Cleaning up on failure, failed to delete Node '%s'", hostName)
+	hostName := p.node.GetName()
+	logrus.Debugf("Deleting Node '%s'", hostName)
+	if xerr := c.deleteNode(task, p.node, p.master); xerr != nil {
+		logrus.Errorf("Failed to delete Node '%s'", hostName)
 		return nil, xerr
 	}
 
-	logrus.Debugf("Cleaning up on failure, successfully deleted Node '%s'", hostName)
+	logrus.Debugf("Successfully deleted Node '%s'", hostName)
 	return nil, nil
 }
 
-func (c *cluster) taskDeleteMaster(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-	rh, ok := params.(resources.Host)
-	if !ok {
-		return nil, fail.InvalidParameterError("params", "must be a 'resources.Host'")
+func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	if c.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	hostName := rh.GetName()
-	logrus.Debugf("Cleaning up on failure, deleting Node '%s'", hostName)
-	if xerr := c.deleteMaster(t, rh); xerr != nil {
-		logrus.Errorf("Cleaning up on failure, failed to delete Master '%s'", hostName)
+	// Convert and validate params
+	p, ok := params.(taskDeleteNodeParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
+	}
+	if p.master.IsNull() {
+		return nil, fail.InvalidParameterError("params.master", "cannot be null value of 'resources.Host'")
+	}
+
+	hostName := p.master.GetName()
+	logrus.Debugf("Deleting Master '%s'", hostName)
+	if xerr := c.deleteMaster(task, p.master); xerr != nil {
+		logrus.Errorf("Failed to delete Master '%s'", hostName)
 		return nil, xerr
 	}
 
-	logrus.Debugf("Cleaning up on failure, successfully deleted Master '%s'", hostName)
+	logrus.Debugf("Successfully deleted master '%s'", hostName)
 	return nil, nil
 }

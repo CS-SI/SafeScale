@@ -434,7 +434,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 	return nil
 }
 
-// BrowseFolder walks through host folder and executes a callback for each entries
+// BrowseFolder walks through folder and executes a callback for each entries
 func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()

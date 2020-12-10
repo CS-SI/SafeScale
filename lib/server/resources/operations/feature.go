@@ -321,7 +321,7 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 
 	featureName := f.GetName()
 	targetName := target.GetName()
-	targetType := target.TargetType().String()
+	targetType := strings.ToLower(target.TargetType().String())
 
 	tracer := debug.NewTracer(f.task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()

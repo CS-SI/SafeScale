@@ -185,7 +185,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		v["ClusterControlplaneUsesVIP"] = true
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
-		// Don't set ControlplaneUsesVIP if there is no VIP... use IP of first available master instead
+		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
 		master, xerr := c.FindAvailableMaster(task)
 		if xerr != nil {
 			return xerr
@@ -461,7 +461,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 			if xerr != nil {
-				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s'", host.GetName())
+				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())
 			}
 			if retcode != 0 {
 				output := stdout
@@ -470,7 +470,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 				} else if stderr != "" {
 					output = stderr
 				}
-				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", host.GetName(), output)
+				msg := fmt.Sprintf("failed to copy content of SAFESCALE_METADATA_SUFFIX to Host '%s': %s", host.GetName(), output)
 				return fail.NewError(strprocess.Capitalize(msg))
 			}
 		}
@@ -735,7 +735,7 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	if !r.Successful() {
 		msg := r.AllErrorMessages()
 		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return fail.NewError("failed to add feature 'docker' on host '%s': %s", host.GetName(), msg)
+		return fail.NewError("failed to add feature 'docker': %s", host.GetName(), msg)
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil

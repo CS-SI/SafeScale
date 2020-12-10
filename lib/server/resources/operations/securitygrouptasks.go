@@ -38,7 +38,7 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 
 	sgID := sg.GetID()
 
-	// Unbind security group from host on provider side
+	// Unbind Security Group from Host on provider side
 	xerr := sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
 	if xerr != nil {
 		switch xerr.(type) {
@@ -49,16 +49,6 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 		}
 	}
 
-	//// Updates metadata
-	//rh, xerr := LoadHost(task, sg.GetService(), hostID)
-	//if xerr != nil {
-	//	switch xerr.(type) {
-	//	case *fail.ErrNotFound:
-	//		// host does not exist anymore ? consider as a success and continue
-	//	default:
-	//		return nil, xerr
-	//	}
-	//} else {
 	// Updates host metadata regarding Security Groups
 	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -105,7 +95,7 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Ta
 			}
 			tg, innerXErr := concurrency.NewTaskGroup(task)
 			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to start new task group to remove security group '%s' from hosts attached to the subnet '%s'", sg.GetName(), rs.GetName())
+				return fail.Wrap(innerXErr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", sg.GetName(), rs.GetName())
 			}
 			for _, v := range nsgV1.ByName {
 				_, innerXErr = tg.Start(sg.taskUnbindFromHost, v)
