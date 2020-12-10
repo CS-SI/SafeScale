@@ -267,7 +267,7 @@ func TestWithAnnotationsAgain(t *testing.T) {
 	assert.NotNil(t, x)
 
 	errct := x.Error()
-	if !strings.Contains(errct, "master-x") {
+	if !strings.Contains(errct, "host-x") {
 		t.Errorf("We lost a key ! : %s", errct)
 	}
 	if !strings.Contains(errct, "OWH") {
@@ -303,19 +303,19 @@ func lazyDevsPlainAndSimple() error {
 
 func moreLazyErrors() error {
 	r := NotFoundError("We lost something !!")
-	r.Annotate("node", "master-x").Annotate("provider", "OWH")
+	r.Annotate("node", "host-x").Annotate("provider", "OWH")
 	return r
 }
 
 func getNotFoundErrorWithAnnotations() error {
 	r := NotFoundError("We lost something !!")
-	r.Annotate("node", "master-x").Annotate("provider", "OWH")
+	r.Annotate("node", "host-x").Annotate("provider", "OWH")
 	return r
 }
 
 func getNotFoundErrorWithAnnotationsAndConsequences() error {
 	nfe := NotFoundError("We lost something !!")
-	nfe.Annotate("node", "master-x").Annotate("provider", "OWH")
+	nfe.Annotate("node", "host-x").Annotate("provider", "OWH")
 	return AddConsequence(nfe, fmt.Errorf("something else ... "))
 }
 

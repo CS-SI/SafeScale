@@ -81,7 +81,7 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 		return fail.InvalidParameterError("task", "cannot be nil!")
 	}
 
-	traceR := newTracer(task, true /*tracing.ShouldTrace("concurrency.lock")*/).entering()
+	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
 	defer traceR.exiting()
 
 	tid, err := task.GetID()
