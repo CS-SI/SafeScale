@@ -597,9 +597,13 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	}
 
 	if status == DONE {
+		t.mu.Lock()
+		defer t.mu.Unlock()
 		return true, t.result, t.err
 	}
 	if status == ABORTED {
+		t.mu.Lock()
+		defer t.mu.Unlock()
 		return true, nil, t.err
 	}
 	if status != RUNNING {

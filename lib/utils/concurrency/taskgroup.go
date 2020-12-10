@@ -49,7 +49,6 @@ type TaskGroup interface {
 
 // task is a structure allowing to identify (indirectly) goroutines
 type taskGroup struct {
-	// groupLock sync.RWMutex // FIXME: This breaks the world
 	last uint
 	*task
 	result TaskGroupResult
@@ -152,9 +151,6 @@ func (tg *taskGroup) SetID(id string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
-
 	return tg.task.SetID(id)
 }
 
@@ -172,9 +168,6 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters) (Task, fail
 	if tg.IsNull() {
 		return tg, fail.InvalidInstanceError()
 	}
-
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
 
 	status, err := tg.task.GetStatus()
 	if err != nil {
@@ -216,13 +209,15 @@ func (tg *taskGroup) Wait() (TaskResult, fail.Error) {
 }
 
 // WaitGroup waits for the task to end, and returns the error (or nil) of the execution
+// Note: this function may lead to go routine leaks, because we do not want a taskgroup to be locked because of
+//       a subtask not responding; if a subtask is designed to run forever, it will never end.
+//       It's highly recommended to use task.Aborted() in the body of a task to check
+//       for abortion signal and quit the go routine accordingly to reduce the risk (a taskgroup remains abortable with
+//       this recommandation).
 func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	if tg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
 
 	tid, err := tg.GetID()
 	if err != nil {
@@ -351,9 +346,6 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
-
 	tid, err := tg.GetID()
 	if err != nil {
 		return false, nil, err
@@ -400,9 +392,6 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
-
 	tid, err := tg.GetID()
 	if err != nil {
 		return false, nil, err
@@ -440,9 +429,6 @@ func (tg *taskGroup) Abort() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
-
 	var errors []error
 
 	// Send abort signal to subtasks
@@ -478,9 +464,6 @@ func (tg *taskGroup) New() (Task, fail.Error) {
 	if tg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	// tg.groupLock.Lock()
-	// defer tg.groupLock.Unlock()
 
 	return newTask(context.TODO(), tg.task)
 }
