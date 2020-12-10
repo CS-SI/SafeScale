@@ -286,13 +286,13 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 		NormalizeError,
 	)
 	if xerr != nil {
-		logrus.Errorf("failed to get network '%s': %+v", id, xerr)
+		logrus.Errorf("failed to get Network '%s': %+v", id, xerr)
 		return xerr
 	}
 
 	sns, xerr := s.ListSubnets(id)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to list subnets of network '%s'", network.Name)
+		xerr = fail.Wrap(xerr, "failed to list Subnets of Network '%s'", network.Name)
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
@@ -307,7 +307,7 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 		NormalizeError,
 	)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to delete network '%s'", network.Name)
+		xerr = fail.Wrap(xerr, "failed to delete Network '%s'", network.Name)
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}

@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// ClusterNode describes a Node in the cluster
+// ClusterNode describes a node in the cluster
 // !!! FROZEN !!!
 type ClusterNode struct {
 	ID          string `json:"id"`         // ID of the node

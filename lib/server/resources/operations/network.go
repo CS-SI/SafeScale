@@ -121,13 +121,6 @@ func upgradeProperties(task concurrency.Task, rn resources.Network) fail.Error {
 			as := abstract.NewSubnet()
 			as.Name = an.Name
 			as.Network = an.ID
-			//as.IPVersion = an.IPVersion
-			//as.DNSServers = an.DNSServers
-			//as.CIDR = as.CIDR
-			//as.Domain = an.Domain
-			//as.VIP = an.VIP
-			//xerr = rs.Create(task, req, gwname)
-			_ = rs
 			return nil
 		}
 		return fail.AlteredNothingError()
@@ -270,10 +263,16 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 					// the single subnet present is a subnet named like the network, delete it first
 					rs, xerr := LoadSubnet(task, svc, "", v)
 					if xerr != nil {
-						return xerr
-					}
-					if xerr = rs.Delete(task); xerr != nil {
-						return xerr
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// Subnet is already deleted, consider as a success and continue
+						default:
+							return xerr
+						}
+					} else {
+						if xerr = rs.Delete(task); xerr != nil {
+							return xerr
+						}
 					}
 				}
 			}
@@ -285,8 +284,7 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 		}
 
 		// delete Network, with tolerance
-		innerXErr = svc.DeleteNetwork(an.ID)
-		if innerXErr != nil {
+		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
