@@ -22,6 +22,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"strconv"
 	"strings"
 
@@ -29,8 +30,9 @@ import (
 )
 
 const (
-	defaultCPUProfileFilenameSuffix = "_profile_cpu.pprof"
-	defaultMemProfileFilenameSuffix = "_profile_mem.pprof"
+	defaultCPUProfileFilenameSuffix   = "_profile_cpu.pprof"
+	defaultMemProfileFilenameSuffix   = "_profile_mem.pprof"
+	defaultTraceProfileFilenameSuffix = "_profile.trace"
 )
 
 // Profile starts profiling based on the content of 'what'
@@ -41,9 +43,9 @@ func Profile(what string) func() {
 	}
 
 	var (
-		profileCPU, profileMemory bool
-		cpufile, memfile          *os.File
-		err                       error
+		profileCPU, profileMemory, profileTrace bool
+		cpufile, memfile, tracefile             *os.File
+		err                                     error
 	)
 	parts := strings.Split(what, ",")
 	for _, v := range parts {
@@ -76,6 +78,20 @@ func Profile(what string) func() {
 			}
 			logrus.Infof("RAM profiling enabled")
 			profileMemory = true
+		case "trace":
+			var filename string
+			if len(content) > 1 {
+				filename = constructProfileFilename(content[1], defaultTraceProfileFilenameSuffix)
+			} else {
+				filename = constructProfileFilename("", defaultTraceProfileFilenameSuffix)
+			}
+			tracefile, err = os.Create(filename)
+			if err != nil {
+				logrus.Fatalf("Failed to create profile file '%s'", filename)
+			}
+			_ = trace.Start(tracefile)
+			logrus.Infof("Trace profiling enabled")
+			profileTrace = true
 		case "web", "www":
 			listen := "localhost"
 			port := "6060"
@@ -120,6 +136,9 @@ func Profile(what string) func() {
 		}
 		if profileCPU {
 			pprof.StopCPUProfile()
+		}
+		if profileTrace {
+			trace.Stop()
 		}
 	}
 }
