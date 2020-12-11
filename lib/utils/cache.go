@@ -97,7 +97,7 @@ func (c *MapCache) Reset(key string) Cache {
 // Get ...
 func (c *MapCache) Get(key string) (value interface{}, ok bool) {
 	c.lock.RLock()
-	defer c.lock.Unlock()
+	defer c.lock.RUnlock()
 
 	value, ok = c.cache[key]
 	return
