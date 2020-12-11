@@ -108,9 +108,13 @@ func main() {
 			Usage:   "Show debug information",
 		},
 		&cli.StringFlag{
-			Name:  "profile",
-			Usage: "Profiles binary; can contain 'cpu', 'ram', 'web' and a combination of them (ie 'cpu,ram')",
-			// TODO: extends profile to accept <what>:params, for example cpu:$HOME/safescale.cpu.pprof, or web:192.168.2.1:1666
+			Name: "profile",
+			Usage: `Profiles binary
+            value is a comma-separated list of <keyword> (ie '<keyword>[:<params>][,<keyword>[:<params>]...]) where <keyword>
+            can be 'cpu', 'ram', 'trace', and 'web'.
+            <params> may contain :
+                for 'ram', 'cpu' and 'trace': optional destination folder of output file (default: current working directory)
+                for 'web': [<listen addr>][:<listen port>] (default: 'localhost:6060')`,
 		},
 		&cli.StringFlag{
 			Name:    "server",
