@@ -1734,18 +1734,37 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 		return 0, "", "", xerr
 	}
 
-	retcode, stdout, stderr, xerr := sshCmd.RunWithTimeout(task, outs, timeout)
+	var (
+		retcode        int
+		stdout, stderr string
+	)
+	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			var innerXErr fail.Error
+			retcode = -1
+			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outs, timeout); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrExecution:
+					// Adds stdout annotation to xerr
+					_ = innerXErr.Annotate("stdout", stdout)
+				}
+				return innerXErr
+			}
+			// If retcode == 255, ssh connection failed
+			if retcode == 255 {
+				return fail.NotAvailableError("failed to connect")
+			}
+			return nil
+		},
+		timeout,
+	)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *fail.ErrExecution:
-			// Adds stdout annotation to xerr
-			_ = xerr.Annotate("stdout", stdout)
+		case *retry.ErrTimeout:
+			xerr = fail.Wrap(xerr.Cause(), "failed to execute command after %s", temporal.FormatDuration(timeout))
+		case *retry.ErrStopRetry:
+			xerr = fail.ToError(xerr.Cause())
 		}
-		return -1, "", "", xerr
-	}
-	// If retcode == 255, ssh connection failed
-	if retcode == 255 {
-		return -1, "", "", fail.NotAvailableError("failed to connect")
 	}
 	return retcode, stdout, stderr, xerr
 }
@@ -2503,11 +2522,7 @@ func (rh host) PushStringToFile(task concurrency.Task, content string, filename 
 	deleted := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			var (
-				retcode   int
-				innerXErr error
-			)
-			retcode, _, _, innerXErr = rh.Push(task, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
+			retcode, _, _, innerXErr := rh.Push(task, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}

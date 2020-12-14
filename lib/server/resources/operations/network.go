@@ -94,7 +94,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		}
 	}
 
-	if xerr = upgradeProperties(task, rn); xerr != nil {
+	if xerr = upgradeNetworkPropertyIfNeeded(task, rn); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
 			// ignore
@@ -105,8 +105,8 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 	return rn, nil
 }
 
-// upgradeProperties upgrades properties to most recent version
-func upgradeProperties(task concurrency.Task, rn resources.Network) fail.Error {
+// upgradeNetworkPropertyIfNeeded upgrades properties to most recent version
+func upgradeNetworkPropertyIfNeeded(task concurrency.Task, rn resources.Network) fail.Error {
 	return rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
@@ -118,10 +118,13 @@ func upgradeProperties(task concurrency.Task, rn resources.Network) fail.Error {
 			if xerr != nil {
 				return xerr
 			}
+
 			as := abstract.NewSubnet()
 			as.Name = an.Name
 			as.Network = an.ID
-			return nil
+			as.CIDR = an.CIDR
+			as.DNSServers = an.DNSServers
+			return rs.Carry(task, as)
 		}
 		return fail.AlteredNothingError()
 	})

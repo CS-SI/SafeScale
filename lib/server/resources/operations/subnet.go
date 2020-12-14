@@ -955,8 +955,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 		return nil, xerr
 	}
 	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
-	xerr = sg.Create(task, network.ID, sgName, description, nil)
-	if xerr != nil {
+	if xerr = sg.Create(task, network.ID, sgName, description, nil); xerr != nil {
 		return nil, xerr
 	}
 

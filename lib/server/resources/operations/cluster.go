@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -51,6 +52,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -204,9 +206,9 @@ func (c *cluster) updateNodesPropertyIfNeeded(task concurrency.Task) fail.Error 
 
 // updateNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
 func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Error {
-	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(clusterproperty.NetworkV3) {
-			return nil
+			return fail.AlteredNothingError()
 		}
 
 		var (
@@ -275,6 +277,13 @@ func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Erro
 		}
 		return nil
 	})
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrAlteredNothing:
+			xerr = nil
+		}
+	}
+	return xerr
 }
 
 // IsNull tells if the instance represents a null value of cluster
@@ -658,15 +667,31 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 			}
 		}()
 	}
+	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			networkV3.NetworkID = rn.GetID()
+			networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the cluster will
+			networkV3.CIDR = req.CIDR
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 
 	// Creates Subnet
 	logrus.Debugf("[cluster %s] creating Subnet '%s'", req.Name, req.Name)
 	subnetReq := abstract.SubnetRequest{
-		Name:      req.Name,
-		NetworkID: rn.GetID(),
-		CIDR:      req.CIDR,
-		HA:        !gwFailoverDisabled,
-		Image:     gatewaysDef.Image,
+		Name:          req.Name,
+		NetworkID:     rn.GetID(),
+		CIDR:          req.CIDR,
+		HA:            !gwFailoverDisabled,
+		Image:         gatewaysDef.Image,
+		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 
 	rs, xerr := NewSubnet(c.service)
@@ -675,7 +700,29 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 	}
 
 	if xerr = rs.Create(task, subnetReq, "", gatewaysDef); xerr != nil {
-		return nil, nil, fail.Wrap(xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, rn.GetName())
+		switch xerr.(type) {
+		case *fail.ErrInvalidRequest:
+			// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
+			logrus.Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
+			_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
+			if err != nil {
+				_ = xerr.AddConsequence(fail.Wrap(err, "failed to compute subset of CIDR '%s'", req.CIDR))
+				return nil, nil, xerr
+			}
+			if subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1); subXErr == nil {
+				subnetReq.CIDR = subIPNet.String()
+			} else {
+				_ = xerr.AddConsequence(fail.Wrap(subXErr, "failed to compute subset of CIDR '%s'", req.CIDR))
+				return nil, nil, xerr
+			}
+			if subXErr := rs.Create(task, subnetReq, "", gatewaysDef); subXErr != nil {
+				return nil, nil, fail.Wrap(subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)", subnetReq.Name, subnetReq.CIDR, rn.GetName(), req.CIDR)
+			}
+			logrus.Infof("CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.", subnetReq.CIDR)
+			xerr = nil
+		default:
+			return nil, nil, fail.Wrap(xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, rn.GetName())
+		}
 	}
 
 	defer func() {
@@ -686,7 +733,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 		}
 	}()
 
-	// Updates cluster metadata, propertiesv3.ClusterNetwork
+	// Updates again cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
@@ -705,8 +752,6 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 				}
 			}
 			networkV3.SubnetID = rs.GetID()
-			networkV3.NetworkID = req.NetworkID // empty NetworkID means that the Network would have to be deleted when the cluster will
-			networkV3.CIDR = req.CIDR
 			networkV3.GatewayID = primaryGateway.GetID()
 			if networkV3.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(task); innerXErr != nil {
 				return innerXErr
@@ -2525,35 +2570,15 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 	}
 
 	// --- Deletes the Network, Subnet and gateway ---
-	networkID, subnetID, xerr := c.extractNetworkingInfo(task)
+	rn, deleteNetwork, rs, xerr := c.extractNetworkingInfo(task)
 	if xerr != nil {
 		cleaningErrors = append(cleaningErrors, xerr)
 		return fail.NewErrorList(cleaningErrors)
 	}
 
-	rn := nullNetwork()
-	rs, xerr := LoadSubnet(task, c.GetService(), networkID, subnetID)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// subnet not found, consider as a successful deletion and continue
-		default:
-			cleaningErrors = append(cleaningErrors, xerr)
-			return fail.NewErrorList(cleaningErrors)
-		}
-	} else {
-		if networkID == "" && !rs.IsNull() {
-			if rn, xerr = rs.GetNetwork(task); xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// Network not found, consider as a successful deletion and continue
-				default:
-					cleaningErrors = append(cleaningErrors, xerr)
-					return fail.NewErrorList(cleaningErrors)
-				}
-			}
-		}
-
+	if !rs.IsNull() {
+		subnetName := rs.GetName()
+		logrus.Debugf("Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 			func() error {
 				if innerXErr := rs.Delete(task); innerXErr != nil {
@@ -2587,7 +2612,8 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 		}
 	}
 
-	if !rn.IsNull() {
+	// If we have to delete network and Network instance is null value, networkID is the same as
+	if !rn.IsNull() && deleteNetwork {
 		networkName := rn.GetName()
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
@@ -2630,23 +2656,37 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 }
 
 // extractNetworkingInfo returns the ID of the network from properties, taking care of ascending compatibility
-func (c cluster) extractNetworkingInfo(task concurrency.Task) (networkID, subnetID string, xerr fail.Error) {
+func (c cluster) extractNetworkingInfo(task concurrency.Task) (network resources.Network, deleteNetwork bool, subnet resources.Subnet, xerr fail.Error) {
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-		return props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			networkID = networkV3.NetworkID
-			subnetID = networkV3.SubnetID
+
+			network, deleteNetwork, subnet = nullNetwork(), false, nullSubnet()
+
+			if networkV3.SubnetID != "" {
+				if subnet, innerXErr = LoadSubnet(task, c.GetService(), networkV3.NetworkID, networkV3.SubnetID); innerXErr != nil {
+					return innerXErr
+				}
+			}
+
+			if networkV3.NetworkID != "" {
+				network, innerXErr = LoadNetwork(task, c.GetService(), networkV3.NetworkID)
+			} else if !subnet.IsNull() {
+				network, innerXErr = subnet.GetNetwork(task)
+			}
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			deleteNetwork = networkV3.CreatedNetwork
 			return nil
 		})
 	})
-	if xerr != nil {
-		return "", "", xerr
-	}
 
-	return networkID, subnetID, nil
+	return network, deleteNetwork, subnet, xerr
 }
 
 func containsClusterNode(list []*propertiesv2.ClusterNode, hostID string) (bool, int) {

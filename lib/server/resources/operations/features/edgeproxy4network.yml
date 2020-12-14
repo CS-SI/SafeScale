@@ -17,6 +17,7 @@
 ---
 feature:
     suitableFor:
+        host: yes
         cluster: all
     requirements:
         features:

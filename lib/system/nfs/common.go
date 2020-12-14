@@ -135,13 +135,14 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	filename := utils.TempFolder + "/" + name
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, stdout, stderr, xerr := sshconfig.Copy(task, filename, f.Name(), true)
-			if xerr != nil {
-				return fail.Wrap(xerr, "ssh operation failed")
+			retcode, stdout, stderr, innerXErr := sshconfig.Copy(task, filename, f.Name(), true)
+			if innerXErr != nil {
+				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 			if retcode != 0 {
-				xerr = fail.ExecutionError(xerr, "script copy failed: %s, %s", stdout, stderr)
-				_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+				innerXErr = fail.ExecutionError(xerr, "script copy failed: %s, %s", stdout, stderr)
+				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+				return innerXErr
 			}
 			return nil
 		},
@@ -160,17 +161,26 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 
 	k, uperr := sshconfig.SudoCommand(task, "which scp")
 	if uperr != nil && k != nil {
-		_, uptext, _, xerr := k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
-		if xerr == nil {
-			connected := strings.Contains(uptext, "/scp")
-			if !connected {
+		var uptext string
+		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+			func() error {
+				var innerXErr fail.Error
+				_, uptext, _, innerXErr = k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
+				if innerXErr != nil {
+					return fail.Wrap(innerXErr, "ssh operation failed")
+				}
+				return nil
+			},
+			temporal.GetHostTimeout(),
+		)
+		if retryErr == nil {
+			if connected := strings.Contains(uptext, "/scp"); !connected {
 				logrus.Warn("SUDO problem ?")
 			}
 		}
 	}
 
-	xerr = utils.LazyRemove(f.Name())
-	if xerr != nil {
+	if xerr = utils.LazyRemove(f.Name()); xerr != nil {
 		logrus.Warnf("Error deleting file: %v", xerr)
 	}
 

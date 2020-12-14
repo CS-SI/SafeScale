@@ -185,7 +185,8 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 	var buffer bytes.Buffer
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			return f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
+			innerErr := f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
+			return innerErr
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -248,7 +249,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 
 			check := target.Bytes()
 			if !bytes.Equal(data, check) {
-				return fail.NewError("remote content is different from source")
+				return fail.NewError("remote content is different from local reference")
 			}
 
 			return nil

@@ -124,7 +124,12 @@ func (o *object) Reload() fail.Error {
 
 	item, err := o.bucket.stowContainer.Item(o.name)
 	if err != nil {
-		return fail.ToError(err)
+		switch err.Error() {
+		case "not found":
+			return fail.NotFoundError("failed to reload '%s:%s' from Object Storage", o.bucket.name, o.name)
+		default:
+			return fail.ToError(err)
+		}
 	}
 	return o.reloadFromItem(item)
 }
@@ -159,8 +164,7 @@ func (o *object) Read(target io.Writer, from, to int64) fail.Error {
 	var length int64
 
 	// 1st reload information about object, to be sure to have the last
-	err := o.Reload()
-	if err != nil {
+	if err := o.Reload(); err != nil {
 		return err
 	}
 
@@ -185,8 +189,7 @@ func (o *object) Read(target io.Writer, from, to int64) fail.Error {
 		return fail.ToError(err)
 	}
 	defer func() {
-		clerr := source.Close()
-		if clerr != nil {
+		if clerr := source.Close(); clerr != nil {
 			logrus.Error("Error closing item")
 		}
 	}()
