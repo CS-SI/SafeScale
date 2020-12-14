@@ -54,13 +54,13 @@ func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error 
 	// Updates owner and access rights if asked for
 	cmd := ""
 	if rfc.RemoteOwner != "" {
-		cmd += "chown " + rfc.RemoteOwner + " " + rfc.Remote
+		cmd += "sudo chown " + rfc.RemoteOwner + " " + rfc.Remote
 	}
 	if rfc.RemoteRights != "" {
 		if cmd != "" {
 			cmd += " && "
 		}
-		cmd += "chmod " + rfc.RemoteRights + " " + rfc.Remote
+		cmd += "sudo chmod " + rfc.RemoteRights + " " + rfc.Remote
 	}
 	retcode, _, _, xerr = clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {

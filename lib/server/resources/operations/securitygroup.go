@@ -226,7 +226,12 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	// Check if securityGroup exists and is managed by SafeScale
 	var found bool
 	if found, xerr = lookupSecurityGroup(task, svc, name); xerr != nil {
-		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// not found, good, continue
+		default:
+			return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+		}
 	}
 	if found {
 		return fail.DuplicateError("a Security Group named '%s' already exists", name)

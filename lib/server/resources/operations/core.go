@@ -139,9 +139,9 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
 	}
 
-	// Reload reloads data from objectstorage to be sure to have the last revision
+	// Reload reloads data from Object Storage to be sure to have the last revision
 	if xerr = c.Reload(task); xerr != nil {
-		return fail.Wrap(xerr, "failed to reload")
+		return fail.Wrap(xerr, "failed to reload metadata")
 	}
 
 	return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
@@ -282,8 +282,7 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 	// 	},
 	// 	temporal.GetMinDelay(),
 	// )
-	xerr := c.readByReference(task, ref)
-	if xerr != nil {
+	if xerr := c.readByReference(task, ref); xerr != nil {
 		// switch xerr.(type) {
 		// case *retry.ErrTimeout:
 		// 	return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
@@ -375,7 +374,7 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
-			return fail.NotFoundError("failed to find %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr, "failed to find %s '%s'", c.kind, ref)
 		}
 	}
 	return xerr

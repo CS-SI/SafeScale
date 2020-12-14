@@ -280,10 +280,8 @@ func (e errorCore) Annotation(key string) (data.Annotation, bool) {
 // Annotate ...
 // satisfies interface data.Annotatable
 func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable {
-	// e.IsNull() not used here, it's not a mistake
-	//if e == nil {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotate()", "from nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Annotate()", "from null value", 0))
 		return e
 	}
 
@@ -297,10 +295,8 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 
 // AnnotationFormatter defines the func to use to format annotations
 func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string) {
-	// e.IsNull() not used here, it's not a mistake
-	//if e == nil {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AnnotationFormatter()", "from nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AnnotationFormatter()", "from null value", 0))
 		return
 	}
 	if formatter == nil {
@@ -312,10 +308,8 @@ func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string)
 
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errorCore) AddConsequence(err error) Error {
-	// e.IsNull() not used here, it's not a mistake
-	//if e == nil {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null value", 0))
 		return e
 	}
 	if err != nil {

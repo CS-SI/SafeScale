@@ -320,9 +320,10 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, fail.Error) {
 
 // SSHCommand defines a SSH command
 type SSHCommand struct {
-	cmd     *exec.Cmd
-	tunnels []*SSHTunnel
-	keyFile *os.File
+	cmdString string
+	cmd       *exec.Cmd
+	tunnels   []*SSHTunnel
+	keyFile   *os.File
 }
 
 func (sc *SSHCommand) closeTunneling() fail.Error {
@@ -348,6 +349,10 @@ func (sc *SSHCommand) closeTunneling() fail.Error {
 // Wait releases any resources associated with the cmd.
 // !!!ATTENTION!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
 func (sc *SSHCommand) Wait() error {
+	if sc == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	err := sc.cmd.Wait()
 	nerr := sc.cleanup()
 	if err != nil {
@@ -361,49 +366,81 @@ func (sc *SSHCommand) Wait() error {
 
 // Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
 func (sc *SSHCommand) Kill() fail.Error {
+	if sc == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	if err := sc.cmd.Process.Kill(); err != nil {
 		return fail.ToError(err)
 	}
 	return nil
 }
 
-// StdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
+// getStdoutPipe returns a pipe that will be connected to the command's standard output when the command starts.
 // Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed.
-// For the same reason, it is incorrect to call Run when using StdoutPipe.
-func (sc *SSHCommand) StdoutPipe() (io.ReadCloser, fail.Error) {
-	r, err := sc.cmd.StdoutPipe()
-	if err != nil {
-		return nil, fail.NewError(err.Error())
+// For the same reason, it is incorrect to call Run when using getStdoutPipe.
+func (sc *SSHCommand) getStdoutPipe() (io.ReadCloser, fail.Error) {
+	if sc == nil {
+		return nil, fail.InvalidInstanceError()
 	}
-	return r, nil
+	if sc.cmd == nil {
+		return nil, fail.InvalidInstanceContentError("sc.cmd", "cannot be nil")
+	}
+
+	pipe, err := sc.cmd.StdoutPipe()
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return pipe, nil
 }
 
-// StderrPipe returns a pipe that will be connected to the command's standard error when the command starts.
-// Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed. For the same reason, it is incorrect to use Run when using StderrPipe.
-func (sc *SSHCommand) StderrPipe() (io.ReadCloser, fail.Error) {
-	r, err := sc.cmd.StderrPipe()
-	if err != nil {
-		return nil, fail.NewError(err.Error())
+// getStderrPipe returns a pipe that will be connected to the command's standard error when the command starts.
+// Wait will close the pipe after seeing the command exit, so most callers need not close the pipe themselves; however, an implication is that it is incorrect to call Wait before all reads from the pipe have completed. For the same reason, it is incorrect to use Run when using getStderrPipe.
+func (sc *SSHCommand) getStderrPipe() (io.ReadCloser, fail.Error) {
+	if sc == nil {
+		return nil, fail.InvalidInstanceError()
 	}
-	return r, nil
+	if sc.cmd == nil {
+		return nil, fail.InvalidInstanceContentError("sc.cmd", "cannot be nil")
+	}
+
+	pipe, err := sc.cmd.StderrPipe()
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return pipe, nil
 }
 
-// StdinPipe returns a pipe that will be connected to the command's standard input when the command starts.
+// getStdinPipe returns a pipe that will be connected to the command's standard input when the command starts.
 // The pipe will be closed automatically after Wait sees the command exit.
 // A caller need only call Close to force the pipe to close sooner.
 // For example, if the command being run will not exit until standard input is closed, the caller must close the pipe.
-func (sc *SSHCommand) StdinPipe() (io.WriteCloser, fail.Error) {
-	r, err := sc.cmd.StdinPipe()
-	if err != nil {
-		return nil, fail.NewError(err.Error())
+func (sc *SSHCommand) getStdinPipe() (io.WriteCloser, fail.Error) {
+	if sc == nil {
+		return nil, fail.InvalidInstanceError()
 	}
-	return r, nil
+	if sc.cmd == nil {
+		return nil, fail.InvalidInstanceContentError("sc.cmd", "cannot be nil")
+	}
+
+	pipe, err := sc.cmd.StdinPipe()
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return pipe, nil
 }
 
-// Output runs the command and returns its standard output.
+// Output returns the standard output of command started.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
 func (sc *SSHCommand) Output() ([]byte, fail.Error) {
+	if sc == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if sc.cmd == nil {
+		return nil, fail.InvalidInstanceContentError("sc.cmd", "cannot be nil")
+	}
+
 	content, err := sc.cmd.Output()
 	nerr := sc.cleanup()
 	if err != nil {
@@ -415,9 +452,16 @@ func (sc *SSHCommand) Output() ([]byte, fail.Error) {
 	return content, nil
 }
 
-// CombinedOutput runs the command and returns its combined standard
+// CombinedOutput returns the combined standard of command started
 // output and standard error.
 func (sc *SSHCommand) CombinedOutput() ([]byte, fail.Error) {
+	if sc == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if sc.cmd == nil {
+		return nil, fail.InvalidInstanceContentError("sc.cmd", "cannot be nil")
+	}
+
 	content, err := sc.cmd.CombinedOutput()
 	nerr := sc.cleanup()
 	if err != nil {
@@ -430,20 +474,30 @@ func (sc *SSHCommand) CombinedOutput() ([]byte, fail.Error) {
 }
 
 // Start starts the specified command but does not wait for it to complete.
-//
 // The Wait method will return the exit code and release associated resources
 // once the command exits.
 func (sc *SSHCommand) Start() fail.Error {
+	if sc == nil {
+		return fail.InvalidInstanceError()
+	}
+	if sc.cmd == nil {
+		return fail.InvalidInstanceContentError("sc.cmd", "cannot be nil")
+	}
+
 	if err := sc.cmd.Start(); err != nil {
-		return fail.NewError(err.Error())
+		return fail.ToError(err)
 	}
 	return nil
 }
 
-// Display ...
-func (sc *SSHCommand) Display() string {
-	return strings.Join(sc.cmd.Args, " ")
-}
+// // Display ...
+// func (sc *SSHCommand) Display() string {
+// 	if sc == nil {
+// 		return ""
+// 	}
+//
+// 	return sc.cmdString
+// }
 
 // Run starts the specified command and waits for it to complete.
 //
@@ -455,44 +509,60 @@ func (sc *SSHCommand) Display() string {
 // type *ExitError. Other error types may be returned for other situations.
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
-func (sc *SSHCommand) Run(t concurrency.Task, outs outputs.Enum) (int, string, string, fail.Error) {
-	tracer := debug.NewTracer(t, false, "(%s)", outs.String()).WithStopwatch().Entering()
+func (sc *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, string, string, fail.Error) {
+	if sc == nil {
+		return -1, "", "", fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+
+	tracer := debug.NewTracer(task, false, "(%s)", outs.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return sc.RunWithTimeout(t, outs, 0)
+	return sc.RunWithTimeout(task, outs, 0)
 }
 
 // RunWithTimeout ...
 func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-	tracer.Trace("command=\n%s\n", sc.Display())
+	if sc == nil {
+		return -1, "", "", fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("ssh")*/, "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer.Trace("command=\n%s\n", sc.cmdString)
 	defer tracer.Exiting()
 
-	// Set up the outputs (std and err)
-	stdoutPipe, xerr := sc.StdoutPipe()
-	if xerr != nil {
-		return 0, "", "", xerr
-	}
-
-	stderrPipe, xerr := sc.StderrPipe()
-	if xerr != nil {
-		return 0, "", "", xerr
-	}
+	// // Prepare command
+	// ctx, xerr := task.GetContext()
+	// if xerr != nil {
+	// 	return -1, "", "", xerr
+	// }
+	// sc.cmd = exec.CommandContext(ctx, "bash", "-c", sc.cmdString)
+	//
+	// // Set up the outputs (std and err)
+	// stdoutPipe, xerr := sc.getStdoutPipe()
+	// if xerr != nil {
+	// 	return -1, "", "", xerr
+	// }
+	//
+	// stderrPipe, xerr := sc.getStderrPipe()
+	// if xerr != nil {
+	// 	return -1, "", "", xerr
+	// }
 
 	subtask, xerr := concurrency.NewTaskWithParent(task)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
 
-	_, xerr = subtask.StartWithTimeout(sc.taskExecute, data.Map{
-		"stdout":          stdoutPipe,
-		"stderr":          stderrPipe,
-		"collect_outputs": outs != outputs.DISPLAY,
-	}, timeout)
-	if xerr != nil {
+	if _, xerr = subtask.StartWithTimeout(sc.taskExecute, taskExecuteParameters{ /*stdout: stdoutPipe, stderr: stderrPipe, */ collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %v", timeout)
+			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout))
 		}
 		return -1, "", "", xerr
 	}
@@ -508,6 +578,11 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, t
 	return -1, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
+type taskExecuteParameters struct {
+	// stdout, stderr io.ReadCloser
+	collectOutputs bool
+}
+
 func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 	if sc == nil {
 		return nil, fail.InvalidInstanceError()
@@ -516,32 +591,16 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	params, ok := p.(data.Map)
+	params, ok := p.(taskExecuteParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be of type data.Map")
+		return nil, fail.InvalidParameterError("p", "must be a 'taskExecuteParameters'")
 	}
-
-	var (
-		stdoutPipe, stderrPipe io.ReadCloser
-		collectOutputs         bool
-	)
-	if stdoutPipe, ok = params["stdout"].(io.ReadCloser); !ok {
-		return nil, fail.InvalidParameterError("p['stdout']", "is missing or is not of type io.ReadCloser")
-	}
-	if stdoutPipe == nil {
-		return nil, fail.InvalidParameterError("p['stdout']", "cannot be nil")
-	}
-
-	if stderrPipe, ok = params["stderr"].(io.ReadCloser); !ok {
-		return nil, fail.InvalidParameterError("p['stderr']", "is missing or is not of type io.ReadCloser")
-	}
-	if stderrPipe == nil {
-		return nil, fail.InvalidParameterError("p['stderr']", "cannot be nil")
-	}
-
-	if collectOutputs, ok = params["collect_outputs"].(bool); !ok {
-		return nil, fail.InvalidParameterError("p[collect_outputs]", "is missing or is not of type bool")
-	}
+	// if params.stdout == nil {
+	// 	return nil, fail.InvalidParameterError("p.stdout", "cannot be nil")
+	// }
+	// if params.stderr == nil {
+	// 	return nil, fail.InvalidParameterError("p.stderr", "cannot be nil")
+	// }
 
 	var (
 		stdoutBridge, stderrBridge cli.PipeBridge
@@ -557,12 +616,30 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		"stderr":  "",
 	}
 
-	if !collectOutputs {
-		if stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe); xerr != nil {
+	// Prepare command
+	ctx, xerr := task.GetContext()
+	if xerr != nil {
+		return result, xerr
+	}
+	sc.cmd = exec.CommandContext(ctx, "bash", "-c", sc.cmdString)
+
+	// Set up the outputs (std and err)
+	stdoutPipe, xerr := sc.getStdoutPipe()
+	if xerr != nil {
+		return result, xerr
+	}
+
+	stderrPipe, xerr := sc.getStderrPipe()
+	if xerr != nil {
+		return result, xerr
+	}
+
+	if !params.collectOutputs {
+		if stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe /*params.stdout*/); xerr != nil {
 			return result, xerr
 		}
 
-		if stderrBridge, xerr = cli.NewStderrBridge(stderrPipe); xerr != nil {
+		if stderrBridge, xerr = cli.NewStderrBridge(stderrPipe /*params.stderr*/); xerr != nil {
 			return result, xerr
 		}
 
@@ -572,35 +649,35 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	}
 
 	// Starts pipebridge if needed
-	if !collectOutputs {
+	if !params.collectOutputs {
 		if xerr = pipeBridgeCtrl.Start(task); xerr != nil {
 			return result, xerr
 		}
 	}
 
 	// Launch the command and wait for its completion
-	if xerr := sc.Start(); xerr != nil {
+	if xerr = sc.Start(); xerr != nil {
 		return result, xerr
 	}
 
-	if collectOutputs {
-		if msgOut, err = ioutil.ReadAll(stdoutPipe); err != nil {
+	if params.collectOutputs {
+		if msgOut, err = ioutil.ReadAll(stdoutPipe /*params.stdout*/); err != nil {
 			return result, fail.ToError(err)
 		}
 
-		if msgErr, err = ioutil.ReadAll(stderrPipe); err != nil {
+		if msgErr, err = ioutil.ReadAll(stderrPipe /*params.stderr*/); err != nil {
 			return result, fail.ToError(err)
 		}
 	}
 
 	var pbcErr error
 	runErr := sc.Wait()
-	_ = stdoutPipe.Close()
-	_ = stderrPipe.Close()
+	_ = stdoutPipe.Close() /*params.stdout.Close()*/
+	_ = stderrPipe.Close() /*params.stderr.Close()*/
 
 	if runErr == nil {
 		result["retcode"] = 0
-		if collectOutputs {
+		if params.collectOutputs {
 			result["stdout"] = string(msgOut)
 			result["stderr"] = string(msgErr)
 		} else {
@@ -618,7 +695,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 			ok     bool
 		)
 		if note, ok = xerr.Annotation("retcode"); !ok || note.(int) == -1 {
-			if !collectOutputs {
+			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)
 				}
@@ -628,7 +705,7 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 		result["retcode"] = note.(int)
 
 		// Make sure all outputs have been processed
-		if !collectOutputs {
+		if !params.collectOutputs {
 			if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
 				logrus.Error(pbcErr.Error())
 			}
@@ -769,10 +846,14 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
 	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	ctx, err := task.GetContext()
-	if err != nil {
-		return nil, err
+	if cmdString = strings.TrimSpace(cmdString); cmdString == "" {
+		return nil, fail.InvalidParameterError("cmdString", "cannot be empty string")
 	}
+
+	// ctx, xerr := task.GetContext()
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	tunnels, sshConfig, err := ssh.CreateTunneling()
 	if err != nil {
@@ -784,9 +865,10 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
 		return nil, fail.Wrap(err, "unable to create command")
 	}
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)
+	// cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
-		cmd:     cmd,
+		cmdString: sshCmdString,
+		// cmd:       cmd,
 		tunnels: tunnels,
 		keyFile: keyFile,
 	}
@@ -835,9 +917,10 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 				return innerErr
 			}
 
-			retcode, stdout, stderr, innerErr = cmd.RunWithTimeout(task, outputs.COLLECT, timeout)
-			if innerErr != nil {
-				return innerErr
+			var innerXErr fail.Error
+			retcode, stdout, stderr, innerXErr = cmd.RunWithTimeout(task, outputs.COLLECT, timeout)
+			if innerXErr != nil {
+				return innerXErr
 			}
 			if retcode != 0 {
 				if retcode == 255 {
@@ -920,11 +1003,12 @@ func (ssh *SSHConfig) copy(
 	}
 
 	sshCmdString := copyCommand.String()
-	cmd := exec.Command("bash", "-c", sshCmdString)
+	// cmd := exec.Command("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
-		cmd:     cmd,
-		tunnels: tunnels,
-		keyFile: identityfile,
+		// cmd:     cmd,
+		cmdString: sshCmdString,
+		tunnels:   tunnels,
+		keyFile:   identityfile,
 	}
 
 	return sshCommand.RunWithTimeout(task, outputs.COLLECT, timeout)

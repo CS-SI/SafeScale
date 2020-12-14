@@ -27,6 +27,7 @@ import (
 // not FROZEN yet
 type ClusterNetwork struct {
 	NetworkID          string           `json:"network_id"`           // contains the ID of the network
+	CreatedNetwork     bool             `json:"created_network"`      // tells if the network had been created with the cluster
 	SubnetID           string           `json:"subnet_id,omitempty"`  // contains the ID of the subnet
 	CIDR               string           `json:"cidr"`                 // the network CIDR
 	GatewayID          string           `json:"gateway_id"`           // contains the ID of the primary gateway

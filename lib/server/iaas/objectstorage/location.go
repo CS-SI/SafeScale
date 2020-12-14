@@ -469,8 +469,7 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 	if err != nil {
 		return err
 	}
-	err = o.Read(writer, from, to)
-	if err != nil {
+	if err = o.Read(writer, from, to); err != nil {
 		return err
 	}
 	return nil
