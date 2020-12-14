@@ -71,6 +71,8 @@ type Error interface {
 
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
+
+	prependToMessage(string)
 }
 
 // errorCore is the implementation of interface Error
@@ -372,6 +374,14 @@ func (e errorCore) ToGRPCStatus() error {
 		return nil
 	}
 	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
+}
+
+func (e *errorCore) prependToMessage(msg string) {
+	if e.IsNull() {
+		logrus.Errorf("invalid call of errorCore.updateMessage() from null instance")
+		return
+	}
+	e.message = msg + ": " + e.message
 }
 
 // ErrTimeout defines a ErrTimeout error
