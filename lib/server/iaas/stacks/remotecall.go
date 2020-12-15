@@ -44,7 +44,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
 			return fail.ToError(xerr.Cause())
-		case *retry.ErrTimeout: // On Timeout, raise a NotFound error with the cause as message
+		case *retry.ErrTimeout: // On timeout, raise a NotFound error with the cause as message
 			return fail.NotFoundError(xerr.Cause().Error())
 		default:
 			return xerr

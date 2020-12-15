@@ -282,7 +282,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
 	isGateway := request.IsGateway // || defaultSubnet.Name == abstract.SingleHostNetworkName
-	// Make sure to allocate Public IP if host is a gateway
+	// Make sure to allocate public IP if host is a gateway
 	request.PublicIP = request.PublicIP || isGateway
 
 	var nets []servers.Network

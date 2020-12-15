@@ -22,9 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
-
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -77,51 +74,6 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
-	// disable subnetwork auto-creation
-	// ne := compute.Network{
-	// 	Name:                  s.GcpConfig.NetworkName,
-	// 	AutoCreateSubnetworks: false,
-	// 	ForceSendFields:       []string{"AutoCreateSubnetworks"},
-	// }
-	//
-	// compuService := s.ComputeService
-	//
-	// recreateSafescaleNetwork := true
-	// recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
-	// if recnet != nil && err == nil {
-	// 	recreateSafescaleNetwork = false
-	// } else if err != nil {
-	// 	xerr := normalizeError(err)
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 	default:
-	// 		return nil, xerr
-	// 	}
-	// }
-	// if recreateSafescaleNetwork {
-	// 	opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectID, &ne).Context(context.Background()).Do()
-	// 	if err != nil {
-	// 		return nil, fail.ToError(err)
-	// 	}
-	//
-	// 	oco := opContext{
-	// 		Operation:    opp,
-	// 		ProjectID:    s.GcpConfig.ProjectID,
-	// 		Service:      compuService,
-	// 		DesiredState: "DONE",
-	// 	}
-	//
-	// 	xerr := rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-	// 	if err != nil {
-	// 		return nil, xerr
-	// 	}
-	// }
-	//
-	// necreated, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
-	// if err != nil {
-	// 	return nil, normalizeError(err)
-	// }
-	//
 	resp, xerr := s.rpcCreateNetwork(req.Name)
 	if xerr != nil {
 		return nullAN, xerr
@@ -132,92 +84,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	net.Name = req.Name
 	net.CIDR = req.CIDR // Not enforced by GCP, but needed by SafeScale
 
-	// // Create subnetwork
-	//
-	// theRegion := s.GcpConfig.Region
-	//
-	// subnetReq := compute.Subnetwork{
-	//	IpCidrRange: req.CIDR,
-	//	Name:        req.Name,
-	//	Network:     fmt.Sprintf("%s/networks/%s", s.linksPrefix, s.GcpConfig.NetworkName),
-	//	Region:      theRegion,
-	// }
-	//
-	// opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
-	// if err != nil {
-	//	return nil, normalizeError(err)
-	// }
-	//
-	// oco := opContext{
-	//	Operation:    opp,
-	//	ProjectID:    s.GcpConfig.ProjectID,
-	//	Service:      compuService,
-	//	DesiredState: "DONE",
-	// }
-	//
-	// err = rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-	// if err != nil {
-	//	return nil, fail.ToError(err)
-	// }
-	//
-	// gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, theRegion, req.Name).Do()
-	// if err != nil {
-	//	return nil, normalizeError(err)
-	// }
-	//
-	// // FIXME: Add properties and GatewayID
-	// subnet := abstract.NewSubnetk()
-	// subnet.ID = strconv.FormatUint(gcpSubNet.Id, 10)
-	// subnet.Name = gcpSubNet.Name
-	// subnet.CIDR = gcpSubNet.IpCidrRange
-	// subnet.IPVersion = ipversion.IPv4
-	//
-	// buildNewRule := true
-	// fws, err := s.ComputeService.Firewalls.Get(s.GcpConfig.ProjectID, firewallRuleName).Do()
-	// if err != nil {
-	// 	xerr := normalizeError(err)
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 	default:
-	// 		return nil, xerr
-	// 	}
-	// }
-	// if fws != nil {
-	// 	buildNewRule = false
-	// }
-	// if buildNewRule {
-	// fiw := compute.Firewall{
-	// 	Allowed: []*compute.FirewallAllowed{
-	// 		{
-	// 			IPProtocol: "all",
-	// 		},
-	// 	},
-	// 	Direction:    "INGRESS",
-	// 	Disabled:     false,
-	// 	Name:         firewallRuleName,
-	// 	Network:      fmt.Sprintf("%s/networks/%s", s.linksPrefix, s.GcpConfig.NetworkName),
-	// 	Priority:     999,
-	// 	SourceRanges: []string{"0.0.0.0/0"},
-	// }
-	//
-	// opp, err := s.ComputeService.Firewalls.Insert(s.GcpConfig.ProjectID, &fiw).Do()
-	// if err != nil {
-	// 	return nil, normalizeError(err)
-	// }
-	//
-	// oco := opContext{
-	// 	Operation:    opp,
-	// 	ProjectID:    s.GcpConfig.ProjectID,
-	// 	Service:      s.ComputeService,
-	// 	DesiredState: "DONE",
-	// }
-	// xerr := rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	// }
-
-	_ = net.OK()
+	// _ = net.OK()
 
 	return net, nil
 }
@@ -261,17 +128,6 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 		return nullAN, xerr
 	}
 	return toAbstractNetwork(*resp), nil
-	// nets, xerr := s.ListNetworks()
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	// for _, net := range nets {
-	// 	if net.Name == name {
-	// 		return net, nil
-	// 	}
-	// }
-	//
-	// return nil, abstract.ResourceNotFoundError("network", name)
 }
 
 func toAbstractNetwork(in compute.Network) *abstract.Network {
@@ -325,9 +181,9 @@ func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
 			return xerr
 		}
 	}
-	if !theNetwork.OK() {
-		logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
-	}
+	// if !theNetwork.OK() {
+	// 	logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
+	// }
 
 	// Remove routes and firewall
 	firewallRuleName := fmt.Sprintf("%s-all-in" /*"%s-%s-all-in"*/, s.GcpConfig.NetworkName /*, subnetwork.Name*/)
@@ -335,38 +191,11 @@ func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-
 	if fws != nil {
 		if xerr = s.rpcDeleteFirewallRuleByID(fmt.Sprintf("%d", fws.Id)); xerr != nil {
 			return xerr
 		}
 	}
-
-	// natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
-	// nws, err := compuService.Routes.Get(s.GcpConfig.ProjectID, natRuleName).Do()
-	// if err != nil {
-	//	logrus.Warn(err)
-	//	return fail.ToError(err)
-	// }
-	//
-	// if nws != nil {
-	//	opp, operr := compuService.Routes.Delete(s.GcpConfig.ProjectID, natRuleName).Do()
-	//	if operr != nil {
-	//		return normalizeError(err)
-	//	}
-	//
-	//	oco := opContext{
-	//		Operation:    opp,
-	//		ProjectID:    s.GcpConfig.ProjectID,
-	//		Service:      compuService,
-	//		DesiredState: "DONE",
-	//	}
-	//	operr = rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-	//	if operr != nil {
-	//		logrus.Warn(operr)
-	//		return fail.ToError(operr)
-	//	}
-	// }
 
 	return s.rpcDeleteNetworkByID(theNetwork.ID)
 }
@@ -469,16 +298,6 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	// FIXME: add tracing
-	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// asg, xerr = s.InspectSecurityGroup(asg)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-
 	return nil
 }
 
@@ -491,15 +310,6 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-
-	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// asg, xerr = s.InspectSecurityGroup(asg)
-	// if xerr != nil {
-	// 	return xerr
-	// }
 
 	return nil
 }
@@ -516,93 +326,14 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xer
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// compuService := s.ComputeService
-
-	// recreateSafescaleNetwork := true
-	// recnet, err := compuService.Networks.Get(s.GcpConfig.ProjectID, ne.Name).Do()
-	// if recnet != nil && err == nil {
-	//    recreateSafescaleNetwork = false
-	// } else if err != nil {
-	//    xerr := normalizeError(err)
-	//    switch xerr.(type) {
-	//    case *fail.ErrNotFound:
-	//    default:
-	//        return nil, xerr
-	//    }
-	// }
-	//
-	// if recreateSafescaleNetwork {
-	//    opp, err := compuService.Networks.Insert(s.GcpConfig.ProjectID, &ne).Context(context.Background()).Do()
-	//    if err != nil {
-	//        return nil, fail.ToError(err)
-	//    }
-	//
-	//    oco := opContext{
-	//        Operation:    opp,
-	//        ProjectID:    s.GcpConfig.ProjectID,
-	//        Service:      compuService,
-	//        DesiredState: "DONE",
-	//    }
-	//
-	//    xerr := rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-	//    if err != nil {
-	//        return nil, xerr
-	//    }
-	// }
-
 	an, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
 		return nullAS, fail.Wrap(xerr, "failed to find Network identified by %s", req.NetworkID)
 	}
 
-	// // Checks if CIDR is valid...
-	// if req.CIDR == "" {
-	// 	tracer.Trace("CIDR is empty, choosing one...")
-	// 	req.CIDR = "192.168.1.0/24"
-	// 	tracer.Trace("CIDR chosen for Subnet is '%s'", req.CIDR)
-	// }
 	if xerr = s.validateCIDR(req, an); xerr != nil {
 		return nil, xerr
 	}
-
-	// // Create as
-	// theRegion := s.GcpConfig.Region
-	//
-	// subnetReq := compute.Subnetwork{
-	// 	IpCidrRange: req.CIDR,
-	// 	Name:        req.Name,
-	// 	Network:     fmt.Sprintf("%s/networks/%s", s.linksPrefix, an.Name),
-	// 	Region:      theRegion,
-	// }
-	// opp, err := compuService.Subnetworks.Insert(s.GcpConfig.ProjectID, theRegion, &subnetReq).Context(context.Background()).Do()
-	// if err != nil {
-	// 	return nil, normalizeError(err)
-	// }
-	//
-	// defer func() {
-	// 	if xerr != nil && !req.KeepOnFailure {
-	// 		_, derr := compuService.Subnetworks.Delete(s.GcpConfig.ProjectID, theRegion, opp.Name).Do()
-	// 		if derr != nil {
-	// 			_ = xerr.AddConsequence(derr)
-	// 		}
-	// 	}
-	// }()
-	//
-	// oco := opContext{
-	// 	Operation:    opp,
-	// 	ProjectID:    s.GcpConfig.ProjectID,
-	// 	Service:      compuService,
-	// 	DesiredState: "DONE",
-	// }
-	// err = rpcWaitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
-	// if err != nil {
-	// 	return nil, fail.ToError(err)
-	// }
-	//
-	// gcpSubNet, err := compuService.Subnetworks.Get(s.GcpConfig.ProjectID, theRegion, req.Name).Do()
-	// if err != nil {
-	// 	return nil, normalizeError(err)
-	// }
 
 	resp, xerr := s.rpcCreateSubnet(req.Name, an.Name, req.CIDR)
 	if xerr != nil {
@@ -637,41 +368,15 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xer
 		}
 	}()
 
-	// firewallRuleName := fmt.Sprintf("%s-%s-all-in", an.Name, as.Name)
-	// if _, xerr = s.rpcGetFirewallRuleByName(firewallRuleName); xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		// continue
-	// 	default:
-	// 		return nil, xerr
-	// 	}
-	// } else {
-	// 	return nil, fail.DuplicateError("failed to create firewall rule named '%s', already exist", firewallRuleName)
-	// }
-	//
-	// allowed := []*compute.FirewallAllowed{
-	// 	{
-	// 		IPProtocol: "all",
-	// 	},
-	// }
-	// if _, xerr = s.rpcCreateFirewallRule(firewallRuleName, an.Name, "", "INGRESS", false, []string{"0.0.0.0/0"}, false, []string{req.CIDR}, allowed, nil); xerr != nil {
-	// 	return nil, xerr
-	// }
-
-	_ = as.OK()
+	// _ = as.OK()
 
 	return as, nil
 }
 
 func (s stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
-	// _, networkDesc, _ := net.ParseCIDR(network.CIDR)
-	_, _ /*subnetDesc*/, err := net.ParseCIDR(req.CIDR)
-	if err != nil {
+	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
 		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
-	// if networkDesc.IP.Equal(subnetDesc.IP) && networkDesc.Mask.String() == subnetDesc.Mask.String() {
-	// 	return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to Network one", req.CIDR)
-	// }
 	return nil
 }
 
@@ -690,14 +395,6 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	}
 
 	return toAbstractSubnet(*resp), nil
-	// subnets, xerr := s.ListSubnets("")
-	// for _, v := range subnets {
-	// 	if v.ID == id {
-	// 		return v, nil
-	// 	}
-	// }
-	//
-	// return nil, abstract.ResourceNotFoundError("network", id)
 }
 
 // InspectSubnetByName returns the subnet identified by name
@@ -709,31 +406,6 @@ func (s stack) InspectSubnetByName(networkRef, name string) (_ *abstract.Subnet,
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	// var region string
-	// if networkRef != "" {
-	// 	resp, xerr := s.rpcGetNetworkByID(networkRef)
-	// 	if xerr != nil {
-	// 		switch xerr.(type) {
-	// 		case *fail.ErrNotFound:
-	// 			resp, xerr = s.rpcGetNetworkByName(networkRef)
-	// 		default:
-	// 			return nullAS, xerr
-	// 		}
-	// 	}
-	// 	if xerr != nil {
-	// 		switch xerr.(type) {
-	// 		case *fail.ErrNotFound:
-	// 			return nullAS, fail.NotFoundError("failed to find Network %s", networkRef)
-	// 		default:
-	// 			return nullAS, xerr
-	// 		}
-	// 	}
-	//
-	// 	if region, xerr = getRegionFromSelfLink(genURL(resp.SelfLink)); xerr != nil {
-	// 		return nullAS, xerr
-	// 	}
-	// }
 
 	resp, xerr := s.rpcGetSubnetByName(name)
 	if xerr != nil {
@@ -828,7 +500,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "Timeout waiting for Subnet deletion")
+			return fail.Wrap(xerr.Cause(), "timeout waiting for Subnet deletion")
 		default:
 			return xerr
 		}

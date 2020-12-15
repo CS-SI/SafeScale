@@ -188,17 +188,15 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, asgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}
 
 	var r *secgroups.SecGroup
 	xerr = stacks.RetryableRemoteCall(
-		func() error {
-			var innerErr error
-			r, innerErr = secgroups.Get(s.NetworkClient, asg.ID).Extract()
-			if innerErr != nil {
+		func() (innerErr error) {
+			if r, innerErr = secgroups.Get(s.NetworkClient, asg.ID).Extract(); innerErr != nil {
 				innerErr = NormalizeError(innerErr)
 				switch innerErr.(type) {
 				case *fail.ErrNotFound: // If not found by id, try to get id of security group by name
@@ -217,10 +215,13 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nullASG, fail.NotFoundError("failed to query Security Group %s", asg.ID)
+			return nullASG, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 		default:
 			return nullASG, xerr
 		}
+	}
+	if r == nil {
+		return nullASG, fail.NotFoundError("failed to find Security Group %s", asgLabel)
 	}
 
 	//asg = abstract.NewSecurityGroup(r.Name)
