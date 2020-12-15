@@ -72,10 +72,14 @@ func qualifyFromCode(code, details string) fail.Error {
 			details = "invalid parameter"
 		}
 		return fail.InvalidRequestError(details)
+	case "5020":
+		return fail.NotFoundError("security group not found")
 	case "5057":
-		return fail.NotFoundError("network not found")
+		return fail.NotFoundError("subnet not found")
 	case "5063":
 		return fail.NotFoundError("host not found")
+	case "5065":
+		return fail.NotFoundError("network not found")
 	case "5071":
 		return fail.NotFoundError("keypair not found")
 	case "9005":
@@ -90,6 +94,8 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.InvalidRequestError("not included in VPC Targets")
 	case "9058":
 		return fail.DuplicateError("network already exist")
+	case "10042":
+		return fail.OverloadError("memory quota exceeded")
 	}
 	return nil
 }

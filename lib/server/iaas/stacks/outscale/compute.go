@@ -660,7 +660,7 @@ func (s stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 }
 
 func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
-	// Allocate Public IP
+	// Allocate public IP
 	resp, xerr := s.rpcCreatePublicIp()
 	if xerr != nil {
 		return osc.PublicIp{}, xerr
@@ -669,7 +669,7 @@ func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
 	defer func() {
 		if xerr != nil {
 			if derr := s.rpcDeletePublicIpByID(resp.PublicIpId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Public IP with ID %s", resp.PublicIpId))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete public IP with ID %s", resp.PublicIpId))
 			}
 		}
 	}()

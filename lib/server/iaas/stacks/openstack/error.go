@@ -131,8 +131,13 @@ func NormalizeError(err error) fail.Error {
 	case *url.Error:
 		return fail.NewErrorWithCause(e)
 	default:
-		logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
-		return fail.NewError("unhandled error received from provider: %s", err.Error())
+		switch err.Error() {
+		case "EOF":
+			return fail.NotFoundError("EOF")
+		default:
+			logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
+			return fail.NewError("unhandled error received from provider: %s", err.Error())
+		}
 	}
 }
 
@@ -250,7 +255,7 @@ func errorMeansServiceUnavailable(err error) bool {
 // // Returns (nil, fail.Error) if any other error occurs
 // // Returns (<retval>, nil) if everything is understood
 // func ParseNeutronError(neutronError string) (map[string]string, fail.Error) {
-// 	startIdx := strings.Index(neutronError, "{\"NeutronError\":")
+// 	startIdx := strings.index(neutronError, "{\"NeutronError\":")
 // 	jsonError := strings.Trim(neutronError[startIdx:], " ")
 // 	unjsoned := map[string]map[string]interface{}{}
 // 	if err := json.Unmarshal([]byte(jsonError), &unjsoned); err != nil {

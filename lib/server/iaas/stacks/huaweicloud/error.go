@@ -19,11 +19,13 @@ package huaweicloud
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/gophercloud/gophercloud"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/gophercloud/gophercloud"
-	"github.com/sirupsen/logrus"
 )
 
 // normalizeError translates gophercloud or openstack error to SafeScale error

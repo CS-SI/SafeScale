@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/sirupsen/logrus"
 
@@ -38,6 +39,8 @@ func normalizeError(err error) fail.Error {
 	switch cerr := err.(type) {
 	case fail.Error:
 		return cerr
+	case *url.Error:
+		return fail.NewErrorWithCause(err)
 	case *googleapi.Error:
 		switch cerr.Code {
 		case 400:
