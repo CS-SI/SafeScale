@@ -155,9 +155,9 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 }
 
 type taskCreateMastersParameters struct {
-	Count      uint
-	MastersDef abstract.HostSizingRequirements
-	NoKeep     bool
+	count         uint
+	mastersDef    abstract.HostSizingRequirements
+	keepOnFailure bool
 }
 
 // taskCreateMasters creates masters
@@ -179,28 +179,28 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskCreteMastersParameters'")
 	}
-	if p.Count < 1 {
-		return nil, fail.InvalidParameterError("params.Count", "cannot be an integer less than 1")
+	if p.count < 1 {
+		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
 
 	clusterName := c.GetName()
 
-	if p.Count == 0 {
+	if p.count == 0 {
 		logrus.Debugf("[cluster %s] no masters to create.", clusterName)
 		return nil, nil
 	}
 
-	logrus.Debugf("[cluster %s] creating %d master%s...", clusterName, p.Count, strprocess.Plural(p.Count))
+	logrus.Debugf("[cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
 	var subtasks []concurrency.Task
-	timeout := temporal.GetContextTimeout() + time.Duration(p.Count)*time.Minute
+	timeout := temporal.GetContextTimeout() + time.Duration(p.count)*time.Minute
 	var i uint
-	for ; i < p.Count; i++ {
+	for ; i < p.count; i++ {
 		subtask, xerr := task.StartInSubtask(c.taskCreateMaster, taskCreateMasterParameters{
-			Index:     i + 1,
-			MasterDef: p.MastersDef,
-			Timeout:   timeout,
-			NoKeep:    p.NoKeep,
+			index:         i + 1,
+			masterDef:     p.mastersDef,
+			timeout:       timeout,
+			keepOnFailure: p.keepOnFailure,
 		})
 		if xerr != nil {
 			return nil, xerr
@@ -224,10 +224,10 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 }
 
 type taskCreateMasterParameters struct {
-	Index     uint
-	MasterDef abstract.HostSizingRequirements
-	Timeout   time.Duration
-	NoKeep    bool
+	index         uint
+	masterDef     abstract.HostSizingRequirements
+	timeout       time.Duration
+	keepOnFailure bool
 }
 
 // taskCreateMaster creates one master
@@ -251,11 +251,11 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, fail.InvalidParameterError("params", "must be a 'taskCreateMasterParameters'")
 	}
 
-	if p.Index < 1 {
-		return nil, fail.InvalidParameterError("params.Index", "must be an integer greater than 0")
+	if p.index < 1 {
+		return nil, fail.InvalidParameterError("params.iindex", "must be an integer greater than 0")
 	}
 
-	hostLabel := fmt.Sprintf("master #%d", p.Index)
+	hostLabel := fmt.Sprintf("master #%d", p.index)
 	logrus.Debugf("[%s] starting Host creation...", hostLabel)
 
 	netCfg, xerr := c.GetNetworkConfig(task)
@@ -286,6 +286,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 	hostReq.DefaultRouteIP = netCfg.DefaultRouteIP
 	hostReq.PublicIP = false
+	hostReq.KeepOnFailure = p.keepOnFailure
 	// hostReq.ImageID = def.Image
 
 	rh, xerr := NewHost(c.service)
@@ -293,9 +294,17 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	if _, xerr = rh.Create(task, hostReq, p.MasterDef); xerr != nil {
+	if _, xerr = rh.Create(task, hostReq, p.masterDef); xerr != nil {
 		return nil, xerr
 	}
+
+	defer func() {
+		if xerr != nil && !p.keepOnFailure {
+			if derr := rh.Delete(task); derr != nil {
+				_ = xerr.AddConsequence(derr)
+			}
+		}
+	}()
 
 	// Updates cluster metadata to keep track of created IPAddress, before testing if an error occurred during the creation
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -328,11 +337,9 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 			return nil
 		})
 	})
-	if xerr != nil {
-		if p.NoKeep {
-			if derr := rh.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(derr)
-			}
+	if xerr != nil && !p.keepOnFailure {
+		if derr := rh.Delete(task); derr != nil {
+			_ = xerr.AddConsequence(derr)
 		}
 		return nil, fail.Wrap(xerr, "[%s] Host creation failed")
 	}
@@ -443,7 +450,7 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	}
 
 	if p.Index < 1 {
-		return nil, fail.InvalidParameterError("params.Index", "cannot be an integer less than 1")
+		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 	if p.Host.IsNull() {
 		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
@@ -471,10 +478,10 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 }
 
 type taskCreateNodesParameters struct {
-	Count    uint
-	Public   bool
-	NodesDef abstract.HostSizingRequirements
-	NoKeep   bool
+	count         uint
+	public        bool
+	nodesDef      abstract.HostSizingRequirements
+	keepOnFailure bool
 }
 
 // taskCreateNodes creates nodes
@@ -493,30 +500,30 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 		return nil, fail.InvalidParameterError("params", "must be a 'taskCreateNodesParameters'")
 	}
 
-	if p.Count < 1 {
-		return nil, fail.InvalidParameterError("params.Count", "cannot be an integer less than 1")
+	if p.count < 1 {
+		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.Count, p.Public).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	clusterName := c.GetName()
 
-	if p.Count == 0 {
+	if p.count == 0 {
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
 		return nil, nil
 	}
-	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, p.Count, strprocess.Plural(p.Count))
+	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, p.count, strprocess.Plural(p.count))
 
-	timeout := temporal.GetContextTimeout() + time.Duration(p.Count)*time.Minute
+	timeout := temporal.GetContextTimeout() + time.Duration(p.count)*time.Minute
 	var subtasks []concurrency.Task
-	for i := uint(1); i <= p.Count; i++ {
+	for i := uint(1); i <= p.count; i++ {
 		subtask, xerr := task.StartInSubtask(c.taskCreateNode, taskCreateNodeParameters{
-			Index:   i,
-			NodeDef: p.NodesDef,
-			Timeout: timeout,
-			NoKeep:  p.NoKeep,
+			index:         i,
+			nodeDef:       p.nodesDef,
+			timeout:       timeout,
+			keepOnFailure: p.keepOnFailure,
 		})
 		if xerr != nil {
 			return nil, xerr
@@ -536,15 +543,15 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 		return nil, fail.NewErrorList(errs)
 	}
 
-	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, p.Count, strprocess.Plural(p.Count))
+	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, p.count, strprocess.Plural(p.count))
 	return nil, nil
 }
 
 type taskCreateNodeParameters struct {
-	Index   uint
-	NodeDef abstract.HostSizingRequirements
-	Timeout time.Duration // Not used currently
-	NoKeep  bool
+	index         uint
+	nodeDef       abstract.HostSizingRequirements
+	timeout       time.Duration // Not used currently
+	keepOnFailure bool
 }
 
 // taskCreateNode creates a node in the Cluster
@@ -565,15 +572,15 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, fail.InvalidParameterError("params", "must be a data.Map")
 	}
 
-	if p.Index < 1 {
-		return nil, fail.InvalidParameterError("params.Index", "cannot be an integer less than 1")
+	if p.index < 1 {
+		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.Index).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	hostLabel := fmt.Sprintf("node #%d", p.Index)
+	hostLabel := fmt.Sprintf("node #%d", p.index)
 	logrus.Debugf("[%s] starting Host creation...", hostLabel)
 
 	netCfg, xerr := c.GetNetworkConfig(task)
@@ -611,23 +618,19 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	}
 
 	hostReq.PublicIP = false
-	// hostReq.ImageID = def.Image
-
-	// if timeout < temporal.GetLongOperationTimeout() {
-	// 	timeout = temporal.GetLongOperationTimeout()
-	// }
+	hostReq.KeepOnFailure = p.keepOnFailure
 
 	rh, xerr := NewHost(c.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if _, xerr = rh.Create(task, hostReq, p.NodeDef); xerr != nil {
+	if _, xerr = rh.Create(task, hostReq, p.nodeDef); xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
-		if xerr != nil && p.NoKeep {
+		if xerr != nil && !p.keepOnFailure {
 			if derr := rh.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
@@ -673,7 +676,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
 
-	hostLabel = fmt.Sprintf("node #%d (%s)", p.Index, rh.GetName())
+	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, rh.GetName())
 
 	if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
 		return nil, xerr
@@ -774,7 +777,7 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 		return nil, fail.InvalidParameterError("params", "must be a 'taskConfigureNodeParameters'")
 	}
 	if p.Index < 1 {
-		return nil, fail.InvalidParameterError("params.Index", "cannot be an integer less than 1")
+		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 	if p.Host.IsNull() {
 		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")

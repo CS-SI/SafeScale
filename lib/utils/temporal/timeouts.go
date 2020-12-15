@@ -49,7 +49,7 @@ const (
 	DefaultExecutionTimeout = 5 * time.Minute
 
 	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
-	DefaultMetadataReadAfterWriteTimeout = 2 * time.Minute
+	DefaultMetadataReadAfterWriteTimeout = 5 * time.Minute
 
 	// SmallDelay is the predefined small delay
 	SmallDelay = 1 * time.Second

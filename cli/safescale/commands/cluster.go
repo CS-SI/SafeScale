@@ -373,6 +373,12 @@ var clusterCreateCommand = &cli.Command{
 			Name:  "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
+		&cli.IntFlag{
+			Name:    "initial-node-count",
+			Aliases: []string{"workers"},
+			Usage:   `Used to define the count of initial nodes to create (default: minimum imposed by the Flavor+Complexity)`,
+			Value:   0,
+		},
 	},
 
 	Action: func(c *cli.Context) (err error) {
@@ -432,31 +438,6 @@ var clusterCreateCommand = &cli.Command{
 			}
 		}
 
-		// VPL: logic has to be moved belongside what is commented in constructPBHostDefinitionFromCLI
-		// if gatewaysDef == nil && mastersDef == nil && nodesDef == nil {
-		// 	cpu := int32(c.Uint("cpu"))
-		// 	ram := float32(c.Float64("ram"))
-		// 	disk := int32(c.Uint("disk"))
-		// 	gpu := int32(c.Uint("gpu"))
-
-		// 	if cpu > 0 || ram > 0.0 || disk > 0 || los != "" {
-		// 		nodesDef = &protocol.HostDefinition{
-		// 			ImageId: los,
-		// 			Sizing: &protocol.HostSizing{
-		// 				MinCpuCount: cpu,
-		// 				MaxCpuCount: cpu * 2,
-		// 				MinRamSize:  ram,
-		// 				MaxRamSize:  ram * 2.0,
-		// 				MinDiskSize: disk,
-		// 				GpuCount:    gpu,
-		// 			},
-		// 		}
-		// 		gatewaysDef = nodesDef
-		// 		gatewaysDef.Sizing.GpuCount = -1 // Neither GPU for gateways by default ...
-		// 		mastersDef = gatewaysDef         // ... nor for masters
-		// 	}
-		// }
-
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
@@ -474,21 +455,10 @@ var clusterCreateCommand = &cli.Command{
 			GatewaySizing: gatewaysDef,
 			MasterSizing:  mastersDef,
 			NodeSizing:    nodesDef,
+			NodeCount:     uint32(c.Int("nodes")),
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.GetLongOperationTimeout())
-		// clusterInstance, err := cluster.Create(concurrency.RootTask(), resources.ClusterRequest{
-		// 	Name:                    clusterName,
-		// 	Complexity:              comp,
-		// 	CIDR:                    cidr,
-		// 	Flavor:                  fla,
-		// 	KeepOnFailure:           keep,
-		// 	GatewaysDef:             gatewaysDef,
-		// 	MastersDef:              mastersDef,
-		// 	MastersCount:            mastersCount,
-		// 	NodesCount:              nodesCount,
-		// 	NodesDef:                nodesDef,
-		// 	DisabledDefaultFeatures: disableFeatures,
-		// })
+
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			// msg := fmt.Sprintf("failed to create cluster: %s", err.Error())

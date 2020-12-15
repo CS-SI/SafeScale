@@ -686,6 +686,7 @@ message ClusterCreateRequest {
 	string node_sizing = 11;
 	string domain = 12;
 	string tenant_id = 13;
+	uint32 node_count = 14;
 }
 
 message ClusterResizeRequest {
