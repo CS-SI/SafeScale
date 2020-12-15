@@ -118,9 +118,9 @@ func (s *Subnet) OK() bool {
 		logrus.Debug("Subnet without CIDR")
 	}
 	result = result && len(s.GatewayIDs) == 0
-	if len(s.GatewayIDs) == 0 {
-		logrus.Debug("Subnet without gateways")
-	}
+	// if len(s.GatewayIDs) == 0 {
+	// 	logrus.Debug("Subnet without gateways")
+	// }
 
 	return result
 }

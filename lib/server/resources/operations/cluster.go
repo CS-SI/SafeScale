@@ -340,6 +340,15 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		}
 	}()
 
+	_, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
+	if req.InitialNodeCount == 0 {
+		req.InitialNodeCount = privateNodeCount
+	}
+	if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
+		logrus.Warnf("[cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
+		req.InitialNodeCount = privateNodeCount
+	}
+
 	// Define the sizing requirements for cluster hosts
 	gatewaysDef, mastersDef, nodesDef, xerr := c.determineSizingRequirements(task, req)
 	if xerr != nil {
@@ -374,11 +383,11 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	}()
 
 	// Creates and configures hosts
-	if xerr = c.createHostResources(task, rs, *mastersDef, *nodesDef, req.KeepOnFailure); xerr != nil {
+	if xerr = c.createHostResources(task, rs, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure); xerr != nil {
 		return xerr
 	}
 
-	// Starting from here, exiting with error deletes hosts if req.KeepOnFailure is false
+	// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			tg, tgerr := concurrency.NewTaskGroup(task)
@@ -791,6 +800,7 @@ func (c *cluster) createHostResources(
 	subnet resources.Subnet,
 	mastersDef abstract.HostSizingRequirements,
 	nodesDef abstract.HostSizingRequirements,
+	initialNodeCount uint,
 	keepOnFailure bool,
 ) (xerr fail.Error) {
 
@@ -827,7 +837,7 @@ func (c *cluster) createHostResources(
 		}
 	}
 
-	masterCount, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
+	masterCount, _, _, xerr := c.determineRequiredNodes(task)
 	if xerr != nil {
 		return xerr
 	}
@@ -845,19 +855,19 @@ func (c *cluster) createHostResources(
 	}
 
 	mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, taskCreateMastersParameters{
-		Count:      masterCount,
-		MastersDef: mastersDef,
-		NoKeep:     !keepOnFailure,
+		count:         masterCount,
+		mastersDef:    mastersDef,
+		keepOnFailure: keepOnFailure,
 	})
 	if xerr != nil {
 		return xerr
 	}
 
 	privateNodesTask, xerr := task.StartInSubtask(c.taskCreateNodes, taskCreateNodesParameters{
-		Count:    privateNodeCount,
-		Public:   false,
-		NodesDef: nodesDef,
-		NoKeep:   !keepOnFailure,
+		count:         initialNodeCount,
+		public:        false,
+		nodesDef:      nodesDef,
+		keepOnFailure: keepOnFailure,
 	})
 	if xerr != nil {
 		return xerr
@@ -873,7 +883,7 @@ func (c *cluster) createHostResources(
 		}
 	}
 
-	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
+	// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 	defer func() {
 		if xerr != nil && !keepOnFailure {
 			list, merr := c.ListMasters(task)
@@ -1682,10 +1692,10 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 	var subtasks []concurrency.Task
 	for i := uint(0); i < count; i++ {
 		subtask, xerr := task.StartInSubtask(c.taskCreateNode, taskCreateNodeParameters{
-			Index:   i + 1,
-			NodeDef: nodeDef,
-			Timeout: timeout,
-			NoKeep:  false,
+			index:         i + 1,
+			nodeDef:       nodeDef,
+			timeout:       timeout,
+			keepOnFailure: false,
 		})
 		if xerr != nil {
 			return nil, xerr

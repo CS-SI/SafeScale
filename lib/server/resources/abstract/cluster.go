@@ -27,32 +27,21 @@ import (
 
 // ClusterRequest defines what kind of Cluster is wanted
 type ClusterRequest struct {
-	// GetName is the name of the cluster wanted
-	Name string
-	// CIDR defines the network to create
-	CIDR string
-	// Domain ...
-	Domain string
-	// Complexity is the implementation wanted, can be Small, Normal or Large
-	Complexity clustercomplexity.Enum
-	// Flavor tells what kind of cluster to create
-	Flavor clusterflavor.Enum
-	// NetworkID is the ID of the network to use; may be empty and in this case a new Network will be created
-	NetworkID string
-	// Tenant contains the name of the tenant
-	Tenant string
-	// KeepOnFailure is set to True to keep resources on cluster creation failure
-	KeepOnFailure bool
-	// GatewaysDef count
-	GatewaysDef HostSizingRequirements
-	// NodesDef count
-	MastersDef HostSizingRequirements
-	// NodesDef count
-	NodesDef HostSizingRequirements
-	// OS contains the name of the linux distribution wanted
-	OS string
-	// DisabledDefaultFeatures contains the list of features that should be installed by default but we don't want actually
-	DisabledDefaultFeatures map[string]struct{}
+	Name                    string                 // contains the name of the cluster wanted
+	CIDR                    string                 // defines the network to create
+	Domain                  string                 // ...
+	Complexity              clustercomplexity.Enum // is the implementation wanted, can be Small, Normal or Large
+	Flavor                  clusterflavor.Enum     // tells what kind of cluster to create
+	NetworkID               string                 // is the ID of the network to use; may be empty and in this case a new Network will be created
+	Tenant                  string                 // contains the name of the tenant
+	KeepOnFailure           bool                   // tells if resources have to be kept in case of failure (for further analysis)
+	GatewaysDef             HostSizingRequirements // sizing of gateways
+	MastersDef              HostSizingRequirements // sizing of Masters
+	NodesDef                HostSizingRequirements // sizing of nodes
+	InitialNodeCount        uint                   // contains the initial count of nodes to create (cannot be less than flavor requirement)
+	OS                      string                 // contains the name of the linux distribution wanted
+	DisabledDefaultFeatures map[string]struct{}    // contains the list of features that should be installed by default but we don't want actually
+
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster

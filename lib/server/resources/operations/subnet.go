@@ -314,7 +314,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
 	rn, an, xerr := rs.validateNetwork(task, &req)
