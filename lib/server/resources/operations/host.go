@@ -522,7 +522,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			return nil
 		})
 		if xerr != nil {
-			return nil, xerr
+			return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
 		}
 	}
 
@@ -531,6 +531,29 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		hostReq.ImageID, xerr = rh.findImageID(&hostDef)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to find image to use on compute resource")
+		}
+	}
+
+	// list IDs of Security Groups to apply to host
+	if len(hostReq.SecurityGroupIDs) == 0 {
+		hostReq.SecurityGroupIDs = make(map[string]struct{}, len(hostReq.Subnets)+1)
+		for _, v := range hostReq.Subnets {
+			hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
+		}
+		if hostReq.PublicIP {
+			xerr = defaultSubnet.LazyInspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				if as.PublicIPSecurityGroupID != "" {
+					hostReq.SecurityGroupIDs[as.PublicIPSecurityGroupID] = struct{}{}
+				}
+				return nil
+			})
+			if xerr != nil {
+				return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
+			}
 		}
 	}
 
@@ -558,8 +581,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
-			derr := rh.core.Delete(task)
-			if derr != nil {
+			if derr := rh.core.Delete(task); derr != nil {
 				logrus.Errorf("cleaning up after failure, failed to delete host '%s' metadata: %v", ahf.Core.Name, derr)
 				_ = xerr.AddConsequence(derr)
 			}
@@ -1709,7 +1731,7 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 			}
 			return innerXErr
 		},
-		connectionTimeout,
+		connectionTimeout*2, // VPL: insufficient delay ?
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Warnf("Remote SSH service on Host '%s' is not ready, retrying...", hostName)
@@ -2527,7 +2549,7 @@ func (rh host) PushStringToFile(task concurrency.Task, content string, filename 
 				return innerXErr
 			}
 			if retcode != 0 {
-				// If retcode == 1 (general copy error), retry. It may be a temporary subnet incident
+				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 && !deleted {
 					// File may exist on target, try to remove it
 					if _, _, _, innerXErr = rh.Run(task, "sudo rm -f "+filename, outputs.COLLECT, temporal.GetConnectSSHTimeout(), temporal.GetExecutionTimeout()); innerXErr == nil {

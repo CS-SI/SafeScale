@@ -408,10 +408,10 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}()
 
 	// IDs of Security Groups to attach to IPAddress used as gateway
-	sgs := []string{
-		subnetGWSG.GetID(),
-		subnetInternalSG.GetID(),
-		subnetPublicIPSG.GetID(),
+	sgs := map[string]struct{}{
+		subnetGWSG.GetID():       struct{}{},
+		subnetInternalSG.GetID(): struct{}{},
+		subnetPublicIPSG.GetID(): struct{}{},
 	}
 
 	caps := svc.GetCapabilities()
