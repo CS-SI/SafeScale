@@ -836,9 +836,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	request.KeyPair = creationKeyPair
 
 	defer func() {
-		derr := s.DeleteKeyPair(creationKeyPair.Name)
-		if derr != nil {
-			logrus.Errorf("failed to delete creation keypair: %v", derr)
+		if derr := s.DeleteKeyPair(creationKeyPair.Name); derr != nil {
+			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
 		}
 	}()
 
@@ -906,25 +905,45 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		},
 	}
 
-	resp, xerr := s.rpcCreateVms(vmsRequest)
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
-	}
-
-	if len(resp) == 0 {
-		return nullAHF, nullUDC, fail.InconsistentError("after creation submission, virtual machine list is empty")
-	}
-	vm := resp[0]
-
-	defer func() {
-		if xerr != nil {
-			if derr := s.DeleteHost(vm.VmId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+	var vm osc.Vm
+	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			resp, innerXErr := s.rpcCreateVms(vmsRequest)
+			if innerXErr != nil {
+				return innerXErr
 			}
-		}
-	}()
 
-	if _, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout()); xerr != nil {
+			if len(resp) == 0 {
+				return retry.StopRetryError(fail.InconsistentError("after creation submission, virtual machine list is empty"))
+			}
+			vm = resp[0]
+
+			// Delete instance if created to be in good shape to retry in case of error
+			defer func() {
+				if innerXErr != nil {
+					logrus.Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
+					if derr := s.DeleteHost(vm.VmId); derr != nil {
+						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
+						logrus.Errorf(strprocess.Capitalize(msg))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
+					} else {
+						logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
+					}
+				}
+			}()
+
+			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout())
+			return innerXErr
+		},
+		temporal.GetLongOperationTimeout(),
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			retryErr = fail.ToError(retryErr.Cause())
+		}
+	}
+	if retryErr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
