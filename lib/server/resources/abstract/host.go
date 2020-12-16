@@ -161,8 +161,8 @@ type HostRequest struct {
 	KeepOnFailure bool
 	// Use spot-like instance
 	Preemptible bool
-	// List of Security Groups to attach to IPAddress
-	SecurityGroupIDs []string
+	// List of Security Groups to attach to IPAddress (using map as dict)
+	SecurityGroupIDs map[string]struct{}
 }
 
 // HostEffectiveSizing ...

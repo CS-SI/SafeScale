@@ -830,11 +830,29 @@ func (c *cluster) createHostResources(
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
+	defer func() {
+		if xerr != nil {
+			if st, _ := primaryGatewayTask.GetStatus(); st == concurrency.RUNNING {
+				_ = primaryGatewayTask.Abort()
+				_, _ = primaryGatewayTask.Wait()
+			}
+		}
+	}()
+
 	// Loads secondary gateway metadata
 	if haveSecondaryGateway {
 		if _, xerr = secondaryGateway.WaitSSHReady(task, temporal.GetExecutionTimeout()); xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
 		}
+
+		defer func() {
+			if xerr != nil {
+				if st, _ := secondaryGatewayTask.GetStatus(); st == concurrency.RUNNING {
+					_ = secondaryGatewayTask.Abort()
+					_, _ = secondaryGatewayTask.Wait()
+				}
+			}
+		}()
 	}
 
 	masterCount, _, _, xerr := c.determineRequiredNodes(task)
@@ -863,6 +881,15 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
+	defer func() {
+		if xerr != nil {
+			if st, _ := mastersTask.GetStatus(); st == concurrency.RUNNING {
+				_ = mastersTask.Abort()
+				_, _ = mastersTask.Wait()
+			}
+		}
+	}()
+
 	privateNodesTask, xerr := task.StartInSubtask(c.taskCreateNodes, taskCreateNodesParameters{
 		count:         initialNodeCount,
 		public:        false,
@@ -872,6 +899,15 @@ func (c *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
+
+	defer func() {
+		if xerr != nil {
+			if st, _ := privateNodesTask.GetStatus(); st == concurrency.RUNNING {
+				_ = privateNodesTask.Abort()
+				_, _ = privateNodesTask.Wait()
+			}
+		}
+	}()
 
 	// Step 2: awaits gateway installation end and masters installation end
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
@@ -2593,6 +2629,8 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			func() error {
 				if innerXErr := rs.Delete(task); innerXErr != nil {
 					switch innerXErr.(type) {
+					case *fail.ErrNotAvailable:
+						return retry.StopRetryError(innerXErr)
 					case *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)
 					default:

@@ -149,6 +149,28 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 	})
 }
 
+// LazyInspect allows to inspect data contained in the instance, without reloading from the Object Storage; it's intended
+// to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
+// change thru time).
+func (c *core) LazyInspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+	if callback == nil {
+		return fail.InvalidParameterError("callback", "cannot be nil")
+	}
+	if c.properties == nil {
+		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
+	}
+
+	return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
+		return callback(clonable, c.properties)
+	})
+}
+
 // Alter protects the data for exclusive write
 func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
 	if c.IsNull() {
@@ -422,7 +444,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 	}
 
 	if c.loaded && !c.committed {
-		return fail.OverloadError("altered and not committed")
+		return fail.InconsistentError("altered and not committed")
 	}
 
 	if xerr := c.readByReference(task, c.GetID()); xerr != nil {
