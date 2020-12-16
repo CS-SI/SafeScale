@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -329,17 +328,27 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				}
 			}
 
+			// Starting from here, delete host if exiting with error, to be in good shape to retry
+			defer func() {
+				if innerXErr != nil {
+					hostName := ahf.GetName()
+					logrus.Debugf("Clean up on failure, deleting host '%s'", hostName)
+					if derr := s.DeleteHost(ahf); derr != nil {
+						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", hostName)
+						logrus.Errorf(strprocess.Capitalize(msg))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
+					} else {
+						logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", hostName)
+					}
+				}
+			}()
+
 			//if server.IsNull() {
 			//	return fail.NewError("failed to create server")
 			//}
 
 			// Wait that IPAddress is ready, not just that the build is started
 			if _, innerXErr = s.WaitHostReady(ahf.GetID(), temporal.GetLongOperationTimeout()); innerXErr != nil {
-				if !request.KeepOnFailure {
-					if derr := s.DeleteHost(ahf.GetID()); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", ahf.GetName()))
-					}
-				}
 				switch innerXErr.(type) {
 				case *fail.ErrInvalidRequest:
 					return retry.StopRetryError(innerXErr)
@@ -371,19 +380,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		if xerr != nil && !request.KeepOnFailure {
-			logrus.Infof("Cleanup, deleting host '%s'", ahf.GetName())
-			if derr := s.DeleteHost(ahf); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", ahf.GetName()))
-			}
-		}
-	}()
-
-	if !ahf.OK() {
-		logrus.Warnf("Missing data in ahf: %s", spew.Sdump(ahf))
-	}
+	// if !ahf.OK() {
+	// 	logrus.Warnf("Missing data in ahf: %s", spew.Sdump(ahf))
+	// }
 
 	return ahf, userData, nil
 }
@@ -437,7 +436,7 @@ func (s stack) buildGcpMachine(
 	imageURL string,
 	userdata string,
 	isPublic bool,
-	sgs []string,
+	sgs map[string]struct{},
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
@@ -587,6 +586,7 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 
 	return nil
 }
+
 func fromMachineTypeToAllocatedSize(machineType string) *abstract.HostEffectiveSizing {
 	hz := abstract.HostEffectiveSizing{}
 

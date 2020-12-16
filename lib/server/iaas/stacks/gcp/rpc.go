@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -124,16 +123,20 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 		Service:      s.ComputeService,
 		DesiredState: "DONE",
 	}
-	retryErr := retry.WhileUnsuccessful(func() error {
-		r, anerr := refreshResult(oco)
-		if anerr != nil {
-			return anerr
-		}
-		if !r.Done {
-			return fmt.Errorf("not finished yet")
-		}
-		return nil
-	}, poll, duration)
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			r, anerr := refreshResult(oco)
+			if anerr != nil {
+				return anerr
+			}
+			if !r.Done {
+				return fmt.Errorf("not finished yet")
+			}
+			return nil
+		},
+		poll,
+		duration,
+	)
 
 	return fail.ToError(retryErr)
 }
@@ -765,11 +768,22 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs []string) (*compute.Instance, fail.Error) {
-	tags := sgs
+func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, xerr fail.Error) {
+	var tags []string
+	for k := range sgs {
+		tags = append(tags, k)
+	}
+
 	// Add nat route name as tag to host that has a public IP
+	var publicIP *compute.Address
 	if hasPublicIP {
 		tags = append(tags, fmt.Sprintf(natRouteNameFormat, networkName, subnetName))
+
+		// Create static regional external address
+		publicIP, xerr = s.rpcCreateExternalAddress("publicip-"+name, false)
+		if xerr != nil {
+			return &compute.Instance{}, fail.Wrap(xerr, "failed to create public IP of instance")
+		}
 	}
 
 	request := compute.Instance{
@@ -794,9 +808,9 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 		},
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
-				AccessConfigs: publicAccess(hasPublicIP),
-				Network:       s.selfLinkPrefix + "/global/networks/" + networkName,
-				Subnetwork:    s.selfLinkPrefix + "/regions/" + s.GcpConfig.Region + "/subnetworks/" + subnetName,
+				// AccessConfigs: publicAccess(hasPublicIP),
+				Network:    s.selfLinkPrefix + "/global/networks/" + networkName,
+				Subnetwork: s.selfLinkPrefix + "/regions/" + s.GcpConfig.Region + "/subnetworks/" + subnetName,
 			},
 		},
 		ServiceAccounts: []*compute.ServiceAccount{
@@ -817,9 +831,18 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 			},
 		},
 	}
+	if hasPublicIP {
+		request.NetworkInterfaces[0].AccessConfigs = []*compute.AccessConfig{
+			{
+				Type:  "ONE_TO_ONE_NAT",
+				Name:  "External NAT",
+				NatIP: publicIP.Address,
+			},
+		}
+	}
 
 	var op *compute.Operation
-	xerr := stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, &request).Do()
 			return err
@@ -847,40 +870,103 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 		return &compute.Instance{}, xerr
 	}
 
-	// Promote public ephemeral ip to a static one
-	if hasPublicIP {
+	defer func() {
+		if xerr != nil {
+			if derr := s.rpcDeleteInstance(name); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance %s", resp.Id))
+			}
+		}
+	}()
+
+	// // Promote public ephemeral ip to a static one
+	// if hasPublicIP {
+	// 	xerr = stacks.RetryableRemoteCall(
+	// 		func() (err error) {
+	// 			_, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &compute.Address{
+	// 				Name:        "publicip-" + name,
+	// 				NetworkTier: "PREMIUM",
+	// 				Address:     resp.NetworkInterfaces[0].AccessConfigs[0].NatIP,
+	// 				Region:      fmt.Sprintf("projects/%s/regions/%s", s.GcpConfig.ProjectID, s.GcpConfig.Region),
+	// 			}).Do()
+	// 			return err
+	// 		},
+	// 		normalizeError,
+	// 	)
+	// 	if xerr != nil {
+	// 		return &compute.Instance{}, fail.Wrap(xerr, "failed to promote public IP to premium"))
+	// 	}
+	// }
+
+	return resp, nil
+}
+
+func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
+	query := compute.Address{
+		Name: name,
+	}
+	var op *compute.Operation
+	if global {
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
-				_, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &compute.Address{
-					Name:        "staticip-" + name,
-					NetworkTier: "PREMIUM",
-					Address:     resp.NetworkInterfaces[0].AccessConfigs[0].NatIP,
-					Region:      fmt.Sprintf("projects/%s/regions/%s", s.GcpConfig.ProjectID, s.GcpConfig.Region),
-				}).Do()
+				op, err = s.ComputeService.GlobalAddresses.Insert(s.GcpConfig.ProjectID, &query).Do()
 				return err
 			},
 			normalizeError,
 		)
-		if xerr != nil {
-			return &compute.Instance{}, xerr
-		}
+	} else {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				op, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &query).Do()
+				return err
+			},
+			normalizeError,
+		)
+	}
+	if xerr != nil {
+		return &compute.Address{}, xerr
+	}
+
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
+		return &compute.Address{}, xerr
+	}
+
+	var resp *compute.Address
+	if global {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.ComputeService.GlobalAddresses.Get(s.GcpConfig.ProjectID, name).Do()
+				return err
+			},
+			normalizeError,
+		)
+	} else {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+				return err
+			},
+			normalizeError,
+		)
+	}
+	if xerr != nil {
+		return &compute.Address{}, xerr
 	}
 
 	return resp, nil
 }
 
-func publicAccess(isPublic bool) []*compute.AccessConfig {
-	if isPublic {
-		return []*compute.AccessConfig{
-			{
-				Type: "ONE_TO_ONE_NAT",
-				Name: "External NAT",
-			},
-		}
-	}
-
-	return []*compute.AccessConfig{}
-}
+// func publicAccess(isPublic bool) []*compute.AccessConfig {
+// 	if isPublic {
+// 		return []*compute.AccessConfig{
+// 			{
+// 				Type: "ONE_TO_ONE_NAT",
+// 				Name: "External NAT",
+// 			},
+// 		}
+// 	}
+//
+// 	return []*compute.AccessConfig{}
+// }
 
 func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	if ref == "" {
@@ -902,60 +988,84 @@ func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 }
 
 func (s stack) rpcDeleteInstance(ref string) fail.Error {
+	// Get instance to make sure we have the hostname used to name the optional public IP (ref may be id or name)
+	instance, xerr := s.rpcGetInstance(ref)
+	if xerr != nil {
+		return xerr
+	}
+
 	var op *compute.Operation
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			op, err = s.ComputeService.Instances.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-	if xerr != nil {
-		return xerr
-	}
-
-	cleanStaticIP := false
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
-			_, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, "staticip-"+ref).Do()
-			if err != nil {
-				if gerr, ok := err.(*googleapi.Error); ok {
-					if gerr.Code == 404 {
-						cleanStaticIP = false
-						return nil
-					}
-					return err
-				}
-			} else {
-				cleanStaticIP = true
-			}
+			op, err = s.ComputeService.Instances.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name).Do()
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
+		return fail.Wrap(xerr, "failed to delete instance '%s'", instance.Name)
+	}
+
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout()); xerr != nil {
 		return xerr
 	}
 
-	if cleanStaticIP {
-		xerr = stacks.RetryableRemoteCall(
-			func() (err error) {
-				_, err = s.ComputeService.Addresses.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, "staticip-"+ref).Do()
-				return err
-			},
-			normalizeError,
-		)
-		if xerr != nil {
-			return xerr
+	publicIPName := "publicip-" + instance.Name
+	if xerr = s.rpcDeleteExternalAddress(publicIPName, false); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// external ip not found, continue
+		default:
+			return fail.Wrap(xerr, "failed to delete public IP '%s'", publicIPName)
 		}
 	}
 
 	return nil
+}
+
+func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
+	var resp *compute.Address
+	if global {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.ComputeService.GlobalAddresses.Get(s.GcpConfig.ProjectID, name).Do()
+				return err
+			},
+			normalizeError,
+		)
+	} else {
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				resp, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+				return err
+			},
+			normalizeError,
+		)
+	}
+	if xerr != nil {
+		return &compute.Address{}, xerr
+	}
+	return resp, nil
+}
+
+func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
+	if global {
+		return stacks.RetryableRemoteCall(
+			func() (err error) {
+				_, err = s.ComputeService.GlobalAddresses.Delete(s.GcpConfig.ProjectID, name).Do()
+				return err
+			},
+			normalizeError,
+		)
+	}
+
+	return stacks.RetryableRemoteCall(
+		func() (err error) {
+			_, err = s.ComputeService.Addresses.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+			return err
+		},
+		normalizeError,
+	)
 }
 
 func (s stack) rpcStopInstance(ref string) fail.Error {
