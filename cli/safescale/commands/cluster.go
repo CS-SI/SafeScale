@@ -375,7 +375,7 @@ var clusterCreateCommand = &cli.Command{
 		},
 		&cli.IntFlag{
 			Name:    "initial-node-count",
-			Aliases: []string{"workers"},
+			Aliases: []string{"nodes", "workers"},
 			Usage:   `Used to define the count of initial nodes to create (default: minimum imposed by the Flavor+Complexity)`,
 			Value:   0,
 		},
