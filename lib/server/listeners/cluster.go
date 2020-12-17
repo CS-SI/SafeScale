@@ -110,7 +110,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.New(task, job.GetService())
+	rc, xerr := clusterfactory.New(task, job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -120,12 +120,12 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, xerr
 	}
 
-	xerr = instance.Create(task, req)
+	xerr = rc.Create(task, req)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return instance.ToProtocol(task)
+	return rc.ToProtocol(task)
 }
 
 // State returns the status of a cluster
@@ -158,11 +158,20 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	defer job.Close()
 
 	task := job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	rc, xerr := clusterfactory.Load(task, job.GetService(), ref)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	st, xerr := rc.GetState(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return converters.ClusterStateFromAbstractToProtocol(st), nil
 }
 
 // Inspect a cluster
@@ -184,8 +193,8 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	clusterName, _ := srvutils.GetReference(in)
-	if clusterName == "" {
+	ref, _ := srvutils.GetReference(in)
+	if ref == "" {
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
@@ -196,26 +205,21 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer job.Close()
 
 	task := job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(task, job.GetService(), clusterName)
+	rc, xerr := clusterfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return instance.ToProtocol(task)
+	return rc.ToProtocol(task)
 }
 
 // Start ...
 func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot start cluster")
-	// defer func() {
-	// 	if err != nil {
-	// 		err = fail.Wrap(err, "cannot start cluster").ToGRPCStatus()
-	// 	}
-	// }()
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -260,15 +264,15 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("cluster name is missing")
-	}
-	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -302,11 +306,11 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -328,12 +332,12 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(task, job.GetService(), ref)
+	rc, xerr := clusterfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return empty, instance.Delete(task)
+	return empty, rc.Delete(task)
 }
 
 // Expand adds node(s) to a cluster
@@ -344,11 +348,11 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -380,12 +384,12 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		sizing.Image = in.GetImageId()
 	}
 
-	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
+	rc, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	resp, xerr := instance.AddNodes(task, uint(in.Count), *sizing)
+	resp, xerr := rc.AddNodes(task, uint(in.Count), *sizing)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -410,11 +414,11 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -566,12 +570,12 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
+	rc, xerr := clusterfactory.Load(task, job.GetService(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	list, xerr := instance.ListNodes(task)
+	list, xerr := rc.ListNodes(task)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -678,11 +682,11 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -823,12 +827,26 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 		return nil, err
 	}
 	defer job.Close()
+	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	rc, xerr := clusterfactory.Load(task, job.GetService(), clusterName)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	list, xerr := rc.ListMasters(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	out, xerr := converters.IndexedListOfClusterNodesFromResourceToProtocol(task, list)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return out, nil
 }
 
 // FindAvailableMaster determines the first master available master (ie the one that responds on ssh request)
@@ -860,12 +878,25 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 		return nil, err
 	}
 	defer job.Close()
+	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", clusterName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	rc, xerr := clusterfactory.Load(task, job.GetService(), clusterName)
+	if xerr != nil {
+		return nil, xerr
+	}
+	master, xerr := rc.FindAvailableMaster(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	out, xerr := master.ToProtocol(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return out, nil
 }
 
 // InspectMaster returns the information about a master of the cluster
@@ -901,10 +932,48 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 		return nil, err
 	}
 	defer job.Close()
+	task := job.GetTask()
+	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s', %s)", clusterName, masterRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	rc, xerr := clusterfactory.Load(task, svc, clusterName)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var masterID string
+	xerr = rc.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			for _, v := range nodesV2.Masters {
+				if v.ID == masterRef || v.Name == masterRef {
+					masterID = v.ID
+					break
+				}
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+	if masterID == "" {
+		return nil, fail.NotFoundError("failed to find a master '%s' in cluster '%s'", masterRefLabel, clusterName)
+	}
+
+	master, xerr := hostfactory.Load(task, svc, masterID)
+	if xerr != nil {
+		return nil, xerr
+	}
+	out, xerr := master.ToProtocol(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return out, nil
 }

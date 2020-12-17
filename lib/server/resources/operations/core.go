@@ -447,7 +447,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 		return fail.InconsistentError("altered and not committed")
 	}
 
-	if xerr := c.readByReference(task, c.GetID()); xerr != nil {
+	if xerr := c.readByID(task, c.GetID()); xerr != nil {
 		return xerr
 	}
 	c.loaded = true

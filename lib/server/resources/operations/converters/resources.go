@@ -110,3 +110,19 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 // 	}
 // 	return out, nil
 // }
+
+func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
+	out := &protocol.ClusterNodeListResponse{}
+	if len(in) == 0 {
+		return out, nil
+	}
+	out.Nodes = make([]*protocol.Host, 0, len(in))
+	for _, v := range in {
+		item, xerr := v.ToProtocol(task)
+		if xerr != nil {
+			return &protocol.ClusterNodeListResponse{}, xerr
+		}
+		out.Nodes = append(out.Nodes, item)
+	}
+	return out, nil
+}

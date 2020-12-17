@@ -494,8 +494,8 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	params["MasterIPs"] = list
 	params["ClusterAdminUsername"] = "cladm"
 	params["ClusterAdminPassword"] = identity.AdminPassword
-	params["getDefaultRouteIP"] = netCfg.DefaultRouteIP
-	params["getEndpointIP"] = netCfg.EndpointIP
+	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
+	params["EndpointIP"] = netCfg.EndpointIP
 	params["IPRanges"] = netCfg.CIDR
 	params["SSHPublicKey"] = identity.Keypair.PublicKey
 	params["SSHPrivateKey"] = identity.Keypair.PrivateKey

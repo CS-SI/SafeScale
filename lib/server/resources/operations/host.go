@@ -2429,7 +2429,7 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 	v["Hostname"] = rh.GetName() + domain
 
 	v["HostIP"] = rh.getPrivateIP(task)
-	v["getPublicIP"] = rh.getPublicIP(task)
+	v["PublicIP"] = rh.getPublicIP(task)
 
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
@@ -2462,12 +2462,12 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) fa
 		v["SecondaryPublicIP"] = rgwi.getPublicIP(task)
 	}
 
-	if v["getEndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
+	if v["EndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
 		return xerr
 	}
 
-	v["getPublicIP"] = v["getEndpointIP"]
-	if v["getDefaultRouteIP"], xerr = rs.GetDefaultRouteIP(task); xerr != nil {
+	v["PublicIP"] = v["EndpointIP"]
+	if v["DefaultRouteIP"], xerr = rs.GetDefaultRouteIP(task); xerr != nil {
 		return xerr
 	}
 
