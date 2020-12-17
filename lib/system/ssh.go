@@ -517,7 +517,7 @@ func (sc *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, string
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	tracer := debug.NewTracer(task, false, "(%s)", outs.String()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return sc.RunWithTimeout(task, outs, 0)
@@ -532,7 +532,7 @@ func (sc *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, t
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("ssh")*/, "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("command=\n%s\n", sc.cmdString)
 	defer tracer.Exiting()
 

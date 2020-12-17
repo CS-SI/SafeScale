@@ -19,6 +19,7 @@ package converters
 import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
@@ -371,5 +372,12 @@ func SecurityGroupFromAbstractToProtocol(in abstract.SecurityGroup) *protocol.Se
 		Name:        in.Name,
 		Description: in.Description,
 		Rules:       SecurityGroupRulesFromAbstractToProtocol(in.Rules),
+	}
+}
+
+// ClusterStateFromAbstractToProtocol ...
+func ClusterStateFromAbstractToProtocol(in clusterstate.Enum) *protocol.ClusterStateResponse {
+	return &protocol.ClusterStateResponse{
+		State: protocol.ClusterState(in),
 	}
 }

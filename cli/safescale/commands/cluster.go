@@ -455,7 +455,7 @@ var clusterCreateCommand = &cli.Command{
 			GatewaySizing: gatewaysDef,
 			MasterSizing:  mastersDef,
 			NodeSizing:    nodesDef,
-			NodeCount:     uint32(c.Int("nodes")),
+			NodeCount:     uint32(c.Int("initial-node-count")),
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.GetLongOperationTimeout())
 

@@ -152,12 +152,12 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		}
 		if as.VIP != nil {
 			// VPL: for now, no public IP on VIP, so uses the IP of the first getGateway
-			// (*values)["getEndpointIP"] = as.VIP.getPublicIP
-			(*values)["getEndpointIP"] = k.gatewayPublicIP
-			(*values)["getDefaultRouteIP"] = as.VIP.PrivateIP
+			// (*values)["EndpointIP"] = as.VIP.getPublicIP
+			(*values)["EndpointIP"] = k.gatewayPublicIP
+			(*values)["DefaultRouteIP"] = as.VIP.PrivateIP
 		} else {
-			(*values)["getEndpointIP"] = k.gatewayPublicIP
-			(*values)["getDefaultRouteIP"] = k.gatewayPrivateIP
+			(*values)["EndpointIP"] = k.gatewayPublicIP
+			(*values)["DefaultRouteIP"] = k.gatewayPrivateIP
 		}
 		return nil
 	})
@@ -166,8 +166,8 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	}
 
 	// Legacy...
-	(*values)["getPublicIP"] = (*values)["getEndpointIP"]
-	(*values)["GatewayIP"] = (*values)["getDefaultRouteIP"]
+	(*values)["PublicIP"] = (*values)["EndpointIP"]
+	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
 
 	// Analyzes the rule...
 	switch ruleType {
