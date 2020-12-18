@@ -264,6 +264,9 @@ func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Erro
 				return nil
 			})
 		}
+		if innerXErr != nil {
+			return innerXErr
+		}
 
 		if update {
 			return props.Alter(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
@@ -1077,7 +1080,7 @@ func (c *cluster) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
 
-	r, err := json.Marshal(c)
+	r, err := json.Marshal(c) // nolint
 	return r, fail.ToError(err)
 }
 
@@ -1098,7 +1101,7 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
-	err := json.Unmarshal(buf, c)
+	err := json.Unmarshal(buf, c) // nolint
 	return fail.ToError(err)
 }
 
@@ -2575,20 +2578,19 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			if _, innerXErr := s.Wait(); innerXErr != nil {
+			if _, xerr = s.Wait(); xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// node not found, consider as a successful deletion and continue
 				default:
-					cleaningErrors = append(cleaningErrors, innerXErr)
+					return xerr
 				}
 			}
 		}
 	}
 
 	// --- Delete the Masters ---
-	list, xerr = c.ListMasters(task)
-	if xerr != nil {
+	if list, xerr = c.ListMasters(task); xerr != nil {
 		cleaningErrors = append(cleaningErrors, xerr)
 		return fail.NewErrorList(cleaningErrors)
 	}
@@ -2614,12 +2616,14 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			}
 		}
 	}
+	if len(cleaningErrors) > 0 {
+		return fail.NewErrorList(cleaningErrors)
+	}
 
 	// --- Deletes the Network, Subnet and gateway ---
 	rn, deleteNetwork, rs, xerr := c.extractNetworkingInfo(task)
 	if xerr != nil {
-		cleaningErrors = append(cleaningErrors, xerr)
-		return fail.NewErrorList(cleaningErrors)
+		return xerr
 	}
 
 	if !rs.IsNull() {
@@ -2654,8 +2658,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			case *fail.ErrNotFound:
 				// Subnet not found, consider as a successful deletion and continue
 			default:
-				cleaningErrors = append(cleaningErrors, xerr)
-				return fail.NewErrorList(cleaningErrors)
+				return xerr
 			}
 		}
 	}
@@ -2692,8 +2695,7 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 				// network not found, consider as a successful deletion and continue
 			default:
 				logrus.Errorf("Failed to delete Network '%s'", networkName)
-				cleaningErrors = append(cleaningErrors, xerr)
-				return fail.NewErrorList(cleaningErrors)
+				return xerr
 			}
 		}
 		logrus.Infof("Network '%s' successfully deleted.", networkName)
@@ -2750,14 +2752,14 @@ func containsClusterNode(list []*propertiesv2.ClusterNode, hostID string) (bool,
 	return found, idx
 }
 
-// unconfigureMaster executes what has to be done to remove master from Cluster
-func (c *cluster) unconfigureMaster(task concurrency.Task, host resources.Host) fail.Error {
-	if c.makers.UnconfigureMaster != nil {
-		return c.makers.UnconfigureMaster(task, c, host)
-	}
-	// Not finding a callback isn't an error, so return nil in this case
-	return nil
-}
+// // unconfigureMaster executes what has to be done to remove master from Cluster
+// func (c *cluster) unconfigureMaster(task concurrency.Task, host resources.Host) fail.Error {
+// 	if c.makers.UnconfigureMaster != nil {
+// 		return c.makers.UnconfigureMaster(task, c, host)
+// 	}
+// 	// Not finding a callback isn't an error, so return nil in this case
+// 	return nil
+// }
 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
@@ -2775,12 +2777,12 @@ func (c *cluster) configureCluster(task concurrency.Task) (xerr fail.Error) {
 		}
 	}()
 
-	// Installs reverseproxy feature on cluster (gateways)
+	// Install reverseproxy feature on cluster (gateways)
 	if xerr = c.installReverseProxy(task); xerr != nil {
 		return xerr
 	}
 
-	// Installs remotedesktop feature on cluster (all masters)
+	// Install remotedesktop feature on cluster (all masters)
 	if xerr = c.installRemoteDesktop(task); xerr != nil {
 		return xerr
 	}

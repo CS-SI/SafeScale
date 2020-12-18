@@ -48,24 +48,19 @@ func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interfa
 		logLevelFn = logrus.Error
 	}
 
-	in := strprocess.FormatStrings(msg)
-	if len(in) == 0 {
-		in = extractCallerName()
-	}
-
 	switch v := err.(type) {
 	case *ErrRuntimePanic, *ErrInvalidInstance, *ErrInvalidInstanceContent, *ErrInvalidParameter:
 		// These errors are systematically logged, no need to log them twice
 	case *Error:
 		if *v != nil {
-			logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *v))
+			logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
 		}
 	case *error:
 		if *v != nil {
 			if IsGRPCError(*v) {
-				logLevelFn(fmt.Sprintf(outputErrorTemplate, in, grpcstatus.Convert(*v).Message()))
+				logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), grpcstatus.Convert(*v).Message()))
 			} else {
-				logLevelFn(fmt.Sprintf(outputErrorTemplate, in, *v))
+				logLevelFn(fmt.Sprintf(outputErrorTemplate, consolidateMessage(msg...), *v))
 			}
 		}
 	default:
@@ -73,18 +68,26 @@ func OnExitLogErrorWithLevel(err interface{}, level logrus.Level, msg ...interfa
 	}
 }
 
+func consolidateMessage(msg ...interface{}) string {
+	out := strprocess.FormatStrings(msg)
+	if len(out) == 0 {
+		out = extractCallerName()
+	}
+	return out
+}
+
 func extractCallerName() string {
 	// if 'in' is empty, recover function name from caller
 	var out string
-	toSkip := 0
+	toSkip := 2 // skip 2 first calls, being consolidateMessage + extractCallerName...
 	for {
-		if pc, _, line, ok := runtime.Caller(toSkip); ok {
+		if pc, file, line, ok := runtime.Caller(toSkip); ok {
 			if f := runtime.FuncForPC(pc); f != nil {
-				if strings.Contains(f.Name(), "fail.OnExitLog") || strings.Contains(f.Name(), "fail.extractCallerName") {
+				if strings.Contains(f.Name(), "fail.OnExitLog") {
 					toSkip++
 					continue
 				}
-				out = filepath.Base(f.Name() + fmt.Sprintf(",%d", line))
+				out = filepath.Base(f.Name()) + fmt.Sprintf("() [%s:%d]", file, line)
 				break
 			}
 		}

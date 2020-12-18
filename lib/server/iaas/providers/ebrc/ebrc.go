@@ -130,6 +130,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("ProviderNetwork", opts.ProviderNetwork)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
+	cfg.Set("UseNATService", opts.UseNATService)
 
 	return cfg, nil
 }

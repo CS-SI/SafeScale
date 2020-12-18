@@ -165,15 +165,15 @@ disable_services() {
 	esac
 }
 
-# If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity() {
-	{{- if .AddGateway }}
-		route del -net default &>/dev/null
-		route add -net default gw {{ .DefaultRouteIP }}
-	{{- else }}
-	:
-	{{- end}}
-}
+## If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
+#ensure_network_connectivity() {
+#	{{- if .AddGateway }}
+#		route del -net default &>/dev/null
+#		route add -net default gw {{ .DefaultRouteIP }}
+#	{{- else }}
+#	:
+#	{{- end}}
+#}
 
 # ---- Main
 
@@ -183,7 +183,7 @@ put_hostname_in_hosts
 disable_cloudinit_network_autoconf
 disable_services
 create_user
-ensure_network_connectivity
+#ensure_network_connectivity
 
 touch /etc/cloud/cloud-init.disabled
 

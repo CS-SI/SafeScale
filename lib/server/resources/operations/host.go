@@ -540,7 +540,14 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		for _, v := range hostReq.Subnets {
 			hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
 		}
-		if hostReq.PublicIP {
+
+		opts, xerr := svc.GetConfigurationOptions()
+		if xerr != nil {
+			return nil, xerr
+		}
+		anon, ok := opts.Get("UseNATService")
+		useNATService := ok && anon.(bool)
+		if hostReq.PublicIP || useNATService {
 			xerr = defaultSubnet.LazyInspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
@@ -1727,6 +1734,8 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 				switch innerXErr.(type) {
 				case *fail.ErrTimeout:
 					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to run command in %s", executionTimeout)
+				case *fail.ErrExecution:
+					innerXErr = retry.StopRetryError(innerXErr)
 				}
 			}
 			return innerXErr
@@ -1740,8 +1749,15 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			xerr = fail.ToError(xerr.Cause())
 		case *fail.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+			switch rerr := xerr.Cause().(type) {
+			case *fail.ErrTimeout:
+				xerr = fail.Wrap(rerr, "failed to execute command on Host '%s'", hostName)
+			default:
+				xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+			}
 		}
 	}
 	return retCode, stdOut, stdErr, xerr
