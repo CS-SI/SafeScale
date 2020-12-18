@@ -177,6 +177,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
+	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("ProviderName", p.GetName())
 	return cfg, nil
 }

@@ -210,6 +210,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, error) {
 	config.Set("ProviderNetwork", p.Config.ProviderNetwork)
 	config.Set("OperatorUsername", p.Config.OperatorUsername)
 	config.Set("ProviderName", p.GetName())
+	cfg.Set("UseNATService", opts.UseNATService)
 
 	return config, nil
 }

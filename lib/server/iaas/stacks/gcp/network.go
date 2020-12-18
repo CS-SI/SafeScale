@@ -34,6 +34,7 @@ import (
 
 const (
 	natRouteNameFormat = "%s-%s-nat-allowed"
+	natRouteTagFormat  = "%s-%s-nat-needed"
 )
 
 // ------ network methods ------

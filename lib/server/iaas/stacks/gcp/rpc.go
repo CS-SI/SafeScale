@@ -587,12 +587,13 @@ func (s stack) rpcCreateRoute(networkName, subnetName string) (*compute.Route, f
 	routeName := fmt.Sprintf(natRouteNameFormat, networkName, subnetName)
 
 	request := compute.Route{
-		DestRange:       "0.0.0.0/0",
-		Name:            routeName,
-		Network:         fmt.Sprintf("%s/global/networks/%s", s.selfLinkPrefix, networkName),
+		DestRange: "0.0.0.0/0",
+		Name:      routeName,
+		Network:   fmt.Sprintf("%s/global/networks/%s", s.selfLinkPrefix, networkName),
+		//NextHopIP: ???,
 		NextHopInstance: fmt.Sprintf("%s/zones/%s/instances/gw-%s", s.selfLinkPrefix, s.GcpConfig.Zone, subnetName),
 		Priority:        800,
-		Tags:            []string{fmt.Sprintf("no-ip-%s", subnetName)},
+		Tags:            []string{fmt.Sprintf(natRouteTagFormat, networkName, subnetName)},
 	}
 	var opp *compute.Operation
 	xerr := stacks.RetryableRemoteCall(
@@ -784,6 +785,8 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 		if xerr != nil {
 			return &compute.Instance{}, fail.Wrap(xerr, "failed to create public IP of instance")
 		}
+	} else {
+		tags = append(tags, fmt.Sprintf(natRouteTagFormat, networkName, subnetName))
 	}
 
 	request := compute.Instance{

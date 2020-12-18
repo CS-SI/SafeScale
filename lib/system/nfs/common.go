@@ -191,9 +191,11 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	)
 
 	if !hidesOutput {
-		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s;exit ${PIPESTATUS}", filename, filename)
+		// cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s;exit ${PIPESTATUS}", filename, filename)
+		cmd = fmt.Sprintf("bash -c %s;exit ${PIPESTATUS}", filename, filename)
 	} else {
-		cmd = fmt.Sprintf("chmod u+rwx %s; export BASH_XTRACEFD=7; bash -c %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
+		// cmd = fmt.Sprintf("chmod u+rwx %s; export BASH_XTRACEFD=7; bash -c %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
+		cmd = fmt.Sprintf("export BASH_XTRACEFD=7; bash -c %s 7> /tmp/captured 2>&1;echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
 	}
 
 	retryErr = retry.Action(

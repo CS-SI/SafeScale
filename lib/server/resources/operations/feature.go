@@ -403,7 +403,7 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 
 	tracer := debug.NewTracer(f.task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", featureName, targetType, targetName),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),

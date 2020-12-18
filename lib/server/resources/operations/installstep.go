@@ -281,7 +281,8 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 
 	tracer := debug.NewTracer(is.Worker.feature.task, true, "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+
 	nHosts := uint(len(hosts))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),
@@ -380,9 +381,9 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
 			}
-			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
-			if err != nil {
-				return nil, err
+			subtask, xerr := concurrency.NewTaskWithParent(is.Worker.feature.task)
+			if xerr != nil {
+				return nil, xerr
 			}
 
 			subtask, xerr = subtask.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
@@ -499,9 +500,11 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	if !hidesOutput {
-		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", filename, filename)
+		// command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", filename, filename)
+		command = fmt.Sprintf("sudo bash %s;exit ${PIPESTATUS}", filename)
 	} else {
-		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
+		// command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
+		command = fmt.Sprintf("sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", filename)
 	}
 
 	// Executes the script on the remote rh
