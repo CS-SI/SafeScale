@@ -859,8 +859,20 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		userData.PublicIP = ip.IP
 	}
 
+	// VPL: temporary to see if we can consult and eventually remove userdata script containing SSH key
+	m, xerr := s.GetMetadataOfInstance(newHost.Core.ID)
+	if xerr != nil {
+		logrus.Errorf("failed to get instance metadata")
+	} else {
+		spew.Dump(m)
+	}
+
 	logrus.Infoln(msgSuccess)
 	return newHost, userData, nil
+}
+
+func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) {
+	return s.rpcGetMetadataOfInstance(id)
 }
 
 // identifyOpenstackSubnetsAndPorts ...
