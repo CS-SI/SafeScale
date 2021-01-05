@@ -109,12 +109,13 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 
 	req := abstract.SubnetRequest{
-		NetworkID:     rn.GetID(),
-		Name:          in.GetName(),
-		CIDR:          in.GetCidr(),
-		Domain:        in.GetDomain(),
-		HA:            in.GetFailOver(),
-		KeepOnFailure: in.GetKeepOnFailure(),
+		NetworkID:      rn.GetID(),
+		Name:           in.GetName(),
+		CIDR:           in.GetCidr(),
+		Domain:         in.GetDomain(),
+		HA:             in.GetFailOver(),
+		DefaultSshPort: in.GetGateway().GetSshPort(),
+		KeepOnFailure:  in.GetKeepOnFailure(),
 	}
 	rs, xerr := subnetfactory.New(svc)
 	if xerr != nil {

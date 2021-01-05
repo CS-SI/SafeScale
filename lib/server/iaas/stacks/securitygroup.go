@@ -59,14 +59,14 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 
 // DefaultTCPRules creates TCP rules to configure the default security group for public hosts
 // egress: allow all, ingress: allow ssh only
-func DefaultTCPRules() []abstract.SecurityGroupRule {
+func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Ingress: allow SSH only
 		{
 			Description: "INGRESS: TCP4: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
-			PortFrom:    22,
-			//PortTo:      22,
+			PortFrom:    sshPort,
+			//PortTo:      sshPort,
 			EtherType: ipversion.IPv4,
 			Protocol:  "tcp",
 			Targets:   []string{"0.0.0.0/0"},
@@ -74,8 +74,8 @@ func DefaultTCPRules() []abstract.SecurityGroupRule {
 		{
 			Description: "INGRESS: TCP6: Allow everything",
 			Direction:   securitygroupruledirection.INGRESS,
-			PortFrom:    22,
-			//PortTo:      22,
+			PortFrom:    sshPort,
+			//PortTo:      sshPort,
 			EtherType: ipversion.IPv6,
 			Protocol:  "tcp",
 			Targets:   []string{"::/0"},

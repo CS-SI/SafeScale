@@ -344,6 +344,10 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	}()
 
 	_, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
+	if xerr != nil {
+		return xerr
+	}
+
 	if req.InitialNodeCount == 0 {
 		req.InitialNodeCount = privateNodeCount
 	}

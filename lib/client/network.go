@@ -106,10 +106,11 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 func (n network) Create(
 	name, cidr string,
 	noSubnet bool,
-	gwname, os, sizing string,
+	gwname string, defaultSshPort uint32, os, sizing string,
 	keepOnFailure bool,
 	timeout time.Duration,
 ) (*protocol.Network, error) {
+
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
@@ -123,6 +124,11 @@ func (n network) Create(
 		Cidr:          cidr,
 		NoSubnet:      noSubnet,
 		KeepOnFailure: keepOnFailure,
+		Gateway: &protocol.GatewayDefinition{
+			Name:    gwname,
+			SshPort: defaultSshPort,
+			ImageId: os,
+		},
 	}
 	return service.Create(ctx, def)
 }

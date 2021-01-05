@@ -229,7 +229,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 					ip := rgw.(*host).getAccessIP(task)
 					primaryGatewayConfig = &system.SSHConfig{
 						PrivateKey: gwahc.PrivateKey,
-						Port:       22,
+						Port:       int(gwahc.SshPort),
 						IPAddress:  ip,
 						Hostname:   gwahc.Name,
 						User:       abstract.DefaultUser,
@@ -257,7 +257,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						}
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
-							Port:       22,
+							Port:       int(gwahc.SshPort),
 							IPAddress:  rgw.(*host).getAccessIP(task),
 							Hostname:   rgw.GetName(),
 							User:       abstract.DefaultUser,
@@ -274,8 +274,9 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
+
 		rh.sshProfile = &system.SSHConfig{
-			Port:                   22,
+			Port:                   int(ahc.SshPort),
 			IPAddress:              rh.accessIP,
 			Hostname:               rh.GetName(),
 			User:                   abstract.DefaultUser,
@@ -580,6 +581,13 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 			}
 		}
 	}()
+
+	// Make sure ssh port wanted is set
+	if hostReq.SshPort > 0 {
+		ahf.Core.SshPort = hostReq.SshPort
+	} else {
+		ahf.Core.SshPort = 22
+	}
 
 	// Creates metadata early to "reserve" host name
 	if xerr = rh.Carry(task, ahf.Core); xerr != nil {
