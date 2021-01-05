@@ -18,7 +18,7 @@ debug
 .idea/workspace.xml
 .vscode
 .idea
-
+.run
 
 #remove client tests
 providers/aws/*_test.go
