@@ -112,3 +112,5 @@ lib/server/resources/operations/iaas/.DS_Store
 .atom/
 
 lib/server/iaas/userdata/version.go
+
+.run/
