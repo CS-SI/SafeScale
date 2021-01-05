@@ -118,7 +118,7 @@ func (s subnet) Inspect(networkRef, name string, timeout time.Duration) (*protoc
 // FIXME: do not use protocol as response
 func (s subnet) Create(
 	networkRef, name, cidr string, failover bool,
-	gwname, os, sizing string,
+	gwname string, gwport uint32, os, sizing string,
 	keepOnFailure bool,
 	timeout time.Duration,
 ) (*protocol.Subnet, error) {
@@ -139,6 +139,7 @@ func (s subnet) Create(
 		Gateway: &protocol.GatewayDefinition{
 			ImageId:        os,
 			Name:           gwname,
+			SshPort:        uint32(gwport),
 			SizingAsString: sizing,
 		},
 		KeepOnFailure: keepOnFailure,

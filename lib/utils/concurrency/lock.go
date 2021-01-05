@@ -29,6 +29,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
 
+// TaskedLockHelpers ...
 type TaskedLockHelpers interface {
 	SafeLock(Task)    // To be used when instance and parameter are notoriously not nil
 	SafeUnlock(Task)  // To be used when instance and parameter are notoriously not nil

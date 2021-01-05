@@ -247,6 +247,13 @@ var networkCreate = &cli.Command{
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
+		&cli.IntFlag{
+			Name:    "ssh-port",
+			Aliases: []string{"default-ssh-port"},
+			Value:   22,
+			Usage: `Define the port to use for SSH (default: 22) in default subnet;
+		Meaningful only if --empty is not used`,
+		},
 		&cli.BoolFlag{
 			Name:  "failover",
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
@@ -300,9 +307,10 @@ var networkCreate = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
+		defaultSshPort := uint32(c.Int("ssh-port"))
 		network, err := clientSession.Network.Create(
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
-			c.String("gwname"), c.String("os"), sizing,
+			c.String("gwname"), defaultSshPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
 			temporal.GetExecutionTimeout(),
 		)
@@ -1018,6 +1026,11 @@ var subnetCreate = &cli.Command{
 			Value: "",
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
+		&cli.IntFlag{
+			Name:  "gwport",
+			Value: 22,
+			Usage: "port to use for SSH on the gateway",
+		},
 		&cli.BoolFlag{
 			Name:  "failover",
 			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
@@ -1080,7 +1093,7 @@ var subnetCreate = &cli.Command{
 
 		network, err := clientSession.Subnet.Create(
 			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
-			c.String("gwname"), c.String("os"), sizing,
+			c.String("gwname"), uint32(c.Int("gwport")), c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
 			temporal.GetExecutionTimeout(),
 		)

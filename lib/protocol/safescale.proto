@@ -230,6 +230,7 @@ message SubnetCreateRequest {
 	bool fail_over = 5;
 	string domain = 6;
 	bool keep_on_failure = 7;
+	uint32 default_ssh_port = 8;
 }
 
 message GatewayDefinition {
@@ -242,6 +243,7 @@ message GatewayDefinition {
 	string gpu_type = 8;    // Deprecated: replaced by sizing field
 	HostSizing sizing = 9;  // Deprecated: replaced by sizing_as_string field
 	string sizing_as_string = 10;
+	uint32 ssh_port = 11;
 }
 
 enum SubnetState {
@@ -327,24 +329,18 @@ message HostDefinition {
 	string sizing_as_string = 17;
 	string tenant_id = 18;
 	repeated string subnets = 19;
+	int32 ssh_port = 20;
 }
 
-
 enum HostState {
-	/*STOPPED host is stopped*/
-	HS_STOPPED = 0;
-	/*STARTING host is starting*/
-	HS_STARTING = 1;
-	/*STARTED host is started*/
-	HS_STARTED = 2;
-	/*STOPPING host is stopping*/
-	HS_STOPPING = 3;
-	/*ERROR host is in error state*/
-	HS_ERROR = 4;
-	/*TERMINATED host is terminated (in AWS, it's like DELETED)*/
-	HS_TERMINATED = 5;
-	/*UNKNOWN is unknown*/
-	HS_UNKNOWN = 6;
+	HS_STOPPED = 0; 	// host is stopped
+	HS_STARTING = 1; 	// host is starting
+	HS_STARTED = 2; 	// host is started
+	HS_STOPPING = 3; 	// host is stopping
+	HS_ERROR = 4; 	    // host is in error state
+	HS_TERMINATED = 5; 	// host is terminated (in AWS, it's like DELETED)
+	HS_UNKNOWN = 6; 	// status is unknown
+
 }
 
 message Host {
@@ -361,6 +357,7 @@ message Host {
 	string os_kind = 11;
 	repeated string attached_volume_names = 12;
 	string password = 13;
+	int32 ssh_port = 14;
 }
 
 message HostStatus {
@@ -507,12 +504,12 @@ service VolumeService {
 	rpc Inspect(Reference) returns (VolumeInspectResponse){}
 }
 
-// safescale bucket|container create c1
-// safescale bucket|container mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
-// safescale bucket|container umount c1 host1
-// safescale bucket|container delete c1
-// safescale bucket|container list
-// safescale bucket|container inspect C1
+// safescale bucket create c1
+// safescale bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /containers/c1)
+// safescale bucket umount c1 host1
+// safescale bucket delete c1
+// safescale bucket list
+// safescale bucket inspect C1
 
 message Bucket {
 	string name = 1;
@@ -686,7 +683,10 @@ message ClusterCreateRequest {
 	string node_sizing = 11;
 	string domain = 12;
 	string tenant_id = 13;
-	uint32 node_count = 14;
+	uint32 node_count = 14;         // initial node count
+	string gateway_options = 15;    // to store options for gateways than does not concern sizing (like ssh port for example)
+	string master_options = 16;     // same as gateway_options for masters
+	string node_options = 17;       // same as gateway_options for nodes
 }
 
 message ClusterResizeRequest {
@@ -713,11 +713,20 @@ message ClusterIdentity {
 	string private_key = 5;
 }
 
+message ClusterHostOptions {
+	uint32 ssh_port = 1;
+	string host_name_pattern = 2; // contains the string pattern used to define the host name (where mandatory %d
+								  // corresponds to host index in cluster) [Not used yet]
+}
+
 message ClusterDefaults {
 	HostSizing gateway_sizing = 1;
 	HostSizing master_sizing = 2;
 	HostSizing node_sizing = 3;
 	string Image = 4;
+	ClusterHostOptions gateway_options = 5;
+	ClusterHostOptions master_options = 6;
+	ClusterHostOptions node_options = 7;
 }
 
 message ClusterControlplane {

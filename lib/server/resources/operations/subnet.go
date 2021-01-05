@@ -518,6 +518,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}()
 	}
 
+	// --- Create the gateway(s) ---
+
 	var template *abstract.HostTemplate
 	if gwSizing == nil {
 		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
@@ -601,6 +603,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		ImageID:          img.ID,
 		Subnets:          []*abstract.Subnet{as},
 		KeyPair:          keypair,
+		SshPort:          req.DefaultSshPort,
 		TemplateID:       template.ID,
 		KeepOnFailure:    req.KeepOnFailure,
 		SecurityGroupIDs: sgs,
@@ -790,7 +793,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}
 
-	// Updates subnet state in metadata
+	// --- Updates subnet state in metadata ---
 	return rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {

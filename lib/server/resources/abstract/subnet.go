@@ -38,15 +38,16 @@ const (
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type SubnetRequest struct {
-	NetworkID     string         // contains the ID of the parent Network
-	Name          string         // contains the name of the subnet (must be unique in a network)
-	IPVersion     ipversion.Enum // must be IPv4 or IPv6 (see IPVersion)
-	CIDR          string         // CIDR mask
-	DNSServers    []string       // Contains the DNS servers to configure
-	Domain        string         // contains the DNS suffix to use for this network
-	HA            bool           // tells if 2 gateways and a VIP needs to be created; the VIP IP address will be used as gateway
-	Image         string         // contains the ID of the image requested for gateway(s)
-	KeepOnFailure bool           // tells if resources have to be kept in case of failure (default behavior is to delete them)
+	NetworkID      string         // contains the ID of the parent Network
+	Name           string         // contains the name of the subnet (must be unique in a network)
+	IPVersion      ipversion.Enum // must be IPv4 or IPv6 (see IPVersion)
+	CIDR           string         // CIDR mask
+	DNSServers     []string       // Contains the DNS servers to configure
+	Domain         string         // contains the DNS suffix to use for this network
+	HA             bool           // tells if 2 gateways and a VIP needs to be created; the VIP IP address will be used as gateway
+	Image          string         // contains the ID of the image requested for gateway(s)
+	DefaultSshPort uint32         // contains the port to use for SSH on all hosts of the subnet by default
+	KeepOnFailure  bool           // tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
 //// FIXME: comment!
@@ -70,12 +71,14 @@ type Subnet struct {
 	GWSecurityGroupID       string           `json:"gw_security_group_id,omitempty"`       // Contains the ID of the Security Group for external access of gateways in Subnet
 	PublicIPSecurityGroupID string           `json:"publicip_security_group_id,omitempty"` // contains the ID of the Security Group for hosts with public IP in Subnet
 	InternalSecurityGroupID string           `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
+	DefaultSshPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on hosts in the Subnet
 }
 
 // NewSubnet initializes a new instance of Subnet
 func NewSubnet() *Subnet {
 	return &Subnet{
-		State: subnetstate.UNKNOWN,
+		State:          subnetstate.UNKNOWN,
+		DefaultSshPort: 22,
 	}
 }
 

@@ -133,36 +133,22 @@ func (i Image) OK() bool {
 
 // HostRequest represents requirements to create host
 type HostRequest struct {
-	// ResourceName contains the name of the compute resource
-	ResourceName string
-	// HostName contains the hostname on the system (if empty, will use ResourceName)
-	HostName string
-	// Networks lists the networks the host must be connected to
-	Subnets []*Subnet
-	// defaultRouteIP is the IP used as default route
-	DefaultRouteIP string
-	// // DefaultGateway is the host used as default gateway
-	// DefaultGateway *HostCore
-	// getPublicIP a flag telling if the host must have a public IP
-	PublicIP bool
-	// TemplateID is the UUID of the template used to size the host (see SelectTemplates)
-	TemplateID string
-	// ImageID is the UUID of the image that contains the server's OS and initial state.
-	ImageID string
-	// KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
-	KeyPair *KeyPair
-	// Password contains the safescale password usable on host console only
-	Password string
-	// DiskSize allows to ask for a specific size for system disk (in GB)
-	DiskSize int
-	// IsGateway tells if the host will act as a gateway
-	IsGateway bool
-	// KeepOnFailure tells if resource must be kept on failure
-	KeepOnFailure bool
-	// Use spot-like instance
-	Preemptible bool
-	// List of Security Groups to attach to IPAddress (using map as dict)
-	SecurityGroupIDs map[string]struct{}
+	ResourceName     string              // ResourceName contains the name of the compute resource
+	HostName         string              // HostName contains the hostname on the system (if empty, will use ResourceName)
+	Subnets          []*Subnet           // Subnets lists the networks the host must be connected to
+	DefaultRouteIP   string              // DefaultRouteIP is the IP used as default route
+	PublicIP         bool                // PublicIP a flag telling if the host must have a public IP
+	TemplateID       string              // TemplateID is the UUID of the template used to size the host (see SelectTemplates)
+	ImageID          string              // ImageID is the UUID of the image that contains the server's OS and initial state.
+	KeyPair          *KeyPair            // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
+	SshPort          uint32              // contains the port to use for SSH
+	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
+	DiskSize         int                 // DiskSize allows to ask for a specific size for system disk (in GB)
+	IsGateway        bool                // IsGateway tells if the host will act as a gateway
+	KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure
+	Preemptible      bool                // Use spot-like instance
+	SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to IPAddress (using map as dict)
+
 }
 
 // HostEffectiveSizing ...
@@ -210,13 +196,14 @@ type HostCore struct {
 	ID         string         `json:"id,omitempty"`
 	Name       string         `json:"name,omitempty"`
 	PrivateKey string         `json:"private_key,omitempty"`
+	SshPort    uint32         `json:"ssh_port,omitempty"`
 	Password   string         `json:"password,omitempty"`
 	LastState  hoststate.Enum `json:"last_state,omitempty"`
 }
 
 // NewHostCore ...
 func NewHostCore() *HostCore {
-	return &HostCore{}
+	return &HostCore{SshPort: 22}
 }
 
 // IsNull tells if the instance is a null value

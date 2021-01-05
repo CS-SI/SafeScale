@@ -125,10 +125,11 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			return nil, xerr
 		}
 		req := abstract.SubnetRequest{
-			NetworkID:     rn.GetID(),
-			Name:          in.GetName(),
-			CIDR:          subnetNet.String(),
-			KeepOnFailure: in.GetKeepOnFailure(),
+			NetworkID:      rn.GetID(),
+			Name:           in.GetName(),
+			CIDR:           subnetNet.String(),
+			KeepOnFailure:  in.GetKeepOnFailure(),
+			DefaultSshPort: in.GetGateway().GetSshPort(),
 		}
 		xerr = rs.Create(task, req, "", nil)
 		if xerr != nil {
