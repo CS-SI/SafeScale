@@ -818,11 +818,12 @@ message FeatureSettings {
 }
 
 message FeatureActionRequest {
-	string name = 1;
-	FeatureTargetType target_type = 2;
-	Reference target_ref = 3;
-	map<string, string> variables = 4;
-	FeatureSettings settings = 5;
+	string tenant_id = 1;
+	string name = 2;
+	FeatureTargetType target_type = 3;
+	Reference target_ref = 4;
+	map<string, string> variables = 5;
+	FeatureSettings settings = 6;
 }
 
 service FeatureService {
