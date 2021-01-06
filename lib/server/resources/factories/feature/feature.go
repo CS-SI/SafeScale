@@ -66,7 +66,7 @@ import (
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(task concurrency.Task, name string) (resources.Feature, error) {
+func New(task concurrency.Task, name string) (resources.Feature, fail.Error) {
 	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
@@ -74,16 +74,18 @@ func New(task concurrency.Task, name string) (resources.Feature, error) {
 		return nil, fail.InvalidParameterError("name", "can't be empty string!")
 	}
 
-	feat, err := operations.NewFeature(task, name)
-	if err != nil {
-		if _, ok := err.(*fail.ErrNotFound); !ok {
-			return nil, err
+	feat, xerr := operations.NewFeature(task, name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// feature not found, continue to try with embedded ones
+		default:
+			return nil, xerr
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		feat, err = operations.NewEmbeddedFeature(task, name)
-		if err != nil {
-			return nil, err
+		if feat, xerr = operations.NewEmbeddedFeature(task, name); xerr != nil {
+			return nil, xerr
 		}
 	}
 	return feat, nil

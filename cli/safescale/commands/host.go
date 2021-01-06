@@ -23,6 +23,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -832,9 +834,9 @@ func hostFeatureAddAction(c *cli.Context) error {
 
 // hostFeatureCheckCommand handles 'host feature check <host name or id> <pkgname>'
 var hostFeatureCheckCommand = &cli.Command{
-	Name:      "check-feature",
-	Aliases:   []string{"verify-feature"},
-	Usage:     "check-feature HOSTNAME FEATURENAME",
+	Name:      "check",
+	Aliases:   []string{"verify"},
+	Usage:     "checks if a feature is installed on Host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
@@ -880,17 +882,18 @@ func hostFeatureCheckAction(c *cli.Context) error {
 	}
 
 	// Wait for SSH service on remote host first
-	err = clientSession.SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
-	if err != nil {
+	if err = clientSession.SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout()); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
-	err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0)
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
-		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+	if err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
+		switch grpcstatus.Code(err) {
+		case codes.NotFound:
+			return clitools.FailureResponse(clitools.ExitOnNotFound(fail.FromGRPCStatus(err).Error()))
+		default:
+			return clitools.FailureResponse(clitools.ExitOnRPC(fail.FromGRPCStatus(err).Error()))
+		}
 	}
 	return clitools.SuccessResponse(nil)
 }
