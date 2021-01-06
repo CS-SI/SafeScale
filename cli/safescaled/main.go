@@ -105,6 +105,7 @@ func work(c *cli.Context) {
 	protocol.RegisterBucketServiceServer(s, &listeners.BucketListener{})
 	protocol.RegisterClusterServiceServer(s, &listeners.ClusterListener{})
 	protocol.RegisterHostServiceServer(s, &listeners.HostListener{})
+	protocol.RegisterFeatureServiceServer(s, &listeners.FeatureListener{})
 	protocol.RegisterImageServiceServer(s, &listeners.ImageListener{})
 	protocol.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
 	protocol.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
