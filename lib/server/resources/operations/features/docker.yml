@@ -225,6 +225,10 @@ feature:
                         run: |
                             sfService disable docker
                             sfService stop docker
+
+                            sfFirewallAdd --zone=trusted --remove-interface=docker0 --remove-interface=docker_gwbridge
+                            sfFirewallReload || sfFail 198 "Firewall problem"
+
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfApt purge -y docker-ce*
