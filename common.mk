@@ -80,7 +80,8 @@ endif
 
 # Handling multiple gopath: use ~/go by default
 ifeq ($(findstring :,$(GOBIN)),:)
-GOBIN=$(HOME)/go/bin
+# GOBIN=$(HOME)/go/bin
+GOBIN=$(shell $(GO) env GOBIN | cut -d: -f1)
 endif
 
 # Handling multiple gopath: use $(HOME)/go by default
