@@ -41,7 +41,7 @@ func PrevailRetry(arbiters ...Arbiter) Arbiter {
 		for _, a := range arbiters {
 			v, err := a(t)
 			if err != nil {
-				return 0, err
+				return verdict.Abort, err
 			}
 
 			switch v {
@@ -65,14 +65,14 @@ func PrevailDone(arbiters ...Arbiter) Arbiter {
 		for _, a := range arbiters {
 			v, err := a(t)
 			if err != nil {
-				return 0, err
+				return verdict.Abort, err
 			}
 
 			switch v {
 			case verdict.Done:
 				final = verdict.Done
 			case verdict.Abort:
-				return verdict.Abort, err
+				return verdict.Abort, nil
 			}
 		}
 		return final, nil
@@ -116,20 +116,20 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 	}
 }
 
-// Successful returns Retry when the try produced no error.
+// Successful returns Retry when the try produced no error; returns Done otherwise
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			switch cerr := t.Err.(type) {
-			case *ErrStopRetry:
-				return verdict.Done, cerr
-			case *fail.ErrRuntimePanic:
-				return verdict.Done, cerr
-			default:
-				return verdict.Retry, nil
-			}
+			// switch cerr := t.Err.(type) {
+			// case *ErrStopRetry:
+			// 	return verdict.Done, cerr
+			// case *fail.ErrRuntimePanic:
+			// 	return verdict.Done, cerr
+			// default:
+				return verdict.Done, nil
+			// }
 		}
-		return verdict.Done, nil
+		return verdict.Retry, nil
 	}
 }
 
