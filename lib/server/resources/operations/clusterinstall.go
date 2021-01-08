@@ -355,7 +355,7 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", path, path)
+		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
 	} else {
 		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
 	}
@@ -368,22 +368,10 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	// VPL: integrate what is found in <flavor>_install__<nodetype>.sh in node_install_requirements.sh and this part will
-	// be removed
-	// if c.makers.GetTemplateBox == nil {
-	//	return fail.InvalidParameterError("c.makers.GetTemplateBox", "cannot be nil")
-	// }
-	// ENDVPL
-
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
-
-	// script, xerr := flavors.GetGlobalSystemRequirements(task, c)
-	// if xerr != nil {
-	// 	return xerr
-	// }
 
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {

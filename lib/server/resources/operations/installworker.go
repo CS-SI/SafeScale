@@ -750,7 +750,8 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 
 		// For any other situations, raise error and break
-		return &r, fail.NewError(r.ErrorMessages())
+		msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.ErrorMessages())
+		return &r, fail.NewError(msg)
 	}
 
 	return &r, nil
