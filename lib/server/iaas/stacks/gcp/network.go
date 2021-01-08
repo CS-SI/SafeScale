@@ -186,18 +186,6 @@ func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
 	// 	logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
 	// }
 
-	// Remove routes and firewall
-	firewallRuleName := fmt.Sprintf("%s-all-in" /*"%s-%s-all-in"*/, s.GcpConfig.NetworkName /*, subnetwork.Name*/)
-	fws, xerr := s.rpcGetFirewallRuleByName(firewallRuleName)
-	if xerr != nil {
-		return xerr
-	}
-	if fws != nil {
-		if xerr = s.rpcDeleteFirewallRuleByID(fmt.Sprintf("%d", fws.Id)); xerr != nil {
-			return xerr
-		}
-	}
-
 	return s.rpcDeleteNetworkByID(theNetwork.ID)
 }
 
