@@ -246,7 +246,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 
 		results, xerr := feat.Add(rh, featureVariables, featureSettings)
 		if xerr != nil {
-			return empty, fail.Wrap(xerr, "cannot add feature")
+			return empty, xerr
 		}
 		if results.Successful() {
 			return empty, nil
@@ -260,7 +260,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 
 		results, xerr := feat.Add(rc, featureVariables, featureSettings)
 		if xerr != nil {
-			return empty, fail.Wrap(xerr, "cannot add feature")
+			return empty, xerr
 		}
 		if results.Successful() {
 			return empty, nil

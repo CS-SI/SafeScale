@@ -290,7 +290,7 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
-				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
+				// If Network doesn't exist anymore on the provider side, do not fail to cleanup the metadata: log but continue
 				logrus.Warnf("failed to find Network on provider side, cleaning up metadata.")
 			case *fail.ErrTimeout:
 				logrus.Error("cannot delete Network due to a timeout")
