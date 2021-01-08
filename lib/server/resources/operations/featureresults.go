@@ -65,7 +65,10 @@ func (urs unitResults) ErrorMessages() string {
 	for k, v := range urs {
 		val := v.ErrorMessage()
 		if val != "" {
-			output += k + ": " + val + "\n"
+			if output != "" {
+				output += ", "
+			}
+			output += k + ": " + val
 		}
 	}
 	return output

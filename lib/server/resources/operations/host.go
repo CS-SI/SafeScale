@@ -1858,6 +1858,9 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
+	if retcode != 0 {
+		return retcode, stdout, stderr, nil
+	}
 
 	cmd := ""
 	if owner != "" {

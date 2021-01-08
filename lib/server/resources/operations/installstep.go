@@ -71,14 +71,14 @@ func (sr stepResult) Error() error {
 }
 
 func (sr stepResult) ErrorMessage() string {
+	var msg string
 	if sr.err != nil {
-		msg := sr.err.Error()
-		if msg == "" && sr.retcode != 0 {
-			msg = fmt.Sprintf("exited with error %d", sr.retcode)
-		}
-		return msg
+		msg = sr.err.Error()
 	}
-	return ""
+	if msg == "" && sr.retcode != 0 {
+		msg = fmt.Sprintf("exited with error %d", sr.retcode)
+	}
+	return msg
 }
 
 // // stepResults contains the errors of the step for each host target
@@ -502,7 +502,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	if !hidesOutput {
 		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", filename, filename)
 	} else {
-		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";echo ${PIPESTATUS} > /tmp/errc;cat /tmp/captured; sudo rm /tmp/captured;exit `cat /tmp/errc`", filename, filename)
+		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", filename, filename)
 	}
 
 	// Executes the script on the remote rh

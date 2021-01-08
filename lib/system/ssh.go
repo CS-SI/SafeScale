@@ -165,8 +165,7 @@ func SCPErrorString(retcode int) string {
 // Close closes ssh tunnel
 func (tunnel *SSHTunnel) Close() fail.Error {
 	defer func() {
-		lazyErr := utils.LazyRemove(tunnel.keyFile.Name())
-		if lazyErr != nil {
+		if lazyErr := utils.LazyRemove(tunnel.keyFile.Name()); lazyErr != nil {
 			logrus.Error(lazyErr)
 		}
 	}()
@@ -181,10 +180,8 @@ func (tunnel *SSHTunnel) Close() fail.Error {
 	bytesCmd, err := exec.Command("pgrep", "-f", tunnel.cmdString).Output()
 	if err == nil {
 		portStr := strings.Trim(string(bytesCmd), "\n")
-		_, err = strconv.Atoi(portStr)
-		if err == nil {
-			err = exec.Command("kill", "-9", portStr).Run()
-			if err != nil {
+		if _, err = strconv.Atoi(portStr); err == nil {
+			if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
 				logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
 				return fail.Wrap(err, "unable to close tunnel")
 			}

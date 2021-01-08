@@ -33,20 +33,20 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep docker-ce &>/dev/null || sfFail 1
+                                    dpkg -l | grep docker-ce &>/dev/null || sfFail 194
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 centos|redhat|rhel)
-                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 1
+                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 194
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 fedora)
-                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 1
+                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 194
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 1
+                                    sfFail 195
                                     ;;
                             esac
 
@@ -82,10 +82,10 @@ feature:
                                         if [ $op -ne 0 ]; then
                                             sfFail 194
                                         else
-                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail 194
+                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail 195
                                         fi
                                     else
-                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 194
+                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 196
                                     fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
@@ -98,18 +98,18 @@ feature:
                                     if [ $op -ne 0 ]; then
                                         dnf install -y curl &>/dev/null && op=$? || true
                                         if [ $op -ne 0 ]; then
-                                            sfFail 194
+                                            sfFail 193
                                         else
                                             sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce" || sfFail 194
                                         fi
                                     else
-                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce --nobest" || sfFail 194
+                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce --nobest" || sfFail 195
                                     fi
                                     systemctl enable --now docker || true
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 197
                                     ;;
                             esac
                             sfExit
@@ -123,9 +123,9 @@ feature:
                         run: |
                             op=-1
                             VERSION=$(sfStandardRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
-                            [ $op -ne 0 ] && sfFail 192
+                            [ $op -ne 0 ] && sfFail 198
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || sfFail 193
+                            sfDownload "$URL" docker-compose 3m 5 || sfFail 199
                             chmod +x docker-compose && mv docker-compose /usr/bin
                             sfExit
 
@@ -197,7 +197,7 @@ feature:
                             sfService restart firewalld
                             sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
                             sfFirewallAdd --zone=trusted --add-masquerade
-                            sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfFirewallReload || sfFail 200 "Firewall problem"
 
                     ready:
                         targets:
@@ -206,11 +206,11 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService enable docker || sfFail 195
-                            sfService restart docker || sfFail 196
+                            sfService enable docker || sfFail 201
+                            sfService restart docker || sfFail 202
                             op=-1
                             sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && sfFail 197
+                            [ $op -ne 0 ] && sfFail 203
                             sfExit
 
             remove:
@@ -227,7 +227,7 @@ feature:
                             sfService stop docker
 
                             sfFirewallAdd --zone=trusted --remove-interface=docker0 --remove-interface=docker_gwbridge
-                            sfFirewallReload || sfFail 198 "Firewall problem"
+                            sfFirewallReload || sfFail 192 "Firewall problem"
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
@@ -241,7 +241,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 1 "Unsupported operating system '$LINUX_KIND'"
+                                    sfFail 193 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
                             rm -f /usr/bin/docker-compose || true
