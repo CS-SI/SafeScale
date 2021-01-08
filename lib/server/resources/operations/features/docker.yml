@@ -227,7 +227,7 @@ feature:
                             sfService stop docker
 
                             sfFirewallAdd --zone=trusted --remove-interface=docker0 --remove-interface=docker_gwbridge
-                            sfFirewallReload || sfFail 198 "Firewall problem"
+                            sfFirewallReload || sfFail 192 "Firewall problem"
 
                             case $LINUX_KIND in
                                 debian|ubuntu)
