@@ -620,7 +620,7 @@ var hostSecurityGroupRemoveCommand = &cli.Command{
 
 var hostSecurityGroupListCommand = &cli.Command{
 	Name:      "list",
-	Aliases:   []string{"show"},
+	Aliases:   []string{"show", "ls"},
 	Usage:     "list HOSTNAME",
 	ArgsUsage: "HOSTNAME",
 	Flags: []cli.Flag{
