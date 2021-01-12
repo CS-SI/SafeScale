@@ -54,6 +54,7 @@ const (
 	sshCopyTemplate = `scp -i {{.IdentityFile}} -P {{.Port}} {{.Options}} {{if .IsUpload}}"{{.LocalPath}}" {{.User}}@{{.IPAddress}}:"{{.RemotePath}}"{{else}}{{.User}}@{{.IPAddress}}:"{{.RemotePath}}" "{{.LocalPath}}"{{end}}`
 )
 
+
 var (
 	sshErrorMap = map[int]string{
 		1:  "Malformed configuration or invalid cli options",
@@ -763,7 +764,7 @@ func (sconf *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, fail.Error)
 func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, fail.Error) {
 	f, err := CreateTempFileFromString(sconf.PrivateKey, 0400)
 	if err != nil {
-		return "", nil, fail.Wrap(err, "unable to create temporary key file")
+		return "", "", nil, fail.Wrap(err, "unable to create temporary key file")
 	}
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error"
@@ -805,7 +806,7 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	}
 	//logrus.Debugf("createSSHCommand() sshCmdString: %s\n", sshCmdString)
 
-	return sshCmdString, f, nil
+	return sshCmdString, sshPingCmdString, f, nil
 
 }
 
@@ -1033,7 +1034,8 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 		return fail.Wrap(err, "unable to create command")
 	}
 
-	proc := exec.Command(bash, "-c", sshCmdString)
+	// First check ssh is available
+	proc := exec.Command(bash, "-c", sshPingCmdString)
 	proc.Stdin = os.Stdin
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
