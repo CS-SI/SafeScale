@@ -60,7 +60,8 @@ type Host interface {
 	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                       // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
 	Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
-	PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                                        // creates a file 'filename' on remote 'host' with the content 'content'
+	PushStringToFile(task concurrency.Task, content string, filename string) fail.Error                                                            // creates a file 'filename' on remote 'host' with the content 'content'
+	PushStringToFileWithOwnership(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                           // creates a file 'filename' on remote 'host' with the content 'content' and apply ownership to it
 	Reboot(task concurrency.Task) fail.Error                                                                                                       // reboots the host
 	Resize(hostSize abstract.HostSizingRequirements) fail.Error                                                                                    // resize the host (probably not yet implemented on some proviers if not all)
 	Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
