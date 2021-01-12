@@ -1057,10 +1057,20 @@ func (rh host) runInstallPhase(task concurrency.Task, phase userdata.Phase, user
 	if xerr != nil {
 		return xerr
 	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil)
+	}
+
 	file := fmt.Sprintf("/opt/safescale/var/tmp/user_data.%s.sh", phase)
-	if xerr = rh.PushStringToFile(task, string(content), file, "", ""); xerr != nil {
+	if xerr = rh.PushStringToFile(task, string(content), file); xerr != nil {
 		return xerr
 	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil)
+	}
+
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
 	// Executes the script on the remote host
 	retcode, _, stderr, xerr := rh.Run(task, command, outputs.COLLECT, 0, 0)
@@ -1738,6 +1748,11 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 					innerXErr = retry.StopRetryError(innerXErr)
 				}
 			}
+
+			if task.Aborted() {
+				return fail.AbortedError(innerXErr)
+			}
+
 			return innerXErr
 		},
 		connectionTimeout*2, // VPL: insufficient delay ?
@@ -1785,6 +1800,8 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 				case *fail.ErrExecution:
 					// Adds stdout annotation to xerr
 					_ = innerXErr.Annotate("stdout", stdout)
+					_ = innerXErr.Annotate("stderr", stderr)
+
 				}
 				return innerXErr
 			}
@@ -1794,14 +1811,16 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 			}
 			return nil
 		},
-		timeout,
+		timeout*2,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			xerr = fail.Wrap(xerr.Cause(), "failed to execute command after %s", temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(xerr.Cause())
+			if xerr.Cause() != nil {
+				xerr = fail.ToError(xerr.Cause())
+			}
 		}
 	}
 	return retcode, stdout, stderr, xerr
@@ -1864,10 +1883,10 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 
 	cmd := ""
 	if owner != "" {
-		cmd += "chown " + owner + ` '` + target + `' ;`
+		cmd += "sudo chown " + owner + ` '` + target + `' ;`
 	}
 	if mode != "" {
-		cmd += "chmod " + mode + ` '` + target + `'`
+		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
 		retcode, stdout, stderr, xerr = run(task, ssh, cmd, outputs.DISPLAY, timeout)
@@ -2540,7 +2559,12 @@ func (rh host) IsGateway(task concurrency.Task) (bool, fail.Error) {
 }
 
 // PushStringToFile creates a file 'filename' on remote 'host' with the content 'content'
-func (rh host) PushStringToFile(task concurrency.Task, content string, filename string, owner, mode string) (xerr fail.Error) {
+func (rh host) PushStringToFile(task concurrency.Task, content string, filename string) (xerr fail.Error) {
+	return rh.PushStringToFileWithOwnership(task, content, filename, "", "")
+}
+
+// PushStringToFileWithOwnership creates a file 'filename' on remote 'host' with the content 'content', and apply ownership
+func (rh host) PushStringToFileWithOwnership(task concurrency.Task, content string, filename string, owner, mode string) (xerr fail.Error) {
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -2814,7 +2838,7 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 			for k, v := range hsgV1.ByID {
 				if k == sgID {
 					if v.FromSubnet {
-						return fail.InvalidRequestError("cannot unbind a security group from host when from subnet")
+						return fail.InvalidRequestError("cannot unbind Security Group '%s': inherited from Subnet", sg.GetName())
 					}
 					found = true
 					break
