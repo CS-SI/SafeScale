@@ -2965,7 +2965,12 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 			default:
 				cleaningErrors = append(cleaningErrors, innerXErr)
 			}
-		}
+
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
 	}
 
 	//
