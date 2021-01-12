@@ -55,9 +55,10 @@ import (
 //      use the same port for all access to a same host (not the case currently)
 //      May not be used for interactive ssh connection...
 const (
-	sshOptions     = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
-	sshPingOptions = "-q -oBatchMode=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no -oChallengeResponseAuthentication=no" // VPL: Add "-o ConnectTimeout=<seconds>" to set a timeout
+	sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
+	sshPingOptions = "-q -oBatchMode=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ChallengeResponseAuthentication=no" // Ajouter -o ConnectTimeout=? pour faire expirer la commande
 )
+
 
 var (
 	sshErrorMap = map[int]string{
@@ -790,7 +791,7 @@ func createSSHCommands(sshConfig *SSHConfig, cmdString, username, shell string, 
 	options := sshOptions + " -oLogLevel=error"
 
 	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s", f.Name(), options, sshConfig.Port, sshConfig.User, sshConfig.IPAddress)
-	sshPingCmdString := fmt.Sprintf("ssh -i %s %s -oConnectTimeout=5 -p %d %s@%s exit", f.Name(), sshPingOptions, sshConfig.Port, sshConfig.User, sshConfig.IPAddress)
+	sshPingCmdString := fmt.Sprintf("ssh %s -oConnectTimeout=120 -p %d %s@%s", sshOptions, sshConfig.Port, sshConfig.User, sshConfig.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
