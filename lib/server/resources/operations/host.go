@@ -1787,6 +1787,8 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 		return 0, "", "", xerr
 	}
 
+	defer sshCmd.Close()
+
 	var (
 		retcode        int
 		stdout, stderr string

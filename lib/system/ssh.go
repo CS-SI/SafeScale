@@ -55,10 +55,9 @@ import (
 //      use the same port for all access to a same host (not the case currently)
 //      May not be used for interactive ssh connection...
 const (
-	sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
-	sshPingOptions = "-q -oBatchMode=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=no -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ChallengeResponseAuthentication=no" // Ajouter -o ConnectTimeout=? pour faire expirer la commande
+	sshOptions     = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
+	sshPingOptions = "-q -oBatchMode=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oKbdInteractiveAuthentication=no -oChallengeResponseAuthentication=no" // VPL: Add "-o ConnectTimeout=<seconds>" to set a timeout
 )
-
 
 var (
 	sshErrorMap = map[int]string{
@@ -276,6 +275,7 @@ func buildTunnel(cfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		}
 	}
 
+	// TODO: add "ssh ping" before this code ?
 	options := sshOptions + " -oServerAliveInterval=60"
 	cmdString := fmt.Sprintf("ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -p %d",
 		f.Name(),
@@ -355,15 +355,7 @@ func (sc *SSHCommand) Wait() error {
 		return fail.InvalidInstanceError()
 	}
 
-	err := sc.cmd.Wait()
-	nerr := sc.cleanup()
-	if err != nil {
-		return err
-	}
-	if nerr != nil {
-		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
-	}
-	return nerr
+	return sc.cmd.Wait()
 }
 
 // Kill kills SSHCommand process and releases any resources associated with the SSHCommand.
@@ -444,12 +436,8 @@ func (sc *SSHCommand) Output() ([]byte, fail.Error) {
 	}
 
 	content, err := sc.cmd.Output()
-	nerr := sc.cleanup()
 	if err != nil {
 		return nil, fail.NewError(err.Error())
-	}
-	if nerr != nil {
-		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return content, nil
 }
@@ -465,12 +453,8 @@ func (sc *SSHCommand) CombinedOutput() ([]byte, fail.Error) {
 	}
 
 	content, err := sc.cmd.CombinedOutput()
-	nerr := sc.cleanup()
 	if err != nil {
 		return nil, fail.NewError(err.Error())
-	}
-	if nerr != nil {
-		logrus.Warnf("Error waiting for command cleanup: %v", nerr)
 	}
 	return content, nil
 }
@@ -739,7 +723,8 @@ func (sc *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParam
 	return result, nil
 }
 
-func (sc *SSHCommand) cleanup() fail.Error {
+// Close is called to clean SSHCommand (close tunnel(s), remove temporary files, ...)
+func (sc *SSHCommand) Close() fail.Error {
 	err1 := sc.closeTunneling()
 	err2 := utils.LazyRemove(sc.keyFile.Name())
 	if err1 != nil {
@@ -805,7 +790,7 @@ func createSSHCommands(sshConfig *SSHConfig, cmdString, username, shell string, 
 	options := sshOptions + " -oLogLevel=error"
 
 	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s", f.Name(), options, sshConfig.Port, sshConfig.User, sshConfig.IPAddress)
-	sshPingCmdString := fmt.Sprintf("ssh %s -oConnectTimeout=120 -p %d %s@%s", sshOptions, sshConfig.Port, sshConfig.User, sshConfig.IPAddress)
+	sshPingCmdString := fmt.Sprintf("ssh -i %s %s -oConnectTimeout=5 -p %d %s@%s exit", f.Name(), sshPingOptions, sshConfig.Port, sshConfig.User, sshConfig.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
@@ -895,7 +880,6 @@ func (ssh *SSHConfig) command(task concurrency.Task, cmdString string, withTty, 
 }
 
 // WaitServerReady waits until the SSH server is ready
-// the 'timeout' parameter is in minutes
 func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeout time.Duration) (out string, xerr fail.Error) {
 	if ssh == nil {
 		return "", fail.InvalidInstanceError()
@@ -936,6 +920,8 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 				return innerErr
 			}
 
+			defer cmd.Close()
+
 			var innerXErr fail.Error
 			retcode, stdout, stderr, innerXErr = cmd.RunWithTimeout(task, outputs.COLLECT, timeout)
 			if innerXErr != nil {
@@ -949,7 +935,7 @@ func (ssh *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeo
 			}
 			return nil
 		},
-		timeout,
+		timeout*2,
 	)
 	if retryErr != nil {
 		return stdout, retryErr

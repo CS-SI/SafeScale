@@ -25,7 +25,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-	github.com/golang/mock v1.4.4 // indirect
+	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.1
 	github.com/google/martian v2.1.0+incompatible
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
