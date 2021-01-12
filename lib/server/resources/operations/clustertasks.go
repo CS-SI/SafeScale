@@ -252,27 +252,85 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	}
 
 	if p.index < 1 {
-		return nil, fail.InvalidParameterError("params.iindex", "must be an integer greater than 0")
+		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
 	hostLabel := fmt.Sprintf("master #%d", p.index)
-	logrus.Debugf("[%s] starting Host creation...", hostLabel)
+	logrus.Debugf("[%s] starting master Host creation...", hostLabel)
+
+	hostReq := abstract.HostRequest{}
+	hostReq.ResourceName, xerr = c.buildHostname(task, "master", clusternodetype.Master)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// First creates master in metadata, to keep track of its tried creation, in case of failure
+	var (
+		node *propertiesv2.ClusterNode
+		nodeIdx int
+	)
+	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			nodesV2.GlobalLastIndex++
+			nodeIdx = len(nodesV2.Masters)
+
+			node = &propertiesv2.ClusterNode{
+				NumericalID: nodesV2.GlobalLastIndex,
+				Name:        hostReq.ResourceName,
+			}
+			nodesV2.Masters = append(nodesV2.Masters, node)
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
+	}
+
+	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
+	defer func() {
+		if xerr != nil && !p.keepOnFailure {
+			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+					nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					if nodeIdx == len(nodesV2.Masters) {
+						nodesV2.Masters = nodesV2.Masters[:nodeIdx-1]
+					} else {
+						nodesV2.Masters = append(nodesV2.Masters[:nodeIdx], nodesV2.Masters[nodeIdx+1:]...)
+					}
+					return nil
+				})
+			})
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove master from Cluster metadata"))
+			}
+		}
+	}()
 
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	hostReq := abstract.HostRequest{}
+	// Create the rh
 	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		hostReq.Subnets = []*abstract.Subnet{as}
 		return nil
 	})
@@ -280,16 +338,14 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	if hostReq.ResourceName, xerr = c.buildHostname(task, "master", clusternodetype.Master); xerr != nil {
+	if hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(task); xerr != nil {
 		return nil, xerr
 	}
 
-	hostReq.DefaultRouteIP = netCfg.DefaultRouteIP
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
-	// hostReq.ImageID = def.Image
 
-	rh, xerr := NewHost(c.service)
+	rh, xerr := NewHost(c.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -306,58 +362,149 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		}
 	}()
 
-	// Updates cluster metadata to keep track of created IPAddress, before testing if an error occurred during the creation
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// References new node in cluster
-		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
-			nodesV2 := clonable.(*propertiesv2.ClusterNodes)
-			nodesV2.GlobalLastIndex++
-			pubIP, innerXErr := rh.GetPublicIP(task)
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) (innerXErr fail.Error) {
+			// nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+			// if !ok {
+			// 	return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// }
+
+			// node = nodesV2.Masters[nodeIdx]
+			node.ID = rh.GetID()
+			node.PublicIP, innerXErr = rh.GetPublicIP(task)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
-					// no public IP, this can happen, continue
+					// No public IP, this can happen; continue
 				default:
 					return innerXErr
 				}
 			}
 
-			privIP, innerXErr := rh.GetPrivateIP(task)
-			if innerXErr != nil {
-				return innerXErr
-			}
-			node := &propertiesv2.ClusterNode{
-				ID:          rh.GetID(),
-				NumericalID: nodesV2.GlobalLastIndex,
-				Name:        rh.GetName(),
-				PrivateIP:   privIP,
-				PublicIP:    pubIP,
-			}
-			nodesV2.Masters = append(nodesV2.Masters, node)
-			return nil
+			node.PrivateIP, innerXErr = rh.GetPrivateIP(task)
+			return innerXErr
 		})
 	})
-	if xerr != nil && !p.keepOnFailure {
-		if derr := rh.Delete(task); derr != nil {
-			_ = xerr.AddConsequence(derr)
-		}
-		return nil, fail.Wrap(xerr, "[%s] Host creation failed")
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
 
-	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, rh.GetName())
-	logrus.Debugf("[%s] Host creation successful", hostLabel)
+	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, rh.GetName())
 
 	if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
-	// Installs cluster-level system requirements...
 	if xerr = c.installNodeRequirements(task, clusternodetype.Master, rh, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
 	logrus.Debugf("[%s] Host creation successful.", hostLabel)
-	return nil, nil
+	return rh, nil
+
+	// hostLabel := fmt.Sprintf("master #%d", p.index)
+	// logrus.Debugf("[%s] starting Host creation...", hostLabel)
+	//
+	// netCfg, xerr := c.GetNetworkConfig(task)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	// subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// hostReq := abstract.HostRequest{}
+	// xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	// 	as, ok := clonable.(*abstract.Subnet)
+	// 	if !ok {
+	// 		return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 	}
+	// 	hostReq.Subnets = []*abstract.Subnet{as}
+	// 	return nil
+	// })
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// if hostReq.ResourceName, xerr = c.buildHostname(task, "master", clusternodetype.Master); xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// hostReq.DefaultRouteIP = netCfg.DefaultRouteIP
+	// hostReq.PublicIP = false
+	// hostReq.KeepOnFailure = p.keepOnFailure
+	// // hostReq.ImageID = def.Image
+	//
+	// rh, xerr := NewHost(c.service)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// if _, xerr = rh.Create(task, hostReq, p.masterDef); xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// defer func() {
+	// 	if xerr != nil && !p.keepOnFailure {
+	// 		if derr := rh.Delete(task); derr != nil {
+	// 			_ = xerr.AddConsequence(derr)
+	// 		}
+	// 	}
+	// }()
+	//
+	// // Updates cluster metadata to keep track of created IPAddress, before testing if an error occurred during the creation
+	// xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	// References new node in cluster
+	// 	return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+	// 		nodesV2 := clonable.(*propertiesv2.ClusterNodes)
+	// 		nodesV2.GlobalLastIndex++
+	// 		pubIP, innerXErr := rh.GetPublicIP(task)
+	// 		if innerXErr != nil {
+	// 			switch innerXErr.(type) {
+	// 			case *fail.ErrNotFound:
+	// 				// no public IP, this can happen, continue
+	// 			default:
+	// 				return innerXErr
+	// 			}
+	// 		}
+	//
+	// 		privIP, innerXErr := rh.GetPrivateIP(task)
+	// 		if innerXErr != nil {
+	// 			return innerXErr
+	// 		}
+	// 		node := &propertiesv2.ClusterNode{
+	// 			ID:          rh.GetID(),
+	// 			NumericalID: nodesV2.GlobalLastIndex,
+	// 			Name:        rh.GetName(),
+	// 			PrivateIP:   privIP,
+	// 			PublicIP:    pubIP,
+	// 		}
+	// 		nodesV2.Masters = append(nodesV2.Masters, node)
+	// 		return nil
+	// 	})
+	// })
+	// if xerr != nil && !p.keepOnFailure {
+	// 	if derr := rh.Delete(task); derr != nil {
+	// 		_ = xerr.AddConsequence(derr)
+	// 	}
+	// 	return nil, fail.Wrap(xerr, "[%s] Host creation failed")
+	// }
+	//
+	// hostLabel = fmt.Sprintf("%s (%s)", hostLabel, rh.GetName())
+	// logrus.Debugf("[%s] Host creation successful", hostLabel)
+	//
+	// if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// // Installs cluster-level system requirements...
+	// if xerr = c.installNodeRequirements(task, clusternodetype.Master, rh, hostLabel); xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// logrus.Debugf("[%s] Host creation successful.", hostLabel)
+	// return nil, nil
 }
 
 // taskConfigureMasters configure masters
@@ -374,27 +521,22 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	list, xerr := c.ListMasterIDs(task)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(list) == 0 {
-		return nil, nil
-	}
-
 	logrus.Debugf("[cluster %s] Configuring masters...", c.GetName())
 	started := time.Now()
 
 	var subtasks []concurrency.Task
-	masters, xerr := c.ListMasterIDs(task)
+	masters, xerr := c.ListMasters(task)
 	if xerr != nil {
 		return nil, xerr
+	}
+	if len(masters) == 0 {
+		return nil, nil
 	}
 
 	var errors []error
 
-	for i, hostID := range masters {
-		host, xerr := LoadHost(task, c.GetService(), hostID)
+	for i, master := range masters {
+		host, xerr := LoadHost(task, c.GetService(), master.GetID())
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			errors = append(errors, xerr)
@@ -835,10 +977,11 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 }
 
 type taskDeleteNodeParameters struct {
-	node, master resources.Host
+	node *propertiesv2.ClusterNode
+	master resources.Host
 }
 
-func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -851,25 +994,33 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
 	}
-	if p.node.IsNull() {
-		return nil, fail.InvalidParameterError("params.node", "cannot be null value of 'resources.Host'")
+	if p.node == nil {
+		return nil, fail.InvalidParameterError("params.node", "cannot be nil")
 	}
 	if p.master.IsNull() {
 		return nil, fail.InvalidParameterError("params.master", "cannot be null value of 'resources.Host'")
 	}
 
-	hostName := p.node.GetName()
-	logrus.Debugf("Deleting Node '%s'", hostName)
-	if xerr := c.deleteNode(task, p.node, p.master); xerr != nil {
-		logrus.Errorf("Failed to delete Node '%s'", hostName)
+	logrus.Debugf("Deleting Node '%s'", p.node.Name)
+	var host resources.Host
+	if p.node.ID != "" {
+		host, xerr = LoadHost(task, c.GetService(), p.node.ID)
+	} else if p.node.Name != "" {
+		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
+	} else {
+		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
+	}
+
+	if xerr := c.deleteNode(task, host, p.master); xerr != nil {
+		logrus.Errorf("Failed to delete Node '%s'", p.node.Name)
 		return nil, xerr
 	}
 
-	logrus.Debugf("Successfully deleted Node '%s'", hostName)
+	logrus.Debugf("Successfully deleted Node '%s'", p.node.Name)
 	return nil, nil
 }
 
-func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -882,17 +1033,25 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
 	}
-	if p.master.IsNull() {
-		return nil, fail.InvalidParameterError("params.master", "cannot be null value of 'resources.Host'")
+	if p.node == nil {
+		return nil, fail.InvalidParameterError("params.node", "cannot be nil")
 	}
 
-	hostName := p.master.GetName()
-	logrus.Debugf("Deleting Master '%s'", hostName)
-	if xerr := c.deleteMaster(task, p.master); xerr != nil {
-		logrus.Errorf("Failed to delete Master '%s'", hostName)
+	var host resources.Host
+	if p.node.ID != "" {
+		host, xerr = LoadHost(task, c.GetService(), p.node.ID)
+	} else if p.node.Name != "" {
+		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
+	} else {
+		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
+	}
+
+	logrus.Debugf("Deleting Master '%s'", p.node.Name)
+	if xerr := c.deleteMaster(task, host); xerr != nil {
+		logrus.Errorf("Failed to delete Master '%s'", p.node.Name)
 		return nil, xerr
 	}
 
-	logrus.Debugf("Successfully deleted master '%s'", hostName)
+	logrus.Debugf("Successfully deleted master '%s'", p.node.Name)
 	return nil, nil
 }
