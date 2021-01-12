@@ -72,25 +72,25 @@ feature:
                                     sfStandardRetry "sfApt install -qqy docker-ce" || sfFail 194
                                     ;;
                                 centos|redhat|rhel)
-                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 192
-                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 193
+                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 195
+                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 196
                                     kop=0
                                     op=-1
                                     yum install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then
                                         sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y curl &>/dev/null" && op=$? || true
                                         if [ $op -ne 0 ]; then
-                                            sfFail 194
+                                            sfFail 197
                                         else
-                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail 195
+                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail 198
                                         fi
                                     else
-                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 196
+                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 199
                                     fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
                                 fedora)
-                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 192
+                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 200
                                     sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo"
                                     kop=0
                                     op=-1
@@ -98,12 +98,12 @@ feature:
                                     if [ $op -ne 0 ]; then
                                         dnf install -y curl &>/dev/null && op=$? || true
                                         if [ $op -ne 0 ]; then
-                                            sfFail 193
+                                            sfFail 201
                                         else
-                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce" || sfFail 194
+                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce" || sfFail 202
                                         fi
                                     else
-                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce --nobest" || sfFail 195
+                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce --nobest" || sfFail 203
                                     fi
                                     systemctl enable --now docker || true
                                     ;;
@@ -123,9 +123,9 @@ feature:
                         run: |
                             op=-1
                             VERSION=$(sfStandardRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
-                            [ $op -ne 0 ] && sfFail 198
+                            [ $op -ne 0 ] && sfFail 204
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || sfFail 199
+                            sfDownload "$URL" docker-compose 3m 5 || sfFail 205
                             chmod +x docker-compose && mv docker-compose /usr/bin
                             sfExit
 
@@ -197,7 +197,7 @@ feature:
                             sfService restart firewalld
                             sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
                             sfFirewallAdd --zone=trusted --add-masquerade
-                            sfFirewallReload || sfFail 200 "Firewall problem"
+                            sfFirewallReload || sfFail 206 "Firewall problem"
 
                     ready:
                         targets:
@@ -206,11 +206,11 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService enable docker || sfFail 201
-                            sfService restart docker || sfFail 202
+                            sfService enable docker || sfFail 207
+                            sfService restart docker || sfFail 208
                             op=-1
                             sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && sfFail 203
+                            [ $op -ne 0 ] && sfFail 209
                             sfExit
 
             remove:
