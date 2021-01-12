@@ -52,6 +52,7 @@ func Test_Command(t *testing.T) {
 	assert.Nil(t, err)
 	cmd, err := sshConf.Command(voidtask, "whoami")
 	assert.Nil(t, err)
+	defer cmd.Close()
 	out, err := cmd.Output() // FIXME Correct this test
 	if err != nil {
 		t.Skip()
@@ -64,6 +65,7 @@ func Test_Command(t *testing.T) {
 		sshConf.GatewayConfig = &gateway
 		cmd, err := sshConf.Command(voidtask, "bash -c whoami")
 		assert.Nil(t, err)
+		defer cmd.Close()
 		out, err := cmd.Output()
 		assert.Nil(t, err)
 		assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
@@ -74,6 +76,7 @@ func Test_Command(t *testing.T) {
 		sshConf.GatewayConfig.GatewayConfig = &gw
 		cmd, err := sshConf.Command(voidtask, "bash -c whoami")
 		assert.Nil(t, err)
+		defer cmd.Close()
 		out, err := cmd.Output()
 		assert.Nil(t, err)
 		assert.Equal(t, usr.Name, strings.Trim(string(out), "\n"))
