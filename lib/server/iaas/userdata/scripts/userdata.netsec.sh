@@ -18,24 +18,25 @@
 
 {{.Header}}
 
-print_error() {
+function print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
-fail() {
+function failure() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
     exit $1
 }
+export -f failure
 
-# Redirects outputs to /opt/safescale/log/user_data.netsec.log
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.netsec.log
-exec 2>&1
+# Redirects outputs to /opt/safescale/var/log/user_data.netsec.log
+LOGFILE=/opt/safescale/var/log/user_data.netsec.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /var/log/ss.log) 2>&1
 set -x
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
@@ -44,17 +45,19 @@ set -x
 {{ .BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
-reset_fw() {
+function reset_fw() {
     case $LINUX_KIND in
         debian|ubuntu)
+            echo "Reset firewall"
             sfApt update &>/dev/null || return 1
-            sfApt install -q -y firewalld || return 1
+            sfApt install -q -y firewalld 2>&1 || return 1
 
-            systemctl stop ufw
+            echo "Stopping ufw"
+            systemctl stop ufw || return 1
             # systemctl start firewalld || return 1
-            systemctl disable ufw
+            systemctl disable ufw || return 1
             # systemctl enable firewalld
-            sfApt purge -q -y ufw &>/dev/null || return 1
+            sfApt purge -q -y ufw 2>&1 || return 1
             ;;
 
         rhel|centos)
@@ -106,7 +109,9 @@ reset_fw() {
     firewall-offline-cmd --zone=public --add-service=ssh || return 1
 
     # Save current fw settings as permanent
-    sfService enable firewalld
+    sfService enable firewalld || return 1
+
+    return 0
 }
 
 NICS=
@@ -120,7 +125,7 @@ AWS=
 
 # Don't request dns name servers from DHCP server
 # Don't update default route
-configure_dhclient() {
+function configure_dhclient() {
     # kill any dhclient process already running
     pkill dhclient || true
 
@@ -141,7 +146,7 @@ EOF
     fi
 }
 
-is_ip_private() {
+function is_ip_private() {
     ip=$1
     ipv=$(sfIP2long $ip)
 
@@ -159,7 +164,7 @@ is_ip_private() {
     return 1
 }
 
-identify_nics() {
+function identify_nics() {
     NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
     NICS=${NICS/[[:cntrl:]]/ }
 
@@ -213,21 +218,21 @@ identify_nics() {
     echo
 }
 
-substring_diff() {
+function substring_diff() {
     read -a l1 <<<$1
     read -a l2 <<<$2
     echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity() {
+function ensure_network_connectivity() {
     op=-1
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
     [ $op -ne 0 ] && echo "ensure_network_connectivity started WITHOUT network..." || echo "ensure_network_connectivity started WITH network..."
 
     {{- if .AddGateway }}
-        route del -net default &>/dev/null
-        route add -net default gw {{ .DefaultRouteIP }}
+        route del -net default || true
+        route add -net default gw {{ .DefaultRouteIP }} || true
     {{- else }}
     :
     {{- end}}
@@ -237,7 +242,7 @@ ensure_network_connectivity() {
     [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
 }
 
-configure_dns() {
+function configure_dns() {
     if systemctl status systemd-resolved &>/dev/null; then
         echo "Configuring dns with resolved"
         configure_dns_systemd_resolved
@@ -251,14 +256,14 @@ configure_dns() {
 }
 
 # adds entry in /etc/hosts corresponding to FQDN hostname with private IP
-update_fqdn() {
+function update_fqdn() {
     IF=${PR_IFs[0]}
     [ -z ${IF} ] && return
     IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    sed -i -nr "/^${IP}"'/!p/$a'"${IP}"'\t{{ .HostName }}' /etc/hosts
+    sed -i -nr "/^${IP}"'/!p;$a'"${IP}"'\t{{ .HostName }}' /etc/hosts
 }
 
-configure_network() {
+function configure_network() {
     case $LINUX_KIND in
         debian|ubuntu)
             if systemctl status systemd-networkd &>/dev/null; then
@@ -267,7 +272,7 @@ configure_network() {
                 configure_network_debian
             else
                 echo "PROVISIONING_ERROR: failed to determine how to configure network"
-                fail 192
+                failure 192
             fi
             ;;
 
@@ -282,24 +287,24 @@ configure_network() {
 
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 193
+            failure 193
             ;;
     esac
 
     {{- if .IsGateway }}
-    configure_as_gateway || fail 194
+    configure_as_gateway || failure 194
     {{- end }}
 
     update_fqdn
 
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
-        fail 196
+        failure 196
     }
 }
 
 # Configure network for Debian distribution
-configure_network_debian() {
+function configure_network_debian() {
     echo "Configuring network (debian-like)..."
 
     local path=/etc/network/interfaces.d
@@ -327,7 +332,7 @@ EOF
     echo "Looking for network..."
     check_for_network || {
         echo "PROVISIONING_ERROR: failed network cfg 0"
-        fail 197
+        failure 197
     }
 
     configure_dhclient
@@ -337,7 +342,7 @@ EOF
     echo "Looking for network..."
     check_for_network || {
         echo "PROVISIONING_ERROR: failed network cfg 1"
-        fail 198
+        failure 198
     }
 
     systemctl restart networking
@@ -345,16 +350,16 @@ EOF
     echo "Looking for network..."
     check_for_network || {
         echo "PROVISIONING_ERROR: failed network cfg 2"
-        fail 199
+        failure 199
     }
 
-    reset_fw || fail 200
+    reset_fw || failure 200
 
-    echo done
+    echo "done"
 }
 
 # Configure network using systemd-networkd
-configure_network_systemd_networkd() {
+function configure_network_systemd_networkd() {
     echo "Configuring network (using netplan and systemd-networkd)..."
 
     {{- if .IsGateway }}
@@ -471,17 +476,17 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 0"
-            fail 201
+            failure 201
         }
     fi
 
-    netplan generate && netplan apply || fail 198
+    netplan generate && netplan apply || failure 198
 
     if [[ $AWS -eq 1 ]]; then
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 1"
-            fail 202
+            failure 202
         }
     fi
 
@@ -491,7 +496,7 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 2"
-            fail 203
+            failure 203
         }
     fi
 
@@ -501,17 +506,17 @@ EOF
         echo "Looking for network..."
         check_for_network || {
             echo "PROVISIONING_ERROR: failed networkd cfg 3"
-            fail 204
+            failure 204
         }
     fi
 
-    reset_fw || fail 205
+    reset_fw || failure 205
 
-    echo done
+    echo "done"
 }
 
 # Configure network for redhat7-like distributions (rhel, centos, ...)
-configure_network_redhat() {
+function configure_network_redhat() {
     echo "Configuring network (redhat7-like)..."
 
     if [ -z $VERSION_ID -o $VERSION_ID -lt 7 ]; then
@@ -584,12 +589,12 @@ EOF
 
     echo "exclude=NetworkManager" >>/etc/yum.conf
 
-    reset_fw || fail 206
+    reset_fw || failure 206
 
-    echo done
+    echo "done"
 }
 
-check_for_ip() {
+function check_for_ip() {
     ip=$(ip -f inet -o addr show $1 | cut -d' ' -f7 | cut -d' ' -f1)
     [ -z "$ip" ] && echo "Failure checking for ip '$ip' when evaluating '$1'" && return 1
     return 0
@@ -599,7 +604,7 @@ export -f check_for_ip
 # Checks network is set correctly
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
-check_for_network() {
+function check_for_network() {
     NETROUNDS=24
     REACHED=0
 
@@ -622,7 +627,7 @@ check_for_network() {
     return 0
 }
 
-configure_as_gateway() {
+function configure_as_gateway() {
     echo "Configuring host as gateway..."
 
     if [[ ! -z ${PR_IFs} ]]; then
@@ -655,15 +660,15 @@ EOF
     # Allows default services on public zone
     firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
 
-    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || sfFail 207
-    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 208
-    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config || sfFail 209
+    sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 207
+    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || failure 208
+    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config || failure 209
     systemctl restart sshd
 
-    echo done
+    echo "done"
 }
 
-configure_dns_legacy() {
+function configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
     cp /etc/resolv.conf /etc/resolv.conf.bak
 
@@ -699,10 +704,10 @@ EOF
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
     [ ${op} -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
 
-    echo done
+    echo "done"
 }
 
-configure_dns_resolvconf() {
+function configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
 
     EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
@@ -718,10 +723,10 @@ nameserver 1.1.1.1
 EOF
 
     resolvconf -u
-    echo done
+    echo "done"
 }
 
-configure_dns_systemd_resolved() {
+function configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
 {{- if not .DefaultRouteIP }}
@@ -740,10 +745,10 @@ Cache=yes
 DNSStubListener=yes
 EOF
     systemctl restart systemd-resolved
-    echo done
+    echo "done"
 }
 
-early_packages_update() {
+function early_packages_update() {
     ensure_network_connectivity
 
     # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
@@ -763,7 +768,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -q -y systemd pciutils || fail 210
+            sfApt install -q -y systemd pciutils || failure 210
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -777,9 +782,9 @@ EOF
             sfApt update
             # Force update of systemd, pciutils and netplan
             if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-                sfApt install -y systemd pciutils netplan.io || fail 211
+                sfApt install -y systemd pciutils netplan.io || failure 211
             else
-                sfApt install -y systemd pciutils || fail 212
+                sfApt install -y systemd pciutils || failure 212
             fi
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
@@ -793,7 +798,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -q -y systemd pciutils yum-utils || fail 213
+            yum install -q -y systemd pciutils yum-utils || failure 213
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -804,22 +809,24 @@ EOF
     sfProbeGPU
 }
 
-install_packages() {
+function install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
-            sfApt install -y -qq jq zip time zip &>/dev/null || fail 214
+            echo "This is great"
+            sfApt install -y -qq jq zip time &>/dev/null || failure 214
+            echo "And it could be better"
             ;;
         redhat|centos)
-            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || fail 215
+            yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 215
             ;;
         *)
             echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 216
+            failure 216
             ;;
      esac
 }
 
-add_common_repos() {
+function add_common_repos() {
     case $LINUX_KIND in
         ubuntu)
             sfFinishPreviousInstall
@@ -836,7 +843,7 @@ add_common_repos() {
     esac
 }
 
-configure_locale() {
+function configure_locale() {
     case $LINUX_KIND in
         ubuntu|debian) locale-gen en_US.UTF-8
                        ;;
@@ -844,7 +851,7 @@ configure_locale() {
     export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
-force_dbus_restart() {
+function force_dbus_restart() {
     case $LINUX_KIND in
         ubuntu)
             sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
@@ -854,7 +861,7 @@ force_dbus_restart() {
     esac
 }
 
-update_kernel_settings() {
+function update_kernel_settings() {
     cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
 EOF
@@ -877,7 +884,7 @@ configure_network
 
 install_packages
 
-update_kernel_settings || fail 217
+update_kernel_settings || failure 217
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 
@@ -886,6 +893,8 @@ echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:
 #insert_tag
 
 force_dbus_restart
+
+systemctl restart sshd
 
 set +x
 exit 0
