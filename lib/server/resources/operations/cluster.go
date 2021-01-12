@@ -2090,7 +2090,8 @@ func (c cluster) FindAvailableMaster(task concurrency.Task) (master resources.Ho
 		return nil, xerr
 	}
 
-	var lastError error
+	var lastError fail.Error
+	lastError = fail.NotFoundError("no master found")
 	master = nil
 	for _, v := range masters {
 		if _, xerr = v.WaitSSHReady(task, temporal.GetConnectSSHTimeout()); xerr != nil {
@@ -2106,7 +2107,7 @@ func (c cluster) FindAvailableMaster(task concurrency.Task) (master resources.Ho
 		break
 	}
 	if master == nil {
-		return nil, fail.NotAvailableError("failed to find available master: %v", lastError)
+		return nil, lastError
 	}
 	return master, nil
 }

@@ -314,6 +314,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 			if handler.job.Aborted() {
 				return retry.StopRetryError(nil, "operation aborted by user")
 			}
+
 			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
 			return xerr
 		},
@@ -334,6 +335,9 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
+
+	defer sshCmd.Close()
+
 	return sshCmd.RunWithTimeout(handler.job.GetTask(), outputs.DISPLAY, duration)
 }
 

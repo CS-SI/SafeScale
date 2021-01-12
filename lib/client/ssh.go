@@ -86,6 +86,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
+	defer sshCmd.Close()
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
