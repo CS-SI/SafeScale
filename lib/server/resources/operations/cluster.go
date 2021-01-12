@@ -1948,14 +1948,20 @@ func (c cluster) ListMasters(task concurrency.Task) (list resources.IndexedListO
 	defer fail.OnPanic(&xerr)
 
 	xerr = c.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(task, clusterproperty.NodesV2, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			list = make(resources.IndexedListOfClusterNodes, len(nodesV2.Masters))
+
 			for _, v := range nodesV2.Masters {
-				host, innerXErr := LoadHost(task, c.service, v.ID)
+				var host resources.Host
+				if v.ID == "" { // this is a master in creation, not yet completed; ignore it
+					continue
+				}
+				host, innerXErr = LoadHost(task, c.service, v.ID)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -2507,13 +2513,15 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 
 	// Deletes node
 	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Leave node from cluster, if selectedMasterID is not empty
-		if innerXErr := c.leaveNodesFromList(task, []resources.Host{host}, master); innerXErr != nil {
-			return innerXErr
-		}
-		if c.makers.UnconfigureNode != nil {
-			if innerXErr := c.makers.UnconfigureNode(task, c, host, master); innerXErr != nil {
+		// Leave node from cluster, if master is not null
+		if !master.IsNull() {
+			if innerXErr := c.leaveNodesFromList(task, []resources.Host{host}, master); innerXErr != nil {
 				return innerXErr
+			}
+			if c.makers.UnconfigureNode != nil {
+				if innerXErr := c.makers.UnconfigureNode(task, c, host, master); innerXErr != nil {
+					return innerXErr
+				}
 			}
 		}
 
@@ -2539,9 +2547,22 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	selectedMaster, xerr := c.FindAvailableMaster(task)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// No master found, continue without one
+			selectedMaster = nil
+		default:
+			return xerr
+		}
+	}
+
+	var cleaningErrors []error
+
+	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Updates cluster state to mark cluster as Removing
-		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2549,73 +2570,135 @@ func (c *cluster) Delete(task concurrency.Task) fail.Error {
 			stateV1.State = clusterstate.Removed
 			return nil
 		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Delete nodes
+		return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
+			nodesV2, ok := clonable.(*propertiesv2.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if length := len(nodesV2.PrivateNodes); length > 0 {
+				subtasks := make([]concurrency.Task, 0, length)
+				for _, v := range nodesV2.PrivateNodes {
+					subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v, master: selectedMaster})
+					if xerr != nil {
+						cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of node '%s'", v.Name))
+						break
+					}
+					subtasks = append(subtasks, subtask)
+				}
+				for _, s := range subtasks {
+					if _, xerr = s.Wait(); xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// node not found, consider as a successful deletion and continue
+						default:
+							return xerr
+						}
+					}
+				}
+			}
+
+			if length := len(nodesV2.Masters); length > 0 {
+				subtasks := make([]concurrency.Task, 0, length)
+				for _, v := range nodesV2.Masters {
+					subtask, xerr := task.StartInSubtask(c.taskDeleteMaster, taskDeleteNodeParameters{node: v})
+					if xerr != nil {
+						cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of master '%s'", v.Name))
+						break
+					}
+					subtasks = append(subtasks, subtask)
+				}
+				for _, s := range subtasks {
+					if _, xerr := s.Wait(); xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// master missing, consider as a successful deletion and continue
+						default:
+							cleaningErrors = append(cleaningErrors, xerr)
+						}
+					}
+				}
+			}
+
+			return nil
+		})
 	})
 	if xerr != nil {
 		return xerr
 	}
 
-	var cleaningErrors []error
-
-	// --- Delete the nodes ---
-	list, xerr := c.ListNodes(task)
-	if xerr != nil {
-		return xerr
-	}
-	length := uint(len(list))
-	if length > 0 {
-		selectedMaster, xerr := c.FindAvailableMaster(task)
-		if xerr != nil {
-			return xerr
-		}
-
-		subtasks := make([]concurrency.Task, 0, length)
-		for _, v := range list {
-			subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v, master: selectedMaster})
-			if xerr != nil {
-				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of node '%s'", v.GetName()))
-				break
-			}
-			subtasks = append(subtasks, subtask)
-		}
-		for _, s := range subtasks {
-			if _, xerr = s.Wait(); xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// node not found, consider as a successful deletion and continue
-				default:
-					return xerr
-				}
-			}
-		}
-	}
-
-	// --- Delete the Masters ---
-	if list, xerr = c.ListMasters(task); xerr != nil {
-		cleaningErrors = append(cleaningErrors, xerr)
-		return fail.NewErrorList(cleaningErrors)
-	}
-	length = uint(len(list))
-	if length > 0 {
-		subtasks := make([]concurrency.Task, 0, length)
-		for _, v := range list {
-			subtask, xerr := task.StartInSubtask(c.taskDeleteMaster, taskDeleteNodeParameters{master: v})
-			if xerr != nil {
-				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of master '%s'", v.GetName()))
-				break
-			}
-			subtasks = append(subtasks, subtask)
-		}
-		for _, s := range subtasks {
-			if _, xerr := s.Wait(); xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// master missing, consider as a successful deletion and continue
-				default:
-					cleaningErrors = append(cleaningErrors, xerr)
-				}
-			}
-		}
-	}
+	//
+	// // --- Delete the nodes ---
+	// list, xerr := c.ListNodes(task)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// length := uint(len(list))
+	// if length > 0 {
+	// 	selectedMaster, xerr := c.FindAvailableMaster(task)
+	// 	if xerr != nil {
+	// 		switch xerr.(type) {
+	// 		case *fail.ErrNotFound:
+	// 			// No master found, continue without one
+	// 			selectedMaster = nil
+	// 		default:
+	// 			return xerr
+	// 		}
+	// 	}
+	//
+	// 	subtasks := make([]concurrency.Task, 0, length)
+	// 	for _, v := range list {
+	// 		subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v, master: selectedMaster})
+	// 		if xerr != nil {
+	// 			cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of node '%s'", v.GetName()))
+	// 			break
+	// 		}
+	// 		subtasks = append(subtasks, subtask)
+	// 	}
+	// 	for _, s := range subtasks {
+	// 		if _, xerr = s.Wait(); xerr != nil {
+	// 			switch xerr.(type) {
+	// 			case *fail.ErrNotFound:
+	// 				// node not found, consider as a successful deletion and continue
+	// 			default:
+	// 				return xerr
+	// 			}
+	// 		}
+	// 	}
+	// }
+	//
+	// // --- Delete the Masters ---
+	// if list, xerr = c.ListMasters(task); xerr != nil {
+	// 	cleaningErrors = append(cleaningErrors, xerr)
+	// 	return fail.NewErrorList(cleaningErrors)
+	// }
+	// length = uint(len(list))
+	// if length > 0 {
+	// 	subtasks := make([]concurrency.Task, 0, length)
+	// 	for _, v := range list {
+	// 		subtask, xerr := task.StartInSubtask(c.taskDeleteMaster, taskDeleteNodeParameters{master: v})
+	// 		if xerr != nil {
+	// 			cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of master '%s'", v.GetName()))
+	// 			break
+	// 		}
+	// 		subtasks = append(subtasks, subtask)
+	// 	}
+	// 	for _, s := range subtasks {
+	// 		if _, xerr := s.Wait(); xerr != nil {
+	// 			switch xerr.(type) {
+	// 			case *fail.ErrNotFound:
+	// 				// master missing, consider as a successful deletion and continue
+	// 			default:
+	// 				cleaningErrors = append(cleaningErrors, xerr)
+	// 			}
+	// 		}
+	// 	}
+	// }
 	if len(cleaningErrors) > 0 {
 		return fail.NewErrorList(cleaningErrors)
 	}
