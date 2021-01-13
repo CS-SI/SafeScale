@@ -316,7 +316,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	}, nil
 }
 
-// SSHCommand defines a SSH command
+// SSHCommand defines a SSH newCommand
 type SSHCommand struct {
 	hostname string
 	runCmdString  string
@@ -341,10 +341,10 @@ func (scmd *SSHCommand) closeTunneling() fail.Error {
 	return err
 }
 
-// Wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
-// The command must have been started by Start.
-// The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
-// If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
+// Wait waits for the newCommand to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
+// The newCommand must have been started by Start.
+// The returned error is nil if the newCommand runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
+// If the newCommand fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
 // Wait does not release resources associated with the cmd; SSHCommand.Close() must be called for that.
 // !!!ATTENTION!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
@@ -425,7 +425,7 @@ func (scmd *SSHCommand) getStdinPipe() (io.WriteCloser, fail.Error) {
 	return pipe, nil
 }
 
-// Output returns the standard output of command started.
+// Output returns the standard output of newCommand started.
 // Any returned error will usually be of type *ExitError.
 // If c.Stderr was nil, Output populates ExitError.Stderr.
 func (scmd *SSHCommand) Output() ([]byte, fail.Error) {
@@ -443,7 +443,7 @@ func (scmd *SSHCommand) Output() ([]byte, fail.Error) {
 	return content, nil
 }
 
-// CombinedOutput returns the combined standard of command started
+// CombinedOutput returns the combined standard of newCommand started
 // output and standard error.
 func (scmd *SSHCommand) CombinedOutput() ([]byte, fail.Error) {
 	if scmd == nil {
@@ -478,11 +478,11 @@ func (scmd *SSHCommand) Start() fail.Error {
 
 // Run starts the specified command and waits for it to complete.
 //
-// The returned error is nil if the command runs, has no problems
+// The returned error is nil if the newCommand runs, has no problems
 // copying stdin, stdout, and stderr, and exits with a zero exit
 // status.
 //
-// If the command starts but does not complete successfully, the error is of
+// If the newCommand starts but does not complete successfully, the error is of
 // type *ExitError. Other error types may be returned for other situations.
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
@@ -779,19 +779,19 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 		// it works this way for those reasons:
 		//	 a direct ssh to the user would force the host admin to tweak ssh and weaken the security by mistake
 		//   sudo can not be forced to ask the password unless you modify the sudoers file to do so
-		//	 su may be used to ask password then launch a command but it launches a shell without tty (sudo for example would refuse to work)
+		//	 su may be used to ask password then launch a newCommand but it launches a shell without tty (sudo for example would refuse to work)
 		cmd = "su " + username + " -c exit && " + sshCmdString + " -t sudo -u " + username
 		withTty = true
 	}
 
 	if withTty {
-		// tty option is required for some command like ls
+		// tty option is required for some newCommand like ls
 		sshCmdString += " -t"
 	}
 
 	if withSudo {
 		if cmd == "" {
-			// tty option is required for some command like ls
+			// tty option is required for some newCommand like ls
 			cmd = "sudo"
 		}
 	}
@@ -832,12 +832,12 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 
 	tunnels, sshConfig, err := sconf.CreateTunneling()
 	if err != nil {
-		return nil, fail.Wrap(err, "unable to create command")
+		return nil, fail.Wrap(err, "unable to create newCommand")
 	}
 
 	sshCmdString, keyFile, err := createSSHCommand(sshConfig, cmdString, "", "", withTty, withSudo)
 	if err != nil {
-		return nil, fail.Wrap(err, "unable to create command")
+		return nil, fail.Wrap(err, "unable to create newCommand")
 	}
 
 	// cmd := exec.NewCommandWithContext(ctx, "bash", "-c", sshCmdString)
@@ -1000,7 +1000,7 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 				logrus.Warnf("Error closing sconf tunnel: %v", nerr)
 			}
 		}
-		return fail.Wrap(xerr, "unable to create command")
+		return fail.Wrap(xerr, "unable to create newCommand")
 	}
 
 	sshCmdString, keyFile, xerr := createSSHCommand(sshConfig, "", username, shell, true, false)
@@ -1015,7 +1015,7 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 				logrus.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fail.Wrap(xerr, "unable to create command")
+		return fail.Wrap(xerr, "unable to create newCommand")
 	}
 
 	bash, err := exec.LookPath("bash")
@@ -1030,10 +1030,10 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 				logrus.Warnf("Error removing file %v", nerr)
 			}
 		}
-		return fail.Wrap(err, "unable to create command")
+		return fail.Wrap(err, "unable to create newCommand")
 	}
 
-	// First check ssh is available
+	// First check sconf is available
 	proc := exec.Command(bash, "-c", sshPingCmdString)
 	proc.Stdin = os.Stdin
 	proc.Stdout = os.Stdout
@@ -1054,16 +1054,16 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 // // NewCommandWithContext is like NewCommand but includes a context.
 // //
 // // The provided context is used to kill the process (by calling
-// // os.Process.Kill) if the context becomes done before the command
+// // os.Process.Kill) if the context becomes done before the newCommand
 // // completes on its own.
 // func (ssh *SSHConfig) NewCommandWithContext(ctx context.Context, runCmdString string) (*SSHCommand, error) {
 // 	tunnels, sshConfig, err := ssh.CreateTunneling()
 // 	if err != nil {
-// 		return nil, fmt.Errorf("unable to create command : %s", err.Error()
+// 		return nil, fmt.Errorf("unable to create newCommand : %s", err.Error()
 // 	}
 // 	sshCmdString, sshPingCmdString, keyFile, err := createSSHCommand(sshConfig, runCmdString, false)
 // 	if err != nil {
-// 		return nil, fmt.Errorf("unable to create command : %s", err.Error()
+// 		return nil, fmt.Errorf("unable to create newCommand : %s", err.Error()
 // 	}
 //
 // 	cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)
