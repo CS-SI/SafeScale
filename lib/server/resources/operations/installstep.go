@@ -38,7 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -283,12 +282,12 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	nHosts := uint(len(hosts))
-	defer temporal.NewStopwatch().OnExitLogWithLevel(
-		fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),
-		fmt.Sprintf("Ending step '%s' on %d host%s", is.Name, len(hosts), strprocess.Plural(nHosts)),
-		logrus.DebugLevel,
-	)()
+	// nHosts := uint(len(hosts))
+	// defer temporal.NewStopwatch().OnExitLogWithLevel(
+	// 	fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),
+	// 	fmt.Sprintf("Ending step '%s' on %d host%s", is.Name, len(hosts), strprocess.Plural(nHosts)),
+	// 	logrus.DebugLevel,
+	// )()
 
 	if is.Serial || s.Serialize {
 
@@ -469,7 +468,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		// err := UploadStringToRemoteFile(is.OptionsFileContent, rh, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
 		rfcItem := remotefile.Item{
 			Remote:       utils.TempFolder + "/options.json",
-			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here
+			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
 		xerr = rfcItem.UploadString(task, is.OptionsFileContent, p.Host)
@@ -514,44 +513,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil
 }
-
-// func clitools.ReturnValuesFromShellToError(retcode int, stdout string, stderr string, err error, msg string) error {
-// 	richErrc := fmt.Sprintf("%d", retcode)
-
-// 	var collected []string
-// 	if stdout != "" {
-// 		errLines := strings.Split(stdout, "\n")
-// 		for _, errline := range errLines {
-// 			if strings.Contains(errline, "An error occurred") {
-// 				collected = append(collected, errline)
-// 			}
-// 		}
-// 	}
-// 	if stderr != "" {
-// 		errLines := strings.Split(stderr, "\n")
-// 		for _, errline := range errLines {
-// 			if strings.Contains(errline, "An error occurred") {
-// 				collected = append(collected, errline)
-// 			}
-// 		}
-// 	}
-
-// 	if len(collected) > 0 {
-// 		if err != nil {
-// 			return fail.Wrap(err, fmt.Sprintf("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";")))
-// 		}
-// 		return fail.NewError("%s: failed with error code %s, std errors [%s]", msg, richErrc, strings.Join(collected, ";"))
-// 	}
-
-// 	if err != nil {
-// 		return fail.Wrap(err, fmt.Sprintf("%s: failed with error code %s", msg, richErrc))
-// 	}
-// 	if retcode != 0 {
-// 		return fail.NewError("%s: failed with error code %s", msg, richErrc)
-// 	}
-
-// 	return nil
-// }
 
 // realizeVariables replaces any template occuring in every variable
 func realizeVariables(variables data.Map) (data.Map, fail.Error) {

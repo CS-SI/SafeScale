@@ -317,7 +317,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		// 	return nerr
 		// }
 
-		// c, err := ssh.Command(job.GetTask(), cmd)
+		// c, err := ssh.NewCommand(job.GetTask(), cmd)
 		// if err != nil {
 		// 	logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.GetName, err)
 		// 	return err

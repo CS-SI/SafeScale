@@ -1782,12 +1782,12 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 // If run fails to connect to remote host, returns *fail.ErrNotAvailable
 func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// Create the command
-	sshCmd, xerr := ssh.Command(task, cmd)
+	sshCmd, xerr := ssh.NewCommand(task, cmd)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
 
-	defer sshCmd.Close()
+	defer func() { _ = sshCmd.Close() }()
 
 	var (
 		retcode        int
