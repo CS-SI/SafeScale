@@ -18,14 +18,14 @@
 
 {{.Header}}
 
-print_error() {
+function print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
-fail() {
+function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.init.done
     exit $1
@@ -35,16 +35,16 @@ mkdir -p /opt/safescale/etc /opt/safescale/bin &>/dev/null
 mkdir -p /opt/safescale/var/log &>/dev/null
 mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
 
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.init.log
-exec 2>&1
+LOGFILE=/opt/safescale/var/log/user_data.init.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /var/log/ss.log) 2>&1
 set -x
 
 LINUX_KIND=
 VERSION_ID=
 
-sfDetectFacts() {
+function sfDetectFacts() {
 	[ -f /etc/os-release ] && {
 		. /etc/os-release
 		LINUX_KIND=$ID
@@ -64,7 +64,7 @@ sfDetectFacts() {
 }
 sfDetectFacts
 
-create_user() {
+function create_user() {
 	echo "Creating user {{.User}}..."
 	if getent passwd {{.User}}; then
     echo "User {{.User}} already exists !"
@@ -136,7 +136,7 @@ EOF
 	echo done
 }
 
-put_hostname_in_hosts() {
+function put_hostname_in_hosts() {
 	echo "{{ .HostName }}" >/etc/hostname
 	hostname {{ .HostName }}
 	SHORT_HOSTNAME=$(hostname -s)
@@ -145,13 +145,13 @@ put_hostname_in_hosts() {
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
-disable_cloudinit_network_autoconf() {
+function disable_cloudinit_network_autoconf() {
 	fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 	mkdir -p $(dirname $fname)
 	echo "network: {config: disabled}" >$fname
 }
 
-disable_services() {
+function disable_services() {
 	case $LINUX_KIND in
 		debian|ubuntu)
             if [[ -n $(command -v systemctl) ]]; then

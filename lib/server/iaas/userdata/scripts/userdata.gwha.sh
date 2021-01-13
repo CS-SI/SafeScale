@@ -18,30 +18,30 @@
 
 {{ .Header }}
 
-print_error() {
+function print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
-fail() {
+function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.gwha.done
     exit $1
 }
 
 # Redirects outputs to /opt/safescale/log/user_data.phase2.log
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.phase2.log
-exec 2>&1
+LOGFILE=/opt/safescale/var/log/user_data.phase2.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /var/log/ss.log) 2>&1
 set -x
 
 # Includes the BashLibrary
 {{ .BashLibrary }}
 
-install_keepalived() {
+function install_keepalived() {
     case $LINUX_KIND in
         ubuntu|debian)
             sfApt update && sfApt -y install keepalived || return 1
