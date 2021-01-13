@@ -18,14 +18,14 @@
 
 {{.Header}}
 
-print_error() {
+function print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
-fail() {
+function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
 
@@ -34,18 +34,21 @@ fail() {
     exit $1
 }
 
-# Redirects outputs to /opt/safescale/log/user_data.final.log
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/user_data.final.log
-exec 2>&1
+# Redirects outputs to /opt/safescale/var/log/user_data.final.log
+LOGFILE=/opt/safescale/var/log/user_data.final.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /var/log/ss.log) 2>&1
 set -x
 
+# Tricks BashLibrary's waitUserData to believe the current phase 'user_data.final' is already done (otherwise will deadlock)
+>/opt/safescale/var/state/user_data.final.done
 # Includes the BashLibrary
 {{ .BashLibrary }}
+rm -f /opt/safescale/var/state/user_data.final.done
 
-install_drivers_nvidia() {
-    lspci | grep -i nvidia &>/dev/null || return
+function install_drivers_nvidia() {
+    lspci | grep -i nvidia &>/dev/null || return 0
 
     case $LINUX_KIND in
         ubuntu)
@@ -92,20 +95,20 @@ install_drivers_nvidia() {
     esac
 }
 
-install_python3() {
-        case $LINUX_KIND in
-        debian|ubuntu)
-            sfFinishPreviousInstall
-            sfApt update || fail 201
-            sfApt -y install python3 &>/dev/null|| fail 210
-            ;;
-        redhat|rhel|centos)
-            yum install -y python3
-            ;;
-        *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 209
-            ;;
+function install_python3() {
+    case $LINUX_KIND in
+    debian|ubuntu)
+        sfFinishPreviousInstall || fail 200
+        sfApt update || fail 201
+        sfApt -y install python3 &>/dev/null|| fail 210
+        ;;
+    redhat|rhel|centos)
+        yum install -y python3 || fail 210
+        ;;
+    *)
+        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
+        fail 209
+        ;;
     esac
 }
 
