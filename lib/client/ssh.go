@@ -82,11 +82,11 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	// defer cancel()
 
 	// Create the command
-	sshCmd, xerr := sshCfg.Command(task, command)
+	sshCmd, xerr := sshCfg.NewCommand(task, command)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
-	defer sshCmd.Close()
+	defer func() { _ = sshCmd.Close() }()
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {

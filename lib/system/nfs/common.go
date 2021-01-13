@@ -159,7 +159,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		return "", xerr
 	}
 
-	k, uperr := sshconfig.SudoCommand(task, "which scp")
+	k, uperr := sshconfig.NewSudoCommand(task, "which scp")
 	if uperr != nil && k != nil {
 		var uptext string
 		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
@@ -201,7 +201,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 			stdout = ""
 			// retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(task, cmd)
+			sshCmd, err := sshconfig.NewSudoCommand(task, cmd)
 			if err != nil {
 				return fail.ExecutionError(err)
 			}
@@ -235,7 +235,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	}
 
 	/*
-		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
+		k, uperr = sshconfig.NewSudoCommand("ping -c4 google.com")
 		if uperr != nil {
 			logrus.Warn("Network problem...")
 		} else {
