@@ -515,7 +515,7 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-	tracer.Trace("newCommand=\n%s\n", scmd.runCmdString)
+	tracer.Trace("command=\n%s\n", sc.runCmdString)
 	defer tracer.Exiting()
 
 	// // Prepare newCommand
