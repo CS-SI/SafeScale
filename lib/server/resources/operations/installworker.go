@@ -741,7 +741,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
 			msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted())
-			logrus.Warnf(strprocess.Capitalize(msg))
+			logrus.Errorf(strprocess.Capitalize(msg))
 			return &r, fail.NewError(msg)
 		}
 		// not successful but completed, if action is check means the feature is not installed, it's an information not a failure
@@ -751,6 +751,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 		// For any other situations, raise error and break
 		msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.ErrorMessages())
+		logrus.Errorf(strprocess.Capitalize(msg))
 		return &r, fail.NewError(msg)
 	}
 
