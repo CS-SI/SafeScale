@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -90,20 +91,27 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			var innerErr fail.Error
-			retcode, stdout, stderr, innerErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
-
-			// If an error occurred and is not a timeout one, stop the loop and propagates this error
-			if innerErr != nil {
-				if _, ok := innerErr.(*fail.ErrTimeout); ok {
-					return innerErr
+			var (
+				innerXErr fail.Error
+				ready     bool
+			)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotAvailable:
+					ready = false
+				case *fail.ErrTimeout:
+					return innerXErr
+				default:
+					// stop the loop and propagate the error
+					retcode = -1
+					return retry.StopRetryError(innerXErr)
 				}
-				retcode = -1
-				return retry.StopRetryError(innerErr)
 			}
 			// If retcode == 255, ssh connection failed, retry
-			if retcode == 255 {
-				return fail.NewError("failed to connect")
+			if retcode == 255 || !ready {
+				log.Warnf("Remote SSH server on Host '%s' is not available, retrying", sshCfg.Hostname)
+				return fail.NotAvailableError("failed to connect")
 			}
 			return nil
 		},
@@ -115,10 +123,12 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		},
 	)
 	if retryErr != nil {
-		if realErr, ok := retryErr.(*retry.ErrStopRetry); ok {
-			return -1, "", "", fail.ToError(realErr.Cause())
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return -1, "", "", fail.ToError(retryErr.Cause())
+		default:
+			return -1, "", "", retryErr
 		}
-		return -1, "", "", retryErr
 	}
 	return retcode, stdout, stderr, nil
 }
