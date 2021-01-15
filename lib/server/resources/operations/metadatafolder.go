@@ -238,7 +238,8 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if _, xerr := f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); xerr != nil {
 		return xerr
 	}
-	sourceHash, remoteHash := md5.New(), md5.New()
+
+	sourceHash := md5.New()
 	_, _ = sourceHash.Write(data)
 
 	sourceHash := md5.New()
