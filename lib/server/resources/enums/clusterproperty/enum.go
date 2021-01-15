@@ -44,9 +44,12 @@ const (
 	// Deprecated by NetworkV3 (but kept for compatibility)
 	NetworkV2 = "10"
 	// NodesV2 contains optional additional info describing Nodes inside the cluster
+	// Deprecated by NodesV3 (but kept for compatibility)
 	NodesV2 = "11"
 	// ControlPlaneV1 contains optional additional info describing control plane settings inside the cluster
 	ControlPlaneV1 = "12"
 	// NetworkV3 contains optional additional info about network of the cluster
 	NetworkV3 = "13"
+	// NodesV3 contains optional additional info about network of the cluster
+	NodesV3 = "14"
 )

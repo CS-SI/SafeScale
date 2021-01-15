@@ -29,7 +29,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -340,31 +342,27 @@ func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	// xerr := retry.WhileUnsuccessfulDelay1Second(
-	// 	func() error {
-	// 		if innerErr := c.readByID(task, id); innerErr != nil {
-	// 			switch innerErr.(type) {
-	// 			case *fail.ErrNotFound: // If not found, stop immediately
-	// 				return retry.StopRetryError(innerErr)
-	// 			default:
-	// 				return innerErr
-	// 			}
-	// 		}
-	// 		return nil
-	// 	},
-	// 	temporal.GetMinDelay(),
-	// )
-	xerr := c.readByID(task, id)
+	xerr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			if innerXErr := c.readByID(task, id); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound: // If not found, stop immediately
+					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		},
+		temporal.GetMinDelay(),
+	)
 	if xerr != nil {
-		// switch xerr.(type) {
-		// case *retry.ErrTimeout:
-		// 	return fail.NotFoundError("failed to load metadata of %s %s", c.kind, id)
-		// case *retry.ErrStopRetry:
-		// 	// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
-		// 	return fail.ToError(xerr.Cause())
-		// default:
-		return xerr
-		// }
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+		default:
+			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
+		}
 	}
 
 	c.loaded = true
@@ -385,20 +383,53 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 // readByReference gets the data from Object Storage
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
 func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
-	if xerr = c.readByID(task, ref); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
-			xerr = c.readByName(task, ref)
-		default:
-			return xerr
-		}
-	}
+	xerr = retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			if innerXErr := c.readByID(task, ref); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound: // If not found, stop immediately
+					if xerr = c.readByName(task, ref); xerr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrNotFound:
+							return retry.StopRetryError(innerXErr)
+						default:
+							return innerXErr
+						}
+					}
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		},
+		temporal.GetCommunicationTimeout(),
+	)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
+		case *retry.ErrTimeout:
+			xerr = fail.Wrap(xerr.Cause(), "failed to read %s '%s'", c.kind, ref)
+		case *retry.ErrStopRetry:
+			xerr = fail.Wrap(xerr.Cause(), "failed to read %s '%s'", c.kind, ref)
+		case *fail.ErrNotFound:
 			xerr = fail.Wrap(xerr, "failed to find %s '%s'", c.kind, ref)
+		default:
+			xerr = fail.Wrap(xerr, "failed to read %s '%s'", c.kind, ref)
 		}
 	}
+	// if xerr = c.readByID(task, ref); xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
+	// 		xerr = c.readByName(task, ref)
+	// 	default:
+	// 		return xerr
+	// 	}
+	// }
+	// if xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
+	// 		xerr = fail.Wrap(xerr, "failed to find %s '%s'", c.kind, ref)
+	// 	}
+	// }
 	return xerr
 }
 
@@ -447,9 +478,30 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 		return fail.InconsistentError("altered and not committed")
 	}
 
-	if xerr := c.readByID(task, c.GetID()); xerr != nil {
-		return xerr
+	id := c.GetID()
+	xerr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			if innerXErr := c.readByID(task, id); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound: // If not found, stop immediately
+					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		},
+		temporal.GetMinDelay(),
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+		default:
+			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
+		}
 	}
+
 	c.loaded = true
 	c.committed = true
 	return nil
