@@ -238,7 +238,8 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if _, xerr := f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); xerr != nil {
 		return xerr
 	}
-	sourceHash, remoteHash := md5.New(), md5.New()
+
+	sourceHash := md5.New()
 	_, _ = sourceHash.Write(data)
 
 	// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
@@ -250,11 +251,10 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 				return innerErr
 			}
 
-			remote := target.Bytes()
-			_, _ = remoteHash.Write(remote)
-			// if !bytes.Equal([]byte(sourceHash), []byte(remoteHash)) {
+			remoteHash := md5.New()
+			_, _ = remoteHash.Write(target.Bytes())
 			if hex.EncodeToString(sourceHash.Sum(nil)) != hex.EncodeToString(remoteHash.Sum(nil)) {
-				return fail.NewError("remote content is different from local reference (source md5 %x != remote md5 %x)", sourceHash, remoteHash)
+				return fail.NewError("remote content is different from local reference")
 			}
 
 			return nil

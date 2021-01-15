@@ -18,15 +18,16 @@ package operations
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"os"
 	"os/user"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 
 	"github.com/sirupsen/logrus"
 
@@ -50,7 +51,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -1736,8 +1736,8 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	}
 
 	hostName := rh.GetName()
-	xerr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
-		func() error {
+	// xerr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
+	// 	func() error {
 			var innerXErr fail.Error
 			retCode, stdOut, stdErr, innerXErr = run(task, ssh, cmd, outs, executionTimeout)
 			if innerXErr != nil {
@@ -1749,21 +1749,22 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 				}
 			}
 
-			if task.Aborted() {
-				return fail.AbortedError(innerXErr)
-			}
-
-			return innerXErr
-		},
-		connectionTimeout*2, // VPL: insufficient delay ?
-		func(t retry.Try, v verdict.Enum) {
-			if v == verdict.Retry {
-				logrus.Warnf("Remote SSH service on Host '%s' is not ready, retrying...", hostName)
-			}
-		},
-	)
-	if xerr != nil {
-		switch xerr.(type) {
+			// if task.Aborted() {
+			// 	return fail.AbortedError(innerXErr)
+			// }
+		//
+		// 	return innerXErr
+		// },
+		// connectionTimeout*2, // VPL: insufficient delay ?
+		// func(t retry.Try, v verdict.Enum) {
+		// 	if v == verdict.Retry {
+		// 		logrus.Warnf("Remote SSH service on Host '%s' is not ready, retrying...", hostName)
+		// 	}
+		// },
+	// )
+	// if xerr != nil {
+	if innerXErr != nil {
+		switch innerXErr.(type) {
 		case *retry.ErrStopRetry:
 			xerr = fail.ToError(xerr.Cause())
 		case *fail.ErrTimeout:
@@ -1773,6 +1774,8 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 			default:
 				xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
 			}
+		default:
+			xerr = innerXErr
 		}
 	}
 	return retCode, stdOut, stdErr, xerr
@@ -1803,7 +1806,6 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 					// Adds stdout annotation to xerr
 					_ = innerXErr.Annotate("stdout", stdout)
 					_ = innerXErr.Annotate("stderr", stderr)
-
 				}
 				return innerXErr
 			}
@@ -1813,7 +1815,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 			}
 			return nil
 		},
-		timeout*2,
+		timeout+time.Minute,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
