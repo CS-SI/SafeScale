@@ -27,20 +27,11 @@ var sourceFileRemovePart atomic.Value
 
 // SourceFilePathUpdater returns a function to alter source file path, if debug is not enabled
 func SourceFilePathUpdater() func(string) string {
-	var (
-		fn func(string) string
-	)
-	// if app.Debug {
-	// VPL: disabled for further thinking...
-	// Do not change anything in source file path
-	fn = func(path string) string { return path }
-	// } else {
-	//     // Alter filepath to remove absolute part (that may not exist)
-	//     removePath := sourceFilePrefixToRemove()
-	//     fn = func(path string) string {
-	//         return strings.Replace(path, removePath, "", 1)
-	//     }
-	// }
+	removePath := sourceFilePrefixToRemove()
+	fn := func(path string) string {
+		newPath := strings.Replace(path, removePath, "...", 1)
+		return newPath
+	}
 	return fn
 }
 

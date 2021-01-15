@@ -79,15 +79,15 @@ func consolidateMessage(msg ...interface{}) string {
 func extractCallerName() string {
 	// if 'in' is empty, recover function name from caller
 	var out string
-	toSkip := 2 // skip 2 first calls, being consolidateMessage + extractCallerName...
+	toSkip := 3 // skip 3 first calls, being something + consolidateMessage + extractCallerName...
 	for {
 		if pc, file, line, ok := runtime.Caller(toSkip); ok {
 			if f := runtime.FuncForPC(pc); f != nil {
-				if strings.Contains(f.Name(), "fail.OnExitLog") {
+				if strings.Contains(f.Name(), "fail.OnExit") {
 					toSkip++
 					continue
 				}
-				out = filepath.Base(f.Name()) + fmt.Sprintf("() [%s:%d]", file, line)
+				out = filepath.Base(f.Name()) + fmt.Sprintf("() [%s:%d]", callstack.SourceFilePathUpdater()(file), line)
 				break
 			}
 		}
