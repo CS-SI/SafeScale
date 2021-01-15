@@ -556,6 +556,9 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		return nil, err
 	}
 
+	if status == READY {  // Waiting a ready task always succeed by design
+		return nil, nil
+	}
 	if status == DONE {
 		return t.result, t.err
 	}
@@ -563,7 +566,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		return nil, t.err
 	}
 	if status != RUNNING {
-		return nil, fail.InconsistentError(fmt.Sprintf("cannot wait task '%s': not running (%d)", tid, status))
+		return nil, fail.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
 	}
 
 	<-t.finishCh
@@ -607,7 +610,7 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fail.NewError("cannot wait task '%s': not running", tid)
+		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
 	}
 	if len(t.finishCh) == 1 {
 		_, err := t.Wait()
@@ -643,7 +646,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 		return true, nil, t.err
 	}
 	if status != RUNNING {
-		return false, nil, fail.NewError("cannot wait task '%s': not running", tid)
+		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
 	}
 
 	var result TaskResult

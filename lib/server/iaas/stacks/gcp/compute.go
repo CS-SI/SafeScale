@@ -321,6 +321,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				// }
 
 				switch innerXErr.(type) {
+				case *fail.ErrDuplicate:
+					return retry.StopRetryError(innerXErr)
 				case *fail.ErrInvalidRequest:
 					return retry.StopRetryError(innerXErr)
 				default:

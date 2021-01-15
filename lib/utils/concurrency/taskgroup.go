@@ -260,7 +260,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		return nil, fail.AbortedError(fail.NewErrorList(errors), "taskgroup was already aborted")
 	}
 	if taskStatus != RUNNING && taskStatus != READY {
-		return nil, fail.ForbiddenError("cannot wait task group '%s': not running", tid)
+		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
 	tg.subtasksLock.SafeLock(tg.task)
@@ -346,19 +346,19 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	tid, err := tg.GetID()
-	if err != nil {
-		return false, nil, err
+	tid, xerr := tg.GetID()
+	if xerr != nil {
+		return false, nil, xerr
 	}
 
 	results := make(map[string]TaskResult)
 
-	taskStatus, err := tg.task.GetStatus()
-	if err != nil {
-		return false, nil, err
+	taskStatus, xerr := tg.task.GetStatus()
+	if xerr != nil {
+		return false, nil, xerr
 	}
 	if taskStatus != RUNNING {
-		return false, nil, fail.NewError("cannot wait task group '%s': not running", tid)
+		return false, nil, fail.NewError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
 	tg.subtasksLock.SafeLock(tg.task)
@@ -371,9 +371,9 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 		}
 	}
 
-	result, err := tg.Wait()
+	result, xerr := tg.Wait()
 	results[tid] = result
-	return true, results, err
+	return true, results, xerr
 }
 
 // WaitFor ...
@@ -404,7 +404,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		return false, nil, err
 	}
 	if taskStatus != RUNNING {
-		return false, nil, fail.InvalidRequestError("cannot wait task '%s': not running", tid)
+		return false, nil, fail.InvalidRequestError("cannot wait task '%s': not running (%d)", tid, taskStatus)
 	}
 
 	// FIXME: go routine never ends if timeout occurs!
