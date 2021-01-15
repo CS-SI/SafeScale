@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 )
 
 // ShareFromPropertyToProtocol convert a share from host to protocol message
@@ -76,6 +77,19 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 // 	return out
 // }
 
+// HostSizingRequirementsFromPropertyToProtocol ...
+func HostSizingRequirementsFromPropertyToProtocol(in propertiesv1.HostSizingRequirements) *protocol.HostSizing {
+	return &protocol.HostSizing{
+		MinCpuCount: int32(in.MinCores),
+		MaxCpuCount: int32(in.MaxCores),
+		MinRamSize: in.MinRAMSize,
+		MaxRamSize: in.MaxRAMSize,
+		MinDiskSize: int32(in.MinDiskSize),
+		GpuCount: int32(in.MinGPU),
+		MinCpuFreq: in.MinCPUFreq,
+	}
+}
+
 // ClusterControlplaneFromPropertyToProtocol does what the name says
 func ClusterControlplaneFromPropertyToProtocol(in propertiesv1.ClusterControlplane) *protocol.ClusterControlplane {
 	out := protocol.ClusterControlplane{}
@@ -91,6 +105,41 @@ func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *p
 	out.Tenants = make([]string, len(in.Tenants))
 	copy(out.Tenants, in.Tenants)
 	return &out
+}
+
+// ClusterDefaultsFromPropertyToProtocol does what the name says
+func ClusterDefaultsFromPropertyToProtocol(in propertiesv2.ClusterDefaults) *protocol.ClusterDefaults {
+	return &protocol.ClusterDefaults{
+		GatewaySizing: HostSizingRequirementsFromPropertyToProtocol(in.GatewaySizing),
+		MasterSizing: HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
+		NodeSizing: HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
+		Image: in.Image,
+	}
+}
+
+// ClusterNetworkFromPropertyToProtocol does what the name says
+func ClusterNetworkFromPropertyToProtocol(in propertiesv3.ClusterNetwork) *protocol.ClusterNetwork {
+	return &protocol.ClusterNetwork{
+		NetworkId: in.NetworkID,
+		Cidr: in.CIDR,
+		Domain: in.Domain,
+		GatewayId: in.GatewayID,
+		GatewayIp: in.GatewayIP,
+		SecondaryGatewayId: in.SecondaryGatewayID,
+		SecondaryGatewayIp: in.SecondaryGatewayIP,
+		DefaultRouteIp: in.DefaultRouteIP,
+		PrimaryPublicIp: in.PrimaryPublicIP,
+		SecondaryPublicIp: in.SecondaryPublicIP,
+		EndpointIp: in.EndpointIP,
+	}
+}
+
+// ClusterFeaturesFromPropertyToProtocol does what the name says
+func ClusterFeaturesFromPropertyToProtocol(in propertiesv1.ClusterFeatures) (*protocol.FeatureListResponse, *protocol.FeatureListResponse) {
+	installed := &protocol.FeatureListResponse{}
+	disabled := &protocol.FeatureListResponse{}
+
+	return installed, disabled
 }
 
 // SecurityGroupBondsFromPropertyToProtocol does what the name says
@@ -136,8 +185,8 @@ func SliceOfSecurityGroupBondFromPropertyToProtocol(in []*propertiesv1.SecurityG
 	return out
 }
 
-// ClusterNodeFromPropertyToProtocol converts a propertiesv2.ClusterNode to a protocol.Host
-func ClusterNodeFromPropertyToProtocol(in propertiesv2.ClusterNode) *protocol.Host {
+// ClusterNodeFromPropertyToProtocol converts a propertiesv3.ClusterNode to a protocol.Host
+func ClusterNodeFromPropertyToProtocol(in propertiesv3.ClusterNode) *protocol.Host {
 	return &protocol.Host{
 		Id:        in.ID,
 		Name:      in.Name,

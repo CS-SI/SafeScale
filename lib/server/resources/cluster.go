@@ -22,7 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -50,7 +49,7 @@ type Cluster interface {
 	Stop(task concurrency.Task) fail.Error                                                                           // stops the cluster
 	AddNode(task concurrency.Task, def abstract.HostSizingRequirements) (Host, fail.Error)                           // adds a node
 	AddNodes(task concurrency.Task, count uint, def abstract.HostSizingRequirements) ([]Host, fail.Error)            // adds several nodes
-	DeleteLastNode(task concurrency.Task) (*propertiesv2.ClusterNode, fail.Error)                                    // deletes the last added node and returns its name
+	DeleteLastNode(task concurrency.Task) (*propertiesv3.ClusterNode, fail.Error)                                    // deletes the last added node and returns its name
 	DeleteSpecificNode(task concurrency.Task, hostID string, selectedMasterID string) fail.Error                     // deletes a node identified by its ID
 	ListMasters(task concurrency.Task) (IndexedListOfClusterNodes, fail.Error)                                       // lists the node instances corresponding to masters (if there is such masters in the flavor...)
 	ListMasterNames(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                   // lists the names of the master nodes in the Cluster
@@ -67,6 +66,7 @@ type Cluster interface {
 	CheckFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)  // checks feature on cluster
 	AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)    // adds feature on cluster
 	RemoveFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error) // removes feature from cluster
+	Shrink(task concurrency.Task, count uint) ([]*propertiesv3.ClusterNode, fail.Error)                              // reduce the size of the cluster of 'count' nodes (the last created)
 	ListInstalledFeatures(task concurrency.Task) ([]Feature, fail.Error)                                             // returns the list of installed features
 	ToProtocol(concurrency.Task) (*protocol.ClusterResponse, fail.Error)
 }
