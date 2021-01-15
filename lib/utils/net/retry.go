@@ -115,8 +115,13 @@ func normalizeError(in error) (err error) {
 			}
 			return retry.StopRetryError(in)
 		default:
-			// In any other case, the error should explain the potential retry has to stop
-			return retry.StopRetryError(in)
+			switch in.Error() {
+			case "not found":   // stow may return that error message if it does not find something
+				return fail.NotFoundError("not found")
+			default:
+				// In any other case, the error should explain the potential retry has to stop
+				return retry.StopRetryError(in)
+			}
 		}
 	}
 	return nil
