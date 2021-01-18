@@ -75,12 +75,13 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	accessKeyID := auth.AccessKeyID
 	secretAccessKey := auth.SecretAccessKey
 
-	s := session.Must(session.NewSession(&aws.Config{
-		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-		S3ForcePathStyle: aws.Bool(true),
-		Region:           aws.String(localCfg.Region),
-		Endpoint:         aws.String(localCfg.S3Endpoint),
-	}))
+	// VPL: S3 is not used through AWS API, but through STOW
+	// ss3 := session.Must(session.NewSession(&aws.Config{
+	// 	Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+	// 	S3ForcePathStyle: aws.Bool(true),
+	// 	Region:           aws.String(localCfg.Region),
+	// 	Endpoint:         aws.String(localCfg.S3Endpoint),
+	// }))
 
 	sec2 := session.Must(session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
@@ -102,7 +103,7 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 		Region:           aws.String(endpoints.UsEast1RegionID),
 	}))
 
-	stack.S3Service = s3.New(s, &aws.Config{})
+	// stack.S3Service = s3.New(ss3, &aws.Config{})
 	stack.EC2Service = ec2.New(sec2, &aws.Config{})
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})

@@ -496,6 +496,9 @@ func (s stack) rpcReadSubnetByID(id string) (osc.Subnet, fail.Error) {
 	if len(subnets) > 1 {
 		return osc.Subnet{}, fail.InconsistentError("more than 1 Subnet with ID %s found", id)
 	}
+	if len(subnets) == 0 {
+		return osc.Subnet{}, fail.NotFoundError("failed to find Subnet %s", id)
+	}
 	return subnets[0], nil
 }
 

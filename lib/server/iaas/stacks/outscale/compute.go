@@ -1109,11 +1109,11 @@ func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 			ahf.Core.Name = tag
 		}
 	}
-	subnets, nics, err := s.listSubnetsByHost(vm.VmId)
-	if err != nil {
-		return err
+	subnets, nics, xerr := s.listSubnetsByHost(vm.VmId)
+	if xerr != nil {
+		return xerr
 	}
-	xerr := s.setHostProperties(ahf, subnets, vm, nics)
+	xerr = s.setHostProperties(ahf, subnets, vm, nics)
 	return xerr
 }
 

@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -115,10 +116,14 @@ func normalizeError(in error) (err error) {
 			}
 			return retry.StopRetryError(in)
 		default:
-			switch in.Error() {
+			str := in.Error()
+			switch str {
 			case "not found":   // stow may return that error message if it does not find something
 				return fail.NotFoundError("not found")
-			default:
+			default:    // stow may return an error containing "dial tcp:" for some HTTP errors
+				if strings.Contains(str, "dial tcp:") {
+					return fail.NewError(str)
+				}
 				// In any other case, the error should explain the potential retry has to stop
 				return retry.StopRetryError(in)
 			}

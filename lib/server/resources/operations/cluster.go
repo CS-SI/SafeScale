@@ -385,6 +385,10 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage("failed to create cluster infrastructure:"))
 	defer fail.OnPanic(&xerr)
 
+	if _, xerr := LoadCluster(task, c.GetService(), req.Name); xerr == nil {
+		return fail.DuplicateError("a cluster named '%s' already exist", req.Name)
+	}
+
 	// Creates first metadata of cluster after initialization
 	if xerr = c.firstLight(task, req); xerr != nil {
 		return xerr
@@ -3441,6 +3445,8 @@ func (c cluster) ToProtocol(task concurrency.Task) (_ *protocol.ClusterResponse,
 			return innerXErr
 		}
 
+		// FIXME: do not use resources.Host to describe nodes, too much information and too much time wasted. Use ClusterNodes instead
+		//        if user wants more information about a node, he can use safescale host inspect.
 		innerXErr = props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
