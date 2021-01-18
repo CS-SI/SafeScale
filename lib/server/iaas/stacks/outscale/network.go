@@ -588,8 +588,14 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 	for _, nic := range resp {
 		item, xerr := s.InspectSubnet(nic.SubnetId)
 		if xerr != nil {
-			return emptySubnetSlice, emptyNicSlice, xerr
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				continue
+			default:
+				return emptySubnetSlice, emptyNicSlice, xerr
+			}
 		}
+
 		list = append(list, item)
 	}
 	return list, resp, nil

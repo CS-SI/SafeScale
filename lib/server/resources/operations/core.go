@@ -22,8 +22,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -203,7 +201,6 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	if xerr = c.Reload(task); xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
 	}
-
 	xerr = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
@@ -360,6 +357,8 @@ func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+		case *retry.ErrStopRetry:
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
 		default:
 			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
 		}
@@ -496,6 +495,8 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+		case *retry.ErrStopRetry:
 			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
 		default:
 			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
@@ -676,26 +677,28 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 	)
 
 	if err := json.Unmarshal(buf, &mapped); err != nil {
-		logrus.Tracef("*core.Deserialize(): Unmarshalling buf to map failed!")
-		return fail.ToError(err)
+		return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
 	}
 	if props, ok = mapped["properties"].(map[string]interface{}); ok {
 		delete(mapped, "properties")
 	}
 	jsoned, err := json.Marshal(mapped)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.SyntaxError("failed to marshal core to JSON: %s", err.Error())
 	}
+
 	if xerr = c.shielded.Deserialize(task, jsoned); xerr != nil {
-		return xerr
+		return fail.Wrap(xerr, "deserializing core failed")
 	}
+
 	if len(props) > 0 {
 		jsoned, err = json.Marshal(props)
 		if err != nil {
-			return fail.ToError(err)
+			return fail.SyntaxError("failed to marshal properties to JSON: %s", err.Error())
 		}
+
 		if xerr = c.properties.Deserialize(task, jsoned); xerr != nil {
-			return xerr
+			return fail.Wrap(xerr, "failed to deserialize properties")
 		}
 	}
 	return nil

@@ -131,11 +131,15 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 	xerr := d.Inspect(task, func(clonable data.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
-		return fail.ToError(innerErr)
+		if innerErr != nil {
+			return fail.SyntaxError("failed to marshal: %s", innerErr.Error())
+		}
+		return nil
 	})
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return jsoned, nil
 }
 
@@ -153,6 +157,10 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 	}
 
 	return d.Alter(task, func(clonable data.Clonable) fail.Error {
-		return fail.ToError(json.Unmarshal(buf, clonable))
+		innerErr := json.Unmarshal(buf, clonable)
+		if innerErr != nil {
+			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
+		}
+		return nil
 	})
 }

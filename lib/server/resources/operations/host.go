@@ -565,7 +565,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}
 
-	hostReq.Password = "safescale" // VPL:for debugging purpose, remove if you see this!
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
