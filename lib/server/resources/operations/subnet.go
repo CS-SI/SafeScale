@@ -308,9 +308,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	tracer := debug.NewTracer(
-		task,
-		tracing.ShouldTrace("resources.subnet"),
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -348,7 +346,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer func() {
 		if xerr != nil && as != nil && !req.KeepOnFailure {
 			if derr := svc.DeleteSubnet(as.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}
 	}()

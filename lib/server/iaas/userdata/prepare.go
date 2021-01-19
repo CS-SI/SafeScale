@@ -53,10 +53,14 @@ type Content struct {
 	ExitOnError string
 	// Password for the user safescale (for troubleshoot use, usable only in console)
 	Password string
-	// PublicKey is the public key used to create the IPAddress
-	PublicKey string
-	// PrivateKey is the private key used to create the IPAddress
-	PrivateKey string
+	// FirstPublicKey is the public key used for first connection after Host creation
+	FirstPublicKey string
+	// FirstPrivateKey is the private key used for first connection after Host creation
+	FirstPrivateKey string
+	// FirstPublicKey is the public key used to connect to Host starting phase3 (disabling FirstPublicKey)
+	FinalPublicKey string
+	// FinalPrivateKey is the private key used to connect tp Host starting phase3 (disabling FirstPrivateKey)
+	FinalPrivateKey string
 	// ConfIF, if set to true, configure all interfaces to DHCP
 	ConfIF bool
 	// IsGateway, if set to true, activate IP forwarding
@@ -142,10 +146,6 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		operatorUsername    string
 		useNATService       bool
 	)
-	// VPL: if environment variable SAFESCALE_UNSAFE_PASSWORD is set, uses its content as OperatorUsername password
-	if request.Password == "" {
-		request.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
-	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {
@@ -189,8 +189,8 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.Revision = REV
 	ud.User = operatorUsername
 	ud.ExitOnError = exitOnErrorHeader
-	ud.PublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
-	ud.PrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
+	ud.FinalPublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
+	ud.FinalPrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
 	ud.IsGateway = request.IsGateway && request.Subnets[0].Name != abstract.SingleHostNetworkName
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
@@ -202,6 +202,15 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.ProviderName = options.ProviderName
 	ud.BuildSubnetworks = options.BuildSubnets
 
+	// Generate a keypair for first SSH connection, that will then be replace by FinalPxxxKey during phase2
+	kp, xerr := abstract.NewKeyPair("")
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to create initial Keypair")
+	}
+
+	ud.FirstPrivateKey = kp.PrivateKey
+	ud.FirstPublicKey = kp.PublicKey
+	logrus.Printf("FirstPrivateKey=%v\n", ud.FirstPrivateKey)
 	if request.HostName != "" {
 		ud.HostName = request.HostName
 	} else {
