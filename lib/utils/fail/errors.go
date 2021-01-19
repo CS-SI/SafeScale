@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -41,6 +42,10 @@ type consequencer interface {
 	Consequences() []error
 	AddConsequence(error) error
 	Error() string
+}
+
+func ToError(in error) Error {
+	return in
 }
 
 // AddConsequence adds an error 'err' to the list of consequences
@@ -150,6 +155,10 @@ func (e ErrCore) Cause() error {
 	return e.cause
 }
 
+func (e ErrCore) Unwrap() error {
+	return e.cause
+}
+
 func (e ErrCore) Message() string {
 	return e.message
 }
@@ -167,6 +176,16 @@ func Wrap(cause error, message string) ErrCore {
 
 	fileLine := GetCallerFileLine()
 	return NewErrCore(message, cause, nil, fileName, fileLine)
+}
+
+func Wrapf(format string, a ...interface{}) ErrCore {
+	fileName := GetCallerFileName()
+	ind := strings.Index(fileName, "/SafeScale") + len("/SafeScale")
+	fileName = fileName[ind:]
+
+	fileLine := GetCallerFileLine()
+	formattedErr := fmt.Errorf(format, a...)
+	return NewErrCore("", formattedErr, nil, fileName, fileLine)
 }
 
 func ErrorfWithoutCause(message string) ErrCore {
@@ -268,7 +287,7 @@ func Cause(err error) (resp error) {
 		}
 		err = cause.Cause()
 		if err != nil {
-			resp = err
+			resp = errors.Unwrap(err)
 		}
 	}
 
