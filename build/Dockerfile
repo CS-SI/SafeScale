@@ -26,6 +26,8 @@ unzip \
 vim \
 git \
 jq \
+iproute2 \
+iputils-ping \
 openssh-server \
 python3.6 \
 python3-pip \
