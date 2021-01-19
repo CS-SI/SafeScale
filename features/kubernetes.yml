@@ -803,9 +803,9 @@ feature:
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
+                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 228
+                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 229
+                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 230
 
                             # Configure firewall
                             case {{.CNI}} in
