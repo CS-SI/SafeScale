@@ -239,6 +239,20 @@ func k8shelm2Feature() *Feature {
 	}
 }
 
+func k8shelm3Feature() *Feature {
+	name := "k8s.helm3"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &Feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // sparkmaster4platformFeature ...
 func sparkmaster4platformFeature() *Feature {
 	name := "sparkmaster4platform"

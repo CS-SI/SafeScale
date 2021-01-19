@@ -53,6 +53,7 @@ func init() {
 		packetbeatFeature(),
 		kibanaFeature(),
 		k8shelm2Feature(),
+		k8shelm3Feature(),
 		sparkmaster4platformFeature(),
 		elassandraFeature(),
 		consul4platformFeature(),
