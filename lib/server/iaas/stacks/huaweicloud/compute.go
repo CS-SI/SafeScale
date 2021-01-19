@@ -590,13 +590,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
-	m, xerr := s.Stack.GetMetadataOfInstance(host.GetID())
-	if xerr != nil {
-		logrus.Errorf("failed to get instance metadata")
-	} else {
-		spew.Dump(m)
-	}
-
 	return host, nil
 }
 

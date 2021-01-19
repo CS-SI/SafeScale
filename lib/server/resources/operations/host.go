@@ -549,7 +549,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		anon, ok := opts.Get("UseNATService")
 		useNATService := ok && anon.(bool)
 		if hostReq.PublicIP || useNATService {
-			xerr = defaultSubnet.LazyInspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = defaultSubnet.CachedInspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError("*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -563,6 +563,11 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 				return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
 			}
 		}
+	}
+
+	// Give a chance to set a password by safescaled environment (meaning for all Hosts)
+	if hostReq.Password == "" {
+		hostReq.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
 	}
 
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
@@ -1218,40 +1223,53 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 		return xerr
 	}
 
+	// Update Keypair of the Host with the one set in HostRequest
+	xerr := rh.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ah, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ah.PrivateKey = req.KeyPair.PrivateKey
+		return nil
+	})
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to update Keypair")
+	}
+
 	// Reboot host
 	command := "sudo systemctl reboot"
-	if _, _, _, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetContextTimeout(), temporal.GetHostTimeout()); xerr != nil {
+	if _, _, _, xerr = rh.Run(task, command, outputs.COLLECT, temporal.GetContextTimeout(), temporal.GetHostTimeout()); xerr != nil {
 		return xerr
 	}
 
-	if _, xerr := rh.waitInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, 0); xerr != nil {
+	if _, xerr = rh.waitInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, 0); xerr != nil {
 		return xerr
 	}
 
-	// if host is not a gateway, executes userdata.PHASE4 and 5 script to configure subnet and security
+	// if host is not a gateway, executes userdata.PHASE4/5 scripts to fix possible system issues and finalize host creation
 	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
 	if !req.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-		if xerr := rh.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userdataContent); xerr != nil {
+		if xerr = rh.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userdataContent); xerr != nil {
 			return xerr
 		}
 
 		// Reboot host
 		command = "sudo systemctl reboot"
-		if _, _, _, xerr := rh.Run(task, command, outputs.COLLECT, 0, 0); xerr != nil {
+		if _, _, _, xerr = rh.Run(task, command, outputs.COLLECT, 0, 0); xerr != nil {
 			return xerr
 		}
 
-		if _, xerr := rh.waitInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
+		if _, xerr = rh.waitInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
 			return xerr
 		}
 
 		// execute userdata.PHASE5_FINAL script to final install/configure of the host (no need to reboot)
-		if xerr := rh.runInstallPhase(task, userdata.PHASE5_FINAL, userdataContent); xerr != nil {
+		if xerr = rh.runInstallPhase(task, userdata.PHASE5_FINAL, userdataContent); xerr != nil {
 			return xerr
 		}
 
-		if _, xerr := rh.waitInstallPhase(task, userdata.PHASE5_FINAL, temporal.GetHostTimeout()); xerr != nil {
+		if _, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL, temporal.GetHostTimeout()); xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
 				return fail.Wrap(xerr, "timeout creating a host")
@@ -1745,41 +1763,42 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	hostName := rh.GetName()
 	// xerr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
 	// 	func() error {
-			var innerXErr fail.Error
-			retCode, stdOut, stdErr, innerXErr = run(task, ssh, cmd, outs, executionTimeout)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrTimeout:
-					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to run command in %s", executionTimeout)
-				case *fail.ErrExecution:
-					innerXErr = retry.StopRetryError(innerXErr)
-				}
-			}
+	var innerXErr fail.Error
+	retCode, stdOut, stdErr, innerXErr = run(task, ssh, cmd, outs, executionTimeout)
+	if innerXErr != nil {
+		switch innerXErr.(type) {
+		case *fail.ErrTimeout:
+			innerXErr = fail.Wrap(innerXErr.Cause(), "failed to run command in %s", executionTimeout)
+		case *fail.ErrExecution:
+			innerXErr = retry.StopRetryError(innerXErr)
+		}
+	}
 
-			// if task.Aborted() {
-			// 	return fail.AbortedError(innerXErr)
-			// }
-		//
-		// 	return innerXErr
-		// },
-		// connectionTimeout*2, // VPL: insufficient delay ?
-		// func(t retry.Try, v verdict.Enum) {
-		// 	if v == verdict.Retry {
-		// 		logrus.Warnf("Remote SSH service on Host '%s' is not ready, retrying...", hostName)
-		// 	}
-		// },
+	// if task.Aborted() {
+	// 	return fail.AbortedError(innerXErr)
+	// }
+	//
+	// 	return innerXErr
+	// },
+	// connectionTimeout*2, // VPL: insufficient delay ?
+	// func(t retry.Try, v verdict.Enum) {
+	// 	if v == verdict.Retry {
+	// 		logrus.Warnf("Remote SSH service on Host '%s' is not ready, retrying...", hostName)
+	// 	}
+	// },
 	// )
 	// if xerr != nil {
 	if innerXErr != nil {
+		cerr := xerr.Cause()
 		switch innerXErr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(xerr.Cause())
+			xerr = fail.ToError(cerr)
 		case *fail.ErrTimeout:
-			switch rerr := xerr.Cause().(type) {
+			switch cerr.(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.Wrap(rerr, "failed to execute command on Host '%s'", hostName)
+				xerr = fail.Wrap(cerr, "failed to execute command on Host '%s'", hostName)
 			default:
-				xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+				xerr = fail.Wrap(cerr, "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
 			}
 		default:
 			xerr = innerXErr

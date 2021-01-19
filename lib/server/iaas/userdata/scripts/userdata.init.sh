@@ -45,124 +45,132 @@ LINUX_KIND=
 VERSION_ID=
 
 function sfDetectFacts() {
-	[ -f /etc/os-release ] && {
-		. /etc/os-release
-		LINUX_KIND=$ID
-	} || {
-		command -v lsb_release &>/dev/null && {
-			LINUX_KIND=$(lsb_release -is)
-			LINUX_KIND=${LINUX_KIND,,}
-			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
-		} || {
-			[ -f /etc/redhat-release ] && {
-				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
-				LINUX_KIND=${LINUX_KIND,,}
-				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-			}
-		}
-	}
+    [ -f /etc/os-release ] && {
+        . /etc/os-release
+        LINUX_KIND=$ID
+    } || {
+        command -v lsb_release &>/dev/null && {
+            LINUX_KIND=$(lsb_release -is)
+            LINUX_KIND=${LINUX_KIND,,}
+            VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+        } || {
+            [ -f /etc/redhat-release ] && {
+                LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
+                LINUX_KIND=${LINUX_KIND,,}
+                VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+            }
+        }
+    }
 }
 sfDetectFacts
 
 function create_user() {
-	echo "Creating user {{.User}}..."
-	if getent passwd {{.User}}; then
-    echo "User {{.User}} already exists !"
-    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
-	else
-    useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
-	fi
-	echo "{{.User}}:{{.Password}}" | chpasswd
-	if getent group docker; then
-	  echo "Group docker already exists !"
-	else
-	  groupadd -r docker
-	fi
-	usermod -aG docker {{.User}}
-	SUDOERS_FILE=/etc/sudoers.d/{{.User}}
-	[ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
-	cat >>$SUDOERS_FILE <<-'EOF'
+echo "Creating user {{.User}}..."
+    if getent passwd {{.User}}; then
+        echo "User {{.User}} already exists !"
+        useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
+    else
+        useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+    fi
+    # This password will be changed at phase 2 and can be used only from console (not remotely)
+    echo "{{.User}}:safescale" | chpasswd
+
+    if getent group docker; then
+        echo "Group docker already exists !"
+    else
+        groupadd -r docker
+    fi
+    usermod -aG docker {{.User}}
+    SUDOERS_FILE=/etc/sudoers.d/{{.User}}
+    [ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
+    cat >>$SUDOERS_FILE <<-'EOF'
 Defaults:{{.User}} !requiretty
 {{.User}} ALL=(ALL) NOPASSWD:ALL
 EOF
 
-	mkdir /home/{{.User}}/.ssh
-	echo "{{.PublicKey}}" >>/home/{{.User}}/.ssh/authorized_keys
-	echo "{{.PrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
-	chmod 0700 /home/{{.User}}/.ssh
-	chmod -R 0600 /home/{{.User}}/.ssh/*
+    mkdir /home/{{.User}}/.ssh
+    echo "{{.FirstPublicKey}}" >/home/{{.User}}/.ssh/authorized_keys
+    echo "{{.FirstPrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
+    chmod 0700 /home/{{.User}}/.ssh
+    chmod -R 0600 /home/{{.User}}/.ssh/*
+    cat /home/{{.User}}/.ssh/id_rsa
 
-	cat >>/home/{{.User}}/.bashrc <<-'EOF'
+    cat >>/home/{{.User}}/.bashrc <<-'EOF'
 pathremove() {
-		local IFS=':'
-		local NEWPATH
-		local DIR
-		local PATHVARIABLE=${2:-PATH}
-		for DIR in ${!PATHVARIABLE} ; do
-				if [ "$DIR" != "$1" ] ; then
-					NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-				fi
-		done
-		export $PATHVARIABLE="$NEWPATH"
+        local IFS=':'
+        local NEWPATH
+        local DIR
+        local PATHVARIABLE=${2:-PATH}
+        for DIR in ${!PATHVARIABLE} ; do
+                if [ "$DIR" != "$1" ] ; then
+                    NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
+                fi
+        done
+        export $PATHVARIABLE="$NEWPATH"
 }
 pathprepend() {
-		pathremove $1 $2
-		local PATHVARIABLE=${2:-PATH}
-		export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+        pathremove $1 $2
+        local PATHVARIABLE=${2:-PATH}
+        export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
 }
 pathappend() {
-		pathremove $1 $2
-		local PATHVARIABLE=${2:-PATH}
-		export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+        pathremove $1 $2
+        local PATHVARIABLE=${2:-PATH}
+        export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
 }
 pathprepend $HOME/.local/bin
 pathappend /opt/safescale/bin
 EOF
 
-	chown -R {{.User}}:{{.User}} /opt/safescale
-	chmod -R 0640 /opt/safescale
-	find /opt/safescale -type d -exec chmod a+rx {} \;
-	chmod 1777 /opt/safescale/var/tmp
+    chown -R {{.User}}:{{.User}} /opt/safescale
+    chmod -R 0640 /opt/safescale
+    find /opt/safescale -type d -exec chmod a+rx {} \;
+    chmod 1777 /opt/safescale/var/tmp
 
-	chown -R {{.User}}:{{.User}} /home/{{.User}}
+    chown -R {{.User}}:{{.User}} /home/{{.User}}
 
-	for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
-		touch $i
-		chown root:{{.User}} $i
-		chmod ug+r-wx,o-rwx $i
-	done
+    for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
+        touch $i
+        chown root:{{.User}} $i
+        chmod ug+r-wx,o-rwx $i
+    done
 
 
-	echo done
+    echo done
 }
 
 function put_hostname_in_hosts() {
-	echo "{{ .HostName }}" >/etc/hostname
-	hostname {{ .HostName }}
-	SHORT_HOSTNAME=$(hostname -s)
-	[[ "$SHORT_HOSTNAME" == "{{ .HostName }}" ]] && return
-	ping -n -c1 -w5 $SHORT_HOSTNAME 2>/dev/null || sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
+    echo "{{ .HostName }}" >/etc/hostname
+    hostname {{ .HostName }}
+    SHORT_HOSTNAME=$(hostname -s)
+    [[ "$SHORT_HOSTNAME" == "{{ .HostName }}" ]] && return
+    ping -n -c1 -w5 $SHORT_HOSTNAME 2>/dev/null || sed -i -nr '/^127.0.1.1/!p;$a127.0.1.1\t'"${SHORT_HOSTNAME}" /etc/hosts
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
 function disable_cloudinit_network_autoconf() {
-	fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-	mkdir -p $(dirname $fname)
-	echo "network: {config: disabled}" >$fname
+    fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    mkdir -p $(dirname $fname)
+    echo "network: {config: disabled}" >$fname
 }
 
+function secure_sshd() {
+    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config && \
+    systemctl restart sshd
+}
 function disable_services() {
-	case $LINUX_KIND in
-		debian|ubuntu)
+    case $LINUX_KIND in
+        debian|ubuntu)
             if [[ -n $(command -v systemctl) ]]; then
-		        systemctl stop apt-daily.service &>/dev/null
-			    systemctl kill --kill-who=all apt-daily.service &>/dev/null
-		    fi
-		    if [[ -n $(command -v system) ]]; then
+                systemctl stop apt-daily.service &>/dev/null
+                systemctl kill --kill-who=all apt-daily.service &>/dev/null
+            fi
+            if [[ -n $(command -v system) ]]; then
                 which system && service stop apt-daily.service &>/dev/null
-		    fi
-			;;
-	esac
+            fi
+            ;;
+    esac
 }
 
 ## If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
@@ -182,6 +190,7 @@ export DEBIAN_FRONTEND=noninteractive
 put_hostname_in_hosts
 disable_cloudinit_network_autoconf
 disable_services
+secure_sshd
 create_user
 #ensure_network_connectivity
 
