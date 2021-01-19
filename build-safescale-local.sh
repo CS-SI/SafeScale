@@ -2,7 +2,7 @@
 
 echo "Checks..."
 if [[ ! -v BUILD_ENV ]]; then
-    echo "BUILD_ENV is not set, this script is intented to run inside a docker container" && exit 1
+    echo "BUILD_ENV is not set, this script is intended to run inside a docker container" && exit 1
 fi
 
 # ----------------------
