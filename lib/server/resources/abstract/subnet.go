@@ -50,12 +50,6 @@ type SubnetRequest struct {
 	KeepOnFailure  bool           // tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
-//// FIXME: comment!
-//type SubNetwork struct {
-//	Targets string `json:"subnetmask,omitempty"` // FIXME: comment!
-//	ID   string `json:"subnetid,omitempty"`   // FIXME: comment!
-//}
-
 // Subnet represents a subnet
 type Subnet struct {
 	ID                      string           `json:"id,omitempty"`                         // ID of the subnet (from provider)
