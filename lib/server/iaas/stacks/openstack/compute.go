@@ -680,7 +680,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// --- Initializes abstract.HostCore ---
 
 	ahc := abstract.NewHostCore()
-	ahc.PrivateKey = request.KeyPair.PrivateKey
+	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
 	// --- query provider for host creation ---

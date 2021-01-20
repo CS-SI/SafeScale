@@ -157,6 +157,7 @@ function disable_cloudinit_network_autoconf() {
 function secure_sshd() {
     sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config && \
     sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config && \
+    sed -i '/^.*PubkeyAuthentication / s/^.*$/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
     systemctl restart sshd
 }
 function disable_services() {

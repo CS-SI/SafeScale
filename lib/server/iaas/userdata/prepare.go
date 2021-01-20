@@ -202,6 +202,12 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.ProviderName = options.ProviderName
 	ud.BuildSubnetworks = options.BuildSubnets
 
+	if request.HostName != "" {
+		ud.HostName = request.HostName
+	} else {
+		ud.HostName = request.ResourceName
+	}
+
 	// Generate a keypair for first SSH connection, that will then be replace by FinalPxxxKey during phase2
 	kp, xerr := abstract.NewKeyPair("")
 	if xerr != nil {
@@ -210,12 +216,6 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 
 	ud.FirstPrivateKey = kp.PrivateKey
 	ud.FirstPublicKey = kp.PublicKey
-	logrus.Printf("FirstPrivateKey=%v\n", ud.FirstPrivateKey)
-	if request.HostName != "" {
-		ud.HostName = request.HostName
-	} else {
-		ud.HostName = request.ResourceName
-	}
 
 	return nil
 }

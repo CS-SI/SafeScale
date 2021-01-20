@@ -727,7 +727,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 	defer rh.undoUpdateSubnets(task, hostReq, &xerr)
 
-	if xerr = rh.finalizeProvisioning(task, hostReq, userdataContent); xerr != nil {
+	if xerr = rh.finalizeProvisioning(task, userdataContent); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1215,7 +1215,7 @@ func (rh *host) undoUpdateSubnets(task concurrency.Task, req abstract.HostReques
 	}
 }
 
-func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostRequest, userdataContent *userdata.Content) fail.Error {
+func (rh *host) finalizeProvisioning(task concurrency.Task, userdataContent *userdata.Content) fail.Error {
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure subnet and security
 	if xerr := rh.runInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent); xerr != nil {
 		return xerr
@@ -1227,11 +1227,15 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		ah.PrivateKey = req.KeyPair.PrivateKey
+
+		ah.PrivateKey = userdataContent.FinalPrivateKey
 		return nil
 	})
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update Keypair")
+	}
+	if xerr = rh.cacheAccessInformation(task); xerr != nil {
+		return xerr
 	}
 
 	// Reboot host
@@ -1246,7 +1250,7 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, req abstract.HostReq
 
 	// if host is not a gateway, executes userdata.PHASE4/5 scripts to fix possible system issues and finalize host creation
 	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
-	if !req.IsGateway {
+	if !userdataContent.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
 		if xerr = rh.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userdataContent); xerr != nil {
 			return xerr
@@ -1787,16 +1791,15 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	// )
 	// if xerr != nil {
 	if innerXErr != nil {
-		cerr := xerr.Cause()
 		switch innerXErr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(cerr)
+			xerr = fail.ToError(xerr.Cause())
 		case *fail.ErrTimeout:
-			switch cerr.(type) {
+			switch xerr.Cause().(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.Wrap(cerr, "failed to execute command on Host '%s'", hostName)
+				xerr = fail.Wrap(xerr.Cause(), "failed to execute command on Host '%s'", hostName)
 			default:
-				xerr = fail.Wrap(cerr, "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+				xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
 			}
 		default:
 			xerr = innerXErr
