@@ -64,6 +64,10 @@ func NewEncryptionKey(text []byte) (*Key, error) {
 // the data and provides a check that it hasn't been altered. Output takes the
 // form nonce|ciphertext|tag where '|' indicates concatenation.
 func Encrypt(plaintext []byte, key *Key) ([]byte, error) {
+	if key == nil {
+		return nil, fail.InvalidParameterError("key", "cannot be nil")
+	}
+
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		return nil, err
@@ -87,6 +91,10 @@ func Encrypt(plaintext []byte, key *Key) ([]byte, error) {
 // the data and provides a check that it hasn't been altered. Expects input
 // form nonce|ciphertext|tag where '|' indicates concatenation.
 func Decrypt(ciphertext []byte, key *Key) ([]byte, error) {
+	if key == nil {
+		return nil, fail.InvalidParameterError("key", "cannot be nil")
+	}
+
 	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		return nil, err
