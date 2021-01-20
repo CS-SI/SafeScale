@@ -135,7 +135,6 @@ EOF
         chmod ug+r-wx,o-rwx $i
     done
 
-
     echo done
 }
 
@@ -174,16 +173,6 @@ function disable_services() {
     esac
 }
 
-## If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-#ensure_network_connectivity() {
-#	{{- if .AddGateway }}
-#		route del -net default &>/dev/null
-#		route add -net default gw {{ .DefaultRouteIP }}
-#	{{- else }}
-#	:
-#	{{- end}}
-#}
-
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
@@ -193,7 +182,6 @@ disable_cloudinit_network_autoconf
 disable_services
 secure_sshd
 create_user
-#ensure_network_connectivity
 
 touch /etc/cloud/cloud-init.disabled
 
