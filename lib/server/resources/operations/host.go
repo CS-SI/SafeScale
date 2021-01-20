@@ -722,12 +722,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 
 	// -- Updates host link with subnets --
-	//if !hostReq.IsGateway {
-	if xerr := rh.updateSubnets(task, hostReq); xerr != nil {
+	if xerr = rh.updateSubnets(task, hostReq); xerr != nil {
 		return nil, xerr
 	}
 	defer rh.undoUpdateSubnets(task, hostReq, &xerr)
-	//}
 
 	if xerr = rh.finalizeProvisioning(task, hostReq, userdataContent); xerr != nil {
 		return nil, xerr
