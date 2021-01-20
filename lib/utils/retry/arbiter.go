@@ -110,6 +110,8 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 				if _, retCode, _ := utils.ExtractRetCode(t.Err); retCode == 255 {
 					return verdict.Retry, nil
 				}
+
+				return verdict.Done, fail.ToError(t.Err)
 			}
 		}
 		return verdict.Done, nil
@@ -126,7 +128,7 @@ func Successful() Arbiter {
 			// case *fail.ErrRuntimePanic:
 			// 	return verdict.Done, cerr
 			// default:
-				return verdict.Done, nil
+			return verdict.Done, nil
 			// }
 		}
 		return verdict.Retry, nil
