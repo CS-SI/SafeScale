@@ -734,7 +734,7 @@ func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Sub
 	return nil
 }
 
-func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull) fail.Error {
+func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull, udc userdata.Content) fail.Error {
 	defaultSubnet := func() *abstract.Subnet {
 		if len(request.Subnets) == 0 {
 			return nil
@@ -754,7 +754,7 @@ func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 		return err
 	}
 
-	host.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to host definition
+	host.Core.PrivateKey = udc.FirstPrivateKey
 	host.Core.Password = request.Password
 
 	host.Networking.DefaultSubnetID = func() string {
@@ -843,12 +843,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Configure userdata content
 	udc = userdata.NewContent()
-	xerr = s.prepareUserData(request, udc)
-	if xerr != nil {
+	if xerr = s.prepareUserData(request, udc); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
+
 	ahf = abstract.NewHostFull()
-	if xerr = s.initHostProperties(&request, ahf); xerr != nil {
+	if xerr = s.initHostProperties(&request, ahf, *udc); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
@@ -857,14 +857,13 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
+
 	vmType, xerr := outscaleTemplateID(request.TemplateID)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
-	//op := s.Options.Compute.OperatorUsername
-	//patchSSH := fmt.Sprintf("\nchown -R %s:%s /home/%s", op, op, op)
+
 	buf := bytes.NewBuffer(userDataPhase1)
-	//buf.WriteString(patchSSH)
 
 	// create host
 	vmsRequest := osc.CreateVmsRequest{

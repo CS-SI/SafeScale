@@ -34,30 +34,22 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
+type taskCreateGatewayParameters struct {
+	request abstract.HostRequest
+	sizing  abstract.HostSizingRequirements
+}
+
 func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	var (
-		inputs data.Map
-		ok     bool
-	)
-	if inputs, ok = params.(data.Map); !ok {
-		return nil, fail.InvalidParameterError("params", "must be a data.Map")
-	}
-	hostReq, ok := inputs["request"].(abstract.HostRequest)
-	if !ok {
-		return nil, fail.InvalidParameterError("params['request']", "must be an abstract.GatewayRequest")
-	}
+	hostReq := params.(taskCreateGatewayParameters).request
 	if hostReq.TemplateID == "" {
-		return nil, fail.InvalidRequestError("params['request'].TemplateID cannot be empty string")
+		return nil, fail.InvalidRequestError("params.request.TemplateID cannot be empty string")
 	}
 	if len(hostReq.Subnets) == 0 {
-		return nil, fail.InvalidRequestError("params['request'].Networks cannot be an empty '[]*abstract.Network'")
+		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
 	}
-	hostSizing, ok := inputs["sizing"].(abstract.HostSizingRequirements)
-	if !ok {
-		hostSizing = abstract.HostSizingRequirements{}
-	}
+	hostSizing := params.(taskCreateGatewayParameters).sizing
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
 	svc := rs.GetService()
@@ -128,18 +120,17 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	return r, nil
 }
 
+type taskFinalizeGatewayConfigurationParameters struct {
+	host     *host
+	userdata *userdata.Content
+}
+
 func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
-	var (
-		objgw    *host
-		userData *userdata.Content
-		ok       bool
-	)
-	if objgw, ok = params.(data.Map)["host"].(*host); !ok {
-		return nil, fail.InvalidParameterError("params['host']", "is missing or is not a '*operations.host'")
+	objgw := params.(taskFinalizeGatewayConfigurationParameters).host
+	if objgw.IsNull() {
+		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
-	if userData, ok = params.(data.Map)["userdata"].(*userdata.Content); !ok {
-		return nil, fail.InvalidParameterError("params['userdata']", "is missing or is not a '*userdata.Content'")
-	}
+	userData := params.(taskFinalizeGatewayConfigurationParameters).userdata
 	gwname := objgw.GetName()
 
 	// Executes userdata phase2 script to finalize host installation

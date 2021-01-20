@@ -250,8 +250,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "")
-	if xerr != nil {
+	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, ""); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
 		return nullAHF, nullUD, xerr
@@ -262,6 +261,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		return nullAHF, nullUD, fail.Wrap(xerr, "failed to get image")
 	}
+
 	if request.DiskSize > template.DiskSize {
 		template.DiskSize = request.DiskSize
 	} else if template.DiskSize == 0 {
@@ -376,8 +376,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	logrus.Debugf("Host '%s' created.", ahf.GetName())
 
 	// Add to abstract.HostFull data that does not come with creation data from provider
-	ahf.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
-	ahf.Core.Password = request.Password             // and OperatorUsername's password
+	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to ahf definition
+	ahf.Core.Password = request.Password           // and OperatorUsername's password
 	ahf.Networking.IsGateway = request.IsGateway
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)

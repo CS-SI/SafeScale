@@ -553,8 +553,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "")
-	if xerr != nil {
+	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, ""); xerr != nil {
 		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -589,7 +588,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// --- Initializes resources.IPAddress ---
 
 	ahf = abstract.NewHostFull()
-	ahf.Core.PrivateKey = request.KeyPair.PrivateKey // Add PrivateKey to ahf definition
+	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to ahf definition
 	ahf.Core.Password = request.Password
 
 	ahf.Networking.DefaultSubnetID = defaultSubnetID

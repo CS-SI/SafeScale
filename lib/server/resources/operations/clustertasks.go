@@ -1032,7 +1032,7 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 	}
 
 	// Convert and validate params
-	rh, ok := params.(resources.Host)
+	rh, ok := params.(*host)
 	if !ok || rh.IsNull() {
 		return nil, fail.InvalidParameterError("params", "must be a valid 'resources.Host")
 	}
