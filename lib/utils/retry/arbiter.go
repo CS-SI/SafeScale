@@ -128,6 +128,8 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 			if retCode == 255 {
 				return verdict.Retry, nil
 			}
+
+			return verdict.Done, t.Err
 		}
 		return verdict.Done, nil
 	}
