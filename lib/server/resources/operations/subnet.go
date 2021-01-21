@@ -308,9 +308,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	tracer := debug.NewTracer(
-		task,
-		tracing.ShouldTrace("resources.subnet"),
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -348,7 +346,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer func() {
 		if xerr != nil && as != nil && !req.KeepOnFailure {
 			if derr := svc.DeleteSubnet(as.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}
 	}()
@@ -621,9 +619,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	primaryRequest := gwRequest
 	primaryRequest.ResourceName = primaryGatewayName
 	primaryRequest.HostName = primaryGatewayName + domain
-	primaryTask, xerr = task.StartInSubtask(rs.taskCreateGateway, data.Map{
-		"request": primaryRequest,
-		"sizing":  *gwSizing,
+	primaryTask, xerr = task.StartInSubtask(rs.taskCreateGateway, taskCreateGatewayParameters{
+		request: primaryRequest,
+		sizing:  *gwSizing,
 	})
 	if xerr != nil {
 		return xerr
@@ -637,9 +635,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		if req.Domain != "" {
 			secondaryRequest.HostName = secondaryGatewayName + domain
 		}
-		secondaryTask, xerr = task.StartInSubtask(rs.taskCreateGateway, data.Map{
-			"request": secondaryRequest,
-			"sizing":  *gwSizing,
+		secondaryTask, xerr = task.StartInSubtask(rs.taskCreateGateway, taskCreateGatewayParameters{
+			request: secondaryRequest,
+			sizing:  *gwSizing,
 		})
 		if xerr != nil {
 			return xerr
@@ -765,9 +763,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return xerr
 	}
 
-	primaryTask, xerr = primaryTask.Start(rs.taskFinalizeGatewayConfiguration, data.Map{
-		"host":     primaryGateway,
-		"userdata": primaryUserdata,
+	primaryTask, xerr = primaryTask.Start(rs.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+		host:     primaryGateway,
+		userdata: primaryUserdata,
 	})
 	if xerr != nil {
 		return xerr
@@ -776,9 +774,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		if secondaryTask, xerr = concurrency.NewTask(); xerr != nil {
 			return xerr
 		}
-		secondaryTask, xerr = secondaryTask.Start(rs.taskFinalizeGatewayConfiguration, data.Map{
-			"host":     secondaryGateway,
-			"userdata": secondaryUserdata,
+		secondaryTask, xerr = secondaryTask.Start(rs.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+			host:     secondaryGateway,
+			userdata: secondaryUserdata,
 		})
 		if xerr != nil {
 			return xerr

@@ -394,7 +394,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// --- Initializes abstract.HostCore ---
 
 	ahc := abstract.NewHostCore()
-	ahc.PrivateKey = request.KeyPair.PrivateKey
+	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
 	// --- query provider for host creation ---
@@ -589,6 +589,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
+
 	return host, nil
 }
 

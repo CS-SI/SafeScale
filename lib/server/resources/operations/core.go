@@ -152,7 +152,7 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 // LazyInspect allows to inspect data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change thru time).
-func (c *core) LazyInspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+func (c *core) CachedInspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}

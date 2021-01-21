@@ -930,7 +930,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nil, nil, userData, fail.Wrap(err, "failed to get host '%s' from domain", resourceName)
 	}
 
-	hostCore.PrivateKey = keyPair.PrivateKey
+	hostCore.PrivateKey = userData.FirstPrivateKey
 	hostCore.Password = request.Password
 
 	hostNetwork := abstract.NewHostSubnet()

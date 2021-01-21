@@ -18,9 +18,9 @@ package openstack
 
 import (
 	"encoding/json"
-
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -48,7 +48,7 @@ func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 
 func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
-	if name == "" {
+	if name = strings.TrimSpace(name); name == "" {
 		return nullServer, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
@@ -82,7 +82,7 @@ func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 		return nullServer, fail.InconsistentError("found more than one Host named '%s'", name)
 	}
 	return resp[0], nil
-	//
+
 	// serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	// if found && len(serverList) > 0 {
 	// 	for _, anon := range serverList {
@@ -99,4 +99,32 @@ func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	// 		}
 	// 	}
 	// }
+}
+
+// rpcGetMetadataOfInstance returns the metadata associated with the instance
+func (s Stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Error) {
+	emptyMap := map[string]string{}
+	if id = strings.TrimSpace(id); id == "" {
+		return emptyMap, fail.InvalidParameterError("id", "cannpt be empty string")
+	}
+
+	var out map[string]string
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			res := servers.Metadata(s.ComputeClient, id)
+			out, innerErr = res.Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return emptyMap, xerr
+		default:
+			return emptyMap, xerr
+		}
+	}
+
+	return out, nil
 }
