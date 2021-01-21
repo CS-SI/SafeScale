@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -613,13 +613,16 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 		return nil, xerr
 	}
 
+	// Configure master for flavour
 	if c.makers.ConfigureNode != nil {
 		if xerr = c.makers.ConfigureMaster(task, c, p.Index, p.Host); xerr != nil {
-			return nil, xerr
+			return nil, fail.Wrap(xerr, "failed to configure master '%s'", p.Host.GetName())
 		}
+
 		logrus.Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
 		return nil, nil
 	}
+
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil, nil
 }
@@ -1022,6 +1025,10 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	return nil, nil
 }
 
+type taskDeleteHostOnFailureParameters struct {
+	host *host
+}
+
 // taskDeleteHostOnFailure deletes a host
 func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 	if c.IsNull() {
@@ -1032,9 +1039,9 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 	}
 
 	// Convert and validate params
-	rh, ok := params.(*host)
-	if !ok || rh.IsNull() {
-		return nil, fail.InvalidParameterError("params", "must be a valid 'resources.Host")
+	rh := params.(taskDeleteHostOnFailureParameters).host
+	if rh.IsNull() {
+		return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
 	}
 
 	prefix := "Cleaning up on failure, "
