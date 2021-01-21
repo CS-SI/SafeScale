@@ -1412,20 +1412,15 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 
 		// finally delete subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		//waitMore := false
 		if innerXErr = svc.DeleteSubnet(as.ID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
 				logrus.Warnf("Subnet not found on provider side, cleaning up metadata")
-			//case *fail.ErrTimeout:
-			//	logrus.Error("Cannot delete Subnet due to a timeout")
-			//	waitMore = true
 			default:
 				return innerXErr
 			}
 		}
-		//if waitMore {
 		innerXErr = retry.WhileUnsuccessfulDelay1Second(
 			func() error {
 				if _, recErr := svc.InspectSubnet(as.ID); recErr != nil {
@@ -1443,7 +1438,6 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		if innerXErr != nil {
 			return innerXErr
 		}
-		//}
 		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups

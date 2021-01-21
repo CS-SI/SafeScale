@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -234,46 +234,72 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 
 	bucketName := f.getBucket().Name
 	absolutePath := f.absolutePath(path, name)
-	source := bytes.NewBuffer(data)
-	if _, xerr := f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); xerr != nil {
-		return xerr
-	}
-
-	sourceHash := md5.New()
-	_, _ = sourceHash.Write(data)
-
-	// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
 	timeout := temporal.GetMetadataReadAfterWriteTimeout()
+
+	// Outer retry will write the metadata at most 3 times
 	xerr := retry.Action(
 		func() error {
+			var innerXErr fail.Error
+			source := bytes.NewBuffer(data)
+			sourceHash := md5.New()
+			_, _ = sourceHash.Write(source.Bytes())
+			srcHex := hex.EncodeToString(sourceHash.Sum(nil))
+			if _, innerXErr = f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
+				return innerXErr
+			}
+
+			// inner retry does read-after-write; if timeout consider write has failed, and retry write
 			var target bytes.Buffer
-			if innerErr := f.service.ReadObject(bucketName, absolutePath, &target, 0, 0); innerErr != nil {
-				return innerErr
-			}
+			innerXErr = retry.Action(
+				func() error {
+					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
+					if innerErr := f.service.ReadObject(bucketName, absolutePath, &target, 0, 0); innerErr != nil {
+						return innerErr
+					}
 
-			remoteHash := md5.New()
-			_, _ = remoteHash.Write(target.Bytes())
-			if hex.EncodeToString(sourceHash.Sum(nil)) != hex.EncodeToString(remoteHash.Sum(nil)) {
-				return fail.NewError("remote content is different from local reference")
-			}
+					remoteHash := md5.New()
+					_, _ = remoteHash.Write(target.Bytes())
+					rmtHex := hex.EncodeToString(remoteHash.Sum(nil))
+					if srcHex != rmtHex {
+						return fail.NewError("remote content is different from local reference (local=%s, remote=%s)", srcHex, rmtHex)
+					}
 
-			return nil
+					return nil
+				},
+				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
+				retry.Fibonacci(1*time.Second),
+				nil,
+				nil,
+				func(t retry.Try, v verdict.Enum) {
+					switch v {
+					case verdict.Retry:
+						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying...", bucketName, absolutePath, t.Err.Error())
+					}
+				},
+			)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *retry.ErrTimeout:
+					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+				}
+			}
+			return innerXErr
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-		retry.Fibonacci(1*time.Second),
-		nil,
-		nil,
+		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
+		retry.Constant(1*time.Second),
+	nil,
+	nil,
 		func(t retry.Try, v verdict.Enum) {
 			switch v {
 			case verdict.Retry:
-				logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying...", bucketName, absolutePath, t.Err.Error())
+				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write failed, retrying...", bucketName, absolutePath, temporal.FormatDuration(timeout))
 			}
 		},
 	)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+		case *retry.ErrStopRetry:
+			xerr = fail.ToError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
 		}
 	}
 	return xerr

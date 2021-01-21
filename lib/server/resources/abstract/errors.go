@@ -36,7 +36,7 @@ func ResourceNotFoundError(resource, name string) fail.Error {
 
 // ResourceTimeoutError creates a ErrTimeout error
 func ResourceTimeoutError(resource, name string, dur time.Duration) fail.Error {
-	msgFinal := fmt.Sprintf("timeout of '%s' waiting for '%s' '%s'", dur, resource, name)
+	msgFinal := fmt.Sprintf("timeout of '%s' waiting for %s '%s'", dur, resource, name)
 	return fail.TimeoutError(nil, dur, msgFinal)
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,15 +116,19 @@ func normalizeError(in error) (err error) {
 			}
 			return retry.StopRetryError(in)
 		default:
+			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
 			case "not found":   // stow may return that error message if it does not find something
 				return fail.NotFoundError("not found")
 			default:    // stow may return an error containing "dial tcp:" for some HTTP errors
 				if strings.Contains(str, "dial tcp:") {
-					return fail.NewError(str)
+					return fail.NotAvailableError(str)
 				}
-				// In any other case, the error should explain the potential retry has to stop
+				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
+					return fail.NotFoundError("encountered end-of-file")
+				}
+				// In any other case, the error should explain the retry has to stop
 				return retry.StopRetryError(in)
 			}
 		}
