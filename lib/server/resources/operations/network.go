@@ -273,8 +273,9 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 							return xerr
 						}
 					} else {
+						subnetName := rs.GetName()
 						if xerr = rs.Delete(task); xerr != nil {
-							return xerr
+							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 						}
 					}
 				}

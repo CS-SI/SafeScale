@@ -680,7 +680,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// --- Initializes abstract.HostCore ---
 
 	ahc := abstract.NewHostCore()
-	ahc.PrivateKey = request.KeyPair.PrivateKey
+	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
 	// --- query provider for host creation ---
@@ -861,6 +861,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	logrus.Infoln(msgSuccess)
 	return newHost, userData, nil
+}
+
+func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) {
+	return s.rpcGetMetadataOfInstance(id)
 }
 
 // identifyOpenstackSubnetsAndPorts ...

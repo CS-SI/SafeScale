@@ -278,6 +278,10 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.
 		}
 		return nil, xerr
 	}
+
+	// VPL: temporary
+	_, _ = handler.job.GetService().InspectHost(objh.GetID())
+
 	return objh, nil
 }
 

@@ -2968,6 +2968,29 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 		}
 	}
 
+	allCount := len(all)
+	if allCount > 0 {
+		subtasks = make([]concurrency.Task, 0, allCount)
+		for _, v := range all {
+			subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v})
+			if xerr != nil {
+				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
+				break
+			}
+			subtasks = append(subtasks, subtask)
+		}
+	}
+	for _, s := range subtasks {
+		if _, innerXErr := s.Wait(); innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				// node not found, consider as a successful deletion and continue
+			default:
+				cleaningErrors = append(cleaningErrors, innerXErr)
+			}
+		}
+	}
+
 	//
 	// // --- Delete the nodes ---
 	// list, xerr := c.ListNodes(task)

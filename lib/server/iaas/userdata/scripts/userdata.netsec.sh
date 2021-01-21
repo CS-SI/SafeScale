@@ -661,8 +661,9 @@ EOF
     firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
 
     sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 207
-    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || failure 208
-    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config || failure 209
+# VPL: moved in phase1 (init)
+#    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || failure 208
+#    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config || failure 209
     systemctl restart sshd
 
     echo "done"
@@ -871,8 +872,20 @@ EOF
     esac
 }
 
+function update_credentials() {
+    echo "{{.User}}:{{.Password}}" | chpasswd
+
+    dd if=/dev/urandom of=/home/{{.User}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
+    echo "{{.FinalPublicKey}}" >/home/{{.User}}/.ssh/authorized_keys
+    dd if=/dev/urandom of=/home/{{.User}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
+    echo "{{.FinalPrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
+    chmod 0700 /home/{{.User}}/.ssh
+    chmod -R 0600 /home/{{.User}}/.ssh/*
+}
+
 # ---- Main
 
+update_credentials
 configure_locale
 configure_dns
 ensure_network_connectivity
