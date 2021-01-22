@@ -986,20 +986,20 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		}
 	}
 
-	retcode, stdout, stderr, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _/*stdout*/, _/*stderr*/, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		msg := fmt.Sprintf("command executed on master '%s' of cluster '%s' with failure: %s", master.GetName(), clusterName, stdout)
-		if stderr != "" {
-			if stdout != "" {
-				msg += "\n"
-			}
-			msg += stderr
-		}
-		return cli.NewExitError(msg, retcode)
+		// msg := fmt.Sprintf("command executed on master '%s' of cluster '%s' with failure: %s", master.GetName(), clusterName, stdout)
+		// if stderr != "" {
+		// 	if stdout != "" {
+		// 		msg += "\n"
+		// 	}
+		// 	msg += stderr
+		// }
+		return cli.NewExitError(""/*msg*/, retcode)
 	}
 	return nil
 }
