@@ -909,10 +909,10 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 			newMetadata.Items = append(newMetadata.Items, v)
 		}
 		newMetadata.Fingerprint = resp.Metadata.Fingerprint
-		var op *compute.Operation
+
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
-				op, err = s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
+				_, err = s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
 				return err
 			},
 			normalizeError,
