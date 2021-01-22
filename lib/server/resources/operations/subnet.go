@@ -21,6 +21,7 @@ import (
 	"net"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -66,6 +67,10 @@ const (
 // subnet links Object Storage folder and Subnet
 type subnet struct {
 	*core
+
+	cacheLock *sync.Mutex
+	cachedGateways [2]*host
+	cachedNetwork *network
 }
 
 func nullSubnet() *subnet {
@@ -116,7 +121,11 @@ func NewSubnet(svc iaas.Service) (resources.Subnet, fail.Error) {
 		return nullSubnet(), xerr
 	}
 
-	return &subnet{core: coreInstance}, nil
+	out := &subnet{
+		core: coreInstance,
+		cacheLock: &sync.Mutex{},
+	}
+	return out, nil
 }
 
 // lookupSubnet tells if a Subnet exists
@@ -1278,7 +1287,7 @@ func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail
 }
 
 // GetGateway returns the gateway related to subnet
-func (rs subnet) GetGateway(task concurrency.Task, primary bool) (_ resources.Host, xerr fail.Error) {
+func (rs *subnet) GetGateway(task concurrency.Task, primary bool) (_ resources.Host, xerr fail.Error) {
 	if rs.IsNull() {
 		return nullHost(), fail.InvalidInstanceError()
 	}
@@ -1289,40 +1298,54 @@ func (rs subnet) GetGateway(task concurrency.Task, primary bool) (_ resources.Ho
 	defer fail.OnPanic(&xerr)
 
 	primaryStr := "primary"
+	gwIdx := 0
 	if !primary {
 		primaryStr = "secondary"
+		gwIdx = 1
 	}
 	tracer := debug.NewTracer(nil, true, "(%s)", primaryStr).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	var gatewayID string
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
+	rs.cacheLock.Lock()
+	defer rs.cacheLock.Unlock()
+
+	if rs.cachedGateways[gwIdx] == nil {
+		var gatewayID string
+		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		if primary {
-			if len(as.GatewayIDs) < 1 {
+			if primary {
+				if len(as.GatewayIDs) < 1 {
 				return fail.NotFoundError("no gateway registered")
 			}
-			gatewayID = as.GatewayIDs[0]
-		} else {
-			if len(as.GatewayIDs) < 2 {
+				gatewayID = as.GatewayIDs[0]
+			} else {
+				if len(as.GatewayIDs) < 2 {
 				return fail.NotFoundError("no secondary gateway registered")
 			}
-			gatewayID = as.GatewayIDs[1]
-		}
-		return nil
-	})
-	if xerr != nil {
+				gatewayID = as.GatewayIDs[1]
+			}
+			return nil
+		})
+		if xerr != nil {
 		return nullHost(), xerr
 	}
-	if gatewayID == "" {
-		return nullHost(), fail.NotFoundError("no %s gateway ID found in subnet properties", primaryStr)
+
+		if gatewayID == "" {
+			return nullHost(), fail.NotFoundError("no %s gateway ID found in subnet properties", primaryStr)
+		}
+
+		rh, xerr := LoadHost(task, rs.GetService(), gatewayID)
+		if xerr != nil {
+			return nullHost(), xerr
+		}
+		rs.cachedGateways[gwIdx] = rh.(*host)
 	}
-	return LoadHost(task, rs.GetService(), gatewayID)
+	return rs.cachedGateways[gwIdx], nil
 }
 
 // Delete deletes a Subnet
@@ -1510,20 +1533,31 @@ func (rs *subnet) GetNetwork(task concurrency.Task) (rn resources.Network, xerr 
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	var networkID string
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		networkID = as.Network
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
+	rs.cacheLock.Lock()
+	defer rs.cacheLock.Unlock()
 
-	return LoadNetwork(task, rs.GetService(), networkID)
+	if rs.cachedNetwork == nil {
+		var networkID string
+		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			networkID = as.Network
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		rn, xerr := LoadNetwork(task, rs.GetService(), networkID)
+		if xerr != nil {
+			return nullNetwork(), xerr
+		}
+
+		rs.cachedNetwork = rn.(*network)
+	}
+	return rs.cachedNetwork, nil
 }
 
 // deleteGateways deletes all the gateways of the subnet
