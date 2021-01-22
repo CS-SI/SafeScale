@@ -847,6 +847,7 @@ var clusterKubectlCommand = &cli.Command{
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
+
 		return executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
 	},
 }

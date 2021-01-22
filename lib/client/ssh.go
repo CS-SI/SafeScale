@@ -93,13 +93,14 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		func() error {
 			var (
 				innerXErr fail.Error
-				ready     bool
+				// ready     bool
 			)
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					ready = false
+					return innerXErr
+					// ready = false
 				case *fail.ErrTimeout:
 					return innerXErr
 				default:
@@ -109,7 +110,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				}
 			}
 			// If retcode == 255, ssh connection failed, retry
-			if retcode == 255 || !ready {
+			if retcode == 255 /*|| !ready*/ {
 				log.Warnf("Remote SSH server on Host '%s' is not available, retrying", sshCfg.Hostname)
 				return fail.NotAvailableError("failed to connect")
 			}

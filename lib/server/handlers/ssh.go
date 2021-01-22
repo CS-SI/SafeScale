@@ -186,8 +186,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				}
 			} else {
 				xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-					gwahc, ok = clonable.(*abstract.HostCore)
-					if !ok {
+					if gwahc, ok = clonable.(*abstract.HostCore); !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					return nil
@@ -232,6 +231,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				if xerr != nil {
 					return nil, xerr
 				}
+
 				if ip, xerr = gw.GetAccessIP(task); xerr != nil {
 					return nil, xerr
 				}

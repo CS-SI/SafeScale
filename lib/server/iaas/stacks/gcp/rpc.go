@@ -901,9 +901,10 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	if length := len(resp.Metadata.Items); length > 0 {
 		newMetadata := &compute.Metadata{}
 		newMetadata.Items = make([]*compute.MetadataItems, 0, length)
+		var scriptDoNothing = "exit 0"
 		for _, v := range resp.Metadata.Items {
 			if v.Key == "startup-script" {
-				continue
+				v.Value = &scriptDoNothing
 			}
 			newMetadata.Items = append(newMetadata.Items, v)
 		}
