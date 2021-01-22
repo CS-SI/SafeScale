@@ -192,6 +192,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (*abstract.HostFull, *us
 	return abstract.NewHostFull(), userdata.NewContent(), gError
 }
 
+// ClearHostStartupScript stub
+func (s stack) ClearHostStartupScript(stacks.HostParameter) fail.Error {
+	return gError
+}
+
 // ResizeHost stub
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return abstract.NewHostFull(), gError
