@@ -142,7 +142,7 @@ func (t *tracer) Entering() Tracer {
 		}
 		if t.enabled {
 			t.inDone = true
-			msg := t.EnteringMessage()
+			msg := goingInPrefix + t.buildMessage()
 			if msg != "" {
 				logrus.Tracef(msg)
 			}
@@ -167,7 +167,7 @@ func (t *tracer) Exiting() Tracer {
 		}
 		if t.enabled {
 			t.outDone = true
-			msg := t.ExitingMessage()
+			msg := goingOutPrefix + t.buildMessage()
 			if t.sw != nil {
 				msg += " (duration: " + t.sw.String() + ")"
 			}
@@ -185,8 +185,12 @@ func (t *tracer) buildMessage() string {
 		return ""
 	}
 
+	// Note: this value is very important, it makes sure the internal calls of this package would not interfere with the real caller we want to catch
+	//       badly set and you will get a line number that does not match with the one corresponding to the call
+	const skipCallers int = 2
+
 	message := t.taskSig
-	if _, _, line, ok := runtime.Caller(1); ok {
+	if _, _, line, ok := runtime.Caller(skipCallers); ok {
 		message += " " + t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(line) + "]"
 	}
 	return message
