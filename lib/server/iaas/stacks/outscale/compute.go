@@ -1009,6 +1009,28 @@ func (s stack) deleteHost(id string) fail.Error {
 	return xerr
 }
 
+// ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
+// FIXME: check if anything is needed (does nothing for now)
+func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+	return nil
+	// if s.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
+	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !ahf.IsConsistent() {
+	// 	return fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
+	// }
+	//
+	// tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnPanic(&xerr)
+	//
+	// return s.rpcResetStartupScriptOfInstance(ahf.GetID())
+}
+
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {

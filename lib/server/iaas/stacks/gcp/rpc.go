@@ -856,6 +856,14 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 		return &compute.Instance{}, xerr
 	}
 
+	defer func() {
+		if xerr != nil {
+			if derr := s.rpcDeleteInstance(name); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
+			}
+		}
+	}()
+
 	etag := op.Header.Get("Etag")
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
 		return &compute.Instance{}, xerr
@@ -873,36 +881,47 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 		return &compute.Instance{}, xerr
 	}
 
-	defer func() {
-		if xerr != nil {
-			if derr := s.rpcDeleteInstance(name); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance %s", resp.Id))
-			}
-		}
-	}()
-
-	// // Promote public ephemeral ip to a static one
-	// if hasPublicIP {
-	// 	xerr = stacks.RetryableRemoteCall(
-	// 		func() (err error) {
-	// 			_, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &compute.Address{
-	// 				Name:        "publicip-" + name,
-	// 				NetworkTier: "PREMIUM",
-	// 				Address:     resp.NetworkInterfaces[0].AccessConfigs[0].NatIP,
-	// 				Region:      fmt.Sprintf("projects/%s/regions/%s", s.GcpConfig.ProjectID, s.GcpConfig.Region),
-	// 			}).Do()
-	// 			return err
-	// 		},
-	// 		normalizeError,
-	// 	)
-	// 	if xerr != nil {
-	// 		return &compute.Instance{}, fail.Wrap(xerr, "failed to promote public IP to premium"))
-	// 	}
-	// }
-
 	return resp, nil
 }
 
+func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
+	var resp *compute.Instance
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return xerr
+	}
+
+	// remove startup-script from metadata to prevent it to rerun at reboot (standard behaviour in GCP)
+	if length := len(resp.Metadata.Items); length > 0 {
+		newMetadata := &compute.Metadata{}
+		newMetadata.Items = make([]*compute.MetadataItems, 0, length)
+		for _, v := range resp.Metadata.Items {
+			if v.Key == "startup-script" {
+				continue
+			}
+			newMetadata.Items = append(newMetadata.Items, v)
+		}
+		newMetadata.Fingerprint = resp.Metadata.Fingerprint
+		var op *compute.Operation
+		xerr = stacks.RetryableRemoteCall(
+			func() (err error) {
+				op, err = s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return xerr
+		}
+	}
+	return nil
+}
 func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
 	query := compute.Address{
 		Name: name,

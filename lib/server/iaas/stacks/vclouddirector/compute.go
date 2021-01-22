@@ -35,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -645,6 +646,28 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 	}
 
 	return hostFull, userData, nil
+}
+
+// ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
+// FIXME: determine if anything is needed (does nothing for now)
+func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+	return nil
+	// if s.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
+	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !ahf.IsConsistent() {
+	// 	return fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
+	// }
+	//
+	// tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnPanic(&xerr)
+	//
+	// return s.rpcResetStartupScriptOfInstance(ahf.GetID())
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.IPAddress containing an id

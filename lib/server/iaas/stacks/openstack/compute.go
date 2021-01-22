@@ -607,8 +607,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 
-	userData = userdata.NewContent()
-
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
@@ -620,7 +618,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
 
-	hostNets, hostPorts /*, sgs*/, xerr := s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
+	hostNets, hostPorts, xerr := s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
 	if xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to construct list of Subnets for the host")
 	}
@@ -643,6 +641,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
+	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
@@ -669,7 +668,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	srvOpts := servers.CreateOpts{
 		Name: request.ResourceName,
-		//SecurityGroups:   sgs,
 		Networks:         hostNets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
@@ -861,6 +859,12 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	logrus.Infoln(msgSuccess)
 	return newHost, userData, nil
+}
+
+// ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
+// Does nothing for OpenStack, userdata cannot be updated
+func (s Stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+	return nil
 }
 
 func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) {

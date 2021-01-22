@@ -118,6 +118,8 @@ type Stack interface {
 
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
+	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
+	ClearHostStartupScript(stacks.HostParameter) fail.Error
 	// InspectHost returns the information of the IPAddress identified by id
 	InspectHost(stacks.HostParameter) (*abstract.HostFull, fail.Error)
 	// // InspectHostByName returns the information of the IPAddress identified by name

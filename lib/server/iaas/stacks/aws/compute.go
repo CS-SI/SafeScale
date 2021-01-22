@@ -758,6 +758,28 @@ func (s stack) buildAwsMachine(
 	return &hostCore, nil
 }
 
+// ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
+// FIXME: see if anything is needed (does nothing for now)
+func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+	return nil
+	// if s.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
+	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	// if !ahf.IsConsistent() {
+	// 	return fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
+	// }
+	//
+	// tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnPanic(&xerr)
+	//
+	// return s.rpcResetStartupScriptOfInstance(ahf.GetID())
+}
+
 // InspectHost loads information of a host from AWS
 func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()

@@ -21,10 +21,9 @@ package local
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -168,6 +167,9 @@ func (provider *provider) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 
 func (provider *provider) CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
 	return nil, nil, gReport
+}
+func (provider *provider) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+	return gReport
 }
 func (provider *provider) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, gReport
