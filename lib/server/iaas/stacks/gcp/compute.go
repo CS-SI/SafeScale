@@ -345,11 +345,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				}
 			}()
 
-			//if server.IsNull() {
-			//	return fail.NewError("failed to create server")
-			//}
-
-			// Wait that IPAddress is ready, not just that the build is started
+			// Wait that Host is ready, not just that the build is started
 			if _, innerXErr = s.WaitHostReady(ahf.GetID(), temporal.GetLongOperationTimeout()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrInvalidRequest:
@@ -438,11 +434,11 @@ func (s stack) buildGcpMachine(
 	imageURL string,
 	userdata string,
 	isPublic bool,
-	sgs map[string]struct{},
+	securityGroups map[string]struct{},
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
-	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, sgs)
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, securityGroups)
 	if xerr != nil {
 		return nullAHF, xerr
 	}
@@ -455,7 +451,27 @@ func (s stack) buildGcpMachine(
 	return ahf, nil
 }
 
-// InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
+// ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
+func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+	if s.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsConsistent() {
+		return fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
+	}
+
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
+	defer tracer.Exiting()
+	defer fail.OnPanic(&xerr)
+
+	return s.rpcResetStartupScriptOfInstance(ahf.GetID())
+}
+
+	// InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
@@ -584,16 +600,21 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 	host.Networking.SubnetsByName = subnetIDByName
 	host.Networking.PublicIPv4 = ipv4
 
-	host.Sizing = fromMachineTypeToAllocatedSize(instance.MachineType)
+	host.Sizing = s.fromMachineTypeToAllocatedSize(instance.MachineType)
 
 	return nil
 }
 
-func fromMachineTypeToAllocatedSize(machineType string) *abstract.HostEffectiveSizing {
+func (s stack) fromMachineTypeToAllocatedSize(machineType string) *abstract.HostEffectiveSizing {
 	hz := abstract.HostEffectiveSizing{}
+	mt, xerr := s.rpcGetMachineType(machineType)
+	if xerr != nil {
+		return &hz
+	}
 
-	// FIXME: Implement mapping
-
+	// FIXME: complete mapping
+	hz.Cores = int(mt.GuestCpus)
+	hz.RAMSize = float32(mt.MemoryMb / 1024)
 	return &hz
 }
 
@@ -621,27 +642,6 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 		return -1, fail.NewError("unexpected host status: [%s]", gcpHostStatus)
 	}
 }
-
-// VPL: obsolete
-// // InspectHostByName returns the host identified by ref (name or id)
-// func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.Error) {
-// 	nullAHF := abstract.NewHostFull()
-//
-// 	if name == "" {
-// 		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
-// 	}
-//
-// 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).Entering().Exiting()
-// 	defer fail.OnExitLogError(&xerr)
-//
-// 	instance, xerr := s.rpcGetInstanceByName(name)
-// 	if xerr != nil {
-// 		return nullAHF, xerr
-// 	}
-//
-// 	ahf := abstract.NewHostFull()
-// 	return ahf, s.complementHost(ahf, instance)
-// }
 
 // DeleteHost deletes the host identified by id
 func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
