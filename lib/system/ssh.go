@@ -347,12 +347,14 @@ func (scmd *SSHCommand) closeTunneling() fail.Error {
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
 // Wait does not release resources associated with the cmd; SSHCommand.Close() must be called for that.
-// !!!ATTENTION!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
+// !!!WARNING!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
 func (scmd *SSHCommand) Wait() error {
 	if scmd == nil {
 		return fail.InvalidInstanceError()
 	}
-
+	if scmd.cmd == nil {
+		return fail.InvalidInstanceContentError("scmd.cmd", "cannot be nil")
+	}
 	return scmd.cmd.Wait()
 }
 
@@ -540,7 +542,7 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 	}
 
 	if result, ok := r.(data.Map); ok {
-		tracer.Trace("run succeeded: retcode=%d", result["retcode"].(int))
+		tracer.Trace("run succeeded, retcode=%d", result["retcode"].(int))
 		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
 	}
 	return -1, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
