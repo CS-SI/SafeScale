@@ -1216,6 +1216,11 @@ func (rh *host) undoUpdateSubnets(task concurrency.Task, req abstract.HostReques
 }
 
 func (rh *host) finalizeProvisioning(task concurrency.Task, userdataContent *userdata.Content) fail.Error {
+	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
+	if xerr := rh.GetService().ClearHostStartupScript(rh.GetID()); xerr != nil {
+		return xerr
+	}
+
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure subnet and security
 	if xerr := rh.runInstallPhase(task, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent); xerr != nil {
 		return xerr

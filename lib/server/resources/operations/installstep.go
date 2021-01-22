@@ -503,7 +503,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", filename, filename)
 	} else {
 //		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured.$$ 2>&7\";rc=${PIPESTATUS};cat /tmp/captured.$$; sudo rm /tmp/captured.$$;exit ${rc}", filename, filename)
-		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; tmpfile=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$tmpfile 2>&7\"; rc=${PIPESTATUS};cat $tmpfile; rm $tmpfile; exit ${rc}'", filename, filename)
+		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
 	}
 
 	// Executes the script on the remote host

@@ -205,7 +205,12 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 		return callback(clonable, c.properties)
 	})
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *fail.ErrAlteredNothing:
+			return nil
+		default:
+			return xerr
+		}
 	}
 
 	c.committed = false
