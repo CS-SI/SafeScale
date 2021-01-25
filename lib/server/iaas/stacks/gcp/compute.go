@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
@@ -151,6 +150,7 @@ func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Er
 
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
+// FIXME: change code to really create a keypair on provider side
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
 	if s.IsNull() {
@@ -202,34 +202,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host UUID: %s", err.Error())
-			logrus.Debugf(strprocess.Capitalize(msg))
-			return nullAHF, nullUD, fail.NewError(msg)
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, err = s.CreateKeyPair(name)
-		if err != nil {
-			msg := fmt.Sprintf("failed to create host key pair: %s", err.Error())
-			logrus.Debugf(strprocess.Capitalize(msg))
-			return nullAHF, nullUD, fail.NewError(msg)
-		}
-	}
-	if request.Password == "" {
-		password, err := utils.GeneratePassword(16)
-		if err != nil {
-			return nullAHF, nullUD, fail.NewError("failed to generate password: %s", err.Error())
-		}
-		request.Password = password
+	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
+		return nullAHF, nullUD, fail.Wrap(xerr, "failed to provide credentials for Host")
 	}
 
-	// The Default Network is the first of the provided list, by convention
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
-
 	an, xerr := s.InspectNetwork(defaultSubnet.Network)
 	if xerr != nil {
 		switch xerr.(type) {

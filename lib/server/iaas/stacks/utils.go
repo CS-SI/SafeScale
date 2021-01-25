@@ -17,8 +17,15 @@
 package stacks
 
 import (
+	"fmt"
+
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 // HostParameter can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
@@ -64,4 +71,40 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 	// 	return nil, "", fail.InvalidParameterError("hostParam", "field ID cannot be empty string")
 	// }
 	return ahf, hostLabel, nil
+}
+
+
+// ProvideCredentialsIfNeeded ...
+func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
+	if request == nil {
+		return fail.InvalidParameterError("request", "cannot be nil")
+	}
+
+	// If no key pair is supplied create one
+	if request.KeyPair == nil {
+		id, err := uuid.NewV4()
+		if err != nil {
+			xerr = fail.Wrap(err, "failed to create host UUID")
+			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+			return xerr
+		}
+
+		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
+		if request.KeyPair, xerr = abstract.NewKeyPair(name); xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to create Host key pair")
+			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
+			return xerr
+		}
+	}
+
+	// If no password is supplied, generate one
+	if request.Password == "" {
+		password, err := utils.GeneratePassword(16)
+		if err != nil {
+			return fail.Wrap(err, "failed to generate operator password")
+		}
+		request.Password = password
+	}
+
+	return nil
 }
