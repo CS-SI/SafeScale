@@ -430,25 +430,7 @@ type runOnHostParameters struct {
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
-	var (
-		// p  = data.Map{}
-		ok bool
-	)
-	// if params != nil {
-	// 	if p, ok = params.(data.Map); !ok {
-	// 		return nil, fail.InvalidParameterError("params", "must be a 'data.Map'")
-	// 	}
-	// }
-
-	// Get parameters
-	// rh, ok := p["host"].(resources.Host)
-	// if !ok {
-	// 	return nil, fail.InvalidParameterError("params['host']", "must be a 'resources.Host'")
-	// }
-	// variables, ok := p["variables"].(data.Map)
-	// if !ok {
-	// 	return nil, fail.InvalidParameterError("params['variables'", "must be a 'data.Map'")
-	// }
+	var ok bool
 	if params == nil {
 		return nil, fail.InvalidParameterError("params", "cannot be nil")
 	}
@@ -465,7 +447,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// If options file is defined, upload it to the remote rh
 	if is.OptionsFileContent != "" {
-		// err := UploadStringToRemoteFile(is.OptionsFileContent, rh, utils.TempFolder+"/options.json", "cladm:safescale", "ug+rw-x,o-rwx")
 		rfcItem := remotefile.Item{
 			Remote:       utils.TempFolder + "/options.json",
 			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
@@ -488,7 +469,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
-	// err = UploadStringToRemoteFile(command, rh, filename, "", "")
 	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
@@ -499,10 +479,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	if !hidesOutput {
-//		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", filename, filename)
 		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", filename, filename)
 	} else {
-//		command = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7> /tmp/captured.$$ 2>&7\";rc=${PIPESTATUS};cat /tmp/captured.$$; sudo rm /tmp/captured.$$;exit ${rc}", filename, filename)
 		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
 	}
 
