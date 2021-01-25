@@ -822,6 +822,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
+	// Build KeyPair and password if not provided
+	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for Host")
+	}
+
 	// Configure userdata content
 	udc = userdata.NewContent()
 	if xerr = s.prepareUserData(request, udc); xerr != nil {

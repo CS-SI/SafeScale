@@ -25,7 +25,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -46,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -634,7 +632,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		}
 	}()
 
-	if xerr = s.ProvideCredentialsIfNeeded(&request); xerr != nil {
+	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
@@ -932,53 +930,6 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 	}
 
 	return nets, netPorts /*, sgs*/, nil
-}
-
-// ProvideCredentialsIfNeeded ...
-func (s Stack) ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
-	if s.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if request == nil {
-		return fail.InvalidParameterError("request", "cannot be nil")
-	}
-
-	// If no key pair is supplied create one
-	if request.KeyPair == nil {
-		id, err := uuid.NewV4()
-		if err != nil {
-			xerr = fail.Wrap(err, "failed to create host UUID")
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return xerr
-		}
-
-		name := fmt.Sprintf("%s_%s", request.ResourceName, id)
-		request.KeyPair, xerr = s.CreateKeyPair(name)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to create host key pair")
-			logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-			return xerr
-		}
-
-		defer func() {
-			if xerr != nil && !request.KeepOnFailure {
-				if derr := s.DeleteKeyPair(name); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host keypair"))
-				}
-			}
-		}()
-	}
-
-	// If no password is supplied, generate one
-	if request.Password == "" {
-		password, err := utils.GeneratePassword(16)
-		if err != nil {
-			return fail.Wrap(err, "failed to generate operator password")
-		}
-		request.Password = password
-	}
-
-	return nil
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'

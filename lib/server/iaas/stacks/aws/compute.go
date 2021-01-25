@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -504,13 +503,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.InvalidRequestError("the Host '%s' must be on at least one Subnet (even if public)", resourceName)
 	}
 
-	// If no password is provided, create one
-	if request.Password == "" {
-		password, err := utils.GeneratePassword(16)
-		if err != nil {
-			return nullAHF, nullUDC, fail.Wrap(err, "failed to generate password")
-		}
-		request.Password = password
+	// If no credentials (KeyPair and/or Password) are  supplied create ones
+	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for Host")
 	}
 
 	// The default Subnet is the first of the provided list, by convention
@@ -528,26 +523,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 		// FIXME: fallback to net-safescale ?
 	}
-
-	// defaultSubnet := request.Networks[0]
-	// defaultGateway := request.DefaultGateway
-	// isGateway := defaultGateway == nil && defaultSubnet.Name != abstract.SingleHostNetworkName
-	// defaultGatewayID := ""
-	// defaultGatewayPrivateIP := ""
-	// if defaultGateway != nil {
-	//	xerr = defaultGateway.Properties.Inspect(hostproperty.NetworkV1, func(v data.Clonable) fail.Error {
-	//		hostNetworkV1 := v.(*propertiesv1.HostNetworking)
-	//		defaultGatewayPrivateIP = hostNetworkV1.IPv4Addresses[defaultNetwork]
-	//		defaultGatewayID = defaultGateway.ID
-	//		return nil
-	//	})
-	//	if err != nil {
-	//		return nil, userData, xerr
-	//	}
-	// }
-	// if defaultGateway == nil && !hostMustHavePublicIP {
-	//    return nil, userData, fail.InvalidRequestError("the host %s must have a gateway or be public", resourceName)
-	// }
 
 	// --- prepares data structures for Provider usage ---
 

@@ -264,7 +264,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 
-	userData = userdata.NewContent()
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -275,7 +274,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Validating name of the host
 	if ok, xerr := validateHostname(request); !ok {
-		return nil, userData, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error())
+		return nullAhf, nullUdc, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error())
 	}
 
 	// The default Network is the first of the provided list, by convention
@@ -293,13 +292,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		})
 	}
 
-	if xerr = s.Stack.ProvideCredentialsIfNeeded(&request); xerr != nil {
+	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
 	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
+	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to prepare user data content")
