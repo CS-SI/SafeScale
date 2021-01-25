@@ -340,9 +340,9 @@ var clusterCreateCommand = &cli.Command{
 		&cli.StringFlag{
 			Name: "sizing",
 			Usage: `Describe sizing for any type of host in format "<component><operator><value>[,...]" where:
-	<component> can be cpu, cpufreq, gpu, ram, disk
+	<component> can be cpu, cpufreq, gpu, ram, disk, template (the latter takes precedence over the formers, but corrupting the cloud-agnostic principle)
 	<operator> can be =,~,<,<=,>,>= (except for disk where valid operators are only = or >=):
-		- = means exactly <value>
+		- = means exactly <value> (only operator allowed for template)
 		- ~ means between <value> and 2*<value>
 		- < means strictly lower than <value>
 		- <= means lower or equal to <value>
@@ -354,10 +354,12 @@ var clusterCreateCommand = &cli.Command{
 		- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
 		- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
 		- <disk> is expecting an int as system disk size in GB
+		- <template> is expecting the name of a template from Cloud Provider; if template is not found, fallback to other components defined
 	examples:
 		--sizing "cpu <= 4, ram <= 10, disk = 100"
 		--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
 		--sizing "cpu <= 8, ram ~ 16"
+		--sizing "template=x1.large"
 	Can be used with --gw-sizing and friends to set a global host sizing and refine for a particular type of host.
 `,
 		},
@@ -371,13 +373,11 @@ var clusterCreateCommand = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "node-sizing",
-			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
-		},
-		&cli.IntFlag{
-			Name:    "initial-node-count",
-			Aliases: []string{"nodes", "workers"},
-			Usage:   `Used to define the count of initial nodes to create (default: minimum imposed by the Flavor+Complexity)`,
-			Value:   0,
+			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details),
+		This parameter accepts a supplemental <component> named count, with only = as <operator> and an int as <value> corresponding to the
+		number of workers to create (cannot be less than the minimum required by the flavour).
+	example:
+		--node-sizing "cpu~4, ram~15, count=8" will create 8 nodes`,
 		},
 	},
 
@@ -455,7 +455,7 @@ var clusterCreateCommand = &cli.Command{
 			GatewaySizing: gatewaysDef,
 			MasterSizing:  mastersDef,
 			NodeSizing:    nodesDef,
-			NodeCount:     uint32(c.Int("initial-node-count")),
+			// NodeCount:     uint32(c.Int("initial-node-count")),
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.GetLongOperationTimeout())
 

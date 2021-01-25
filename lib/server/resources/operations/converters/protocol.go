@@ -166,6 +166,10 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if nodeSizing == nil {
 		nodeSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
+	nodeCount, xerr := NodeCountFromStringToInteger(in.NodeSizing)
+	if xerr != nil {
+		return nullCR, xerr
+	}
 
 	disabled := map[string]struct{}{}
 	for _, v := range in.Disabled {
@@ -184,7 +188,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		OS:                      in.Os,
 		KeepOnFailure:           in.KeepOnFailure,
 		DisabledDefaultFeatures: disabled,
-		InitialNodeCount:        uint(in.NodeCount),
+		InitialNodeCount:        uint(nodeCount),
 	}
 	return out, nil
 }

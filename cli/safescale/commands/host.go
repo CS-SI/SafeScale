@@ -275,7 +275,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			Name:    "sizing",
 			Aliases: []string{"S"},
 			Usage: `Describe sizing of host in format "<component><operator><value>[,...]" where:
-			<component> can be cpu, cpufreq, gpu, ram, disk
+			<component> can be cpu, cpufreq, gpu, ram, disk, template (the latter takes precedence over the formers, but corrupting the cloud-agnostic principle)
 			<operator> can be =,~,<=,>= (except for disk where valid operators are only = or >=):
 				- = means exactly <value>
 				- ~ means between <value> and 2*<value>

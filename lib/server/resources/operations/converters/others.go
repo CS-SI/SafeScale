@@ -88,9 +88,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	var err error
 	out := abstract.HostSizingRequirements{}
 	if t, ok := tokens["cpu"]; ok {
-		min, max, rerr := t.Validate()
-		if rerr != nil {
-			return nil, 0, rerr
+		min, max, xerr := t.Validate()
+		if xerr != nil {
+			return nil, 0, xerr
 		}
 		if min != "" {
 			out.MinCores, err = strconv.Atoi(min)
@@ -107,9 +107,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	}
 	var count int
 	if t, ok := tokens["count"]; ok {
-		c, _, rerr := t.Validate()
-		if rerr != nil {
-			return nil, 0, rerr
+		c, _, xerr := t.Validate()
+		if xerr != nil {
+			return nil, 0, xerr
 		}
 		count, err = strconv.Atoi(c)
 		if err != nil {
@@ -117,9 +117,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		}
 	}
 	if t, ok := tokens["cpufreq"]; ok {
-		min, _, rerr := t.Validate()
-		if rerr != nil {
-			return nil, 0, rerr
+		min, _, xerr := t.Validate()
+		if xerr != nil {
+			return nil, 0, xerr
 		}
 		if min != "" {
 			c, err := strconv.ParseFloat(min, 64)
@@ -130,9 +130,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		}
 	}
 	if t, ok := tokens["gpu"]; ok {
-		min, _, rerr := t.Validate()
-		if rerr != nil {
-			return nil, 0, rerr
+		min, _, xerr := t.Validate()
+		if xerr != nil {
+			return nil, 0, xerr
 		}
 		if min != "" {
 			out.MinGPU, err = strconv.Atoi(min)
@@ -144,9 +144,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		out.MinGPU = -1
 	}
 	if t, ok := tokens["ram"]; ok {
-		min, max, rerr := t.Validate()
-		if rerr != nil {
-			return nil, 0, rerr
+		min, max, xerr := t.Validate()
+		if xerr != nil {
+			return nil, 0, xerr
 		}
 		if min != "" {
 			c, err := strconv.ParseFloat(min, 64)
@@ -164,9 +164,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 		}
 	}
 	if t, ok := tokens["disk"]; ok {
-		min, _, rerr := t.Validate()
-		if rerr != nil {
-			return nil, 0, rerr
+		min, _, xerr := t.Validate()
+		if xerr != nil {
+			return nil, 0, xerr
 		}
 		if min != "" {
 			out.MinDiskSize, err = strconv.Atoi(min)
@@ -175,7 +175,33 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 			}
 		}
 	}
+	if t, ok := tokens["template"]; ok {
+		var xerr fail.Error
+		if out.Template, _, xerr = t.Validate(); xerr != nil {
+			return nil, 0, xerr
+		}
+	}
 	return &out, count, nil
+}
+
+// NodeCountFromStringToInteger extracts initial node count from string
+func NodeCountFromStringToInteger(in string) (int, fail.Error) {
+	tokens, xerr := parseSizingString(in)
+	if xerr != nil {
+		return 0, xerr
+	}
+
+	if t, ok := tokens["count"]; ok {
+		if min, _, xerr := t.Validate(); xerr == nil && min != "" {
+			count, err := strconv.Atoi(min)
+			if err != nil {
+				return 0, fail.SyntaxError("invalid value '%s' for 'count'", min)
+			}
+			return count, nil
+		}
+	}
+
+	return 0, nil
 }
 
 // sizingToken describes a token (<keyword> <operator> <value>)
@@ -248,12 +274,14 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 	operator := t.members[1]
 	value := t.members[2]
 	switch operator {
-	case "~":
+	case "~": 		// "~" means "[<value>-<value*2>]"
 		if keyword == "count" {
 			return "", "", fail.InvalidRequestError("'count' can only use '='")
 		}
+		if keyword == "template" {
+			return "", "", fail.InvalidRequestError("'template' can only use '='")
+		}
 
-		// "~" means "[<value>-<value*2>]"
 		vali, err := strconv.Atoi(value)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
@@ -264,6 +292,9 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		}
 		return fmt.Sprintf("%d", vali), fmt.Sprintf("%d", 2*vali), nil
 	case "=":
+		if keyword == "template" {
+			return value, "", nil
+		}
 		if keyword != "count" {
 			if value[0] == '[' && value[len(value)-1] == ']' {
 				value = value[1 : len(value)-1]
@@ -301,6 +332,9 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		if keyword == "count" {
 			return "", "", fail.InvalidRequestError("'count' can only use '='")
 		}
+		if keyword == "template" {
+			return "", "", fail.InvalidRequestError("'template' can only use '='")
+		}
 
 		vali, err := strconv.Atoi(value)
 		if err != nil {
@@ -318,6 +352,9 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		if keyword == "count" {
 			return "", "", fail.InvalidRequestError("'count' can only use '='")
 		}
+		if keyword == "template" {
+			return "", "", fail.InvalidRequestError("'template' can only use '='")
+		}
 
 		_, err := strconv.Atoi(value)
 		if err != nil {
@@ -333,6 +370,9 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 	case ">":
 		if keyword == "count" {
 			return "", "", fail.InvalidRequestError("'count' can only use '='")
+		}
+		if keyword == "template" {
+			return "", "", fail.InvalidRequestError("'template' can only use '='")
 		}
 
 		vali, err := strconv.Atoi(value)
