@@ -601,7 +601,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 
 		// Create a KeyPair for the user cladm
 		kpName := "cluster_" + req.Name + "_cladm_key"
-		kp, innerXErr := c.service.CreateKeyPair(kpName)
+		kp, innerXErr := abstract.NewKeyPair(kpName)
 		if innerXErr != nil {
 			return innerXErr
 		}

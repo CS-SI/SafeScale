@@ -74,6 +74,9 @@ func constructHostDefinitionStringFromCLI(c *cli.Context, key string) (string, e
 		if c.IsSet("disk") {
 			sizing += fmt.Sprintf("disk >= %.01f,", c.Float64("disk"))
 		}
+		if c.IsSet("count") {
+			sizing += fmt.Sprintf("count = %d", c.Int("count"))
+		}
 	}
 	return sizing, nil
 

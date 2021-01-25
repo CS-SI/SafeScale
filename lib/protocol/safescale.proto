@@ -683,10 +683,9 @@ message ClusterCreateRequest {
 	string node_sizing = 11;
 	string domain = 12;
 	string tenant_id = 13;
-	uint32 node_count = 14;         // initial node count
-	string gateway_options = 15;    // to store options for gateways than does not concern sizing (like ssh port for example)
-	string master_options = 16;     // same as gateway_options for masters
-	string node_options = 17;       // same as gateway_options for nodes
+	string gateway_options = 14;    // to store options for gateways than does not concern sizing (like ssh port for example)
+	string master_options = 15;     // same as gateway_options for masters
+	string node_options = 16;       // same as gateway_options for nodes
 }
 
 message ClusterResizeRequest {
