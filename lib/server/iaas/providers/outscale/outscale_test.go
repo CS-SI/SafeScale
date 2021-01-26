@@ -173,7 +173,7 @@ func Test_VMWithGPU(t *testing.T) {
 
 	img, err := tt.Service.SearchImage("Ubuntu 18.04")
 	assert.NoError(t, err)
-	tpls, err := tt.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+	tpls, err := tt.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
 		MinCores:    1,
 		MaxCores:    1,
 		MinRAMSize:  1,

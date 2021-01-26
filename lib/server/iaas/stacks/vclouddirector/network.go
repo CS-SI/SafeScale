@@ -32,7 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func (s *Stack) getOrgVdc() (govcd.Org, govcd.Vdc, fail.Error) {
+func (s *stack) getOrgVdc() (govcd.Org, govcd.Vdc, fail.Error) {
 	org, err := govcd.GetOrgByName(s.EbrcService, s.AuthOptions.ProjectName)
 	if err != nil {
 		return govcd.Org{}, govcd.Vdc{}, normalizeError(err)
@@ -46,7 +46,7 @@ func (s *Stack) getOrgVdc() (govcd.Org, govcd.Vdc, fail.Error) {
 	return org, vdc, nil
 }
 
-func (s *Stack) findVAppNames() ([]string, fail.Error) {
+func (s *stack) findVAppNames() ([]string, fail.Error) {
 	_, vdc, xerr := s.getOrgVdc()
 	if xerr != nil {
 		return []string{}, xerr
@@ -70,7 +70,7 @@ func (s *Stack) findVAppNames() ([]string, fail.Error) {
 }
 
 // TODO: move to compute.go
-func (s *Stack) findVmNames() ([]string, fail.Error) {
+func (s *stack) findVmNames() ([]string, fail.Error) {
 	_, vdc, xerr := s.getOrgVdc()
 	if xerr != nil {
 		return []string{}, xerr
@@ -93,7 +93,7 @@ func (s *Stack) findVmNames() ([]string, fail.Error) {
 }
 
 // TODO: move to compute.go
-func (s *Stack) findVMByID(id string) (govcd.VM, fail.Error) {
+func (s *stack) findVMByID(id string) (govcd.VM, fail.Error) {
 	var vm govcd.VM
 
 	if strings.Contains(id, ":vapp:") {
@@ -121,7 +121,7 @@ func (s *Stack) findVMByID(id string) (govcd.VM, fail.Error) {
 }
 
 // TODO: move to compute.go
-func (s *Stack) findVMByIDS(id string) (govcd.VM, fail.Error) {
+func (s *stack) findVMByIDS(id string) (govcd.VM, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return govcd.VM{}, normalizeError(err)
@@ -136,7 +136,7 @@ func (s *Stack) findVMByIDS(id string) (govcd.VM, fail.Error) {
 }
 
 // TODO: move to compute.go
-func (s *Stack) findVMByName(id string) (govcd.VM, fail.Error) {
+func (s *stack) findVMByName(id string) (govcd.VM, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
 
 	appNames, err := s.findVAppNames()
@@ -162,7 +162,7 @@ func (s *Stack) findVMByName(id string) (govcd.VM, fail.Error) {
 }
 
 // TODO: move to compute.go
-func (s *Stack) findDiskByID(id string) (*govcd.Disk, fail.Error) {
+func (s *stack) findDiskByID(id string) (*govcd.Disk, fail.Error) {
 	_, vdc, xerr := s.getOrgVdc()
 	if xerr != nil {
 		return nil, xerr
@@ -189,7 +189,7 @@ func (s *Stack) findDiskByID(id string) (*govcd.Disk, fail.Error) {
 }
 
 // TODO: move to compute.go
-func (s *Stack) findDiskByName(name string) (*govcd.Disk, fail.Error) {
+func (s *stack) findDiskByName(name string) (*govcd.Disk, fail.Error) {
 	_, vdc, xerr := s.getOrgVdc()
 	if xerr != nil {
 		return nil, xerr
@@ -211,7 +211,7 @@ func (s *Stack) findDiskByName(name string) (*govcd.Disk, fail.Error) {
 	return nil, fail.NewError("disk with name '%s' not found", name)
 }
 
-func (s *Stack) findEdgeGatewayNames() ([]string, fail.Error) {
+func (s *stack) findEdgeGatewayNames() ([]string, fail.Error) {
 	_, vdc, xerr := s.getOrgVdc()
 	if xerr != nil {
 		return []string{}, xerr
@@ -233,7 +233,7 @@ func (s *Stack) findEdgeGatewayNames() ([]string, fail.Error) {
 	return gateways, nil
 }
 
-func (s *Stack) getPublicIPs() (types.IPRanges, error) {
+func (s *stack) getPublicIPs() (types.IPRanges, error) {
 	_, vdc, err := s.getOrgVdc()
 	if err != nil {
 		return types.IPRanges{}, err
@@ -406,7 +406,7 @@ func getLinks(org govcd.Org, typed string) ([]types.Link, fail.Error) {
 }
 
 // CreateNetwork creates a network named name
-func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, xerr fail.Error) {
+func (s *stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Network, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -607,7 +607,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 }
 
 // InspectNetwork returns the network identified by ref (id or name)
-func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
+func (s *stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -649,7 +649,7 @@ func (s *Stack) InspectNetwork(ref string) (*abstract.Network, fail.Error) {
 }
 
 // GetNetworkByName returns the network identified by ref (id or name)
-func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
+func (s *stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -680,7 +680,7 @@ func (s *Stack) GetNetworkByName(ref string) (*abstract.Network, fail.Error) {
 }
 
 // ListNetworks lists available networks
-func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
+func (s *stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -715,7 +715,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s *Stack) DeleteNetwork(ref string) fail.Error {
+func (s *stack) DeleteNetwork(ref string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -808,22 +808,22 @@ func (s *Stack) DeleteNetwork(ref string) fail.Error {
 //	return s.DeleteHost(ref)
 // }
 
-func (s *Stack) CreateVIP(string, string, string, []string) (*abstract.VirtualIP, fail.Error) {
+func (s *stack) CreateVIP(string, string, string, []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) AddPublicIPToVIP(ip *abstract.VirtualIP) fail.Error {
+func (s *stack) AddPublicIPToVIP(ip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) BindHostToVIP(ip *abstract.VirtualIP, s2 string) fail.Error {
+func (s *stack) BindHostToVIP(ip *abstract.VirtualIP, s2 string) fail.Error {
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) UnbindHostFromVIP(ip *abstract.VirtualIP, s2 string) fail.Error {
+func (s *stack) UnbindHostFromVIP(ip *abstract.VirtualIP, s2 string) fail.Error {
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s *Stack) DeleteVIP(ip *abstract.VirtualIP) fail.Error {
+func (s *stack) DeleteVIP(ip *abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }

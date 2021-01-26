@@ -37,7 +37,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+func (s *stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -101,7 +101,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 }
 
 // InspectVolume returns the volume identified by id
-func (s *Stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
+func (s *stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -137,7 +137,7 @@ func (s *Stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+func (s *stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -174,7 +174,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *Stack) DeleteVolume(ref string) fail.Error {
+func (s *stack) DeleteVolume(ref string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -210,7 +210,7 @@ func getAttachmentID(volume string, domain string) string {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+func (s *stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if s == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -246,7 +246,7 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 }
 
 // GetVolumeAttachment returns the volume attachment identified by id
-func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s *stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -270,7 +270,7 @@ func (s *Stack) GetVolumeAttachment(serverID, id string) (*abstract.VolumeAttach
 }
 
 // DeleteVolumeAttachment ...
-func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
+func (s *stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -302,7 +302,7 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) fail.Error {
 }
 
 // ListVolumeAttachments lists available volume attachments
-func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
+func (s *stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}

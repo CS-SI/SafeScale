@@ -449,7 +449,7 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error
 	return s.rpcResetStartupScriptOfInstance(ahf.GetID())
 }
 
-	// InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
+// InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
@@ -578,23 +578,23 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 	host.Networking.SubnetsByName = subnetIDByName
 	host.Networking.PublicIPv4 = ipv4
 
-	host.Sizing = s.fromMachineTypeToAllocatedSize(instance.MachineType)
+	//host.Sizing = s.fromMachineTypeToAllocatedSize(instance.MachineType)
 
 	return nil
 }
 
-func (s stack) fromMachineTypeToAllocatedSize(machineType string) *abstract.HostEffectiveSizing {
-	hz := abstract.HostEffectiveSizing{}
-	mt, xerr := s.rpcGetMachineType(machineType)
-	if xerr != nil {
-		return &hz
-	}
-
-	// FIXME: complete mapping
-	hz.Cores = int(mt.GuestCpus)
-	hz.RAMSize = float32(mt.MemoryMb / 1024)
-	return &hz
-}
+//func (s stack) fromMachineTypeToAllocatedSize(machineType string) *abstract.HostEffectiveSizing {
+//	hz := abstract.HostEffectiveSizing{}
+//	mt, xerr := s.rpcGetMachineType(machineType)
+//	if xerr != nil {
+//		return &hz
+//	}
+//
+//	// FIXME: complete mapping
+//	hz.Cores = int(mt.GuestCpus)
+//	hz.RAMSize = float32(mt.MemoryMb / 1024.0)
+//	return &hz
+//}
 
 func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 	switch gcpHostStatus {

@@ -44,7 +44,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s *Stack) ListImages(all bool) (list []abstract.Image, xerr fail.Error) {
+func (s *stack) ListImages(all bool) (list []abstract.Image, xerr fail.Error) {
 	var nullImage []abstract.Image
 	if s == nil {
 		return nullImage, fail.InvalidInstanceError()
@@ -89,7 +89,7 @@ func (s *Stack) ListImages(all bool) (list []abstract.Image, xerr fail.Error) {
 }
 
 // GetImage returns the Image referenced by id
-func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
+func (s *stack) GetImage(id string) (*abstract.Image, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -110,7 +110,7 @@ func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (s *stack) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	var nullTemplate []abstract.HostTemplate
 	if s == nil {
 		return nullTemplate, fail.InvalidInstanceError()
@@ -126,7 +126,7 @@ func (s *Stack) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 }
 
 // ListTemplates overload OpenStackEbrc ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s *Stack) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, fail.Error) {
+func (s *stack) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, fail.Error) {
 	var nullTemplateSlice []abstract.HostTemplate
 
 	if s == nil {
@@ -199,7 +199,7 @@ func (s *Stack) ListTemplatesSpecial(all bool) ([]abstract.HostTemplate, fail.Er
 }
 
 // GetTemplate overload OpenStackEbrc GetTemplate method to add GPU configuration
-func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
+func (s *stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -229,7 +229,7 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
 // CreateKeyPair creates and import a key pair
-func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
+func (s *stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -244,22 +244,22 @@ func (s *Stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error
 }
 
 // GetKeyPair returns the key pair identified by id
-func (s *Stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s *stack) GetKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("")
 }
 
 // ListKeyPairs lists available key pairs
-func (s *Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+func (s *stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("")
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s *Stack) DeleteKeyPair(id string) fail.Error {
+func (s *stack) DeleteKeyPair(id string) fail.Error {
 	return fail.NotImplementedError("")
 }
 
 // CreateHost creates an host satisfying request
-func (s *Stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.HostFull, content *userdata.Content, xerr fail.Error) {
+func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.HostFull, content *userdata.Content, xerr fail.Error) {
 	nullAhf := abstract.NewHostFull()
 	if s == nil {
 		return nullAhf, nil, fail.InvalidInstanceError()
@@ -671,7 +671,7 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.IPAddress containing an id
-func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
+func (s *stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFull, xerr fail.Error) {
 	ahf = &abstract.HostFull{}
 	if s == nil {
 		return ahf, fail.InvalidInstanceError()
@@ -720,7 +720,7 @@ func (s *Stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 	return ahf, nil
 }
 
-func (s *Stack) complementHost(host *abstract.HostFull, newHost *abstract.HostFull) fail.Error {
+func (s *stack) complementHost(host *abstract.HostFull, newHost *abstract.HostFull) fail.Error {
 	host.Core.ID = newHost.Core.ID
 	if host.Core.Name == "" {
 		host.Core.Name = newHost.Core.Name
@@ -772,7 +772,7 @@ func stateConvert(stateVcd int) hoststate.Enum {
 }
 
 // InspectHostByName returns the host identified by ref (name or id)
-func (s *Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+func (s *stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -805,7 +805,7 @@ func (s *Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) 
 }
 
 // DeleteHost deletes the host identified by id
-func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -854,12 +854,12 @@ func (s *Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost change the template used by an host
-func (s *Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s *stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet")
 }
 
 // ListHosts lists available hosts
-func (s *Stack) ListHosts() ([]*abstract.HostCore, fail.Error) {
+func (s *stack) ListHosts() ([]*abstract.HostCore, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -887,7 +887,7 @@ func (s *Stack) ListHosts() ([]*abstract.HostCore, fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -924,7 +924,7 @@ func (s *Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StartHost starts the host identified by id
-func (s *Stack) StartHost(hostParam interface{}) fail.Error {
+func (s *stack) StartHost(hostParam interface{}) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -961,7 +961,7 @@ func (s *Stack) StartHost(hostParam interface{}) fail.Error {
 }
 
 // RebootHost reboot the host identified by id
-func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -998,7 +998,7 @@ func (s *Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // GetHostState returns the host identified by id
-func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s *stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s == nil {
 		return hoststate.ERROR, fail.InvalidInstanceError()
 	}
@@ -1017,20 +1017,20 @@ func (s *Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fa
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s *Stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
+func (s *stack) ListAvailabilityZones() (map[string]bool, fail.Error) {
 	return map[string]bool{"local": true}, nil
 }
 
-func (s *Stack) ListRegions() ([]string, fail.Error) {
+func (s *stack) ListRegions() ([]string, fail.Error) {
 	return nil, fail.NotImplementedError("ListRegions() not implemented yet") // FIXME: Technical debt
 }
 
 // BindSecurityGroupToHost ...
-func (s *Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s *stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s *Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s *stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	return fail.NotImplementedError("not yet implemented")
 }

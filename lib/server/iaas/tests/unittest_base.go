@@ -199,7 +199,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 
 	var gateway *abstract.HostFull
 	if withGW {
-		tpls, err := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+		tpls, err := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
 			MinCores:    1,
 			MinRAMSize:  1,
 			MinDiskSize: 0,
@@ -229,7 +229,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 
 // CreateHost creates a test host
 func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstract.Subnet, public bool) (*abstract.HostFull, *userdata.Content, fail.Error) {
-	tpls, xerr := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+	tpls, xerr := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,
@@ -253,7 +253,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstr
 
 // CreateGW creates a test GW
 func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fail.Error {
-	tpls, xerr := tester.Service.SelectTemplatesBySize(abstract.HostSizingRequirements{
+	tpls, xerr := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,
 		MinDiskSize: 10,

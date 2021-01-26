@@ -21,6 +21,7 @@ feature:
         cluster: all
     parameters:
         - DockerComposeVersion=1.27.4
+
     install:
         bash:
             check:
