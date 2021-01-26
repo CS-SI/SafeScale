@@ -468,7 +468,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 				logrus.Debugf("Cleaning up on failure, deleting Hosts...")
 				var list map[uint]*propertiesv3.ClusterNode
 				derr := c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error{
+					return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 						nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -621,7 +621,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 
 // determineSizingRequirements calculates the sizings needed for the hosts of the cluster
 func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstract.ClusterRequest) (
-	*abstract.HostSizingRequirements, *abstract.HostSizingRequirements, *abstract.HostSizingRequirements, fail.Error,
+	_ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, xerr fail.Error,
 ) {
 
 	var (
@@ -663,6 +663,13 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
 	gatewaysDef.Image = imageID
 
+	svc := c.GetService()
+	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
+	if xerr != nil {
+		return nil, nil, nil, xerr
+	}
+	gatewaysDef.Template = tmpl.Name
+
 	// Determine master sizing
 	if c.makers.DefaultMasterSizing != nil {
 		mastersDefault = complementSizingRequirements(nil, c.makers.DefaultMasterSizing(task, c))
@@ -676,9 +683,18 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 			MinGPU:      -1,
 		}
 	}
-	// Note: no way yet to define master sizing from cli...
 	mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
 	mastersDef.Image = imageID
+
+	if mastersDef.Equals(*gatewaysDef) {
+		mastersDef.Template = gatewaysDef.Template
+	} else {
+		tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
+		if xerr != nil {
+			return nil, nil, nil, xerr
+		}
+		mastersDef.Template = tmpl.Name
+	}
 
 	// Determine node sizing
 	if c.makers.DefaultNodeSizing != nil {
@@ -693,11 +709,23 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 			MinGPU:      -1,
 		}
 	}
-	// nodesDefault.ImageID = imageID
 	nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
 	nodesDef.Image = imageID
 
-	xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	if nodesDef.Equals(*gatewaysDef) {
+		nodesDef.Template = gatewaysDef.Template
+	} else if nodesDef.Equals(*mastersDef) {
+		nodesDef.Template = mastersDef.Template
+	} else {
+		tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
+		if xerr != nil {
+			return nil, nil, nil, xerr
+		}
+		nodesDef.Template = tmpl.Name
+	}
+
+	// Updates property
+	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
@@ -1248,7 +1276,7 @@ func (c cluster) GetIdentity(task concurrency.Task) (clusterIdentity abstract.Cl
 		return abstract.ClusterIdentity{}, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	xerr = c.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = c.CachedInspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1270,7 +1298,7 @@ func (c cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, xe
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	aci, xerr := c.GetIdentity(task)
 	if xerr != nil {
@@ -2865,7 +2893,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	}()
 
 	var (
-		all map[uint]*propertiesv3.ClusterNode
+		all            map[uint]*propertiesv3.ClusterNode
 		nodes, masters []uint
 	)
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -3376,7 +3404,7 @@ func (c cluster) ToProtocol(task concurrency.Task) (_ *protocol.ClusterResponse,
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-				out.Network = converters.ClusterNetworkFromPropertyToProtocol(*networkV3)
+			out.Network = converters.ClusterNetworkFromPropertyToProtocol(*networkV3)
 			return nil
 		})
 		if innerXErr != nil {
@@ -3471,8 +3499,8 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 
 	var (
 		removedNodes []*propertiesv3.ClusterNode
-		errors []error
-		toRemove []uint
+		errors       []error
+		toRemove     []uint
 	)
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
