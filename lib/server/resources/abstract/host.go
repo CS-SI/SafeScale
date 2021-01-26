@@ -83,6 +83,31 @@ type HostSizingRequirements struct {
 	Template    string // if != "", describes the template to use and disables the use of other fields
 }
 
+func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
+	if hsr.MinCores != in.MinCores {
+		return false
+	}
+	if hsr.MaxCores != in.MaxCores {
+		return false
+	}
+	if hsr.MinRAMSize != in.MinRAMSize {
+		return false
+	}
+	if hsr.MaxRAMSize != in.MaxRAMSize {
+		return false
+	}
+	if hsr.MinDiskSize != in.MinDiskSize {
+		return false
+	}
+	if hsr.MinGPU != in.MinGPU {
+		return false
+	}
+	if hsr.MinCPUFreq != in.MinCPUFreq {
+		return false
+	}
+	return true
+}
+
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
 	ID           string `bow:"key"`

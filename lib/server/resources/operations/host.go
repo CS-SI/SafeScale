@@ -493,6 +493,21 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
 	if hostReq.TemplateID == "" {
+		if hostDef.Template != "" {
+			tmpl, xerr := svc.FindTemplateByName(hostDef.Template)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				// continue
+				default:
+					return nil, xerr
+				}
+			} else {
+				hostReq.TemplateID = tmpl.ID
+			}
+		}
+	}
+	if hostReq.TemplateID == "" {
 		hostReq.TemplateID, xerr = rh.findTemplateID(hostDef)
 		if xerr != nil {
 			return nil, xerr
@@ -1007,31 +1022,42 @@ func (rh *host) onFailureUndoSetSecurityGroups(task concurrency.Task, errorPtr *
 
 func (rh host) findTemplateID(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
 	svc := rh.GetService()
-	useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
-	templates, xerr := svc.SelectTemplatesBySize(hostDef, useScannerDB)
+	if hostDef.Template != "" {
+		if tpl, xerr := svc.FindTemplateByName(hostDef.Template); xerr == nil {
+			return tpl.ID, nil
+		}
+		logrus.Warning(fail.NotFoundError("failed to find template '%s', trying to guess from sizing...", hostDef.Template))
+	}
+
+	template, xerr := svc.FindTemplateBySizing(hostDef)
 	if xerr != nil {
-		return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+		return "", xerr
 	}
-	var template abstract.HostTemplate
-	if len(templates) > 0 {
-		template = *(templates[0])
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
-			}
-		}
-		msg += ")"
-		logrus.Infof(msg)
-	} else {
-		logrus.Errorf("failed to find template corresponding to requested resources")
-		return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
-	}
+	//useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
+	//templates, xerr := svc.ListTemplatesBySizing(hostDef, useScannerDB)
+	//if xerr != nil {
+	//	return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+	//}
+	//var template abstract.HostTemplate
+	//if len(templates) > 0 {
+	//	template = *(templates[0])
+	//	msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+	//	if template.CPUFreq > 0 {
+	//		msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+	//	}
+	//	msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+	//	if template.GPUNumber > 0 {
+	//		msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+	//		if template.GPUType != "" {
+	//			msg += fmt.Sprintf(" %s", template.GPUType)
+	//		}
+	//	}
+	//	msg += ")"
+	//	logrus.Infof(msg)
+	//} else {
+	//	logrus.Errorf("failed to find template corresponding to requested resources")
+	//	return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+	//}
 	return template.ID, nil
 }
 
