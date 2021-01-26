@@ -57,19 +57,18 @@ type Service interface {
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
+	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
+	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
 	GetMetadataBucket() abstract.ObjectStorageBucket
 	GetMetadataKey() (*crypt.Key, fail.Error)
 	InspectHostByName(string) (*abstract.HostFull, fail.Error)
 	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
-
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
+	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
 	SearchImage(string) (*abstract.Image, fail.Error)
-	SelectTemplatesBySize(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
-	SelectTemplateByName(string) (*abstract.HostTemplate, fail.Error)
+	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
-
-	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 
 	// --- from interface iaas.Providers ---
 	providers.Provider
@@ -283,8 +282,8 @@ func (svc service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 	return svc.reduceTemplates(allTemplates), nil
 }
 
-// SelectTemplateByName returns the template by its name
-func (svc service) SelectTemplateByName(name string) (*abstract.HostTemplate, fail.Error) {
+// FindTemplateByName returns the template by its name
+func (svc service) FindTemplateByName(name string) (*abstract.HostTemplate, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -299,6 +298,37 @@ func (svc service) SelectTemplateByName(name string) (*abstract.HostTemplate, fa
 		}
 	}
 	return nil, fail.NotFoundError(fmt.Sprintf("template named '%s' not found", name))
+}
+
+// FindTemplateBySizing returns an abstracted template corresponding to the Host Sizing Requirements
+func (svc service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error) {
+	useScannerDB := sizing.MinGPU > 0 || sizing.MinCPUFreq > 0
+	templates, xerr := svc.ListTemplatesBySizing(sizing, useScannerDB)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+	}
+
+	var template *abstract.HostTemplate
+	if len(templates) > 0 {
+		template = templates[0]
+		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+		if template.CPUFreq > 0 {
+			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+		}
+		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+		if template.GPUNumber > 0 {
+			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+			if template.GPUType != "" {
+				msg += fmt.Sprintf(" %s", template.GPUType)
+			}
+		}
+		msg += ")"
+		logrus.Infof(msg)
+	} else {
+		logrus.Errorf("failed to find template corresponding to requested resources")
+		return nil, fail.Wrap(xerr, "failed to find template corresponding to requested resources")
+	}
+	return template, nil
 }
 
 func (svc service) reduceTemplates(tpls []abstract.HostTemplate) []abstract.HostTemplate {
@@ -331,9 +361,9 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 	}
 }
 
-// SelectTemplatesBySize select templates satisfying sizing requirements
+// ListTemplatesBySizing select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc service) SelectTemplatesBySize(sizing abstract.HostSizingRequirements, force bool) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
+func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements, force bool) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}

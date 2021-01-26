@@ -19,8 +19,9 @@
 package vclouddirector
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"net/url"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
@@ -63,7 +64,7 @@ func NullStack() *stack {
 
 // New creates and initializes a ClientAPI
 func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationOptions, cfg stacks.ConfigurationOptions) (api.Stack, fail.Error) {
-	stack := &stack{
+	st := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
 	}
@@ -78,7 +79,7 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.VCloudConfigurationO
 	if err != nil {
 		return nil, fail.Wrap(normalizeError(err), "Unable to authenticate")
 	}
-	stack.EbrcService = vcdclient
+	st.EbrcService = vcdclient
 
-	return stack, nil
+	return st, nil
 }
