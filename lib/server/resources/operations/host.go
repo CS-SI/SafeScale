@@ -1794,53 +1794,33 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	}
 
 	hostName := rh.GetName()
-	// xerr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
-	// 	func() error {
-	var innerXErr fail.Error
-	retCode, stdOut, stdErr, innerXErr = run(task, ssh, cmd, outs, executionTimeout)
-	if innerXErr != nil {
-		switch innerXErr.(type) {
-		case *fail.ErrTimeout:
-			innerXErr = fail.Wrap(innerXErr.Cause(), "failed to run command in %s", executionTimeout)
-		case *fail.ErrExecution:
-			innerXErr = retry.StopRetryError(innerXErr)
-		}
-	}
-
-	// if task.Aborted() {
-	// 	return fail.AbortedError(innerXErr)
-	// }
-	//
-	// 	return innerXErr
-	// },
-	// connectionTimeout*2, // VPL: insufficient delay ?
-	// func(t retry.Try, v verdict.Enum) {
-	// 	if v == verdict.Retry {
-	// 		logrus.Warnf("Remote SSH service on Host '%s' is not ready, retrying...", hostName)
-	// 	}
-	// },
-	// )
-	// if xerr != nil {
-	if innerXErr != nil {
-		switch innerXErr.(type) {
-		case *retry.ErrStopRetry:
-			xerr = fail.ToError(xerr.Cause())
+	retCode, stdOut, stdErr, xerr = run(task, ssh, cmd, outs, executionTimeout)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // == *fail.ErrAborted
+			if cerr := xerr.Cause(); cerr != nil {
+				xerr = fail.ToError(cerr)
+			}
 		case *fail.ErrTimeout:
 			switch xerr.Cause().(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.Wrap(xerr.Cause(), "failed to execute command on Host '%s'", hostName)
+				xerr = fail.Wrap(xerr.Cause(), "failed to execute command on Host '%s' in %s", hostName, temporal.FormatDuration(executionTimeout))
 			default:
 				xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
 			}
-		default:
-			xerr = innerXErr
 		}
 	}
+
 	return retCode, stdOut, stdErr, xerr
 }
 
 // run executes command on the host
 // If run fails to connect to remote host, returns *fail.ErrNotAvailable
+// In case of error, can return:
+// - *fail.ErrExecution: // FIXME: complete comment
+// - *fail.ErrNotAvailable: // FIXME: complete comment
+// - *fail.ErrTimeout: // FIXME: complete comment
+// - *fail.ErrAborted: // FIXME: complete comment
 func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// Create the command
 	sshCmd, xerr := ssh.NewCommand(task, cmd)
