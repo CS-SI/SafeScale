@@ -18,13 +18,15 @@ package aws
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -35,7 +37,7 @@ type stack struct {
 	AuthOptions *stacks.AuthenticationOptions
 	AwsConfig   *stacks.AWSConfiguration
 
-	S3Service      *s3.S3
+	// S3Service      *s3.S3
 	EC2Service     *ec2.EC2
 	SSMService     *ssm.SSM
 	PricingService *pricing.Pricing
@@ -66,6 +68,13 @@ func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 
 // New creates and initializes an AWS stack
 func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (api.Stack, error) {
+	if localCfg.Ec2Endpoint == "" {
+		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
+	}
+	if localCfg.SsmEndpoint == "" {
+		localCfg.SsmEndpoint = fmt.Sprintf("https://ssm.%s.amazonaws.com", localCfg.Region)
+	}
+
 	stack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
