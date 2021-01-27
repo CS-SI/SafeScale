@@ -1531,13 +1531,13 @@ EOF
 install_packages() {
     case $LINUX_KIND in
     ubuntu | debian)
-        sfRetry 3m 5 "sfApt install -y -qq jq zip time &>/dev/null" || fail 214
+        sfRetry 4m 5 "sfApt install -y -qq jq zip time &>/dev/null" || fail 214
         ;;
     redhat | rhel | centos)
-        sfRetry 3m 5 "sfYum install --enablerepo=epel -y -q wget jq time zip &>/dev/null" || fail 215
+        sfRetry 4m 5 "sfYum install --enablerepo=epel -y -q wget jq time zip &>/dev/null" || fail 215
         ;;
     fedora)
-        sfRetry 3m 5 "sfYum install -y -q wget jq time zip &>/dev/null" || fail 215
+        sfRetry 4m 5 "sfYum install -y -q wget jq time zip &>/dev/null" || fail 215
         ;;
     *)
         echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -1818,7 +1818,14 @@ function make_ready_for_ansible() {
     esac
 }
 
+function track_time() {
+    uptime
+    last
+}
+
 # ---- Main
+
+track_time
 
 collect_original_packages
 
@@ -1901,6 +1908,8 @@ ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
 #insert_tag
 
 force_dbus_restart
+
+track_time
 
 set +x
 exit 0

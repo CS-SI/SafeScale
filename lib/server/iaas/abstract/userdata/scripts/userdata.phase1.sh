@@ -322,9 +322,11 @@ ensure_network_connectivity() {
     fi
 
     {{- if .AddGateway }}
+    echo "This is NOT a gateway"
     route del -net default &>/dev/null
     route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
+    echo "This IS a gateway"
     :
     {{- end}}
 
@@ -434,11 +436,25 @@ function silent_compatible_network() {
     fi
 }
 
+function track_time() {
+    uptime
+    last
+}
+
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
 
+PHASE_DONE=/opt/safescale/var/state/user_data.phase1.done
+if [[ -f "$PHASE_DONE" ]]; then
+    echo "$PHASE_DONE already there."
+    set +x
+    exit 0
+fi
+
 put_hostname_in_hosts
+
+track_time
 
 check_dns_configuration || true
 
@@ -455,6 +471,8 @@ compatible_network
 touch /etc/cloud/cloud-init.disabled
 
 fail_fast_unsupported_distros
+
+track_time
 
 echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x
