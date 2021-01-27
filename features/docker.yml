@@ -82,10 +82,10 @@ feature:
                                         if [ $op -ne 0 ]; then
                                             sfFail 194
                                         else
-                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce || sfFail 194
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce-19.03.9 || sfFail 194
                                         fi
                                     else
-                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce --nobest || sfFail 194
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce-19.03.9 --nobest || sfFail 194
                                     fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
@@ -100,10 +100,10 @@ feature:
                                         if [ $op -ne 0 ]; then
                                             sfFail 194
                                         else
-                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce || sfFail 194
+                                            sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce-19.03.9 || sfFail 194
                                         fi
                                     else
-                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce --nobest || sfFail 194
+                                        sfRetry {{.TemplateLongOperationTimeout}} {{.TemplateOperationDelay}} sfYum install -y docker-ce-19.03.9 --nobest || sfFail 194
                                     fi
                                     systemctl enable --now docker || true
                                     ;;
@@ -112,6 +112,8 @@ feature:
                                     sfFail 195
                                     ;;
                             esac
+                            sfService start dbus
+                            sfService restart firewalld
                             sfExit
 
                     docker-compose:
@@ -122,11 +124,22 @@ feature:
                             nodes: all
                         run: |
                             op=-1
-                            VERSION=$(sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
-                            [ $op -ne 0 ] && sfFail 192
-                            URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || sfFail 193
+                            # get glib version
+                            glibver=$(ldd --version | head -n 1 | awk {'print $NF'})
+                            testvercomp $glibver 2.27 '>' && op=$? || true
+                            if [ $op -ne 0 ]; then
+                                VERSION=1.27.4
+                                URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                                sfDownload "$URL" docker-compose 3m 5 || sfFail 193
+                            else
+                                op=-1
+                                VERSION=$(sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq .name -r") && op=$? || true
+                                [ $op -ne 0 ] && sfFail 192
+                                URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
+                                sfDownload "$URL" docker-compose 3m 5 || sfFail 193
+                            fi
                             chmod +x docker-compose && mv docker-compose /usr/bin
+                            docker-compose -v || sfFail 194
                             sfExit
 
                     config:
