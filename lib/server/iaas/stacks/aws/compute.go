@@ -486,9 +486,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if s.IsNull() {
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
-	if request.KeyPair == nil {
-		return nullAHF, nullUDC, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
-	}
+	// if request.KeyPair == nil {
+	// 	return nullAHF, nullUDC, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+	// }
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
@@ -497,7 +497,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	resourceName := request.ResourceName
 	subnets := request.Subnets
 	// hostMustHavePublicIP := request.PublicIP
-	keyPairName := request.KeyPair.Name
 
 	if len(subnets) == 0 {
 		return nullAHF, nullUDC, fail.InvalidRequestError("the Host '%s' must be on at least one Subnet (even if public)", resourceName)
@@ -507,6 +506,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for Host")
 	}
+	keyPairName := request.KeyPair.Name
 
 	// The default Subnet is the first of the provided list, by convention
 	defaultSubnet, defaultSubnetID := func() (*abstract.Subnet, string) {
@@ -595,14 +595,19 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				server, innerXErr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, template)
 			}
 			if innerXErr != nil {
-				logrus.Warnf("error creating Host: %+v", innerXErr)
+				switch innerXErr.(type) {
+				case *fail.ErrOverload:
+					return retry.StopRetryError(innerXErr)
+				default:
+					logrus.Warnf("error creating Host: %+v", innerXErr)
 
-				if server != nil && server.ID != "" {
-					if derr := s.DeleteHost(server.ID); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", server.Name))
+					if server != nil && server.ID != "" {
+						if derr := s.DeleteHost(server.ID); derr != nil {
+							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", server.Name))
+						}
 					}
+					return innerXErr
 				}
-				return innerXErr
 			}
 
 			if server == nil {

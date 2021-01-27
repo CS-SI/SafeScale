@@ -18,6 +18,7 @@ package stacks
 
 import (
 	"fmt"
+	"os"
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -98,6 +99,9 @@ func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error)
 	}
 
 	// If no password is supplied, generate one
+	if request.Password == "" {
+		request.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
+	}
 	if request.Password == "" {
 		password, err := utils.GeneratePassword(16)
 		if err != nil {

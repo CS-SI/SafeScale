@@ -48,6 +48,8 @@ func normalizeError(err error) fail.Error {
 			return fail.NotFoundError("failed to find Subnet")
 		case "InvalidParameterValue":
 			return fail.InvalidRequestError(cerr.Message())
+		case "VcpuLimitExcedded":
+			return fail.OverloadError(cerr.Message())
 		default:
 			switch cerr := err.(type) {
 			case awserr.RequestFailure:

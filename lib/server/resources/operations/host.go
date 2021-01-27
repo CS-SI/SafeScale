@@ -580,10 +580,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		}
 	}
 
-	// Give a chance to set a password by safescaled environment (meaning for all Hosts)
-	if hostReq.Password == "" {
-		hostReq.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
-	}
+	// // Give a chance to set a password by safescaled environment (meaning for all Hosts)
+	// if hostReq.Password == "" {
+	// 	hostReq.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
+	// }
 
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
 	if xerr != nil {

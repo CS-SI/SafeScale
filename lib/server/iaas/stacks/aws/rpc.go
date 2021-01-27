@@ -18,6 +18,7 @@ package aws
 
 import (
 	"encoding/base64"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -1206,7 +1207,15 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 	request := ec2.DescribeInstanceTypesInput{}
 	if len(ids) > 0 {
 		request.InstanceTypes = ids
+	} else {
+		request.Filters = []*ec2.Filter{
+			{
+				Name: aws.String("processor-info.supported-architecture"),
+				Values: []*string{aws.String("x86_64")},
+			},
+		}
 	}
+
 	var out []*ec2.InstanceTypeInfo
 	for {
 		var resp *ec2.DescribeInstanceTypesOutput
@@ -1227,7 +1236,15 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 			}
 			return emptySlice, nil
 		}
-		out = append(out, resp.InstanceTypes...)
+		for _, v := range resp.InstanceTypes {
+			it := strings.ToLower(aws.StringValue(v.InstanceType))
+			// exclude special types like Inf* (optimized for inference) or Mac* (macOS) or f1.*
+			if strings.HasPrefix(it, "inf1.") || strings.HasPrefix(it, "mac1.")  || strings.HasPrefix(it, "f1.") {
+				continue
+			}
+			out = append(out, v)
+		}
+		// out = append(out, resp.InstanceTypes...)
 
 		if resp.NextToken == nil {
 			break
