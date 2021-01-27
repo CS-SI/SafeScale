@@ -21,8 +21,6 @@ import (
 
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
@@ -83,16 +81,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return &provider{}, fail.SyntaxError("section compute not found in tenants.toml")
 	}
 
-	networkName := "safescale"
-
+	var networkName string
 	networkCfg, ok := params["network"].(map[string]interface{})
-	if !ok {
-		logrus.Warnf("section network not found in tenants.toml !!")
-	} else {
-		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
-		if newNetworkName != "" {
-			networkName = newNetworkName
-		}
+	if ok {
+		networkName, _ = networkCfg["ProviderNetwork"].(string)
+	}
+	if networkName == "" {
+		networkName = "safescale"
 	}
 
 	region, ok := computeCfg["Region"].(string)

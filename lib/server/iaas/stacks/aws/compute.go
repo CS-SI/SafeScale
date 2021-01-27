@@ -578,6 +578,16 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
+	// import keypair on provider side
+	keypair := abstract.KeyPair{
+		Name: keyPairName,
+		PublicKey: userData.FirstPublicKey,
+		PrivateKey: userData.FirstPrivateKey,
+	}
+	if xerr = s.ImportKeyPair(&keypair); xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
 	// --- query provider for ahf creation ---
 
 	logrus.Debugf("requesting host resource creation...")
@@ -1124,6 +1134,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 		// Remove keypair
 		if keyPairName != "" {
+			// FIXME: move this in rpc.go and call it rpcDeleteKeyPair()
 			xerr = stacks.RetryableRemoteCall(
 				func() error {
 					_, err := s.EC2Service.DeleteKeyPair(&ec2.DeleteKeyPairInput{
@@ -1136,7 +1147,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-				// A missing keypair is considered as a successful deletion
+					// A missing keypair is considered as a successful deletion
 				default:
 					return fail.Wrap(xerr, "error deleting keypair")
 				}

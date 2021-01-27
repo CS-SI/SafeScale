@@ -594,12 +594,12 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	if domain != "" {
 		domain = "." + domain
 	}
-
-	keypairName := "kp_" + subnetName
-	keypair, xerr := svc.CreateKeyPair(keypairName)
-	if xerr != nil {
-		return xerr
-	}
+	//
+	// keypairName := "kp_" + subnetName
+	// keypair, xerr := svc.CreateKeyPair(keypairName)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	keepalivedPassword, err := utils.GeneratePassword(16)
 	if err != nil {
@@ -609,7 +609,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	gwRequest := abstract.HostRequest{
 		ImageID:          img.ID,
 		Subnets:          []*abstract.Subnet{as},
-		KeyPair:          keypair,
+		// KeyPair:          keypair,
 		SshPort:          req.DefaultSshPort,
 		TemplateID:       template.ID,
 		KeepOnFailure:    req.KeepOnFailure,
