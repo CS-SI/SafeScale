@@ -422,29 +422,64 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	tid, _ := t.GetID() // FIXME: Later
 
-	status := t.GetStatus()
-	if status == DONE {
-		return true, t.result, t.err
-	}
-	if status == ABORTED {
-		return true, nil, t.err
-	}
-	if status != RUNNING {
-		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
+	type result struct {
+		resBool bool
+		res TaskResult
+		resErr error
 	}
 
-	for {
-		select {
-		case <-time.After(duration):
-			return false, nil, fail.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
-		default:
-			ok, result, err := t.TryWait()
-			if ok {
-				return ok, result, err
+	resChan := make(chan result)
+	go func() {
+		for {
+			select {
+			case <-t.finishCh:
+				defer close(resChan)
+				resChan <- result{
+					resBool: true,
+					res:     t.result,
+					resErr:  t.err,
+				}
+				return
+			default:
+				status := t.GetStatus()
+				if status == DONE {
+					defer close(resChan)
+					resChan <- result{
+						resBool: true,
+						res:     t.result,
+						resErr:  t.err,
+					}
+					return
+				}
+				if status == ABORTED {
+					defer close(resChan)
+					resChan <- result{
+						resBool: true,
+						res:     nil,
+						resErr:  t.err,
+					}
+					return
+				}
+				if status != RUNNING {
+					defer close(resChan)
+					resChan <- result{
+						resBool: false,
+						res:     nil,
+						resErr:  fmt.Errorf("cannot wait task '%s': not running", tid),
+					}
+					return
+				}
+				// Waits 1 ms between checks...
+				time.Sleep(250 * time.Millisecond)
 			}
-			// Waits 1 ms between checks...
-			time.Sleep(time.Millisecond)
 		}
+	}()
+
+	select {
+	case res := <-resChan:
+		return res.resBool, res.res, res.resErr
+	case <-time.After(duration):
+		return false, nil, fail.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
 	}
 }
 
