@@ -18,6 +18,10 @@ package sshtunnel
 
 import (
 	"bufio"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -31,6 +35,10 @@ import (
 // convertToSSHClientConfig converts the given ssh jump configuration into a ssh.ClientConfig
 func convertToSSHClientConfig(toConvert *SSHJump, timeout time.Duration) (_ *ssh.ClientConfig, err error) {
 	defer OnPanic(&err)
+
+	if toConvert == nil {
+		return nil, fmt.Errorf("toConvert parameter cannot be nil")
+	}
 
 	config := &ssh.ClientConfig{
 		User:            toConvert.user,
@@ -75,7 +83,50 @@ func AuthMethodFromPrivateKey(buffer []byte, passphrase []byte) (_ ssh.AuthMetho
 	return ssh.PublicKeys(signer), nil
 }
 
-func getHostKey(host string) (ssh.PublicKey, error) {
+// GenerateRSAKeyPair creates a key pair
+func GenerateRSAKeyPair(keylen int) (privKey string, pubKey string, err error) {
+	defer OnPanic(&err)
+
+	if keylen < 1024 {
+		return "", "", fmt.Errorf("too weak: %d", keylen)
+	}
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, keylen)
+	if err != nil {
+		return "", "", err
+	}
+	publicKey := privateKey.PublicKey
+	pub, err := ssh.NewPublicKey(&publicKey)
+	if err != nil {
+		return "", "", err
+	}
+	pubBytes := ssh.MarshalAuthorizedKey(pub)
+
+	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	priKeyPem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: priBytes,
+		},
+	)
+	return string(priKeyPem), string(pubBytes), nil
+}
+
+// writePemToFile writes keys to a file
+func writeKeyToFile(keyBytes []byte, saveFileTo string) (err error) {
+	defer OnPanic(&err)
+
+	err = ioutil.WriteFile(saveFileTo, keyBytes, 0600)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getHostKey(host string) (_ ssh.PublicKey, err error) {
+	defer OnPanic(&err)
+
 	// parse OpenSSH known_hosts file
 	file, err := os.Open(filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts"))
 	if err != nil {

@@ -42,8 +42,8 @@ type EndpointOption func(tunnel *Endpoint) error
 
 func (endpoint Endpoint) Validate() error {
 	return validation.ValidateStruct(&endpoint,
-		validation.Field(&endpoint.user, is.Alphanumeric),
-		validation.Field(&endpoint.host, validation.Required, is.Host),
+		validation.Field(&endpoint.user, is.Alphanumeric),              // "^[a-zA-Z0-9]+$"
+		validation.Field(&endpoint.host, validation.Required, is.Host), // net.ParseIP and `^([a-zA-Z0-9_]{1}[a-zA-Z0-9_-]{0,62}){1}(\.[a-zA-Z0-9_]{1}[a-zA-Z0-9_-]{0,62})*[\._]?$`
 		validation.Field(&endpoint.port, validation.Min(0), validation.Max(65535)),
 	)
 }
