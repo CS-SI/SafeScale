@@ -263,7 +263,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 // GetCapabilities returns the capabilities of the provider
 func (p provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
-		PrivateVirtualIP: true,
+		PrivateVirtualIP: false,
 	}
 }
 

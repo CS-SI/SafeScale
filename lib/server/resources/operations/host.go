@@ -1543,11 +1543,11 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 		// Unmount() have to lock for write, and won't succeed while host.properties.Reading() is running,
 		// leading to a deadlock)
 		for _, item := range mounts {
-			objs, loopErr := LoadShare(task, svc, item.ID)
+			rs, loopErr := LoadShare(task, svc, item.ID)
 			if loopErr != nil {
 				return loopErr
 			}
-			loopErr = objs.Unmount(task, rh)
+			loopErr = rs.Unmount(task, rh)
 			if loopErr != nil {
 				return loopErr
 			}
@@ -1555,43 +1555,46 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 
 		// if host exports shares, delete them
 		for _, v := range shares {
-			objs, loopErr := LoadShare(task, svc, v.Name)
+			rs, loopErr := LoadShare(task, svc, v.Name)
 			if loopErr != nil {
 				return loopErr
 			}
-			loopErr = objs.Delete(task)
+			loopErr = rs.Delete(task)
 			if loopErr != nil {
 				return loopErr
 			}
 		}
 
-		// Update networks property propertiesv1.HostNetworking to remove the reference to the host
+		// Walk through property propertiesv1.HostNetworking to remove the reference to the host in Subnets
 		innerXErr = props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			hostID := rh.GetID()
-			hostName := rh.GetName()
+			// hostName := rh.GetName()
 			var errors []error
 			for k := range hostNetworkV2.SubnetsByID {
 				rs, loopErr := LoadSubnet(task, svc, "", k)
+				if loopErr == nil{
+					loopErr = rs.UnbindHost(task, hostID)
+				}
 				if loopErr != nil {
 					logrus.Errorf(loopErr.Error())
 					errors = append(errors, loopErr)
 					continue
 				}
-				loopErr = rs.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
-					return netprops.Alter(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-						subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
-						if !ok {
-							return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-						}
-						delete(subnetHostsV1.ByID, hostID)
-						delete(subnetHostsV1.ByName, hostName)
-						return nil
-					})
-				})
+				// loopErr = rs.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
+				// 	return netprops.Alter(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				// 		subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
+				// 		if !ok {
+				// 			return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				// 		}
+				// 		delete(subnetHostsV1.ByID, hostID)
+				// 		delete(subnetHostsV1.ByName, hostName)
+				// 		return nil
+				// 	})
+				// })
 				if loopErr != nil {
 					logrus.Errorf(loopErr.Error())
 					errors = append(errors, loopErr)
@@ -1633,21 +1636,6 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
 			}
 
-			// Delete default Security Group of IPAddress
-			if hsgV1.DefaultID != "" {
-				rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
-				if derr == nil {
-					derr = rsg.Delete(task)
-				}
-				if derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// Consider a Security Group that cannot be found as a success
-					default:
-						return fail.Wrap(derr, "failed to delete default Security Group of Host")
-					}
-				}
-			}
 			return nil
 		})
 		if innerXErr != nil {
@@ -1713,7 +1701,29 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) fail.Error {
 			}
 		}
 
-		return nil
+		// Delete default Security Group of Host
+		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if hsgV1.DefaultID != "" {
+				rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
+				if derr == nil {
+					derr = rsg.Delete(task)
+				}
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider a Security Group that cannot be found as a success
+					default:
+						return fail.Wrap(derr, "failed to delete default Security Group of Host")
+					}
+				}
+			}
+			return nil
+		})
 	})
 	if xerr != nil {
 		return xerr

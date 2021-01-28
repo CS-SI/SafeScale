@@ -425,9 +425,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	failover := req.HA
 	if failover {
 		if caps.PrivateVirtualIP {
-			logrus.Info("Provider support private Virtual IP, honoring the failover setup for gateways.")
+			logrus.Info("Driver support private Virtual IP, honoring the failover setup for gateways.")
 		} else {
-			logrus.Warning("Provider does not support private Virtual IP, cannot set up failover of subnet default route.")
+			logrus.Warning("Driver does not support private Virtual IP, cannot set up failover of subnet default route.")
 			failover = false
 		}
 	}
@@ -1365,7 +1365,6 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 	rs.SafeLock(task)
 	defer rs.SafeUnlock(task)
 
-	// var gwID string
 	xerr = rs.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
