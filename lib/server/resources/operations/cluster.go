@@ -2829,7 +2829,7 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 	}()
 
 	// Deletes node
-	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return c.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		// Leave node from cluster, if master is not null
 		if !master.IsNull() {
 			if innerXErr := c.leaveNodesFromList(task, []resources.Host{host}, master); innerXErr != nil {
