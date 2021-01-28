@@ -147,16 +147,15 @@ func defaultCauseFormatter(e Error) string {
 		msgFinal += errCore.cause.Error()
 	}
 
-	lenConseq := len(errCore.consequences)
+	lenConseq := uint(len(errCore.consequences))
 	if lenConseq > 0 {
-		msgFinal += "[with consequences {"
+		msgFinal += fmt.Sprintf("\nwith consequence%s:\n", strprocess.Plural(lenConseq))
 		for ind, con := range errCore.consequences {
-			msgFinal += con.Error()
-			if ind+1 < lenConseq {
-				msgFinal += ";"
+			msgFinal += "- "+con.Error()
+			if uint(ind+1) < lenConseq {
+				msgFinal += "\n"
 			}
 		}
-		msgFinal += "}]"
 	}
 
 	return msgFinal
