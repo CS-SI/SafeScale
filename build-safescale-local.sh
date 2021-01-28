@@ -5,7 +5,7 @@
 # ----------------------
 echo "Accessing working directory"
 BRANCH_NAME=${BRANCH_NAME:="develop"}
-WRKDIR=${GOPATH=/go}/src/github.com/CS-SI
+WRKDIR=${GOPATH=/go}
 cd ${WRKDIR}
 
 cd SafeScale
@@ -17,6 +17,20 @@ sed -i "s/\(.*\)develop/\1${BRANCH_NAME}/" common.mk
 echo "Get dev deps"
 make getdevdeps
 [ $? -ne 0 ] && echo "Build getdevdeps failure" && return 1
+
+sleep 2
+
+echo "Get dev deps"
+make getdevdeps
+[ $? -ne 0 ] && echo "Build getdevdeps failure" && return 1
+
+sleep 2
+
+echo "Get dev deps"
+make getdevdeps
+[ $? -ne 0 ] && echo "Build getdevdeps failure" && return 1
+
+sleep 2
 
 echo "Ensure"
 make ensure

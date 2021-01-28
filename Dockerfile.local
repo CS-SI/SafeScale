@@ -49,7 +49,7 @@ ENV SHELL /bin/bash
 ENV GOPATH /go
 COPY build-safescale-local.sh /opt/build-safescale-local.sh
 
-ADD . /go/src/github.com/CS-SI/SafeScale
+ADD . /go/SafeScale
 
 CMD sleep 5
 

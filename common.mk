@@ -110,7 +110,7 @@ GOMODPATH?=$(HOME)/go
 endif
 
 ifneq ($(OS),Windows_NT)
-PATH = $(HOME)/.local/bin:$(shell printenv PATH)
+PATH = $(HOME)/.local/bin:/go/bin:$(shell printenv PATH)
 endif
 
 ifneq ($(OS),Windows_NT)
