@@ -47,7 +47,7 @@ type dumper interface {
 func OnPanic(err *error) func() {
 	return func() {
 		if x := recover(); x != nil {
-			*err = fmt.Errorf("runtime panic occurred: %w", x)
+			*err = fmt.Errorf("runtime panic occurred: %v", x)
 		}
 	}
 }
