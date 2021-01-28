@@ -168,11 +168,11 @@ func (stun *SSHTunnel) Close() fail.Error {
 		}
 	}()
 
-	// Kills the process of the stun
+	// Kills the process of the tunnel
 	err := stun.cmd.Process.Kill()
 	if err != nil {
 		logrus.Errorf("stun.cmd.Process.Kill() failed: %s", reflect.TypeOf(err).String())
-		return fail.Wrap(err, "unable to close stun")
+		return fail.Wrap(err, "unable to close tunnel")
 	}
 	// Kills remaining processes if there are some
 	bytesCmd, err := exec.Command("pgrep", "-f", stun.cmdString).Output()
@@ -181,7 +181,7 @@ func (stun *SSHTunnel) Close() fail.Error {
 		if _, err = strconv.Atoi(portStr); err == nil {
 			if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
 				logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close stun")
+				return fail.Wrap(err, "unable to close tunnel")
 			}
 		}
 	}
@@ -326,19 +326,23 @@ type SSHCommand struct {
 	keyFile       *os.File
 }
 
-func (scmd *SSHCommand) closeTunneling() fail.Error {
-	var err fail.Error
+func (scmd *SSHCommand) closeTunnels() (xerr fail.Error) {
+	var errorList []error
 	for _, t := range scmd.tunnels {
-		err = t.Close()
+		if xerr = t.Close(); xerr != nil {
+			errorList = append(errorList, xerr)
+		}
 	}
 	scmd.tunnels = []*SSHTunnel{}
 
 	// Tunnels are imbricated only last error is significant
-	if err != nil {
-		logrus.Errorf("closeTunneling: %s", reflect.TypeOf(err).String())
+	if len(errorList) > 0 {
+		xerr = fail.NewErrorList(errorList)
+		logrus.Errorf(xerr.Error())
+		return xerr
 	}
 
-	return err
+	return nil
 }
 
 // Wait waits for the command to exit and waits for any copying to stdin or copying from stdout or stderr to complete.
@@ -689,10 +693,10 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 
 // Close is called to clean SSHCommand (close tunnel(s), remove temporary files, ...)
 func (scmd *SSHCommand) Close() fail.Error {
-	err1 := scmd.closeTunneling()
+	err1 := scmd.closeTunnels()
 	err2 := utils.LazyRemove(scmd.keyFile.Name())
 	if err1 != nil {
-		logrus.Errorf("closeTunneling() failed: %s\n", reflect.TypeOf(err1).String())
+		logrus.Errorf("closeTunnels() failed: %s\n", reflect.TypeOf(err1).String())
 		return fail.Wrap(err1, "unable to close SSH tunnels")
 	}
 	if err2 != nil {
@@ -724,7 +728,8 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel,
 						return xerr
 					}
 
-					*tunnels = append(*tunnels, tunnel)
+					// Note: uses LIFO (Last In First Out) during the deletion of tunnels
+					*tunnels = append([]*SSHTunnel{tunnel}, *tunnels...)
 					return nil
 				},
 				2*time.Second,
@@ -750,6 +755,7 @@ func (sconf *SSHConfig) CreateTunneling() ([]*SSHTunnel, *SSHConfig, fail.Error)
 	if err != nil {
 		return nil, nil, fail.Wrap(err, "unable to create SSH Tunnels")
 	}
+
 	sshConfig := *sconf
 	if tunnel == nil {
 		return nil, &sshConfig, nil
