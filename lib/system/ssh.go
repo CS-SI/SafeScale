@@ -920,6 +920,10 @@ func (ssh *SSHConfig) WaitServerReady(phase string, timeout time.Duration) (out 
 				)
 			}
 
+			if stdout == "" && stderr == "" {
+				return fmt.Errorf("empty strings cannot happen: the file should contain info about os version and the error code (0) in string format")
+			}
+
 			if stdout != "" {
 				if !strings.HasPrefix(stdout, "0,") {
 					logrus.Warn(stdout)
