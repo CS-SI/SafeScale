@@ -769,7 +769,7 @@ EOF
 
             sfApt update
             # Force update of systemd, pciutils
-            sfApt install -q -y systemd pciutils || failure 210
+            sfApt install -q -y systemd pciutils sudo || failure 210
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
             ;;
@@ -783,9 +783,9 @@ EOF
             sfApt update
             # Force update of systemd, pciutils and netplan
             if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-                sfApt install -y systemd pciutils netplan.io || failure 211
+                sfApt install -y systemd pciutils netplan.io sudo || failure 211
             else
-                sfApt install -y systemd pciutils || failure 212
+                sfApt install -y systemd pciutils sudo || failure 212
             fi
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
@@ -799,7 +799,7 @@ EOF
             # echo "ip_resolve=4" >>/etc/yum.conf
 
             # Force update of systemd and pciutils
-            yum install -q -y systemd pciutils yum-utils || failure 213
+            yum install -q -y systemd pciutils yum-utils sudo || failure 213
             # systemd, if updated, is restarted, so we may need to ensure again network connectivity
             ensure_network_connectivity
 
@@ -813,9 +813,7 @@ EOF
 function install_packages() {
      case $LINUX_KIND in
         ubuntu|debian)
-            echo "This is great"
             sfApt install -y -qq jq zip time &>/dev/null || failure 214
-            echo "And it could be better"
             ;;
         redhat|centos)
             yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 215
