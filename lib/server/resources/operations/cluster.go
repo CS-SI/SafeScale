@@ -139,6 +139,9 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 	if xerr = instance.(*cluster).updateNetworkPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
+	if xerr = instance.(*cluster).updateDefaultsPropertyIfNeeded(task); xerr != nil {
+		return nullCluster(), xerr
+	}
 
 	return instance, nil
 }
@@ -349,6 +352,61 @@ func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Erro
 	return xerr
 }
 
+// updateDefaultsPropertyIfNeeded ...
+func (c *cluster) updateDefaultsPropertyIfNeeded(task concurrency.Task) fail.Error {
+	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		if props.Lookup(clusterproperty.DefaultsV2) {
+			return fail.AlteredNothingError()
+		}
+
+		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
+		return props.Inspect(task, clusterproperty.DefaultsV1, func(clonable data.Clonable) fail.Error {
+			defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+				defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
+				return nil
+			})
+		})
+	})
+}
+
+// convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
+func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
+	defaultsV2.Image = defaultsV1.Image
+	defaultsV2.GatewaySizing = propertiesv1.HostSizingRequirements{
+		MinCores:    defaultsV1.GatewaySizing.Cores,
+		MinCPUFreq:  defaultsV1.GatewaySizing.CPUFreq,
+		MinGPU:      defaultsV1.GatewaySizing.GPUNumber,
+		MinRAMSize:  defaultsV1.GatewaySizing.RAMSize,
+		MinDiskSize: defaultsV1.GatewaySizing.DiskSize,
+		Replaceable: defaultsV1.GatewaySizing.Replaceable,
+	}
+	defaultsV2.MasterSizing = propertiesv1.HostSizingRequirements{
+		MinCores:    defaultsV1.MasterSizing.Cores,
+		MinCPUFreq:  defaultsV1.MasterSizing.CPUFreq,
+		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
+		MinRAMSize:  defaultsV1.MasterSizing.RAMSize,
+		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
+		Replaceable: defaultsV1.MasterSizing.Replaceable,
+	}
+	defaultsV2.NodeSizing = propertiesv1.HostSizingRequirements{
+		MinCores:    defaultsV1.NodeSizing.Cores,
+		MinCPUFreq:  defaultsV1.NodeSizing.CPUFreq,
+		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
+		MinRAMSize:  defaultsV1.NodeSizing.RAMSize,
+		MinDiskSize: defaultsV1.NodeSizing.DiskSize,
+		Replaceable: defaultsV1.NodeSizing.Replaceable,
+	}
+}
+
 // IsNull tells if the instance represents a null value of cluster
 // Satisfies interface data.NullValue
 func (c *cluster) IsNull() bool {
@@ -406,6 +464,10 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 			}
 		}
 	}()
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	_, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
 	if xerr != nil {
@@ -747,6 +809,10 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 
 // createNetworkingResources creates the network and subnet for the cluster
 func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, xerr fail.Error) {
+	if task.Aborted() {
+		return nil, nil, fail.AbortedError(nil, "aborted")
+	}
+
 	// Determine if getGateway Failover must be set
 	caps := c.service.GetCapabilities()
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
@@ -805,6 +871,10 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 		return nil, nil, xerr
 	}
 
+	if task.Aborted() {
+		return nil, nil, fail.AbortedError(nil, "aborted")
+	}
+
 	// Creates Subnet
 	logrus.Debugf("[cluster %s] creating Subnet '%s'", req.Name, req.Name)
 	subnetReq := abstract.SubnetRequest{
@@ -855,6 +925,10 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 		}
 	}()
 
+	if task.Aborted() {
+		return nil, nil, fail.AbortedError(nil, "aborted")
+	}
+
 	// Updates again cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
@@ -903,6 +977,10 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 		return nil, nil, xerr
 	}
 
+	if task.Aborted() {
+		return nil, nil, fail.AbortedError(nil, "user cancellation")
+	}
+
 	logrus.Debugf("[cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, rn.GetName(), req.Name)
 	return rn, rs, nil
 }
@@ -916,6 +994,10 @@ func (c *cluster) createHostResources(
 	initialNodeCount uint,
 	keepOnFailure bool,
 ) (xerr fail.Error) {
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	var (
 		primaryGateway, secondaryGateway             resources.Host
@@ -939,6 +1021,10 @@ func (c *cluster) createHostResources(
 		}
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	if _, xerr = primaryGateway.WaitSSHReady(task, temporal.GetExecutionTimeout()); xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
@@ -951,6 +1037,10 @@ func (c *cluster) createHostResources(
 			}
 		}
 	}()
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	// Loads secondary gateway metadata
 	if haveSecondaryGateway {
@@ -968,6 +1058,10 @@ func (c *cluster) createHostResources(
 		}()
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	masterCount, _, _, xerr := c.determineRequiredNodes(task)
 	if xerr != nil {
 		return xerr
@@ -983,6 +1077,10 @@ func (c *cluster) createHostResources(
 		if secondaryGatewayTask, xerr = task.StartInSubtask(c.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway}); xerr != nil {
 			return xerr
 		}
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, taskCreateMastersParameters{
@@ -1065,6 +1163,10 @@ func (c *cluster) createHostResources(
 		return mastersStatus
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure getGateway(s) and waits for the result
 	if primaryGatewayTask, xerr = task.StartInSubtask(c.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}); xerr != nil {
@@ -1122,6 +1224,10 @@ func (c *cluster) createHostResources(
 	// Step 5: awaits nodes creation
 	if _, privateNodesStatus = privateNodesTask.Wait(); privateNodesStatus != nil {
 		return privateNodesStatus
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
@@ -1263,6 +1369,7 @@ func (c cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterId
 		if xerr := aci.Deserialize(buf); xerr != nil {
 			return xerr
 		}
+
 		return callback(aci)
 	})
 }
@@ -1841,29 +1948,29 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 	}
 
 	var hostImage string
-	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		if !props.Lookup(clusterproperty.DefaultsV2) {
-			// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
-			return props.Inspect(task, clusterproperty.DefaultsV1, func(clonable data.Clonable) fail.Error {
-				defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
-					defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
-					convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
-					return nil
-				})
-			})
-		}
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
+	// xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	if !props.Lookup(clusterproperty.DefaultsV2) {
+	// 		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
+	// 		return props.Inspect(task, clusterproperty.DefaultsV1, func(clonable data.Clonable) fail.Error {
+	// 			defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
+	// 			if !ok {
+	// 				return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 			}
+	// 			return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+	// 				defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+	// 				if !ok {
+	// 					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 				}
+	// 				convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
+	// 				return nil
+	// 			})
+	// 		})
+	// 	}
+	// 	return nil
+	// })
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	var nodeDefaultDefinition *propertiesv1.HostSizingRequirements
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1988,34 +2095,6 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 	}
 
 	return req
-}
-
-func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
-	defaultsV2.Image = defaultsV1.Image
-	defaultsV2.GatewaySizing = propertiesv1.HostSizingRequirements{
-		MinCores:    defaultsV1.GatewaySizing.Cores,
-		MinCPUFreq:  defaultsV1.GatewaySizing.CPUFreq,
-		MinGPU:      defaultsV1.GatewaySizing.GPUNumber,
-		MinRAMSize:  defaultsV1.GatewaySizing.RAMSize,
-		MinDiskSize: defaultsV1.GatewaySizing.DiskSize,
-		Replaceable: defaultsV1.GatewaySizing.Replaceable,
-	}
-	defaultsV2.MasterSizing = propertiesv1.HostSizingRequirements{
-		MinCores:    defaultsV1.MasterSizing.Cores,
-		MinCPUFreq:  defaultsV1.MasterSizing.CPUFreq,
-		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
-		MinRAMSize:  defaultsV1.MasterSizing.RAMSize,
-		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
-		Replaceable: defaultsV1.MasterSizing.Replaceable,
-	}
-	defaultsV2.NodeSizing = propertiesv1.HostSizingRequirements{
-		MinCores:    defaultsV1.NodeSizing.Cores,
-		MinCPUFreq:  defaultsV1.NodeSizing.CPUFreq,
-		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
-		MinRAMSize:  defaultsV1.NodeSizing.RAMSize,
-		MinDiskSize: defaultsV1.NodeSizing.DiskSize,
-		Replaceable: defaultsV1.NodeSizing.Replaceable,
-	}
 }
 
 // DeleteLastNode deletes the last added node and returns its name

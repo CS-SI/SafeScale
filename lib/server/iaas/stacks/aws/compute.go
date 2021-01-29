@@ -563,7 +563,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// --- Initializes resources.IPAddress ---
 
 	ahf = abstract.NewHostFull()
-	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to ahf definition
+	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to Host description
 	ahf.Core.Password = request.Password
 
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
