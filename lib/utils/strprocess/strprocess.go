@@ -71,5 +71,6 @@ func FormatStrings(msg ...interface{}) string {
 		return ""
 	}
 
-	return fmt.Sprint(msg[0].(string))
+	// return fmt.Sprint(msg[0].(string))
+	return msg[0].(string)
 }

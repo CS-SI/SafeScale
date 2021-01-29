@@ -350,7 +350,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	logrus.Debugf("Host '%s' created.", ahf.GetName())
 
 	// Add to abstract.HostFull data that does not come with creation data from provider
-	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to ahf definition
+	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to Host description
 	ahf.Core.Password = request.Password           // and OperatorUsername's password
 	ahf.Networking.IsGateway = request.IsGateway
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
