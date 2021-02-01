@@ -1205,32 +1205,27 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 // setSecurity applies the security rules defined in specification file (if there are some)
 func (w *worker) setSecurity() (xerr fail.Error) {
-	if xerr = w.setNetworkingSecurity(); xerr != nil {
+	if xerr = w.setNetworkSecurity(); xerr != nil {
 		return xerr
 	}
 	return nil
 }
 
-// setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
-func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
-	const yamlKey = "feature.security.networking"
-	if ok := w.feature.specs.IsSet(yamlKey); !ok {
-		return nil
-	}
-
-	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
+// setNetworkSecurity applies the network security rules defined in specification file (if there are some)
+func (w *worker) setNetworkSecurity() (xerr fail.Error) {
+	rules, ok := w.feature.specs.Get("feature.security.network").([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
 
-	if w.feature.task == nil {
-		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
+	if w.feature.task.IsNull() {
+		return fail.InvalidParameterError("w.feature.task", "cannot be null value of 'concurrency.Task'")
 	}
 
 	task := w.feature.task
 	var (
 		svc iaas.Service
-		rs  resources.Subnet
+		rs resources.Subnet
 	)
 	if w.cluster != nil {
 		svc = w.cluster.GetService()
@@ -1241,100 +1236,96 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 		if rs, xerr = LoadSubnet(task, svc, netprops.NetworkID, netprops.SubnetID); xerr != nil {
 			return xerr
 		}
-	} else if w.host != nil {
-		if rs, xerr = w.host.GetDefaultSubnet(task); xerr != nil {
-			return xerr
-		}
+		defer rs.Dispose() // will not used the instance outside of the function
+
+		// if endpointIP, xerr = rs.GetEndpointIP(w.feature.task); xerr != nil {
+		// 	return xerr
+		// }
+	} else {
 	}
-	defer rs.Dispose() // will not used the instance outside of the function
 
-	// gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
-	// if xerr != nil {
-	// 	return xerr
-	// }
+	gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
+	if xerr != nil {
+		return xerr
+	}
 
-	for k, rule := range rules {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
+	for k, r := range rules {
+		rule, ok := r.(map[string]interface{})
+		if !ok {
+			return fail.InvalidParameterError("r", "is not a rule (map)")
 		}
 
-		r := rule.(map[interface{}]interface{})
-		targets := w.interpretRuleTargets(r)
+		targets := w.interpretRuleTargets(rule)
 
 		// If security rules concerns gateways, update subnet Security Group for gateways
 		if _, ok := targets["gateways"]; ok {
 
-			description, ok := r["name"].(string)
+			description, ok := rule["name"].(string)
 			if !ok {
-				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)
+				return fail.SyntaxError("missing field 'name' of rule #%d in 'feature.security.network'", k+1)
 			}
+			description += " for feature '" + w.feature.GetName() + "'"
 
-			gwSG, xerr := rs.InspectGatewaySecurityGroup(task)
-			if xerr != nil {
-				return xerr
+			gwSG, innerXErr := rs.InspectGatewaySecurityGroup(task)
+			if innerXErr != nil {
+					return innerXErr
 			}
 			defer gwSG.Dispose()
 
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
 			sgRule.EtherType = ipversion.IPv4
-			sgRule.Protocol, _ = r["protocol"].(string)
-			sgRule.Sources = []string{"0.0.0.0/0"}
-			// sgRule.Targets = []string{gwSG.GetID()}
+			sgRule.Protocol, _ = rule["protocol"].(string)
+			sgRule.Targets = gatewayPublicIPs
 
 			var commaSplitted []string
-			if ports, ok := r["ports"].(int); ok {
-				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports)
-				sgRule.PortFrom = int32(ports)
-			} else if ports, ok := r["ports"].(string); ok {
+			ports, ok := rule["ports"].(string)
+			if ok {
 				commaSplitted = strings.Split(ports, ",")
-				if len(commaSplitted) > 0 {
-					var (
-						portFrom, portTo int
-						err              error
-					)
-					for _, v := range commaSplitted {
-						sgRule.Description = description
-						dashSplitted := strings.Split(v, "-")
-						if dashCount := len(dashSplitted); dashCount > 0 {
-							if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
+			}
+			if len(commaSplitted) > 0 {
+				var (
+					portFrom, portTo int
+					err              error
+				)
+				for _, v := range commaSplitted {
+					sgRule.Description = description
+					dashSplitted := strings.Split(v, "-")
+					if dashCount := len(dashSplitted); dashCount > 0 {
+						if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
+							return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+						}
+						if len(dashSplitted) == 2 {
+							if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
 								return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
 							}
-							if len(dashSplitted) == 2 {
-								if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
-									return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
-								}
-							}
-							sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
-
-							sgRule.PortFrom = int32(portFrom)
-							sgRule.PortTo = int32(portTo)
 						}
+						sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
 
-						if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
-							switch xerr.(type) {
-							case *fail.ErrDuplicate:
-								// This rule already exists, consider as a success and continue
-							default:
-								return xerr
-							}
+						sgRule.PortFrom = int32(portFrom)
+						sgRule.PortTo = int32(portTo)
+					}
+
+					if innerXErr = gwSG.AddRule(w.feature.task, sgRule); innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrDuplicate:
+							// This rule already exists, consider as a success and continue
+						default:
+							return innerXErr
 						}
 					}
 				}
 			} else {
-				return fail.SyntaxError("invalid value for ports in rule '%s'")
-			}
-
-			sgRule.Description += " for feature '" + w.feature.GetName() + "'"
-			if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrDuplicate:
-					// This rule already exists, consider as a success and continue
-				default:
-					return xerr
+				sgRule.Description = description
+				if innerXErr = gwSG.AddRule(w.feature.task, sgRule); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrDuplicate:
+						// This rule already exists, consider as a success and continue
+					default:
+						return innerXErr
+					}
 				}
 			}
-
 		}
 	}
 
@@ -1375,7 +1366,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 	//
 	// 		primaryGatewayVariables["Hostname"] = h.GetName() + domain
 	//
-	// 		tP, xerr := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
+	// 		tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 	// 			"ctrl": primaryKongController,
 	// 			"rule": rule,
 	// 			"vars": &primaryGatewayVariables,
@@ -1409,7 +1400,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 	// 			}
 	// 			secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 	//
-	// 			tS, errOp := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
+	// 			tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
 	// 				"ctrl": secondaryKongController,
 	// 				"rule": rule,
 	// 				"vars": &secondaryGatewayVariables,
@@ -1433,7 +1424,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 }
 
 // interpretRuleTargets interprets the targets of a rule
-func (w worker) interpretRuleTargets(rule map[interface{}]interface{}) stepTargets {
+func (w worker) interpretRuleTargets(rule map[string]interface{}) stepTargets {
 	targets := stepTargets{}
 
 	anon, ok := rule["targets"].(map[interface{}]interface{})
