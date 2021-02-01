@@ -225,13 +225,45 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (c *cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
-	return nil, fail.NotImplementedError("ListInstalledFeatures() is not implemented yet")
+func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
+	var emptySlice []resources.Feature
+	if c.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return emptySlice, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+
+	var list map[string]*propertiesv1.ClusterInstalledFeature
+	xerr := c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			list = featuresV1.Installed
+			return nil
+		})
+	})
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	out := make([]resources.Feature, 0, len(list))
+	for k := range list {
+		item, xerr := NewFeature(task, k)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 // AddFeature installs a feature on the cluster
 func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c == nil {
+	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
