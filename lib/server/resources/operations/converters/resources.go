@@ -126,3 +126,12 @@ func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in r
 	}
 	return out, nil
 }
+
+func FeatureSliceFromResourceToProtocol(task concurrency.Task, in []resources.Feature) *protocol.FeatureListResponse {
+	out := &protocol.FeatureListResponse{}
+	out.Features = make([]*protocol.FeatureResponse, 0, len(in))
+	for _, v := range in {
+		out.Features = append(out.Features, v.ToProtocol())
+	}
+	return out
+}

@@ -176,7 +176,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// gets primary gateway information
-			gw, xerr := rs.GetGateway(task, true)
+			gw, xerr := rs.InspectGateway(task, true)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -209,7 +209,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			}
 
 			// gets secondary gateway information
-			gw, xerr = rs.GetGateway(task, false)
+			gw, xerr = rs.InspectGateway(task, false)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
