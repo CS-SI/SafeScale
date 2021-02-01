@@ -58,7 +58,9 @@ func nullCore() *core {
 }
 
 // newCore creates an instance of core
-func newCore(svc iaas.Service, kind string, path string, instance data.Clonable) (*core, fail.Error) {
+func newCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *core, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if svc.IsNull() {
 		return nullCore(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -126,6 +128,8 @@ func (c core) GetName() string {
 
 // Inspect protects the data for shared read
 func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -149,10 +153,12 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 	})
 }
 
-// LazyInspect allows to inspect data contained in the instance, without reloading from the Object Storage; it's intended
+// Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change thru time).
-func (c *core) CachedInspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+func (c *core) Review(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -173,6 +179,8 @@ func (c *core) CachedInspect(task concurrency.Task, callback resources.Callback)
 
 // Alter protects the data for exclusive write
 func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -224,7 +232,9 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the core instance already carries a data
-func (c *core) Carry(task concurrency.Task, clonable data.Clonable) fail.Error {
+func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -275,7 +285,9 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (c *core) Read(task concurrency.Task, ref string) fail.Error {
+func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -326,7 +338,9 @@ func (c *core) Read(task concurrency.Task, ref string) fail.Error {
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
+func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -344,7 +358,7 @@ func (c *core) ReadByID(task concurrency.Task, id string) fail.Error {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	xerr := retry.WhileUnsuccessfulDelay1Second(
+	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(task, id); innerXErr != nil {
 				switch innerXErr.(type) {
@@ -470,7 +484,9 @@ func (c *core) write(task concurrency.Task) fail.Error {
 }
 
 // Reload reloads the content of the Object Storage, overriding what is in the metadata instance (being written or not...)
-func (c *core) Reload(task concurrency.Task) fail.Error {
+func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -483,7 +499,7 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 	}
 
 	id := c.GetID()
-	xerr := retry.WhileUnsuccessfulDelay1Second(
+	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(task, id); innerXErr != nil {
 				switch innerXErr.(type) {
@@ -514,7 +530,9 @@ func (c *core) Reload(task concurrency.Task) fail.Error {
 }
 
 // BrowseFolder walks through folder and executes a callback for each entries
-func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error {
+func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -531,7 +549,9 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 }
 
 // Delete deletes the matadata
-func (c *core) Delete(task concurrency.Task) fail.Error {
+func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -592,6 +612,8 @@ func (c *core) Delete(task concurrency.Task) fail.Error {
 // Serialize serializes instance into bytes (output json code)
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
 func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -650,6 +672,8 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 // Deserialize reads json code and reinstantiates
 // Note: doesn't follow interface data.Serializable (task parameter not used in the interface and needed here)
 func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -707,4 +731,19 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 		}
 	}
 	return nil
+}
+
+// Dispose is used to tell cache that the instance has been used and will not be anymore.
+// Helps the cache handler to know when a cached item can be removed from cache (if needed)
+// Note: Does nothing for now, prepared for future use
+// satisfies interface data.Cacheable
+func (c core) Dispose() {
+
+}
+
+// Discard is used to tell cache that the instance has been deleted and MUST be removed from cache.
+// Note: Does nothing for now, prepared for future use
+// satisfies interface data.Cacheable
+func (c core) Discard() {
+
 }

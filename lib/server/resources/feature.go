@@ -17,6 +17,7 @@
 package resources
 
 import (
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -44,20 +45,14 @@ type Feature interface {
 	data.Identifiable
 	data.NullValue
 
-	// GetFilename returns the filename of the feature
-	GetFilename() string
-	// GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetDisplayFilename() string
-	// GetRequirements returns the other features needed as requirements
-	GetRequirements() ([]string, fail.Error)
-	// Applyable tells if the feature is installable on the target
-	Applyable(Targetable) bool
-	// Check if feature is installed on target
-	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)
-	// Add installs the feature on the target
-	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)
-	// Remove uninstalls the feature from the target
-	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)
+	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)     // Add installs the feature on the target
+	Applyable(Targetable) bool                                                  // Applyable tells if the feature is installable on the target
+	GetDisplayFilename() string                                                 // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
+	GetFilename() string                                                        // GetFilename returns the filename of the feature
+	GetRequirements() ([]string, fail.Error)                                    // GetRequirements returns the other features needed as requirements
+	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)   // Check if feature is installed on target
+	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Remove uninstalls the feature from the target
+	ToProtocol() *protocol.FeatureResponse
 }
 
 // FeatureSettings are used to tune the feature

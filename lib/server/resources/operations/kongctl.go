@@ -77,7 +77,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 	if xerr != nil {
 		return nil, xerr
 	}
-	addressedGateway, xerr := subnet.GetGateway(voidtask, addressPrimaryGateway)
+	addressedGateway, xerr := subnet.InspectGateway(voidtask, addressPrimaryGateway)
 	if xerr != nil {
 		return nil, xerr
 	}
