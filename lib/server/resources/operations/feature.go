@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
@@ -580,4 +581,13 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 		}
 	}
 	return nil
+}
+
+// ToProtocol converts a feature to *protocol.FeatureResponse
+func (f feature) ToProtocol() *protocol.FeatureResponse {
+	out := &protocol.FeatureResponse{
+		Name:     f.GetName(),
+		FileName: f.GetDisplayFilename(),
+	}
+	return out
 }
