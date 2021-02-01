@@ -29,6 +29,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
@@ -37,6 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -357,13 +360,13 @@ func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 			return nil, xerr
 		}
 
-		gw, xerr := subnet.GetGateway(w.feature.task, true)
+		gw, xerr := subnet.InspectGateway(w.feature.task, true)
 		if xerr == nil {
 			_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
 		}
 
 		if xerr != nil {
-			if gw, xerr = subnet.GetGateway(w.feature.task, false); xerr == nil {
+			if gw, xerr = subnet.InspectGateway(w.feature.task, false); xerr == nil {
 				_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
 			}
 		}
@@ -442,13 +445,13 @@ func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 		}
 	}
 
-	gw, xerr := rs.GetGateway(w.feature.task, true)
+	gw, xerr := rs.InspectGateway(w.feature.task, true)
 	if xerr == nil {
 		if _, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
-	if gw, xerr = rs.GetGateway(w.feature.task, false); xerr == nil {
+	if gw, xerr = rs.InspectGateway(w.feature.task, false); xerr == nil {
 		if _, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
@@ -1163,4 +1166,253 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 	}
 
 	return dataBuffer.String(), nil
+}
+
+// setSecurity applies the security rules defined in specification file (if there are some)
+func (w *worker) setSecurity() (xerr fail.Error) {
+	if xerr = w.setNetworkSecurity(); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+// setNetworkSecurity applies the network security rules defined in specification file (if there are some)
+func (w *worker) setNetworkSecurity() (xerr fail.Error) {
+	rules, ok := w.feature.specs.Get("feature.security.network").([]interface{})
+	if !ok || len(rules) == 0 {
+		return nil
+	}
+
+	if w.feature.task.IsNull() {
+		return fail.InvalidParameterError("w.feature.task", "cannot be null value of 'concurrency.Task'")
+	}
+
+	task := w.feature.task
+	var (
+		svc iaas.Service
+		rs resources.Subnet
+	)
+	if w.cluster != nil {
+		svc = w.cluster.GetService()
+		netprops, xerr := w.cluster.GetNetworkConfig(task)
+		if xerr != nil {
+			return xerr
+		}
+		if rs, xerr = LoadSubnet(task, svc, netprops.NetworkID, netprops.SubnetID); xerr != nil {
+			return xerr
+		}
+		defer rs.Dispose() // will not used the instance outside of the function
+
+		// if endpointIP, xerr = rs.GetEndpointIP(w.feature.task); xerr != nil {
+		// 	return xerr
+		// }
+	} else {
+	}
+
+	gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
+	if xerr != nil {
+		return xerr
+	}
+
+	for k, r := range rules {
+		rule, ok := r.(map[string]interface{})
+		if !ok {
+			return fail.InvalidParameterError("r", "is not a rule (map)")
+		}
+
+		targets := w.interpretRuleTargets(rule)
+
+		// If security rules concerns gateways, update subnet Security Group for gateways
+		if _, ok := targets["gateways"]; ok {
+
+			description, ok := rule["name"].(string)
+			if !ok {
+				return fail.SyntaxError("missing field 'name' of rule #%d in 'feature.security.network'", k+1)
+			}
+			description += " for feature '" + w.feature.GetName() + "'"
+
+			gwSG, innerXErr := rs.InspectGatewaySecurityGroup(task)
+			if innerXErr != nil {
+					return innerXErr
+			}
+			defer gwSG.Dispose()
+
+			sgRule := abstract.NewSecurityGroupRule()
+			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
+			sgRule.EtherType = ipversion.IPv4
+			sgRule.Protocol, _ = rule["protocol"].(string)
+			sgRule.Targets = gatewayPublicIPs
+
+			var commaSplitted []string
+			ports, ok := rule["ports"].(string)
+			if ok {
+				commaSplitted = strings.Split(ports, ",")
+			}
+			if len(commaSplitted) > 0 {
+				var (
+					portFrom, portTo int
+					err              error
+				)
+				for _, v := range commaSplitted {
+					sgRule.Description = description
+					dashSplitted := strings.Split(v, "-")
+					if dashCount := len(dashSplitted); dashCount > 0 {
+						if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
+							return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+						}
+						if len(dashSplitted) == 2 {
+							if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
+								return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+							}
+						}
+						sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
+
+						sgRule.PortFrom = int32(portFrom)
+						sgRule.PortTo = int32(portTo)
+					}
+
+					if innerXErr = gwSG.AddRule(w.feature.task, sgRule); innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrDuplicate:
+							// This rule already exists, consider as a success and continue
+						default:
+							return innerXErr
+						}
+					}
+				}
+			} else {
+				sgRule.Description = description
+				if innerXErr = gwSG.AddRule(w.feature.task, sgRule); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrDuplicate:
+						// This rule already exists, consider as a success and continue
+					default:
+						return innerXErr
+					}
+				}
+			}
+		}
+	}
+
+	// VPL: for the future ? For now, targets == gateways only supported...
+	// hosts, xerr := w.identifyHosts(targets)
+	// if xerr != nil {
+	// 	return fail.Wrap(xerr, "failed to apply proxy rules: %s")
+	// }
+	//
+	// 	if _, ok = targets["masters"]; ok {
+	// 	}
+	//
+	// 	if _, ok = targets["nodes"]; ok {
+	// 	}
+	//
+	// 	for _, h := range hosts {
+	// 		if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+	// 			return xerr
+	// 		}
+	// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
+	// 		domain := ""
+	// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 				hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	// 				if !ok {
+	// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 				}
+	// 				domain = hostDescriptionV1.Domain
+	// 				if domain != "" {
+	// 					domain = "." + domain
+	// 				}
+	// 				return nil
+	// 			})
+	// 		})
+	// 		if xerr != nil {
+	// 			return xerr
+	// 		}
+	//
+	// 		primaryGatewayVariables["Hostname"] = h.GetName() + domain
+	//
+	// 		tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
+	// 			"ctrl": primaryKongController,
+	// 			"rule": rule,
+	// 			"vars": &primaryGatewayVariables,
+	// 		})
+	// 		if xerr != nil {
+	// 			return fail.Wrap(xerr, "failed to apply proxy rules")
+	// 		}
+	//
+	// 		var errS fail.Error
+	// 		if secondaryKongController != nil {
+	// 			if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+	// 				return xerr
+	// 			}
+	// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
+	// 			domain = ""
+	// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	// 					if !ok {
+	// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 					}
+	// 					domain = hostDescriptionV1.Domain
+	// 					if domain != "" {
+	// 						domain = "." + domain
+	// 					}
+	// 					return nil
+	// 				})
+	// 			})
+	// 			if xerr != nil {
+	// 				return xerr
+	// 			}
+	// 			secondaryGatewayVariables["Hostname"] = h.GetName() + domain
+	//
+	// 			tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
+	// 				"ctrl": secondaryKongController,
+	// 				"rule": rule,
+	// 				"vars": &secondaryGatewayVariables,
+	// 			})
+	// 			if errOp == nil {
+	// 				_, errOp = tS.Wait()
+	// 			}
+	// 			errS = errOp
+	// 		}
+	//
+	// 		_, errP := tP.Wait()
+	// 		if errP != nil {
+	// 			return errP
+	// 		}
+	// 		if errS != nil {
+	// 			return errS
+	// 		}
+	// 	}
+	// }
+	return nil
+}
+
+// interpretRuleTargets interprets the targets of a rule
+func (w worker) interpretRuleTargets(rule map[string]interface{}) stepTargets {
+	targets := stepTargets{}
+
+	anon, ok := rule["targets"].(map[interface{}]interface{})
+	if !ok {
+		// If no 'targets' key found, applies on host only
+		if w.cluster != nil {
+			return nil
+		}
+		targets[targetHosts] = "yes"
+	} else {
+		for i, j := range anon {
+			switch j := j.(type) {
+			case bool:
+				if j {
+					targets[i.(string)] = "yes"
+				} else {
+					targets[i.(string)] = "no"
+				}
+			case string:
+				targets[i.(string)] = j
+			}
+		}
+	}
+
+	return targets
 }

@@ -757,7 +757,7 @@ type ErrNotImplemented struct {
 
 // NotImplementedError creates a ErrNotImplemented report
 func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
-	r := newError(nil, nil, callstack.DecorateWith("not implemented yet:", strprocess.FormatStrings(msg...), "", 0))
+	r := newError(nil, nil, callstack.DecorateWith("not implemented yet: ", strprocess.FormatStrings(msg...), "", 0))
 	r.grpcCode = codes.Unimplemented
 	return &ErrNotImplemented{r}
 }

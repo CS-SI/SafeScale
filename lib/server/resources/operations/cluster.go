@@ -950,13 +950,13 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			primaryGateway, innerXErr := rs.GetGateway(task, true)
+			primaryGateway, innerXErr := rs.InspectGateway(task, true)
 			if innerXErr != nil {
 				return innerXErr
 			}
 			var secondaryGateway resources.Host
 			if !gwFailoverDisabled {
-				secondaryGateway, innerXErr = rs.GetGateway(task, false)
+				secondaryGateway, innerXErr = rs.InspectGateway(task, false)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -1020,12 +1020,12 @@ func (c *cluster) createHostResources(
 		primaryGatewayTask, secondaryGatewayTask     concurrency.Task
 	)
 
-	if primaryGateway, xerr = subnet.GetGateway(task, true); xerr != nil {
+	if primaryGateway, xerr = subnet.InspectGateway(task, true); xerr != nil {
 		return xerr
 	}
 
 	haveSecondaryGateway := true
-	if secondaryGateway, xerr = subnet.GetGateway(task, false); xerr != nil {
+	if secondaryGateway, xerr = subnet.InspectGateway(task, false); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// It's a valid state not to have a secondary gateway, so continue
@@ -1397,7 +1397,7 @@ func (c cluster) GetIdentity(task concurrency.Task) (clusterIdentity abstract.Cl
 		return abstract.ClusterIdentity{}, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
-	xerr = c.CachedInspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = c.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -3203,7 +3203,7 @@ func (c cluster) extractNetworkingInfo(task concurrency.Task) (network resources
 			if networkV3.NetworkID != "" {
 				network, innerXErr = LoadNetwork(task, c.GetService(), networkV3.NetworkID)
 			} else if !subnet.IsNull() {
-				network, innerXErr = subnet.GetNetwork(task)
+				network, innerXErr = subnet.InspectNetwork(task)
 			}
 			if innerXErr != nil {
 				return innerXErr

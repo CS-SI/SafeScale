@@ -34,18 +34,22 @@ type Subnet interface {
 	data.Identifiable
 	data.NullValue
 
-	BindHost(concurrency.Task, Host) fail.Error                                                                                    // links host ID to the subnet
-	BindSecurityGroup(concurrency.Task, SecurityGroup, SecurityGroupActivation) fail.Error                                         // binds a security group to the subnet
+	BindHost(concurrency.Task, Host) fail.Error                                                                                    // links Host to the Subnet
+	BindSecurityGroup(concurrency.Task, SecurityGroup, SecurityGroupActivation) fail.Error                                         // binds a Security Group to the Subnet
 	Browse(task concurrency.Task, callback func(*abstract.Subnet) fail.Error) fail.Error                                           // ...
-	Create(task concurrency.Task, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a subnet
-	DisableSecurityGroup(concurrency.Task, SecurityGroup) fail.Error                                                               // disables a binded security group on host
-	EnableSecurityGroup(concurrency.Task, SecurityGroup) fail.Error                                                                // enables a binded security group on host
-	GetGateway(task concurrency.Task, primary bool) (Host, fail.Error)                                                             // returns the gateway related to subnet
-	GetDefaultRouteIP(concurrency.Task) (string, fail.Error)                                                                       // returns the IP of the default route of the subnet
-	GetEndpointIP(concurrency.Task) (string, fail.Error)                                                                           // returns the IP address corresponding to the default route
-	GetNetwork(concurrency.Task) (Network, fail.Error)                                                                             // returns the parent Network of the Subnet
-	GetState(concurrency.Task) (subnetstate.Enum, fail.Error)                                                                      // gives the current state of the subnet
-	HasVirtualIP(concurrency.Task) bool                                                                                            // tells if the subnet is using a VIP a default route
+	Create(task concurrency.Task, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a Subnet
+	DisableSecurityGroup(concurrency.Task, SecurityGroup) fail.Error                                                               // disables a binded Security Group on Subnet
+	EnableSecurityGroup(concurrency.Task, SecurityGroup) fail.Error                                                                // enables a binded Security Group on Subnet
+	GetGatewayPublicIP(task concurrency.Task, primary bool) (string, fail.Error)                                                   // returns the gateway related to Subnet
+	GetGatewayPublicIPs(task concurrency.Task) ([]string, fail.Error)                                                              // returns the gateway IPs of the Subnet
+	GetDefaultRouteIP(concurrency.Task) (string, fail.Error)                                                                       // returns the private IP of the default route of the Subnet
+	GetEndpointIP(concurrency.Task) (string, fail.Error)                                                                           // returns the public IP to reach the Subnet from Internet
+	GetState(concurrency.Task) (subnetstate.Enum, fail.Error)                                                                      // gives the current state of the Subnet
+	HasVirtualIP(concurrency.Task) bool                                                                                            // tells if the Subnet is using a VIP as default route
+	InspectGateway(task concurrency.Task, primary bool) (Host, fail.Error)                                                         // returns the gateway related to Subnet
+	InspectGatewaySecurityGroup(task concurrency.Task) (SecurityGroup, fail.Error)                                                 // returns the SecurityGroup responsible of network security on Gateway
+	InspectInternalSecurityGroup(task concurrency.Task) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of internal network security
+	InspectPublicIPSecurityGroup(task concurrency.Task) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of Hosts with Public IP (excluding gateways)
 	InspectNetwork(concurrency.Task) (Network, fail.Error)                                                                         // returns the instance of the parent Network of the Subnet
 	ListHosts(concurrency.Task) ([]Host, fail.Error)                                                                               // returns the list of Host attached to the subnet (excluding gateway)
 	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)       // lists the security groups bound to the subnet
