@@ -343,10 +343,18 @@ func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration ti
 	if xerr != nil {
 		return nil, xerr
 	}
-	_ = ctx
 
-	// service := protocol.NewFeatureServiceClient(c.session.connection)
-	return nil, fail.NotImplementedError()
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	request := &protocol.FeatureListRequest{
+		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef: &protocol.Reference{Name: clusterName},
+		InstalledOnly: !all,
+	}
+	list, err := service.List(ctx, request)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return list, nil
 }
 
 // FindAvailableMaster ...

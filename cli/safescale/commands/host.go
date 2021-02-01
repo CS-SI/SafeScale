@@ -244,7 +244,7 @@ var hostCreate = &cli.Command{
 			Name:  "subnet",
 			Value: &cli.StringSlice{},
 			Usage: `subnet name or id.
-If subnet id is used, '--network' is superfluous.
+If subnet id is provided, '--network' is superfluous.
 May be used multiple times, the first occurrence becoming the default subnet by design`,
 		},
 		&cli.StringFlag{
@@ -292,8 +292,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			examples:
 				--sizing "cpu <= 4, ram <= 10, disk >= 100"
 				--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
-				--sizing "cpu <= 8, ram ~ 16"
-`,
+				--sizing "cpu <= 8, ram ~ 16"`,
 		},
 	},
 	Action: func(c *cli.Context) error {
