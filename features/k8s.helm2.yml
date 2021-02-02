@@ -165,8 +165,6 @@ feature:
                             EOF
                             sfExit
 
-                            sfExit
-
                     rbac-apply:
                         targets:
                             masters: one

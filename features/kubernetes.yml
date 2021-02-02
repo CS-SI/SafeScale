@@ -782,7 +782,7 @@ feature:
                             esac
 
                             touch /etc/kubernetes/.joined
-                            sfExit 0
+                            sfExit
 
                     cpx-init:
                         targets:

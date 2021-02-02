@@ -52,6 +52,7 @@ feature:
                             nodes: no
                         run: |
                             docker pull strapdata/elassandra:6
+                            sfExit
 
                     config:
                         targets:
@@ -104,6 +105,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS up -d
+                            sfExit
 
                     ready:
                         targets:
@@ -117,6 +119,7 @@ feature:
                             PREFIX="elassandra"
                             {{ end }}
                             sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
+                            sfExit
 
             remove:
                 pace: stop,remove
@@ -133,6 +136,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 192
+                            sfExit
 
                     remove:
                         targets:

@@ -49,6 +49,7 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
 
             add:
                 pace: docker-ce,docker-compose,config,firewall,ready
@@ -212,6 +213,7 @@ feature:
                             sfFirewallAdd --zone=trusted --add-service docker-swarm
                             sfFirewallAdd --zone=trusted --add-masquerade
                             sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfExit
 
                     ready:
                         targets:

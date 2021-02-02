@@ -37,6 +37,7 @@ feature:
                             masters: one
                         run: |
                             sudo -u cladm -i helm search ...
+                            sfExit
 
             add:
                 pace: prepare
@@ -684,7 +685,7 @@ feature:
                                     sfFirewallReload || sfFail 204 "Firewall problem"
                                     ;;
                             esac
-                            sfExit 0
+                            sfExit
 
                     cpx-init:
                         targets:
@@ -795,6 +796,7 @@ feature:
                         run: |
                             sfKubectl drain {{.Hostname}} --delete-local-data --force --ignore-daemonsets
                             sfKubectl delete node {{.Hostname}}
+                            sfExit
 
                     reverseproxy:
                         targets:
@@ -802,6 +804,7 @@ feature:
                         run: |
                             rm -f /etc/kong4gateway/includes/kubernetes.conf
                             sfReverseProxyReload
+                            sfExit
 
                     reset:
                         targets:
@@ -809,6 +812,7 @@ feature:
                             nodes: all
                         run: |
                             kubeadm reset -f
+                            sfExit
 
                     clean:
                         targets:

@@ -36,20 +36,25 @@ feature:
                 systemctl enable gmond
                 systemctl start slurmd
                 systemctl start gmond
+                sfExit
 
             remove: |
                 sfRetry 3m 5 "sfYum install -y ohpc-base-compute ohpc-slurm-client lmod-ohpc ganglia-gmond-ohpc nhc-ohpc \
                                ohpc-autotools EasyBuild-ohpc hwloc-ohpc spack-ohpc valgrind-ohpc \
                                openmpi3-gnu7-ohpc mpich-gnu7-ohpc ohpc-gnu7-perf-tools slurm-torque"
+                sfExit
 
     service:
         start: |
             systemctl start slurm-server
+            sfExit
 
         stop: |
             systemctl stop slurm-server
+            sfExit
 
         state: |
             systemctl status slurm-server
+            sfExit
 
 ...

@@ -150,6 +150,7 @@ feature:
                                   - app
                               topologyKey: "kubernetes.io/hostname"
                         EOF
+                        sfExit
 
                 install:
                     targets:

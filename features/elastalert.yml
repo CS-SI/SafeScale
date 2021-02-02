@@ -144,6 +144,7 @@ feature:
                             EOF
                             chown -R safescale:safescale ${SF_ETCDIR}/elastalert
                             chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/elastalert
+                            sfExit
 
                     kibanaplugin:
                         targets:

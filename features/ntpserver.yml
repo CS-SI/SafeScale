@@ -91,6 +91,7 @@ feature:
                             sfService restart firewalld
                             sfFirewallAdd --zone=trusted --add-port=123/udp --permanent
                             sfFirewallReload || sfFail 194 "Firewall problem"
+                            sfExit
 
                     ready:
                         targets:
@@ -166,5 +167,6 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
 
 ...

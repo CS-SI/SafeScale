@@ -115,21 +115,26 @@ feature:
                             git clone git@github.com:Kong/kong-dist-dcos.git && \
                             cd kong-dist-dcos && \
                             {{.dcos}} package install --yes kong {{.options}}
+                            sfExit
 
             remove:
                 pace: pkg
                 steps:
                     pkg:
                         sfDcos package remove --yes kong
+                        sfExit
 
     service:
         start: |
             kong start
+            sfExit
 
         stop: |
             kong stop
+            sfExit
 
         state: |
             kong state
+            sfExit
 
 ...

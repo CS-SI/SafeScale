@@ -27,11 +27,13 @@ feature:
                             masters: one
                         run: |
                             sfDcos package install --yes spark
+                            sfExit
                     cli:
                         targets:
                             masters: all
                         run: |
                             sfDcos package install --yes --cli spark
+                            sfExit
             check:
                 pace: check
                 steps:
@@ -40,6 +42,7 @@ feature:
                             masters: one
                         run: |
                             sfDcos spark plan show deploy --json &>/dev/null
+                            sfExit
 
             remove:
                 pace: pkg
@@ -49,4 +52,5 @@ feature:
                             masters: one
                         run: |
                             sfDcos package remove --yes spark
+                            sfExit
 ...

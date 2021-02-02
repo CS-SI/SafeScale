@@ -32,6 +32,7 @@ feature:
                             hosts: yes
                         run: |
                             [ -f /etc/systemd/system/docker.service.d/proxy.conf ]
+                            sfExit
 
             add:
                 pace: env,docker
@@ -62,6 +63,7 @@ feature:
                                     echo "Unmanaged OS '$LINUX_KIND'. Aborting."
                                     sfFail 1
                             esac
+                            sfExit
 
                     docker:
                         targets:
@@ -73,6 +75,7 @@ feature:
                             Environment="HTTP_PROXY=http://{{.DefaultRouteIP}}:3128/"
                             EOF
                             systemctl daemon-reload || :
+                            sfExit
 
             remove:
                 pace:  env,docker
@@ -95,11 +98,13 @@ feature:
                             esac
                             grep -vi proxy /etc/environment >/etc/environment.new
                             mv /etc/environment.new /etc/environment
+                            sfExit
 
                     docker:
                         targets:
                             hosts: yes
                         run: |
                             rm -f /etc/systemd/system/docker.service.d/proxy.conf
+                            sfExit
 
 ...

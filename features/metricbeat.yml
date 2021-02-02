@@ -140,6 +140,7 @@ feature:
                             EOF
                             chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/metricbeat
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat/config.yml
+                            sfExit
 
                     compose:
                         targets:
@@ -171,6 +172,7 @@ feature:
                             EOF
                             chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/metricbeat
                             chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/metricbeat
+                            sfExit
 
                     start:
                         targets:

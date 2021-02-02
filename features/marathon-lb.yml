@@ -30,12 +30,15 @@ feature:
                             masters: one
                         run: |
                             {{.dcos}} package install --yes marathon-lb
+                            sfExit
                     cli:
                         targets:
                             masters: all
                         run: |
                             {{.dcos}} package install --yes marathon-lb --cli
+                            sfExit
 
             remove: |
                 {{.dcos}} package remove --yes marathon-lb
+                sfExit
 ...

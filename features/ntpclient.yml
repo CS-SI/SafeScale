@@ -51,6 +51,7 @@ feature:
                                     sfFail 193
                                     ;;
                             esac
+                            sfExit
 
             add:
                 pace: ntpdate,config,ready
@@ -232,5 +233,6 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
+                            sfExit
 
 ...
