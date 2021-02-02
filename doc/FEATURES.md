@@ -16,15 +16,15 @@ feature | description | specificities
 `metricbeat` |  Install metricbeat on all hosts and links it to elassandra | For single host installation, will need parameters: <br> `KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
 `nvidiadocker` |  Install nvidia-docker, allowing nvidia driver to works in a docker container   |  On a cluster it will only be applied to nodes
 `remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters. In this context, Username is automatically set to `cladm` and the associated password is stored in the cluster information, viewable with `safescale cluster inspect <cluster_name>`<br><br>When installed on single host, youy will need to set these parameters (this corresponding user must exist on the host before installation of the feature): <br> `Username="existing_user"` <br> `Password="user_password"`
-`edgeproxy4network` |  Install a Kong reverse proxy for SafeScale use<br>Corresponds to `reverseproxy`  | Automatically installed on gateways of clusters
-`postgresql4gateway` |  Install a postgresql v9 server on gateways  | Dependency of `edgeproxy4network`
+`edgeproxy4subnet` |  Install a Kong reverse proxy for SafeScale use<br>Corresponds to `reverseproxy`  | Automatically installed on gateways of clusters
+`postgresql4gateway` |  Install a postgresql v9 server on gateways  | Dependency of `edgeproxy4subnet`
 `kibana` | Installs Kibana for SafeScale use and links it with `elassandra` | Only available for cluster
 `sparkmaster` |  Install and configure a spark cluster   |  Only available on a Swarm or dcos flavored cluster
 `kubernetes` |  Install and configure a kubernetes cluster   |  Only available for clusters
 `k8s.helm2` |   Install helm packet manager v2  |  Only available on a kubernetes flavored cluster
 `k8s.prometheus-operator` |   Install prometheus-operator  |  Only available on K8S flavored cluster
 
-_Note_: the `edgeproxy4network` feature is automatically installed on the gateway when a cluster is created by SafeScale.
+_Note_: the `edgeproxy4subnet` feature is automatically installed on the gateway when a cluster is created by SafeScale.
 
 ## How to install a feature
 
