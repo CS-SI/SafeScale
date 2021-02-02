@@ -243,7 +243,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, fail.E
 			err.Argument = "ServiceClient"
 			return nil, err
 		}
-		flavorID, err := flavors.IDFromName(sc, opts.FlavorName)
+		flavorID, err := IDFromName(sc, opts.FlavorName)
 		if err != nil {
 			return nil, err
 		}
@@ -251,6 +251,45 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, fail.E
 	}
 
 	return map[string]interface{}{"server": b}, nil
+}
+
+// IDFromName is a convienience function that returns a flavor's ID given its
+// name.
+func IDFromName(client *gc.ServiceClient, name string) (string, error) {
+	count := 0
+	id := ""
+	allPages, err := flavors.ListDetail(client, nil).AllPages()
+	if err != nil {
+		return "", err
+	}
+
+	all, err := flavors.ExtractFlavors(allPages)
+	if err != nil {
+		return "", err
+	}
+
+	for _, f := range all {
+		if f.Name == name {
+			count++
+			id = f.ID
+		}
+	}
+
+	switch count {
+	case 0:
+		err := &gc.ErrResourceNotFound{}
+		err.ResourceType = "flavor"
+		err.Name = name
+		return "", err
+	case 1:
+		return id, nil
+	default:
+		err := &gc.ErrMultipleResourcesFound{}
+		err.ResourceType = "flavor"
+		err.Name = name
+		err.Count = count
+		return "", err
+	}
 }
 
 // CreateHost creates a new host
