@@ -1991,13 +1991,13 @@ func (rh host) Pull(task concurrency.Task, target, source string, timeout time.D
 	// 	timeout = temporal.GetHostTimeout()
 	// }
 	var (
-		retcode int
+		retcode        int
 		stdout, stderr string
 	)
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			var innerXErr fail.Error
-			if retcode, stdout, stderr, innerXErr = ssh.Copy(task, target, source, false);  innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = ssh.Copy(task, target, source, false); innerXErr != nil {
 				return innerXErr
 			}
 			switch retcode {
@@ -2038,13 +2038,13 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 	}
 
 	var (
-		retcode int
+		retcode        int
 		stdout, stderr string
 	)
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			var innerXErr fail.Error
-			if retcode, stdout, stderr, innerXErr = ssh.Copy(task, target, source, true);  innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = ssh.Copy(task, target, source, true); innerXErr != nil {
 				return innerXErr
 			}
 			if retcode != 0 {
@@ -2512,6 +2512,128 @@ func (rh host) getAccessIP(task concurrency.Task) string {
 	return rh.accessIP
 }
 
+// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// satisfies interface install.Targetable
+func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+	if rh.IsNull() {
+		logrus.Error(fail.InvalidInstanceError().Error())
+		return map[uint8]installmethod.Enum{}
+	}
+	if task.IsNull() {
+		logrus.Error(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
+		return map[uint8]installmethod.Enum{}
+	}
+
+	rh.SafeLock(task)
+	defer rh.SafeUnlock(task)
+
+	if rh.installMethods == nil {
+		rh.installMethods = map[uint8]installmethod.Enum{}
+
+		_ = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// props, inErr := rh.properties(task)
+			// if inErr != nil {
+			// 	return inErr
+			// }
+
+			// Ignore error in this special case; will fallback to use bash method if cannot determine operating system type and flavor
+			var index uint8
+			_ = props.Inspect(task, hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
+				systemV1, ok := clonable.(*propertiesv1.HostSystem)
+				if !ok {
+					logrus.Error(fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
+				}
+				if systemV1.Type == "linux" {
+					switch systemV1.Flavor {
+					case "centos", "redhat":
+						index++
+						rh.installMethods[index] = installmethod.Yum
+					case "debian":
+						fallthrough
+					case "ubuntu":
+						index++
+						rh.installMethods[index] = installmethod.Apt
+					case "fedora", "rhel":
+						index++
+						rh.installMethods[index] = installmethod.Dnf
+					}
+				}
+				return nil
+			})
+			index++
+			rh.installMethods[index] = installmethod.Bash
+			return nil
+		})
+	}
+	return rh.installMethods
+}
+
+// RegisterFeature registers an installed Feature in metadata of Host
+func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if rh.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if feat.IsNull() {
+		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
+	}
+
+	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			var item *propertiesv1.HostInstalledFeature
+			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
+				requirements, innerXErr := feat.GetRequirements()
+				if innerXErr != nil {
+					return innerXErr
+				}
+				item = &propertiesv1.HostInstalledFeature{
+					Requires: requirements,
+				}
+				featuresV1.Installed[feat.GetName()] = item
+			}
+			if !requiredBy.IsNull() {
+				item.RequiredBy[requiredBy.GetName()] = struct{}{}
+			}
+			return nil
+		})
+	})
+}
+
+// DeregisterFeature deregisters a Feature from Cluster metadata
+func (rh *host) DeregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if rh.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if feat == "" {
+		return fail.InvalidParameterError("feat", "cannot be empty string")
+	}
+
+	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if _, ok := featuresV1.Installed[feat]; ok {
+				delete(featuresV1.Installed, feat)
+			}
+			for _, v := range featuresV1.Installed {
+				delete(v.RequiredBy, feat)
+			}
+			return nil
+		})
+	})
+}
+
 // GetShares returns the information about the shares hosted by the host
 func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -2893,7 +3015,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 	}
 
 	var (
-		ahc *abstract.HostCore
+		ahc           *abstract.HostCore
 		hostSizingV1  *propertiesv1.HostSizing
 		hostVolumesV1 *propertiesv1.HostVolumes
 		volumes       []string

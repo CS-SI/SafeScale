@@ -43,13 +43,13 @@ type Feature interface {
 	data.Identifiable
 	data.NullValue
 
-	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)     // Add installs the feature on the target
-	Applyable(Targetable) bool                                                  // Applyable tells if the feature is installable on the target
-	GetDisplayFilename() string                                                 // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetFilename() string                                                        // GetFilename returns the filename of the feature
-	GetRequirements() ([]string, fail.Error)                                    // GetRequirements returns the other features needed as requirements
-	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)   // Check if feature is installed on target
-	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Remove uninstalls the feature from the target
+	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // Add installs the feature on the target
+	Applyable(Targetable) bool                                                 // Applyable tells if the feature is installable on the target
+	GetDisplayFilename() string                                                // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
+	GetFilename() string                                                       // GetFilename returns the filename of the feature
+	GetRequirements() (map[string]struct{}, fail.Error)                        // GetRequirements returns the other features needed as requirements
+	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Check if feature is installed on target
+	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // Remove uninstalls the feature from the target
 	ToProtocol() *protocol.FeatureResponse
 }
 
