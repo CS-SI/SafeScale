@@ -272,7 +272,7 @@ func RunScanner(targetedTenant string) {
 			fmt.Printf("Error working with tenant %s\n", tenantName)
 		}
 		if err := collect(tenantName); err != nil {
-			logrus.Warn(fmt.Printf("failed to save scanned info from tenant %s", tenantName))
+			logrus.Warnf("failed to save scanned info from tenant %s", tenantName)
 		}
 	}
 }
@@ -315,6 +315,16 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 	err = dumpTemplates(serviceProvider, theTenant)
 	if err != nil {
 		return err
+	}
+
+	providerName := serviceProvider.GetName()
+	authOpts, err := serviceProvider.GetAuthenticationOptions()
+	if err != nil {
+		return err
+	}
+	region, ok := authOpts.Get("Region")
+	if !ok {
+		return fmt.Errorf("region value unset")
 	}
 
 	templates, err := serviceProvider.ListTemplates(true)
@@ -395,10 +405,27 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				}
 			}
 
-			// TODO: If there is a file with today's date, skip it...
+			// TODO: If there is a file created with less than 24h skip it...
 			fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + theTenant + "#" + template.Name + ".json")
-			if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
-				return nil
+			if info, err := os.Stat(fileCandidate); err != nil {
+				if !os.IsNotExist(err) {
+					return nil
+				}
+			} else {
+				if time.Since(info.ModTime()) < 24*time.Hour {
+					return nil
+				}
+			}
+
+			storedFileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/db/images/" + providerName + "/" + region.(string) + "/" + template.Name + ".json")
+			if info, err := os.Stat(storedFileCandidate); err != nil {
+				if !os.IsNotExist(err) {
+					return nil
+				}
+			} else {
+				if time.Since(info.ModTime()) < 24*time.Hour {
+					return nil
+				}
 			}
 
 			logrus.Printf("Checking template %s\n", template.Name)
@@ -534,11 +561,7 @@ func dumpTemplates(service iaas.Service, tenant string) (err error) {
 	f = utils.AbsPathify(f)
 
 	err = ioutil.WriteFile(f, content, 0666)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func dumpImages(service iaas.Service, tenant string) (err error) {
@@ -569,11 +592,7 @@ func dumpImages(service iaas.Service, tenant string) (err error) {
 	f = utils.AbsPathify(f)
 
 	err = ioutil.WriteFile(f, content, 0666)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func main() {
