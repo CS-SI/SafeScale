@@ -571,8 +571,22 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		}
 	}()
 
-	// At the end, configure cluster as a whole
-	return c.configureCluster(task)
+	// configure cluster as a whole
+	if xerr =  c.configureCluster(task); xerr != nil {
+		return xerr
+	}
+
+	// Sets nominal state of the new cluster in metadata
+	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.GetState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			stateV1.State = clusterstate.Nominal
+			return nil
+		})
+	}
 }
 
 // firstLight contains the code leading to cluster first metadata written
