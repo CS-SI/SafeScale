@@ -54,9 +54,9 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-//	}
+	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//	}
 	targetType := in.GetTargetType()
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
@@ -77,7 +77,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	task := job.GetTask()
 	// svc := job.GetService()
 
-	tracer := debug.NewTracer(task, true/*tracing.ShouldTrace("listeners.feature")*/, "(%s, %s)", targetType, targetRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.feature")*/, "(%s, %s)", targetType, targetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -101,9 +101,9 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-//	}
+	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//	}
 	targetType := in.GetTargetType()
 	if targetType != protocol.FeatureTargetType_FT_HOST && targetType != protocol.FeatureTargetType_FT_CLUSTER {
 		return empty, fail.InvalidParameterError("in.TargetType", "invalid value '%d'", targetType)
@@ -127,7 +127,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	task := job.GetTask()
 	svc := job.GetService()
 
-	tracer := debug.NewTracer(task, true/*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer func() {
@@ -197,6 +197,7 @@ func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
 // Add ...
 func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -205,9 +206,9 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-//		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-//	}
+	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+	//	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
@@ -228,7 +229,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	task := job.GetTask()
 	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), true/*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.GetTask(), true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -272,7 +273,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	return empty, fail.Wrap(fail.InconsistentError("reach theoretically unreachable point"), "cannot check feature")
 }
 
-// List lists hosts managed by SafeScale only, or all hosts.
+// Remove uninstalls a Feature
 func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 
@@ -283,9 +284,9 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-//	}
+	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
@@ -306,7 +307,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	task := job.GetTask()
 	svc := job.GetService()
 
-	tracer := debug.NewTracer(task, true/*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

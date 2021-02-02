@@ -390,6 +390,8 @@ func checkParameters(f feature, v data.Map) fail.Error {
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
 func (f feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if f.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -403,7 +405,7 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 
 	tracer := debug.NewTracer(f.task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", featureName, targetType, targetName),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),
@@ -580,4 +582,13 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 		}
 	}
 	return nil
+}
+
+// ToProtocol converts a feature to *protocol.FeatureResponse
+func (f feature) ToProtocol() *protocol.FeatureResponse {
+	out := &protocol.FeatureResponse{
+		Name:     f.GetName(),
+		FileName: f.GetDisplayFilename(),
+	}
+	return out
 }
