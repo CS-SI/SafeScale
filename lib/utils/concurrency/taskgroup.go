@@ -407,7 +407,6 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		return false, nil, fail.InvalidRequestError("cannot wait task '%s': not running (%d)", tid, taskStatus)
 	}
 
-	// FIXME: go routine never ends if timeout occurs!
 	c := make(chan struct{})
 	go func() {
 		results, err = tg.WaitGroup()
@@ -415,9 +414,21 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		close(c)
 	}()
 
+	if duration > 0 {
+		select {
+		case <-time.After(duration):
+			tout := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout waiting for task group '%s'", tid))
+			abErr := tg.Abort()
+			if abErr != nil {
+				_ = tout.AddConsequence(abErr)
+			}
+			return false, nil, tout
+		case <-c:
+			return true, results, err
+		}
+	}
+
 	select {
-	case <-time.After(duration):
-		return false, nil, fail.TimeoutError(nil, duration, fmt.Sprintf("timeout waiting for task group '%s'", tid))
 	case <-c:
 		return true, results, err
 	}
