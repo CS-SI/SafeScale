@@ -57,6 +57,7 @@ var ClusterCommand = &cli.Command{
 	Subcommands: []*cli.Command{
 		clusterNodeCommands,
 		clusterMasterCommands,
+		clusterFeatureCommands,
 		clusterListCommand,
 		clusterCreateCommand,
 		clusterDeleteCommand,
@@ -77,6 +78,7 @@ var ClusterCommand = &cli.Command{
 		clusterFeatureCommands,
 	},
 }
+
 // clusterListCommand handles 'deploy cluster list'
 var clusterListCommand = &cli.Command{
 	Name:    "list",
@@ -367,7 +369,7 @@ var clusterCreateCommand = &cli.Command{
 			Usage: `Describe master sizing in format "<component><operator><value>[,...]" (cf. --sizing for details)`,
 		},
 		&cli.StringFlag{
-			Name:  "node-sizing",
+			Name: "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details),
 		This parameter accepts a supplemental <component> named count, with only = as <operator> and an int as <value> corresponding to the
 		number of workers to create (cannot be less than the minimum required by the flavour).
@@ -981,7 +983,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		}
 	}
 
-	retcode, _/*stdout*/, _/*stderr*/, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _ /*stdout*/, _ /*stderr*/, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -994,7 +996,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		// 	}
 		// 	msg += stderr
 		// }
-		return cli.NewExitError(""/*msg*/, retcode)
+		return cli.NewExitError("" /*msg*/, retcode)
 	}
 	return nil
 }
@@ -1438,9 +1440,9 @@ func clusterFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	if err := clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
+	if err := clientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+		msg := fmt.Sprintf("error adding feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 	return clitools.SuccessResponse(nil)
@@ -1489,9 +1491,9 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	if err := clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil { // FIXME: define duration
+	if err := clientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0); err != nil { // FIXME: define duration
 		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("error checking feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+		msg := fmt.Sprintf("error checking Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 

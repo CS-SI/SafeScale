@@ -254,9 +254,24 @@ func kubernetesFeature() *feature {
 // 	}
 // }
 
-// k8shelm2Feature ...
-func k8shelm2Feature() *feature {
-	name := "k8s.helm2"
+// helm2Feature ...
+func helm2Feature() *feature {
+	name := "helm2"
+	filename, specs, err := loadSpecFile(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
+// helm3Feature ...
+func helm3Feature() *feature {
+	name := "helm3"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())
