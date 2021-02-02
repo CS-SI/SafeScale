@@ -78,6 +78,7 @@ var ClusterCommand = &cli.Command{
 		clusterFeatureCommands,
 	},
 }
+
 // clusterListCommand handles 'deploy cluster list'
 var clusterListCommand = &cli.Command{
 	Name:    "list",
@@ -1439,8 +1440,7 @@ func clusterFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	err = clientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0)
-	if err != nil {
+	if err := clientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -1491,8 +1491,7 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	err = clientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0) // FIXME: define duration
-	if err != nil {
+	if err := clientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0); err != nil { // FIXME: define duration
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error checking Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
