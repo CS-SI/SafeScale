@@ -122,7 +122,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdNetSpeed,
 )
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
 // ScannerHandler defines API to manipulate images
 type ScannerHandler interface {
