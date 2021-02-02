@@ -572,7 +572,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	}()
 
 	// configure cluster as a whole
-	if xerr =  c.configureCluster(task); xerr != nil {
+	if xerr = c.configureCluster(task); xerr != nil {
 		return xerr
 	}
 
@@ -586,7 +586,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 			stateV1.State = clusterstate.Nominal
 			return nil
 		})
-	}
+	})
 }
 
 // firstLight contains the code leading to cluster first metadata written
@@ -597,7 +597,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 	if task.IsNull() {
 		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if req.Name == "" {
+	if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
 		return fail.InvalidParameterError("req.Name", "cannot be empty string")
 	}
 
