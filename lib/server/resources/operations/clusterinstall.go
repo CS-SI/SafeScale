@@ -224,6 +224,72 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	return nil
 }
 
+// RegisterFeature registers an installed Feature in metadata of a Cluster
+func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if feat.IsNull() {
+		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
+	}
+
+	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			var item *propertiesv1.ClusterInstalledFeature
+			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
+				requirements, innerXErr := feat.GetRequirements()
+				if innerXErr != nil {
+					return innerXErr
+				}
+				item = &propertiesv1.ClusterInstalledFeature{
+					Requires: requirements,
+				}
+				featuresV1.Installed[feat.GetName()] = item
+			}
+			if !requiredBy.IsNull() {
+				item.RequiredBy[requiredBy.GetName()] = struct{}{}
+			}
+			return nil
+		})
+	})
+}
+
+// DeregisterFeature deregisters a Feature from Cluster metadata
+func (c *cluster) DeregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if feat == "" {
+		return fail.InvalidParameterError("feat", "cannot be empty string")
+	}
+
+	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if _, ok := featuresV1.Installed[feat]; ok {
+				delete(featuresV1.Installed, feat)
+			}
+			for _, v := range featuresV1.Installed {
+				delete(v.RequiredBy, feat)
+			}
+			return nil
+		})
+	})
+}
+
 // ListInstalledFeatures returns a slice of installed features
 func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
 	var emptySlice []resources.Feature
@@ -282,7 +348,7 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 
 // CheckFeature tells if a feature is installed on the cluster
 func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c == nil {
+	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
@@ -302,7 +368,7 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 
 // RemoveFeature uninstalls a feature from the cluster
 func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c == nil {
+	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
@@ -387,10 +453,10 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
+		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
 		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
 	} else {
-//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
+		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
 		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
 	}
 	return host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
@@ -560,9 +626,10 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
+
 	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4network'", clusterName)
-		feat, xerr := NewEmbeddedFeature(task, "edgeproxy4network")
+		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
+		feat, xerr := NewEmbeddedFeature(task, "edgeproxy4subnet")
 		if xerr != nil {
 			return xerr
 		}
@@ -575,7 +642,10 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 			return fail.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
 		}
 		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
+		return nil
 	}
+
+	logrus.Infof("[cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
 	return nil
 }
 

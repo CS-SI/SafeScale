@@ -68,12 +68,12 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		return nil, fail.InvalidParameterError("subnet", "cannot be null value of 'resources.Subnet'")
 	}
 
-	// Check if 'edgeproxy4network' feature is installed on host
+	// Check if 'edgeproxy4subnet' feature is installed on host
 	voidtask, xerr := concurrency.NewTask()
 	if xerr != nil {
 		return nil, xerr
 	}
-	rp, xerr := NewEmbeddedFeature(voidtask, "edgeproxy4network")
+	rp, xerr := NewEmbeddedFeature(voidtask, "edgeproxy4subnet")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -89,10 +89,10 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		setErr := kongProxyCheckedCache.SetBy(subnet.GetName(), func() (interface{}, fail.Error) {
 			results, xerr := rp.Check(addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if xerr != nil {
-				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4network' is installed on gateway '%s'", addressedGateway.GetName())
+				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
 			}
 			if !results.Successful() {
-				return false, fail.NotFoundError("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.GetName())
+				return false, fail.NotFoundError("feature 'edgeproxy4subnet' is not installed on gateway '%s'", addressedGateway.GetName())
 			}
 
 			return true, nil
@@ -103,7 +103,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		present = true
 	}
 	if !present {
-		return nil, fail.NotFoundError("'edgeproxy4network' feature is not installed on gateway '%s'", addressedGateway.GetName())
+		return nil, fail.NotFoundError("'edgeproxy4subnet' feature is not installed on gateway '%s'", addressedGateway.GetName())
 	}
 
 	ctrl := &KongController{
