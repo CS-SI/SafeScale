@@ -469,6 +469,7 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 		return nil, xerr
 	}
 	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
+
 	return results, xerr
 }
 
@@ -537,17 +538,24 @@ func (f feature) Remove(target resources.Targetable, v data.Map, s resources.Fea
 	return results, xerr
 }
 
+const yamlKey = "feature.requirements.features"
+
 // GetRequirements returns a list of features needed as requirements
-func (f *feature) GetRequirements() ([]string, fail.Error) {
+func (f *feature) GetRequirements() (map[string]struct{}, fail.Error) {
+	emptyMap := map[string]struct{}{}
 	if f.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return emptyMap, fail.InvalidInstanceError()
 	}
-	return nil, fail.NotImplementedError("GetRequirements() is not yet implemented")
+
+	out := make(map[string]struct{}, len(f.specs.GetStringSlice(yamlKey)))
+	for _, r := range f.specs.GetStringSlice(yamlKey) {
+		out[r] = struct{}{}
+	}
+	return out, nil
 }
 
 // installRequirements walks through requirements and installs them if needed
 func (f *feature) installRequirements(t resources.Targetable, v data.Map, s resources.FeatureSettings) fail.Error {
-	yamlKey := "feature.requirements.features"
 	if f.specs.IsSet(yamlKey) {
 		{
 			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.GetName())
@@ -578,6 +586,11 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 				}
 				if !results.Successful() {
 					return fail.NewError("failed to install required feature '%s':\n%s", requirement, results.AllErrorMessages())
+				}
+
+				// Register the needed feature as a requirement for f
+				if xerr = t.RegisterFeature(f.task, needed, f); xerr != nil {
+					return xerr
 				}
 			}
 		}

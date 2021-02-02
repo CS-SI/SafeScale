@@ -485,12 +485,20 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	order := strings.Split(pace, ",")
 
 	// Applies reverseproxy rules to make it functional (feature may need it during the install)
-	if w.action == installaction.Add && !s.SkipProxy {
-		if w.cluster != nil {
-			if xerr := w.setReverseProxy(); xerr != nil {
+	switch w.action {
+	case installaction.Add:
+		if !s.SkipProxy {
+			if w.cluster != nil {
+				if xerr := w.setReverseProxy(); xerr != nil {
+					return nil, xerr
+				}
+			}
+			if xerr := w.setSecurity(); xerr != nil {
 				return nil, xerr
 			}
 		}
+	case installaction.Remove:
+		// FIXME: remove reverse proxy rules and security groups rules
 	}
 
 	// Now enumerate steps and execute each of them
@@ -1170,14 +1178,14 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 // setSecurity applies the security rules defined in specification file (if there are some)
 func (w *worker) setSecurity() (xerr fail.Error) {
-	if xerr = w.setNetworkSecurity(); xerr != nil {
+	if xerr = w.setSubnetSecurity(); xerr != nil {
 		return xerr
 	}
 	return nil
 }
 
-// setNetworkSecurity applies the network security rules defined in specification file (if there are some)
-func (w *worker) setNetworkSecurity() (xerr fail.Error) {
+// setSubnetSecurity applies the network security rules defined in specification file (if there are some)
+func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 	rules, ok := w.feature.specs.Get("feature.security.network").([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
@@ -1190,7 +1198,7 @@ func (w *worker) setNetworkSecurity() (xerr fail.Error) {
 	task := w.feature.task
 	var (
 		svc iaas.Service
-		rs resources.Subnet
+		rs  resources.Subnet
 	)
 	if w.cluster != nil {
 		svc = w.cluster.GetService()
@@ -1233,7 +1241,7 @@ func (w *worker) setNetworkSecurity() (xerr fail.Error) {
 
 			gwSG, innerXErr := rs.InspectGatewaySecurityGroup(task)
 			if innerXErr != nil {
-					return innerXErr
+				return innerXErr
 			}
 			defer gwSG.Dispose()
 

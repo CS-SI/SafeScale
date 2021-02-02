@@ -29,14 +29,12 @@ import (
 type Targetable interface {
 	data.Identifiable
 
-	// TargetType returns the type of the target
-	TargetType() featuretargettype.Enum
-	// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-	InstallMethods(concurrency.Task) map[uint8]installmethod.Enum
-	// GetInstalledFatures returns a list of installed features
-	InstalledFeatures(concurrency.Task) []string
-	// ComplementFeatureParameters adds parameters corresponding to the target in preparation of feature installation
-	ComplementFeatureParameters(t concurrency.Task, v data.Map) fail.Error
+	ComplementFeatureParameters(t concurrency.Task, v data.Map) fail.Error        // adds parameters corresponding to the target in preparation of feature installation
+	DeregisterFeature(t concurrency.Task, f string) fail.Error                    // deregisters a feature from target in metadata
+	InstalledFeatures(concurrency.Task) []string                                  // returns a list of installed features
+	InstallMethods(concurrency.Task) map[uint8]installmethod.Enum                 // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+	RegisterFeature(t concurrency.Task, f Feature, requiredBy Feature) fail.Error // registers a feature on target in metadata
+	TargetType() featuretargettype.Enum                                           // returns the type of the target
 }
 
 // Feature defines the interface of feature
@@ -45,13 +43,13 @@ type Feature interface {
 	data.Identifiable
 	data.NullValue
 
-	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)     // Add installs the feature on the target
-	Applyable(Targetable) bool                                                  // Applyable tells if the feature is installable on the target
-	GetDisplayFilename() string                                                 // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetFilename() string                                                        // GetFilename returns the filename of the feature
-	GetRequirements() ([]string, fail.Error)                                    // GetRequirements returns the other features needed as requirements
-	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)   // Check if feature is installed on target
-	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Remove uninstalls the feature from the target
+	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // Add installs the feature on the target
+	Applyable(Targetable) bool                                                 // Applyable tells if the feature is installable on the target
+	GetDisplayFilename() string                                                // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
+	GetFilename() string                                                       // GetFilename returns the filename of the feature
+	GetRequirements() (map[string]struct{}, fail.Error)                        // GetRequirements returns the other features needed as requirements
+	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Check if feature is installed on target
+	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // Remove uninstalls the feature from the target
 	ToProtocol() *protocol.FeatureResponse
 }
 
