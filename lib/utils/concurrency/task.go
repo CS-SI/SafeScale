@@ -556,7 +556,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		return nil, err
 	}
 
-	if status == READY {  // Waiting a ready task always succeed by design
+	if status == READY { // Waiting a ready task always succeed by design
 		return nil, nil
 	}
 	if status == DONE {
@@ -658,9 +658,21 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 		close(c)
 	}()
 
+	if duration > 0 {
+		select {
+		case <-time.After(duration):
+			toErr := fail.TimeoutError(fmt.Errorf("timeout waiting for task '%s'", tid), duration, nil)
+			abErr := t.Abort()
+			if abErr != nil {
+				_ = toErr.AddConsequence(abErr)
+			}
+			return false, nil, toErr
+		case <-c:
+			return true, result, err
+		}
+	}
+
 	select {
-	case <-time.After(duration):
-		return false, nil, fail.TimeoutError(fmt.Errorf("timeout waiting for task '%s'", tid), duration, nil)
 	case <-c:
 		return true, result, err
 	}
