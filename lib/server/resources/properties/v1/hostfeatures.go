@@ -27,25 +27,52 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostInstalledFeature struct {
-	HostContext bool     `json:"host_context,omitempty"` // tells if the feature has been explicitly installed for host (opposed to for cluster)
-	RequiredBy  []string `json:"required_by,omitempty"`  // tells what feature(s) needs this one
-	Requires    []string `json:"requires,omitempty"`
+	HostContext bool                `json:"host_context,omitempty"` // tells if the feature has been explicitly installed for host (opposed to for cluster)
+	RequiredBy  map[string]struct{} `json:"required_by,omitempty"`  // tells what feature(s) needs this one
+	Requires    map[string]struct{} `json:"requires,omitempty"`
 }
 
 // NewHostInstalledFeature ...
 func NewHostInstalledFeature() *HostInstalledFeature {
 	return &HostInstalledFeature{
-		RequiredBy: []string{},
-		Requires:   []string{},
+		RequiredBy: map[string]struct{}{},
+		Requires:   map[string]struct{}{},
 	}
 }
 
 // Reset resets the content of the property
-func (p *HostInstalledFeature) Reset() {
-	*p = HostInstalledFeature{
-		RequiredBy: []string{},
-		Requires:   []string{},
+func (hif *HostInstalledFeature) Reset() {
+	*hif = HostInstalledFeature{
+		RequiredBy: map[string]struct{}{},
+		Requires:   map[string]struct{}{},
 	}
+}
+
+// Clone ...
+// satisfies interface data.Clonable
+func (hif HostInstalledFeature) Clone() data.Clonable {
+	return newClusterInstalledFeature().Replace(&hif)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if hif == nil || p == nil {
+		return hif
+	}
+
+	src := p.(*HostInstalledFeature)
+	hif.HostContext = src.HostContext
+	hif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
+	for k := range src.RequiredBy {
+		hif.RequiredBy[k] = struct{}{}
+	}
+	hif.Requires = make(map[string]struct{}, len(src.Requires))
+	for k := range src.Requires {
+		hif.Requires[k] = struct{}{}
+	}
+	return hif
 }
 
 // HostFeatures ...

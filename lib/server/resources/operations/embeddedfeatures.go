@@ -464,9 +464,9 @@ func postgres4gatewayFeature() *feature {
 	}
 }
 
-// edgeproxy4networkFeature ...
-func edgeproxy4networkFeature() *feature {
-	name := "edgeproxy4network"
+// edgeproxy4subnetFeature ...
+func edgeproxy4subnetFeature() *feature {
+	name := "edgeproxy4subnet"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

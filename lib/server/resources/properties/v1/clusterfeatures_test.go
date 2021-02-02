@@ -26,7 +26,11 @@ import (
 func TestFeatures_Clone(t *testing.T) {
 	ct := newClusterFeatures()
 
-	ct.Installed["fair"] = &ClusterInstalledFeature{Requires: []string{"something"}}
+	ct.Installed["fair"] = &ClusterInstalledFeature{
+		Requires: map[string]struct{}{
+			"something": struct{}{},
+		},
+	}
 	ct.Disabled["kind"] = struct{}{}
 
 	clonedCt, ok := ct.Clone().(*ClusterFeatures)
@@ -35,7 +39,11 @@ func TestFeatures_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
-	clonedCt.Installed["fair"] = &ClusterInstalledFeature{Requires: []string{"commitment"}}
+	clonedCt.Installed["fair"] = &ClusterInstalledFeature{
+		Requires: map[string]struct{}{
+			"commitment": struct{}{},
+		},
+	}
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
