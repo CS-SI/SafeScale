@@ -662,8 +662,8 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            if [ -d ${SF_ETCDIR}/edgeproxy4network ]; then
-                                TARGET_DIR=${SF_ETCDIR}/edgeproxy4network
+                            if [ -d ${SF_ETCDIR}/edgeproxy4subnet ]; then
+                                TARGET_DIR=${SF_ETCDIR}/edgeproxy4subnet
                             elif [ -d ${SF_ETCDIR}/kong4gateway ]; then
                                 TARGET_DIR=${SF_ETCDIR}/kong4gateway
                             fi
