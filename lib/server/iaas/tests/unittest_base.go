@@ -714,49 +714,6 @@ func (tester *ServiceTester) Containers(t *testing.T) {
 	assert.NotContains(t, cl, "testC", "testC2")
 }
 
-// VPL: disabled, need overhaul
-// // Objects test
-// func (tester *ServiceTester) Objects(t *testing.T) {
-// 	_, err := tester.Service.CreateBucket("testC")
-// 	assert.Nil(t, err)
-// 	_, err = tester.Service.WriteObject("testC", "object1", strings.NewReader("123456789"), 0, objectstorage.ObjectMetadata{"A": "B"})
-// 	assert.Nil(t, err)
-
-// 	var buff bytes.Buffer
-// 	err = tester.Service.ReadObject("testC", "object1", buff, 0, 0)
-// 	sc := buff.String()
-// 	assert.Equal(t, "123456789", sc)
-// 	assert.Equal(t, 1, len(o.Metadata))
-// 	assert.Equal(t, "B", o.Metadata["A"])
-
-// 	o, err = tester.Service.GetObjectMetadata("testC", "object1")
-// 	assert.Empty(t, o.Content)
-// 	assert.Equal(t, 1, len(o.Metadata))
-// 	assert.Equal(t, "B", o.Metadata["A"])
-// 	o, err = tester.Service.GetObject("testC", "object1", []abstract.Range{
-// 		abstract.NewRange(0, 2),
-// 		abstract.NewRange(4, 7),
-// 	})
-// 	assert.Nil(t, err)
-// 	if err == nil {
-// 		buff.Reset()
-// 		_, err = buff.ReadFrom(o.Content)
-// 		assert.Nil(t, err)
-// 		sc = buff.String()
-// 		assert.Equal(t, "1235678", sc)
-// 	}
-
-// 	assert.Nil(t, err)
-// 	time.Sleep(5 * time.Second)
-// 	_, err = tester.Service.GetObject("testC", "object1", nil)
-// 	assert.NotNil(t, err)
-
-// 	err = tester.Service.DeleteObject("testC", "object1")
-// 	assert.NotNil(t, err)
-// 	err = tester.Service.DeleteBucket("testC")
-// 	assert.Nil(t, err)
-// }
-
 // GetImage ...
 func (tester *ServiceTester) GetImage(t *testing.T) {
 	// TODO: Implement this test
