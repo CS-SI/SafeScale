@@ -30,7 +30,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -122,31 +121,9 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
-	k, uperr := sshconfig.Command("which scp")
-	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(nil, outputs.COLLECT, temporal.GetBigDelay())
-		if kerr == nil {
-			connected := strings.Contains(uptext, "/scp")
-			if !connected {
-				logrus.Warn("SSH problem ?")
-			}
-		}
-	}
-
-	k, uperr = sshconfig.SudoCommand("which scp", false)
-	if uperr != nil && k != nil {
-		_, uptext, _, kerr := k.RunWithTimeout(nil, outputs.COLLECT, temporal.GetBigDelay())
-		if kerr == nil {
-			connected := strings.Contains(uptext, "/scp")
-			if !connected {
-				logrus.Warn("SUDO problem ?")
-			}
-		}
-	}
-
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
-		logrus.Warnf("Error deleting file: %v", nerr)
+		logrus.Warnf("error deleting file: %v", nerr)
 	}
 
 	// Execute script on remote host with retries if needed
@@ -194,18 +171,6 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			return 255, stdout, stderr, retryErr
 		}
 	}
-
-	/*
-		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
-		if uperr != nil {
-			logrus.Warn("Network problem...")
-		} else {
-			_, uptext, _, kerr := k.Run()
-			if kerr == nil {
-				logrus.Warnf("Network working !!: %s", uptext)
-			}
-		}
-	*/
 
 	return retcode, stdout, stderr, err
 }
