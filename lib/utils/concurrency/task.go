@@ -420,9 +420,9 @@ func (t *task) Run(action TaskAction, params TaskParameters) (_ TaskResult, err 
 					if vars, ok := anon.(map[string]interface{}); ok {
 						if what, ok := vars["StepID"]; ok {
 							if err != nil {
-								logrus.Warnf("action %s FAILED and took %s", what, time.Since(rt))
+								logrus.Debugf("action %s FAILED and took %s", what, time.Since(rt))
 							} else {
-								logrus.Warnf("action %s took %s", what, time.Since(rt))
+								logrus.Debugf("action %s took %s", what, time.Since(rt))
 							}
 						}
 					}
