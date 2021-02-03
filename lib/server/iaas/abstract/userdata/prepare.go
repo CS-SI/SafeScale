@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"text/template"
+	"time"
 
 	"github.com/asaskevich/govalidator"
 
@@ -203,7 +204,14 @@ func (ud *Content) Prepare(
 	ud.BuildSubnetworks = options.BuildSubnetworks
 	ud.TemplateOperationDelay = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
 	ud.TemplateOperationTimeout = (temporal.GetHostTimeout() / 2).String()
-	ud.TemplateLongOperationTimeout = temporal.GetHostTimeout().String()
+
+	// Minimum of 6 min for specially long operations
+	if 6*time.Minute > temporal.GetHostTimeout() {
+		ud.TemplateLongOperationTimeout = (6 * time.Minute).String()
+	} else {
+		ud.TemplateLongOperationTimeout = temporal.GetHostTimeout().String()
+	}
+
 	ud.TemplatePullImagesTimeout = (2 * temporal.GetHostTimeout()).String()
 
 	if request.HostName != "" {
