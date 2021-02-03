@@ -13,10 +13,25 @@ message TenantList{
     repeated Tenant tenants = 1;
 }
 
+message TenantInspectRequest{
+    bool all = 1;
+}
+
 service TenantService{
     rpc List (google.protobuf.Empty) returns (TenantList){}
     rpc Set (TenantName) returns (google.protobuf.Empty){}
     rpc Get (google.protobuf.Empty) returns (TenantName){}
+    rpc Inspect (TenantInspectRequest) returns (ResourceList){}
+}
+
+message Resource{
+    string resourceId = 1;
+    string resourceName = 2;
+    string resourceType = 3;
+}
+
+message ResourceList{
+    repeated Resource resources = 1;
 }
 
 message Image{
@@ -195,6 +210,7 @@ message Host{
     string os_kind = 11;
     repeated string attached_volume_names = 12;
     string password = 13;
+    map<string, string> tags = 14;
 }
 
 message HostStatus {
@@ -291,12 +307,8 @@ message Volume{
     bool Formatted = 6;
     repeated Volume PVS = 7;
     repeated Volume LVS = 8;
+    map<string, string> tags = 9;
 }
-//message VolumeInfo{
-//    Volume volume = 1;
-//    VolumeAttachment attachment = 2;
-//
-//}
 
 message VolumeInfo{
     string id = 1;

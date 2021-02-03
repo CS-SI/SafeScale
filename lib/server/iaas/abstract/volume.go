@@ -49,6 +49,7 @@ type Volume struct {
 	PVM []*Volume `json:"pvolumes,omitempty"`
 
 	Properties *serialize.JSONProperties `json:"properties,omitempty"`
+	Tags       map[string]string         `json:"tags,omitempty"`
 }
 
 // NewVolume ...
@@ -57,6 +58,7 @@ func NewVolume() *Volume {
 		LVM:        []*Volume{},
 		PVM:        []*Volume{},
 		Properties: serialize.NewJSONProperties("abstract.volume"),
+		Tags:       make(map[string]string),
 	}
 }
 

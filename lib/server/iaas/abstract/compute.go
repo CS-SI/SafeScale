@@ -180,6 +180,7 @@ type Host struct {
 	PrivateKey string                    `json:"private_key,omitempty"`
 	Password   string                    `json:"password,omitempty"`
 	Properties *serialize.JSONProperties `json:"properties,omitempty"`
+	Tags       map[string]string         `json:"tags,omitempty"`
 }
 
 // NewHost ...
