@@ -1440,7 +1440,7 @@ func clusterFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
+	err = clientSession.Cluster.AddFeature(clusterName, featureName, values, &settings, 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on cluster '%s': %s", featureName, clusterName, err.Error())
@@ -1492,7 +1492,7 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
 
-	err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0) // FIXME: define duration
+	err = clientSession.Cluster.CheckFeature(clusterName, featureName, values, &settings, 0) // FIXME: define duration
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error checking Feature '%s' on Cluster '%s': %s", featureName, clusterName, err.Error())
