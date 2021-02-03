@@ -55,7 +55,7 @@ type taskGroup struct {
 
 // NewTaskGroup ...
 func NewTaskGroup(parentTask Task) (TaskGroup, error) {
-	return newTaskGroup(context.TODO(), parentTask)
+	return newTaskGroup(context.Background(), parentTask)
 }
 
 // NewTaskGroupWithContext ...
@@ -164,16 +164,16 @@ func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
 	tid, _ := tg.GetID() // FIXME: Later
 
 	taskStatus := tg.task.GetStatus()
-	if taskStatus == DONE {
-		tg.task.lock.Lock()
-		defer tg.task.lock.Unlock()
-		return tg.result, tg.task.err
-	}
 	if taskStatus == ABORTED {
 		return nil, fail.AbortedError("", nil)
 	}
 	if taskStatus != RUNNING {
 		return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
+	}
+	if taskStatus == DONE {
+		tg.task.lock.Lock()
+		defer tg.task.lock.Unlock()
+		return tg.result, tg.task.err
 	}
 
 	errs := make(map[string]string)
@@ -182,18 +182,53 @@ func (tg *taskGroup) WaitGroup() (TaskGroupResult, error) {
 	tg.lock.Lock()
 	defer tg.lock.Unlock()
 
-	for _, s := range tg.subtasks {
-		sid, err := s.GetID()
-		if err != nil {
-			continue
+	type result struct {
+		tgr  TaskGroupResult
+		errs map[string]string
+	}
+
+	resCh := make(chan result)
+
+	go func() {
+		ierrs := make(map[string]string)
+		iresults := make(TaskGroupResult)
+
+		for _, s := range tg.subtasks {
+			sid, err := s.GetID()
+			if err != nil {
+				continue
+			}
+
+			result, err := s.Wait()
+			if err != nil {
+				ierrs[sid] = err.Error()
+			}
+			iresults[sid] = result
 		}
 
-		result, err := s.Wait()
-		if err != nil {
-			errs[sid] = err.Error()
+		resCh <- result{
+			tgr:  iresults,
+			errs: ierrs,
 		}
-		results[sid] = result
+
+		return
+	}()
+
+	select {
+	case <-tg.ctx.Done():
+		taskStatus = tg.task.GetStatus()
+		if taskStatus == ABORTED {
+			return nil, fail.AbortedError("", nil)
+		}
+		if taskStatus != RUNNING {
+			return nil, fmt.Errorf("cannot wait task group '%s': not running", tid)
+		}
+		return nil, fail.AbortedError(fmt.Sprintf("aborting with a task status of %d", taskStatus), nil)
+	case res := <-resCh:
+		results = res.tgr
+		errs = res.errs
 	}
+
 	var errors []string
 	for i, e := range errs {
 		errors = append(errors, fmt.Sprintf("%s: %s", i, e))
@@ -241,58 +276,50 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult
 		duration = time.Millisecond
 	}
 
-	for {
-		select {
-		case <-time.After(duration):
-			return false, nil, fail.TimeoutError(
-				fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil,
-			)
-		default:
-			ok, result, err := tg.TryWaitGroup()
-			if ok {
-				return ok, result, err
-			}
-			// Waits 1 ms between checks...
-			time.Sleep(time.Millisecond)
+	type result struct {
+		tr  TaskGroupResult
+		err error
+	}
+
+	chRes := make(chan result)
+
+	go func() {
+		wgR, err := tg.WaitGroup()
+		chRes <- result{
+			tr:  wgR,
+			err: err,
 		}
+		return
+	}()
+
+	select {
+	case <-time.After(duration):
+		return false, nil, fail.TimeoutError(
+			fmt.Sprintf("timeout waiting for task group '%s'", tid), duration, nil,
+		)
+	case res := <-chRes:
+		return true, res.tr, res.err
 	}
 }
-
-// // Reset resets the task for reuse
-// func (tg *taskGroup) Reset() (Task, error) {
-// 	tid, _ := tg.GetID() // FIXME: Later
-
-// 	if tg.task.GetStatus() == RUNNING {
-// 		return nil, fmt.Errorf("cannot reset task group '%s': group is running", tid)
-// 	}
-
-// 	tg.task.lock.Lock()
-// 	defer tg.task.lock.Unlock()
-// 	tg.task.status = READY
-// 	tg.task.err = nil
-// 	tg.task.result = nil
-// 	tg.subtasks = []Task{}
-// 	return tg, nil
-// }
-
-// // Result returns the result of the task action
-// func (tg *taskGroup) Result() TaskResult {
-// 	status := tg.GetStatus()
-// 	if status == READY {
-// 		panic("Can't get result of task group '%s': no task started!")
-// 	}
-// 	if status != DONE {
-// 		panic("Can't get result of task group '%s': group not done!")
-// 	}
-// 	return tg.task.Result()
-// }
 
 // Abort aborts the task execution
 func (tg *taskGroup) Abort() error {
 	return tg.task.Abort()
 }
 
+func (tg *taskGroup) Aborted() bool {
+	return tg.task.Aborted()
+}
+
+func (tg *taskGroup) Finished() bool {
+	return tg.task.Finished()
+}
+
 // New creates a subtask from current task
 func (tg *taskGroup) New() (Task, error) {
-	return newTask(context.TODO(), tg.task)
+	return newTask(context.Background(), tg.task)
+}
+
+func (tg *taskGroup) NewWithContext(ctx context.Context) (Task, error) {
+	return newTask(ctx, tg.task)
 }
