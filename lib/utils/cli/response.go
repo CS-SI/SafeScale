@@ -28,6 +28,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/cmdstatus"
 )
 
+type exitErrorWithCause struct {
+	error
+	cause error
+}
+
+func (e *exitErrorWithCause) Cause() error {
+	return e.cause
+}
+
 // response define a standard response for most safescale commands
 type response struct {
 	Status cmdstatus.Enum
@@ -134,6 +143,19 @@ func (r *response) getDisplayResponse() responseDisplay {
 		}
 	}
 	return output
+}
+
+// FailureResponse ...
+func FailureResponseWithCause(cause error, err error) error {
+	r := newResponse()
+	_ = r.Failure(err)
+	if r.Error != nil {
+		return &exitErrorWithCause{
+			cause: cause,
+			error: urfcli.NewExitError("", r.Error.ExitCode()),
+		}
+	}
+	return nil
 }
 
 // FailureResponse ...
