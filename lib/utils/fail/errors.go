@@ -582,6 +582,10 @@ func ErrListError(errors []error) error {
 	}
 }
 
+func (e ErrList) Errors() []error {
+	return e.errors
+}
+
 func (e ErrList) Error() string {
 	return spew.Sdump(e.errors)
 }
