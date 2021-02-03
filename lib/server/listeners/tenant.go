@@ -87,6 +87,9 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
+		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -106,7 +109,6 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 // Get returns the name of the current tenant used
 func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn *pb.TenantName, err error) {
 	if s == nil {
-		// FIXME: return a status.Errorf
 		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 

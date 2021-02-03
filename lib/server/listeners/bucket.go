@@ -68,6 +68,10 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	buckets, err := handler.List(ctx)
 	if err != nil {
 		tbr := fail.Wrap(err, "Can't list buckets"+adaptedUserMessage(err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, tbr.Message())
+		}
+
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -98,6 +102,9 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	err = handler.Create(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot create bucket"+adaptedUserMessage(err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, tbr.Message())
+		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -129,6 +136,9 @@ func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *goo
 	err = handler.Destroy(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot destroy bucket"+adaptedUserMessage(err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, tbr.Message())
+		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -160,6 +170,9 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	err = handler.Delete(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot delete bucket"+adaptedUserMessage(err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, tbr.Message())
+		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -190,6 +203,9 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot inspect bucket"+adaptedUserMessage(err))
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, tbr.Message())
+		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 	if resp == nil {

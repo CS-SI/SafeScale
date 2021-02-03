@@ -89,7 +89,7 @@ func TestCreate(t *testing.T) {
 
 	// ACT
 	_, err := underTest.Create(
-		context.TODO(), &pb.VolumeDefinition{
+		context.Background(), &pb.VolumeDefinition{
 			Speed: pb.VolumeSpeed_SSD,
 		},
 	)
@@ -100,7 +100,7 @@ func TestCreate(t *testing.T) {
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.SSD)
 
 	_, err = underTest.Create(
-		context.TODO(), &pb.VolumeDefinition{
+		context.Background(), &pb.VolumeDefinition{
 			Speed: pb.VolumeSpeed_HDD,
 		},
 	)
@@ -110,7 +110,7 @@ func TestCreate(t *testing.T) {
 
 	myMockedVolService.AssertCalled(t, "Create", mock.Anything, mock.Anything, volumespeed.HDD)
 	_, err = underTest.Create(
-		context.TODO(), &pb.VolumeDefinition{
+		context.Background(), &pb.VolumeDefinition{
 			Speed: pb.VolumeSpeed_COLD,
 		},
 	)
@@ -148,7 +148,7 @@ func TestCreate_Err(t *testing.T) {
 
 	// ACT
 	_, err := underTest.Create(
-		context.TODO(), &pb.VolumeDefinition{
+		context.Background(), &pb.VolumeDefinition{
 			Speed: pb.VolumeSpeed_SSD,
 		},
 	)
@@ -173,7 +173,7 @@ func TestCreate_Err_NoTenantSet(t *testing.T) {
 
 	// ACT
 	_, err := underTest.Create(
-		context.TODO(), &pb.VolumeDefinition{
+		context.Background(), &pb.VolumeDefinition{
 			Speed: pb.VolumeSpeed_SSD,
 		},
 	)

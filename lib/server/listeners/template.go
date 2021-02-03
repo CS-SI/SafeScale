@@ -64,15 +64,19 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	handler := TemplateHandler(tenant.Service)
 	templates, err := handler.List(ctx, all)
 	if err != nil {
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
+		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map abstract.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
 	for _, template := range templates {
-		pbt, err := srvutils.ToPBHostTemplate(&template)
+		theTemplate := template
+		pbt, err := srvutils.ToPBHostTemplate(&theTemplate)
 		if err != nil {
-			log.Warn(err)
+			log.Warnf("ignoring error listing template: %v", err)
 			continue
 		}
 		pbTemplates = append(pbTemplates, pbt)

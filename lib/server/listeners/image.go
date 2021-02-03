@@ -63,15 +63,19 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 	handler := ImageHandler(currentTenant.Service)
 	images, err := handler.List(ctx, in.GetAll())
 	if err != nil {
+		if _, ok := err.(fail.ErrNotFound); ok {
+			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
+		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map abstract.Image to pb.Image
 	var pbImages []*pb.Image
 	for _, image := range images {
-		pbi, err := srvutils.ToPBImage(&image)
+		theImage := image
+		pbi, err := srvutils.ToPBImage(&theImage)
 		if err != nil {
-			logrus.Warn(err)
+			logrus.Warnf("ignoring error listing images: %v", err)
 			continue
 		}
 		pbImages = append(pbImages, pbi)
