@@ -252,11 +252,12 @@ func ToPBHost(in *abstract.Host) (*pb.Host, error) {
 		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
 		PublicIp:            in.GetPublicIP(),
 		PrivateIp:           in.GetPrivateIP(),
+		State:               pb.HostState(in.LastState),
 		PrivateKey:          in.PrivateKey,
 		GatewayId:           hostNetworkV1.DefaultGatewayID,
-		Password:            in.Password,
-		State:               pb.HostState(in.LastState),
 		AttachedVolumeNames: volumes,
+		Password:            in.Password,
+		Tags:                in.Tags,
 	}, nil
 }
 

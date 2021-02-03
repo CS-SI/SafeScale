@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	// hostsFolderName is the technical name of the container used to store networks info
-	hostsFolderName = "hosts"
+	// HostsFolderName is the technical name of the container used to store networks info
+	HostsFolderName = "hosts"
 )
 
 // Host links Object Storage folder and Network
@@ -49,7 +49,7 @@ type Host struct {
 func NewHost(svc iaas.Service) (_ *Host, err error) {
 	defer fail.OnPanic(&err)()
 
-	aHost, err := metadata.NewItem(svc, hostsFolderName)
+	aHost, err := metadata.NewItem(svc, HostsFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +57,30 @@ func NewHost(svc iaas.Service) (_ *Host, err error) {
 	return &Host{
 		item: aHost,
 	}, nil
+}
+
+func (mh *Host) GetID() (string, error) {
+	if mh == nil {
+		return "", fail.InvalidInstanceError()
+	}
+
+	if mh.id == nil {
+		return "", fail.InvalidInstanceError()
+	}
+
+	return *mh.id, nil
+}
+
+func (mh *Host) GetName() (string, error) {
+	if mh == nil {
+		return "", fail.InvalidInstanceError()
+	}
+
+	if mh.name == nil {
+		return "", fail.InvalidInstanceError()
+	}
+
+	return *mh.name, nil
 }
 
 func (mh *Host) OK() (bool, error) {
@@ -77,7 +101,7 @@ func (mh *Host) OK() (bool, error) {
 	return true, nil
 }
 
-// Carry links an host instance to the Metadata instance
+// Carry links an host instance to the metadata instance
 func (mh *Host) Carry(host *abstract.Host) (_ *Host, err error) {
 	defer fail.OnPanic(&err)()
 
@@ -104,7 +128,10 @@ func (mh *Host) Get() (_ *abstract.Host, err error) {
 		return nil, fail.InvalidParameterError("mh.item", "cannot be nil")
 	}
 
-	gh := mh.item.Get().(*abstract.Host)
+	gh, ok := mh.item.Get().(*abstract.Host)
+	if !ok {
+		return nil, fail.InvalidParameterError("mh.item", "is not an *abstract.Host")
+	}
 	return gh, nil
 }
 
@@ -128,6 +155,22 @@ func (mh *Host) Write() (err error) {
 		return err
 	}
 	return mh.item.WriteInto(ByIDFolderName, *mh.id)
+}
+
+func isErrorNotFound(in error) bool {
+	if in == nil {
+		return false
+	}
+
+	if in == stow.ErrNotFound {
+		return true
+	}
+
+	if _, ok := in.(fail.ErrNotFound); ok {
+		return true
+	}
+
+	return false
 }
 
 // ReadByReference ...
@@ -160,7 +203,7 @@ func (mh *Host) ReadByReference(ref string) (err error) {
 	}
 
 	if len(errors) == 2 {
-		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
+		if isErrorNotFound(err1) && isErrorNotFound(err2) { // FIXME: Remove stow dependency
 			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
 		}
 
@@ -414,8 +457,8 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
-					return retry.AbortedError("no metadata found", innerErr)
+				if isErrorNotFound(innerErr) {
+					return retry.AbortedError("no metadata found", fail.NotFoundErrorWithCause("not found", innerErr))
 				}
 
 				return innerErr

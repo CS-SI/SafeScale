@@ -19,8 +19,6 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/graymeta/stow"
-
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
@@ -39,7 +37,7 @@ import (
 
 const (
 	// NetworksFolderName is the technical name of the container used to store networks info
-	networksFolderName = "networks"
+	NetworksFolderName = "networks"
 )
 
 // Network links Object Storage folder and Network resource
@@ -54,7 +52,7 @@ type Network struct {
 func NewNetwork(svc iaas.Service) (_ *Network, err error) {
 	defer fail.OnPanic(&err)()
 
-	aNet, err := metadata.NewItem(svc, networksFolderName)
+	aNet, err := metadata.NewItem(svc, NetworksFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +98,7 @@ func (m *Network) OK() (bool, error) {
 	return true, nil
 }
 
-// Carry links a Network instance to the Metadata instance
+// Carry links a Network instance to the metadata instance
 func (m *Network) Carry(network *abstract.Network) (_ *Network, err error) {
 	defer fail.OnPanic(&err)()
 
@@ -217,7 +215,7 @@ func (m *Network) ReadByReference(ref string) (err error) {
 	}
 
 	if len(errors) == 2 {
-		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
+		if isErrorNotFound(err1) && isErrorNotFound(err2) { // FIXME: Remove stow dependency
 			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
 		}
 
@@ -592,7 +590,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
+				if isErrorNotFound(innerErr) { // FIXME: Remove stow dependency
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
@@ -665,7 +663,7 @@ func NewGateway(svc iaas.Service, networkID string) (gw *Gateway, err error) {
 	}, nil
 }
 
-// Carry links a Network instance to the Metadata instance
+// Carry links a Network instance to the metadata instance
 func (mg *Gateway) Carry(host *abstract.Host) (gw *Gateway, err error) {
 	defer fail.OnPanic(&err)()
 

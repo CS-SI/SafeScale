@@ -19,7 +19,6 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/graymeta/stow"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -33,8 +32,8 @@ import (
 )
 
 const (
-	// volumesFolderName is the technical name of the container used to store volume info
-	volumesFolderName = "volumes"
+	// VolumesFolderName is the technical name of the container used to store volume info
+	VolumesFolderName = "volumes"
 )
 
 // Volume links Object Storage folder and Volumes
@@ -52,7 +51,7 @@ func NewVolume(svc iaas.Service) (_ *Volume, err error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	aVol, err := metadata.NewItem(svc, volumesFolderName)
+	aVol, err := metadata.NewItem(svc, VolumesFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +62,7 @@ func NewVolume(svc iaas.Service) (_ *Volume, err error) {
 	}, nil
 }
 
-// Carry links a Volume instance to the Metadata instance
+// Carry links a Volume instance to the metadata instance
 func (mv *Volume) Carry(volume *abstract.Volume) (_ *Volume, err error) {
 	defer fail.OnPanic(&err)()
 
@@ -169,7 +168,7 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	}
 
 	if len(errors) == 2 {
-		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
+		if isErrorNotFound(err1) && isErrorNotFound(err2) { // FIXME: Remove stow dependency
 			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
 		}
 
@@ -420,7 +419,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
+				if isErrorNotFound(innerErr) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 

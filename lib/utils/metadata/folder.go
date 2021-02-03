@@ -37,10 +37,10 @@ type Folder struct {
 	cryptKey *crypt.Key
 }
 
-// FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
+// FolderDecoderCallback is the prototype of the function that will decode data read from Tags
 type FolderDecoderCallback func([]byte) error
 
-// NewFolder creates a new Metadata Folder object, ready to help access the metadata inside it
+// NewFolder creates a new metadata Folder object, ready to help access the metadata inside it
 func NewFolder(svc iaas.Service, path string) (*Folder, error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil!")
@@ -134,7 +134,7 @@ func (f *Folder) Read(path string, name string, callback FolderDecoderCallback) 
 	_, err = f.service.GetMetadataBucket().ReadObject(f.absolutePath(path, name), &buffer, 0, 0)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
-			return fail.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in Metadata Storage: %v", path, name, err))
+			return fail.NotFoundError(fmt.Sprintf("failed to read '%s/%s' in metadata Storage: %v", path, name, err))
 		}
 		return err
 	}
@@ -179,7 +179,7 @@ func (f *Folder) Write(path string, name string, content []byte) error {
 	return err
 }
 
-// Browse browses the content of a specific path in Metadata and executes 'cb' on each entry
+// Browse browses the content of a specific path in metadata and executes 'cb' on each entry
 func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 	list, err := f.service.GetMetadataBucket().List(f.absolutePath(path), objectstorage.NoPrefix)
 	if err != nil {

@@ -19,7 +19,6 @@ package metadata
 import (
 	"fmt"
 
-	"github.com/graymeta/stow"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -77,7 +76,7 @@ func (n *shareItem) Deserialize(buf []byte) (err error) {
 	return serialize.FromJSON(buf, n)
 }
 
-// Carry links an export instance to the Metadata instance
+// Carry links an export instance to the metadata instance
 func (ms *Share) Carry(hostID, hostName, shareID, shareName string) (_ *Share, err error) {
 	defer fail.OnPanic(&err)()
 
@@ -164,31 +163,31 @@ func (ms *Share) ReadByReference(ref string) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogErrorWithLevel(tracer.TraceMessage(""), &err, logrus.TraceLevel)()
 
-	var errors []error
+	var errs []error
 	err1 := ms.mayReadByID(ref) // First read by id ...
 	if err1 != nil {
-		errors = append(errors, err1)
+		errs = append(errs, err1)
 	}
 
 	err2 := ms.mayReadByName(ref) // ... then read by name if by id failed (no need to read twice)
 	if err2 != nil {
-		errors = append(errors, err2)
+		errs = append(errs, err2)
 	}
 
-	if len(errors) == 2 {
-		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
-			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
+	if len(errs) == 2 {
+		if isErrorNotFound(err1) && isErrorNotFound(err2) {
+			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errs))
 		}
 
 		if _, ok := err1.(fail.ErrNotFound); ok {
 			if _, ok := err2.(fail.ErrNotFound); ok {
 				return fail.NotFoundErrorWithCause(
-					fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors),
+					fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errs),
 				)
 			}
 		}
 
-		return fail.ErrListError(errors)
+		return fail.ErrListError(errs)
 	}
 
 	return nil
@@ -490,7 +489,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
+				if isErrorNotFound(innerErr) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
