@@ -80,6 +80,8 @@ func main() {
 
 	mainCtx, cancelfunc := context.WithCancel(context.Background())
 
+	signalCh := make(chan os.Signal)
+
 	app := cli.NewApp()
 	app.Writer = os.Stderr
 	app.Name = "safescale"
@@ -169,7 +171,21 @@ func main() {
 		}
 
 		clientSession, err = client.New(c.String("server"))
-		return err
+		if err != nil {
+			return err
+		}
+
+		// Starts ctrl+c handler before app.RunContext()
+		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			for {
+				<-signalCh
+				atomic.StoreUint32(&onAbort, 1)
+				cleanup(clientSession, &onAbort)
+				cancelfunc()
+			}
+		}()
+		return nil
 	}
 
 	app.After = func(c *cli.Context) error {
@@ -209,16 +225,17 @@ func main() {
 
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	// Starts ctrl+c handler before app.RunContext()
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		for {
-			<-c
-			atomic.StoreUint32(&onAbort, 1)
-			cancelfunc()
-		}
-	}()
+	// // Starts ctrl+c handler before app.RunContext()
+	// signalCh := make(chan os.Signal)
+	// signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	// go func() {
+	// 	for {
+	// 		<-signalCh
+	// 		atomic.StoreUint32(&onAbort, 1)
+	// 		cleanup(clientSession, &onAbort)
+	// 		cancelfunc()
+	// 	}
+	// }()
 
 	err := app.RunContext(mainCtx, os.Args)
 	if err != nil {

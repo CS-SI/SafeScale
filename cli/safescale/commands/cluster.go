@@ -86,7 +86,7 @@ var clusterListCommand = &cli.Command{
 	Usage:   "ErrorList available clusters",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -139,7 +139,7 @@ var clusterInspectCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 		if err := extractClusterName(c); err != nil {
 			return clitools.FailureResponse(err)
@@ -379,7 +379,7 @@ var clusterCreateCommand = &cli.Command{
 	},
 
 	Action: func(c *cli.Context) (err error) {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 		if err = extractClusterName(c); err != nil {
 			return clitools.FailureResponse(err)
@@ -498,7 +498,7 @@ var clusterDeleteCommand = &cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -535,7 +535,7 @@ var clusterStopCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -562,7 +562,7 @@ var clusterStartCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -589,7 +589,7 @@ var clusterStateCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -640,7 +640,7 @@ var clusterExpandCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -706,7 +706,7 @@ var clusterShrinkCommand = &cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -763,7 +763,7 @@ var clusterKubectlCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -856,7 +856,7 @@ var clusterHelmCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -955,7 +955,7 @@ var clusterRunCommand = &cli.Command{
 	ArgsUsage: "CLUSTERNAME",
 
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
 			return clitools.FailureResponse(err)
@@ -1371,7 +1371,7 @@ var clusterFeatureListCommand = &cli.Command{
 }
 
 func clusterFeatureListAction(c *cli.Context) error {
-	logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCmdLabel, c.Command.Name, c.Args())
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
 	if xerr != nil {
