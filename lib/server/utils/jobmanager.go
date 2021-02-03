@@ -51,11 +51,14 @@ func JobRegister(ctx context.Context, cancelFunc func(), command string) error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
-	jobMap[md.Get("uuid")[0]] = jobInfo{
-		commandName: command,
-		launchTime:  time.Now(),
-		context:     ctx,
-		cancelFunc:  cancelFunc,
+	resp := md.Get("uuid")
+	if len(resp) > 0 {
+		jobMap[resp[0]] = jobInfo{
+			commandName: command,
+			launchTime:  time.Now(),
+			context:     ctx,
+			cancelFunc:  cancelFunc,
+		}
 	}
 
 	return nil
@@ -84,7 +87,10 @@ func JobDeregister(ctx context.Context) {
 	if !ok {
 		logrus.Errorf("Trying to deregister a job without uuid!")
 	} else {
-		JobDeregisterUUID(md.Get("uuid")[0])
+		resp := md.Get("uuid")
+		if len(resp) > 0 {
+			JobDeregisterUUID(resp[0])
+		}
 	}
 }
 
