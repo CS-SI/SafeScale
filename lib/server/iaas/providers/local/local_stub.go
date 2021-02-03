@@ -140,6 +140,9 @@ func (provider *provider) InspectHost(interface{}) (*abstract.Host, error) {
 func (provider *provider) GetHostByName(string) (*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
+func (provider *provider) GetHostByID(string) (*abstract.Host, error) {
+	return nil, fmt.Errorf(errorStr)
+}
 func (provider *provider) GetHostState(interface{}) (hoststate.Enum, error) {
 	return hoststate.ERROR, fmt.Errorf(errorStr)
 }

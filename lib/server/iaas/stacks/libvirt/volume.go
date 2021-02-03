@@ -407,6 +407,10 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 		diskNames = append(diskNames, disk.Target.Dev)
 	}
 	sort.Strings(diskNames)
+	if len(diskNames) == 0 {
+		return "", fmt.Errorf("no disk names")
+	}
+
 	lastDiskName := diskNames[len(diskNames)-1]
 	tmpInt, err := strconv.ParseInt(lastDiskName, 36, 64)
 	newDiskName := strconv.FormatInt(tmpInt+1, 36)

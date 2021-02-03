@@ -1227,6 +1227,29 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	return s.InspectHost(res.Vms[0].VmId)
 }
 
+// GetHostByID returns the host identified by name
+func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
+	res, _, err := s.client.VmApi.ReadVms(
+		s.auth, &osc.ReadVmsOpts{
+			ReadVmsRequest: optional.NewInterface(
+				osc.ReadVmsRequest{
+					DryRun: false,
+					Filters: osc.FiltersVm{
+						Tags: []string{fmt.Sprintf("id=%s", name)},
+					},
+				},
+			),
+		},
+	)
+	if err != nil {
+		return nil, normalizeError(err)
+	}
+	if len(res.Vms) == 0 {
+		return nil, fail.NotFoundError(fmt.Sprintf("No host with id %s", name))
+	}
+	return s.InspectHost(res.Vms[0].VmId)
+}
+
 // GetHostState returns the current state of the host identified by id
 func (s *Stack) GetHostState(hostParam interface{}) (hoststate.Enum, fail.Error) {
 	var host *abstract.Host

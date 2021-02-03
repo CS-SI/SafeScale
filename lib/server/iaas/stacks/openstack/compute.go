@@ -634,6 +634,35 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
+// GetHostByID returns the host using the name passed as parameter
+func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
+	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
+
+	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
+	r := servers.GetResult{}
+	_, r.Err = s.ComputeClient.Get(
+		s.ComputeClient.ServiceURL("servers?id="+name), &r.Body, &gc.RequestOpts{
+			OkCodes: []int{200, 203},
+		},
+	)
+	if r.Err != nil {
+		return nil, fail.Errorf(fmt.Sprintf("failed to get data of host '%s': %v", name, r.Err), r.Err)
+	}
+	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
+	if found && len(serverList) > 0 {
+		for _, anon := range serverList {
+			entry := anon.(map[string]interface{})
+			if entry["id"].(string) == name {
+				host := abstract.NewHost()
+				host.ID = name
+				host.Name = entry["name"].(string)
+				return s.InspectHost(host)
+			}
+		}
+	}
+	return nil, abstract.ResourceNotFoundError("host", name)
+}
+
 // CreateHost creates an host satisfying request
 func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, userData *userdata.Content, xerr fail.Error) {
 	defer debug.NewTracer(

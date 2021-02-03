@@ -74,13 +74,14 @@ type Stack interface {
 	UnbindHostFromVIP(*abstract.VirtualIP, string) fail.Error
 	// DeleteVIP deletes the port corresponding to the VIP
 	DeleteVIP(*abstract.VirtualIP) fail.Error
-
 	// CreateHost creates an host that fulfils the request
 	CreateHost(request abstract.HostRequest) (*abstract.Host, *userdata.Content, fail.Error)
 	// GetHost returns the host identified by id or updates content of a *abstract.Host
 	InspectHost(interface{}) (*abstract.Host, fail.Error)
 	// GetHostByName returns the host identified by name
 	GetHostByName(string) (*abstract.Host, fail.Error)
+	// GetHostByID returns the host identified by ID
+	GetHostByID(string) (*abstract.Host, fail.Error)
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(interface{}) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts

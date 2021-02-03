@@ -166,6 +166,11 @@ func (s *Stack) GetHostByName(string) (*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 
+// GetHostByID stub
+func (s *Stack) GetHostByID(string) (*abstract.Host, fail.Error) {
+	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
+}
+
 // GetHostState stub
 func (s *Stack) GetHostState(interface{}) (hoststate.Enum, fail.Error) {
 	return hoststate.ERROR, fail.Errorf(fmt.Sprintf(errorStr), nil)

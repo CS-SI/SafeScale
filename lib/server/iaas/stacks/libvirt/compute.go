@@ -37,12 +37,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sys/unix"
-
 	"github.com/libvirt/libvirt-go"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/hostproperty"
@@ -843,7 +841,7 @@ func verifyVirtResizeCanAccessKernel() (err error) {
 		return nil
 	}
 
-	return unix.Access(target, unix.R_OK)
+	return nil
 }
 
 // CreateHost creates an host satisfying request
@@ -1183,8 +1181,10 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 		return nil, fail.Errorf(fmt.Sprintf("failed to complement the host : %s", err.Error()), err)
 	}
 
-	if !host.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if !host.OK() {
+			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		}
 	}
 
 	return host, nil
@@ -1192,6 +1192,11 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 
 // GetHostByName returns the host identified by ref (name or id)
 func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
+	return s.InspectHost(name)
+}
+
+// GetHostByID returns the host identified by ref (name or id)
+func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
 	return s.InspectHost(name)
 }
 

@@ -407,6 +407,25 @@ func (w ValidatedProvider) GetHostByName(name string) (res *abstract.Host, xerr 
 	return res, xerr
 }
 
+// GetHostByID ...
+func (w ValidatedProvider) GetHostByID(name string) (res *abstract.Host, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)()
+
+	if name == "" {
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	res, xerr = w.InnerProvider.GetHostByID(name)
+	if xerr != nil {
+		if res != nil {
+			if !res.OK() {
+				logrus.Warnf("Invalid host: %v", *res)
+			}
+		}
+	}
+	return res, xerr
+}
+
 // GetHostState ...
 func (w ValidatedProvider) GetHostState(something interface{}) (res hoststate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)()

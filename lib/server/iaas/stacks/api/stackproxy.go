@@ -11,7 +11,7 @@ type StackProxy WrappedStack
 
 func errorTranslator(inErr fail.Error) (outErr fail.Error) {
 	if inErr == nil {
-		return inErr
+		return nil
 	}
 
 	if fail.ImplementsCauser(inErr) || fail.ImplementsConsequencer(inErr) {
@@ -133,6 +133,11 @@ func (sp StackProxy) InspectHost(i interface{}) (*abstract.Host, fail.Error) {
 
 func (sp StackProxy) GetHostByName(s string) (*abstract.Host, fail.Error) {
 	rv, err := sp.InnerStack.GetHostByName(s)
+	return rv, errorTranslator(err)
+}
+
+func (sp StackProxy) GetHostByID(s string) (*abstract.Host, fail.Error) {
+	rv, err := sp.InnerStack.GetHostByID(s)
 	return rv, errorTranslator(err)
 }
 

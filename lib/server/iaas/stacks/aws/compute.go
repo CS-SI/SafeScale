@@ -1308,6 +1308,21 @@ func (s *Stack) GetHostByName(name string) (_ *abstract.Host, xerr fail.Error) {
 	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
+func (s *Stack) GetHostByID(name string) (_ *abstract.Host, xerr fail.Error) {
+	hosts, err := s.ListHosts()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, host := range hosts {
+		if host.ID == name {
+			return host, nil
+		}
+	}
+
+	return nil, abstract.ResourceNotFoundError("host", name)
+}
+
 func (s *Stack) GetHostState(hostParam interface{}) (_ hoststate.Enum, xerr fail.Error) {
 	host, err := s.InspectHost(hostParam)
 	if err != nil {

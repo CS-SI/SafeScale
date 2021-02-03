@@ -315,6 +315,16 @@ func (w ErrorTraceProvider) GetHostByName(name string) (_ *abstract.Host, xerr f
 	return w.InnerProvider.GetHostByName(name)
 }
 
+// GetHostByID ...
+func (w ErrorTraceProvider) GetHostByID(name string) (_ *abstract.Host, xerr fail.Error) {
+	defer func(prefix string) {
+		if xerr != nil {
+			logrus.Debugf("%s : Intercepted error: %v", prefix, xerr)
+		}
+	}(fmt.Sprintf("%s:GetHostByID", w.Name))
+	return w.InnerProvider.GetHostByID(name)
+}
+
 // GetHostState ...
 func (w ErrorTraceProvider) GetHostState(something interface{}) (_ hoststate.Enum, xerr fail.Error) {
 	defer func(prefix string) {

@@ -762,6 +762,11 @@ func (s *StackEbrc) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	return hr, nil
 }
 
+// GetHostByID returns the host identified by ref (name or id)
+func (s *StackEbrc) GetHostByID(name string) (*abstract.Host, fail.Error) {
+	return s.GetHostByName(name)
+}
+
 // DeleteHost deletes the host identified by id
 func (s *StackEbrc) DeleteHost(id string) error {
 	logrus.Debug("ebrc.Client.DeleteHost() called")

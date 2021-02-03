@@ -781,6 +781,22 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
+// GetHostByID returns the host identified by ref (name or id)
+func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
+	hosts, err := s.ListHosts()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, host := range hosts {
+		if host.ID == name {
+			return host, nil
+		}
+	}
+
+	return nil, abstract.ResourceNotFoundError("host", name)
+}
+
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) (err error) {
 	service := s.ComputeService

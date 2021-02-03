@@ -216,6 +216,11 @@ func (w LoggedProvider) GetHostByName(name string) (*abstract.Host, fail.Error) 
 	return w.InnerProvider.GetHostByName(name)
 }
 
+func (w LoggedProvider) GetHostByID(name string) (*abstract.Host, fail.Error) {
+	defer w.prepare(w.trace("GetHostByID"))
+	return w.InnerProvider.GetHostByID(name)
+}
+
 // GetHostState ...
 func (w LoggedProvider) GetHostState(something interface{}) (hoststate.Enum, fail.Error) {
 	defer w.prepare(w.trace("GetHostState"))
