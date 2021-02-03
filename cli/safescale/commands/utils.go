@@ -130,12 +130,12 @@ func (rfh *RemoteFilesHandler) Upload(hostname string) error {
 }
 
 // Cleanup executes the removal of remote files.
-// Note: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
+// Note: Removal of local files is the responsibility of the caller, not the RemoteFilesHandler.
 func (rfh *RemoteFilesHandler) Cleanup(hostname string) {
 	for _, v := range rfh.items {
 		err := v.RemoveRemote(hostname)
 		if err != nil {
-			logrus.Warnf(err.Error())
+			logrus.Warnf("error cleaning remote files: %v", err)
 		}
 	}
 }

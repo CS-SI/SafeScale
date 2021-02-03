@@ -373,6 +373,14 @@ message BucketList{
     repeated Bucket buckets = 1;
 }
 
+message Error{
+    string error = 1;
+}
+
+message BucketErrorList{
+    repeated Error errors = 1;
+}
+
 message BucketMountingPoint{
     string bucket = 1;
     Reference host = 2;
@@ -385,6 +393,8 @@ service BucketService{
     rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
     rpc Delete(Bucket) returns (google.protobuf.Empty){}
     rpc Destroy(Bucket) returns (google.protobuf.Empty){}
+    rpc Verify(Bucket) returns (BucketErrorList){}
+    rpc Prune(Bucket) returns (google.protobuf.Empty){}
     rpc List(google.protobuf.Empty) returns (BucketList){}
     rpc Inspect(Bucket) returns (BucketMountingPoint){}
 }

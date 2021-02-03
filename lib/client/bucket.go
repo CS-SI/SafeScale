@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // bucket is the part of the safescale client handling buckets
@@ -125,7 +127,7 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []string
+		errs  []error
 	)
 
 	bucketDeleter := func(aname string) {
@@ -133,8 +135,8 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 		_, err := service.Destroy(ctxTo, &pb.Bucket{Name: aname})
 		if err != nil {
 			mutex.Lock()
-			errs = append(errs, err.Error())
-			mutex.Unlock()
+			defer mutex.Unlock()
+			errs = append(errs, err)
 		}
 	}
 
@@ -146,11 +148,15 @@ func (c *bucket) Destroy(names []string, timeout time.Duration) error {
 	isTimeout := waitTimeout(&wg, timeout)
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
 	}
 
 	if isTimeout {
-		return clitools.ExitOnRPC("timeout destroying buckets")
+		return clitools.FailureResponse(fmt.Errorf("timeout destroying buckets"))
 	}
 
 	return nil
@@ -179,7 +185,7 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []string
+		errs  []error
 	)
 
 	bucketDeleter := func(aname string) {
@@ -188,8 +194,7 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
-			errs = append(errs, err.Error())
-			mutex.Unlock()
+			errs = append(errs, err)
 		}
 	}
 
@@ -201,11 +206,73 @@ func (c *bucket) Delete(names []string, timeout time.Duration) error {
 	isTimeout := waitTimeout(&wg, timeout)
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
 	}
 
 	if isTimeout {
-		return clitools.ExitOnRPC("timeout deleting buckets")
+		return clitools.FailureResponse(fmt.Errorf("timeout deleting buckets"))
+	}
+
+	return nil
+}
+
+// Prune ...
+func (c *bucket) Prune(names []string, timeout time.Duration) error {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewBucketServiceClient(c.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return err
+	}
+
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []error
+	)
+
+	bucketDeleter := func(aname string) {
+		defer wg.Done()
+		_, err := service.Prune(ctxTo, &pb.Bucket{Name: aname})
+		if err != nil {
+			mutex.Lock()
+			defer mutex.Unlock()
+			errs = append(errs, err)
+		}
+	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go bucketDeleter(target)
+	}
+
+	isTimeout := waitTimeout(&wg, timeout)
+
+	if len(errs) > 0 {
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
+	}
+
+	if isTimeout {
+		return clitools.FailureResponse(fmt.Errorf("timeout deleting buckets"))
 	}
 
 	return nil
@@ -232,6 +299,31 @@ func (c *bucket) Inspect(name string, timeout time.Duration) (*pb.BucketMounting
 	}
 
 	rv, err := service.Inspect(ctxTo, &pb.Bucket{Name: name})
+
+	return rv, err
+}
+
+// Inspect ...
+func (c *bucket) Verify(name string, timeout time.Duration) (*pb.BucketErrorList, error) {
+	c.session.Connect()
+	defer c.session.Disconnect()
+	service := pb.NewBucketServiceClient(c.session.connection)
+	ctx, err := utils.GetContext(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var ctxTo context.Context
+	var cancel context.CancelFunc
+
+	if timeout > 0 {
+		ctxTo, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	} else {
+		ctxTo = ctx
+	}
+
+	rv, err := service.Verify(ctxTo, &pb.Bucket{Name: name})
 
 	return rv, err
 }

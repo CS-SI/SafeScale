@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	// Path is the path to use to reach Cluster Definitions/Metadata
-	clusterFolderName = "clusters"
+	// Path is the path to use to reach Cluster Definitions/Tags
+	ClusterFolderName = "clusters"
 )
 
 // Metadata is the cluster definition stored in ObjectStorage
@@ -43,7 +43,7 @@ type Metadata struct {
 
 // NewMetadata creates a new Cluster Controller metadata
 func NewMetadata(svc iaas.Service) (*Metadata, error) {
-	meta, err := metadata.NewItem(svc, clusterFolderName)
+	meta, err := metadata.NewItem(svc, ClusterFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,14 @@ func (m *Metadata) Delete() error {
 		return fail.InvalidParameterError("m.item", "cannot be nil")
 	}
 
-	err := m.item.Delete(m.name)
-	if err != nil {
-		return err
+	if m.name != "" {
+		err := m.item.Delete(m.name)
+		if err != nil {
+			return err
+		}
+		m.item.Reset()
 	}
-	m.item.Reset()
+
 	return nil
 }
 
@@ -162,7 +165,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 		return nil
 	}
 
-	// Metadata had been written at least once, so try to reload (and propagate failure if it occurs)
+	// metadata had been written at least once, so try to reload (and propagate failure if it occurs)
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerErr := m.Read(task, m.name)
@@ -173,7 +176,7 @@ func (m *Metadata) Reload(task concurrency.Task) error {
 				}
 
 				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
-					return retry.AbortedError("not found", innerErr)
+					return retry.AbortedError("not found", fail.NotFoundErrorWithCause("not found", innerErr))
 				}
 
 				return innerErr
