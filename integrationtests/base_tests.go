@@ -153,6 +153,7 @@ func Basic(t *testing.T, provider providers.Enum) {
 
 	out, err = GetOutput("safescale share list")
 	require.False(t, strings.Contains(out, names.Shares[0]))
+	require.Nil(t, err)
 
 	fmt.Println("Creating Share " + names.Shares[0])
 

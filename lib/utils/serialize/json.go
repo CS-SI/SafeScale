@@ -147,7 +147,7 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 		panic("key is empty!")
 	}
 
-	// FIXME Zero can panic, look at deferred code
+	// FIXME: Zero can panic, look at deferred code
 
 	x.Lock()
 	defer x.Unlock()
@@ -190,7 +190,7 @@ func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 	x.Lock()
 	defer x.Unlock()
 
-	// FIXME Zero can panic, look at deferred code
+	// FIXME: Zero can panic, look at deferred code
 
 	var (
 		item  *jsonProperty
