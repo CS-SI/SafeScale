@@ -1130,6 +1130,3 @@ function waitForUserdata() {
     done
 }
 export -f waitForUserdata
-
-waitForUserdata
-sfDetectFacts

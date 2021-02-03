@@ -24,6 +24,8 @@ exec 1<>/opt/safescale/var/log/swarm_install_gateway.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
+waitForUserdata
+sfDetectFacts
 
 # Installs and configures everything needed on any node
 {{ .reserved_CommonRequirements }}

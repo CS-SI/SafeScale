@@ -54,9 +54,6 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 		return 0, "", "", err
 	}
 
-	if executionTimeout < temporal.GetHostTimeout() {
-		executionTimeout = temporal.GetHostTimeout()
-	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
 	}

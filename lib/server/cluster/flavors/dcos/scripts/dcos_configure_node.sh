@@ -26,6 +26,8 @@ exec 1<>/opt/safescale/var/log/dcos_configure_node.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
+waitForUserdata
+sfDetectFacts
 
 if [ "{{ .PublicNode }}" = "yes" ]; then
     MODE=slave_public

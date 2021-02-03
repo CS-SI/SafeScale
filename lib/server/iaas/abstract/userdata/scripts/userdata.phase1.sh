@@ -18,14 +18,14 @@
 
 {{.Header}}
 
-print_error() {
+function print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
     echo -n "2,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 }
 trap print_error ERR
 
-fail() {
+function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
     set +x
@@ -42,7 +42,7 @@ exec 1<>/opt/safescale/var/log/user_data.phase1.log
 exec 2>&1
 set -x
 
-sfApt() {
+function sfApt() {
     rc=-1
     DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
     [ $rc -eq -1 ] && return 1
@@ -51,7 +51,7 @@ sfApt() {
 export -f sfApt
 
 # try using dnf instead of yum if available
-sfYum() {
+function sfYum() {
     rc=-1
     if [[ -n $(which dnf) ]]; then
         dnf "$@" && rc=$?
@@ -65,7 +65,7 @@ export -f sfYum
 
 # sfRetry <timeout> <delay> command
 # retries command until success, with sleep of <delay> seconds
-sfRetry() {
+function sfRetry() {
     local timeout=$1
     local delay=$2
     shift 2
@@ -100,7 +100,7 @@ VERSION_ID=
 FULL_VERSION_ID=
 FULL_HOSTNAME=
 
-sfAvail() {
+function sfAvail() {
     rc=-1
     case $LINUX_KIND in
     redhat | rhel | centos | fedora)
@@ -119,7 +119,7 @@ sfAvail() {
 }
 export -f sfAvail
 
-sfDetectFacts() {
+function sfDetectFacts() {
     [[ -f /etc/os-release ]] && {
         . /etc/os-release
         LINUX_KIND=$ID
@@ -149,9 +149,12 @@ sfDetectFacts() {
         }
     }
 }
+export -f sfDetectFacts
+
+# Detect facts
 sfDetectFacts
 
-create_user() {
+function create_user() {
     echo "Creating user {{.User}}..."
     useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
     echo "{{.User}}:{{.Password}}" | chpasswd
@@ -210,12 +213,12 @@ EOF
         chmod ug+r-wx,o-rwx $i
     done
 
-    echo done
+    echo "done"
 }
 
 # Follows the CentOS rules:
 # - /etc/hostname contains short hostname
-put_hostname_in_hosts() {
+function put_hostname_in_hosts() {
     FULL_HOSTNAME="{{ .HostName }}"
     SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
@@ -226,13 +229,13 @@ put_hostname_in_hosts() {
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
-disable_cloudinit_network_autoconf() {
+function disable_cloudinit_network_autoconf() {
     fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
     mkdir -p $(dirname $fname)
     echo "network: {config: disabled}" >$fname
 }
 
-disable_services() {
+function disable_services() {
     case $LINUX_KIND in
     debian | ubuntu)
         if [[ -n $(which systemctl) ]]; then
@@ -277,7 +280,7 @@ function check_dns_configuration() {
 }
 
 function is_network_reachable() {
-    NETROUNDS=4
+    NETROUNDS=2
     REACHED=0
     TRIED=0
 
@@ -288,7 +291,7 @@ function is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            break
+            continue
         fi
 
         if which wget; then
@@ -297,7 +300,7 @@ function is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            break
+            continue
         fi
 
         ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
@@ -312,7 +315,7 @@ function is_network_reachable() {
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-ensure_network_connectivity() {
+function ensure_network_connectivity() {
     op=-1
     is_network_reachable && op=$? || true
     if [[ ${op} -eq 0 ]]; then
@@ -452,6 +455,13 @@ if [[ -f "$PHASE_DONE" ]]; then
     exit 0
 fi
 
+PHASE_DONE=/opt/safescale/var/state/user_data.phase2.done
+if [[ -f "$PHASE_DONE" ]]; then
+    echo "$PHASE_DONE already there."
+    set +x
+    exit 0
+fi
+
 put_hostname_in_hosts
 
 track_time
@@ -474,6 +484,6 @@ fail_fast_unsupported_distros
 
 track_time
 
-echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
+echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.phase1.done
 set +x
 exit 0
