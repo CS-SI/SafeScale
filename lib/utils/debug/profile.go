@@ -126,7 +126,11 @@ func Profile(what string) func() {
 
 func constructProfileFilename(path, complement string) string {
 	if path == "" {
-		path = "./" + os.Args[0] + complement
+		prefix := "./"
+		if strings.HasPrefix(os.Args[0], "/") {
+			prefix = ""
+		}
+		path = prefix + os.Args[0] + complement
 	}
 	path = strings.TrimSpace(path)
 	st, err := os.Stat(path)
@@ -135,7 +139,11 @@ func constructProfileFilename(path, complement string) string {
 			logrus.Fatalf("failed to check if profile file '%s' exists: %s", path, err.Error())
 		}
 	} else if st.IsDir() {
-		path += "/" + os.Args[0] + complement
+		prefix := "/"
+		if strings.HasPrefix(os.Args[0], prefix) {
+			prefix = ""
+		}
+		path += prefix + os.Args[0] + complement
 	}
 	return path
 }
