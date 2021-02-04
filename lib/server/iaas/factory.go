@@ -17,20 +17,20 @@
 package iaas
 
 import (
-    "encoding/json"
-    "fmt"
-    "regexp"
+	"encoding/json"
+	"fmt"
+	"regexp"
 
-    "github.com/sirupsen/logrus"
-    "github.com/spf13/viper"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
-    "github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/providers"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
-    "github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-    "github.com/CS-SI/SafeScale/lib/utils/crypt"
-    "github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var (
@@ -181,7 +181,7 @@ func UseService(tenantName string) (newService Service, err error) {
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
-		// Initializes Metadata Object Storage (may be different than the Object Storage)
+		// Initializes metadata Object Storage (may be different than the Object Storage)
 		var (
 			metadataBucket   objectstorage.Bucket
 			metadataCryptKey *crypt.Key

@@ -129,7 +129,7 @@ func main() {
 	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
 
 	app.Authors = []cli.Author{
-		cli.Author{
+		{
 			Name:  "CS-SI",
 			Email: "safescale@c-s.fr",
 		},

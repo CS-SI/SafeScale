@@ -137,8 +137,7 @@ func (c *Controller) Create(task concurrency.Task, req Request, f Foreman) (err 
 		},
 	)
 	if err != nil {
-		log.Errorf("failed to store disabled feature: %v", err)
-		return err
+		return fail.Wrapf("failed to store disabled feature: %w", err)
 	}
 
 	c.foreman = f.(*foreman)
@@ -499,7 +498,7 @@ func (c *Controller) GetNode(task concurrency.Task, hostID string) (host *pb.Hos
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
+		return nil, fail.Wrapf("failed to find node '%s' in Cluster '%s'", hostID, c.Name)
 	}
 	return client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
 }
@@ -630,12 +629,12 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 
 	err = c.metadata.Reload(task)
 	if err != nil {
-		return err
+		return fail.Wrapf("failed metadata reloading: %w", err)
 	}
 	if c.metadata.Written() {
 		mc, err := c.metadata.Get()
 		if err != nil {
-			return err
+			return fail.Wrapf("failed writing metadata: %w", err)
 		}
 		c.replace(task, mc)
 	} else {
@@ -645,7 +644,7 @@ func (c *Controller) UpdateMetadata(task concurrency.Task, updatefn func() error
 	if updatefn != nil {
 		err := updatefn()
 		if err != nil {
-			return err
+			return fail.Wrapf("failed updating cluster: %w", err)
 		}
 	}
 	return c.metadata.Write()
@@ -1309,7 +1308,7 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 			func(clonable data.Clonable) error {
 				nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
 				if nAttached > 0 {
-					return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+					return fail.Wrapf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
 				}
 				return nil
 			},
@@ -1450,7 +1449,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	case clusterstate.Starting, clusterstate.Created, clusterstate.Nominal, clusterstate.Degraded:
 		// continue
 	default:
-		return fmt.Errorf("failed to stop Cluster because of it's current state: %s", state.String())
+		return fail.Wrapf("failed to stop Cluster because of it's current state: %s", state.String())
 	}
 
 	// Updates metadata to mark the cluster as Stopping
@@ -1486,7 +1485,7 @@ func (c *Controller) Stop(task concurrency.Task) (err error) {
 	)
 	c.RUnlock(task)
 	if err != nil {
-		return fmt.Errorf("failed to get list of hosts: %v", err)
+		return fail.Wrapf("failed to get list of hosts: %v", err)
 	}
 	c.RLock(task)
 	if c.Properties.Lookup(property.NetworkV2) {
@@ -1599,7 +1598,7 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	case clusterstate.Stopping, clusterstate.Stopped:
 		// Continue
 	default:
-		return fmt.Errorf("failed to start Cluster because of it's current state: %s", state.String())
+		return fail.Wrapf("failed to start Cluster because of it's current state: %s", state.String())
 	}
 
 	// Updates metadata to mark the cluster as Starting
@@ -1634,7 +1633,7 @@ func (c *Controller) Start(task concurrency.Task) (err error) {
 	)
 	c.RUnlock(task)
 	if err != nil {
-		return fmt.Errorf("failed to get list of hosts: %v", err)
+		return fail.Wrapf("failed to get list of hosts: %v", err)
 	}
 	c.RLock(task)
 	if c.Properties.Lookup(property.NetworkV2) {
@@ -1718,83 +1717,3 @@ func (c *Controller) taskStartHost(task concurrency.Task, params concurrency.Tas
 		return nil, c.service.StartHost(hostID)
 	}
 }
-
-// // sanitize tries to rebuild manager struct based on what is available on ObjectStorage
-// func (c *Controller) Sanitize(data *Metadata) error {
-
-// 	core := data.Get()
-// 	instance := &Cluster{
-// 		Core:     core,
-// 		metadata: data,
-// 	}
-// 	instance.reset()
-
-// 	if instance.manager == nil {
-// 		var mgw *providermetadata.Gateway
-// 		mgw, err := providermetadata.LoadGateway(svc, instance.Core.NetworkID)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		gw := mgw.Get()
-// 		hm := providermetadata.NewHost(svc)
-// 		hosts := []*abstract.Host{}
-// 		err = hm.Browse(func(h *abstract.Host) error {
-// 			if strings.HasPrefix(h.Name, instance.Core.Name+"-") {
-// 				hosts = append(hosts, h)
-// 			}
-// 			return nil
-// 		})
-// 		if err != nil {
-// 			return err
-// 		}
-// 		if len(hosts) == 0 {
-// 			return fmt.Errorf("failed to find hosts belonging to cluster")
-// 		}
-
-// 		// We have hosts, fill the manager
-// 		masterIDs := []string{}
-// 		masterIPs := []string{}
-// 		privateNodeIPs := []string{}
-// 		publicNodeIPs := []string{}
-// 		defaultNetworkIP := ""
-// 		err = gw.Properties.LockForRead(Hostproperty.NetworkV1).ThenUse(func(v interface{}) error {
-// 			hostNetworkV1 := v.(*propsv1.HostNetwork)
-// 			defaultNetworkIP = hostNetworkV1.IPv4Addresses[hostNetworkV1.DefaultNetworkID]
-// 			for _, h := range hosts {
-// 				if strings.HasPrefix(h.Name, instance.Core.Name+"-master-") {
-// 					masterIDs = append(masterIDs, h.ID)
-// 					masterIPs = append(masterIPs, defaultNetworkIP)
-// 				} else if strings.HasPrefix(h.Name, instance.Core.Name+"-node-") {
-// 					privateNodeIPs = append(privateNodeIPs, defaultNetworkIP)
-// 				} else if strings.HasPrefix(h.Name, instance.Core.Name+"-pubnode-") {
-// 					publicNodeIPs = append(privateNodeIPs, defaultNetworkIP)
-// 				}
-// 			}
-// 			return nil
-// 		})
-// 		if err != nil {
-// 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
-// 		}
-
-// 		newManager := &managerData{
-// 			BootstrapID:      gw.ID,
-// 			BootstrapIP:      defaultNetworkIP,
-// 			MasterIDs:        masterIDs,
-// 			MasterIPs:        masterIPs,
-// 			PrivateNodeIPs:   privateNodeIPs,
-// 			PublicNodeIPs:    publicNodeIPs,
-// 			MasterLastIndex:  len(masterIDs),
-// 			PrivateLastIndex: len(privateNodeIPs),
-// 			PublicLastIndex:  len(publicNodeIPs),
-// 		}
-// 		log.Debugf("updating metadata...\n")
-// 		err = instance.updateMetadata(func() error {
-// 			instance.manager = newManager
-// 			return nil
-// 		})
-// 		if err != nil {
-// 			return fmt.Errorf("failed to update metadata of cluster '%s': %s", instance.Core.Name, err.Error())
-// 		}
-// 	}
-// 	return nil
-// }

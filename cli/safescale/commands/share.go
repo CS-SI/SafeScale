@@ -158,7 +158,7 @@ var shareDelete = cli.Command{
 			defer wg.Done()
 			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
-				msgs := errMessage.Load().(string)
+				msgs, _ := errMessage.Load().(string)
 				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
 				errMessage.Store(msgs)
 				atomic.AddInt32(&errs, 1)

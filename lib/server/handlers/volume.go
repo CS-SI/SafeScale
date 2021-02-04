@@ -265,7 +265,6 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(
 		nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true,
