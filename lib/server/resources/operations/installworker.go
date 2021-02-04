@@ -1213,7 +1213,8 @@ func (w *worker) setSecurity() (xerr fail.Error) {
 
 // setSubnetSecurity applies the network security rules defined in specification file (if there are some)
 func (w *worker) setSubnetSecurity() (xerr fail.Error) {
-	rules, ok := w.feature.specs.Get("feature.security.network").([]interface{})
+	const yamlKey = "feature.security.subnet"
+	rules, ok := w.feature.specs.Get(yamlKey).([]map[string]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
@@ -1227,7 +1228,7 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 		svc iaas.Service
 		rs  resources.Subnet
 	)
-	if w.cluster != nil {
+	if !w.cluster.IsNull() {
 		svc = w.cluster.GetService()
 		netprops, xerr := w.cluster.GetNetworkConfig(task)
 		if xerr != nil {
@@ -1237,11 +1238,11 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 			return xerr
 		}
 		defer rs.Dispose() // will not used the instance outside of the function
-
-		// if endpointIP, xerr = rs.GetEndpointIP(w.feature.task); xerr != nil {
-		// 	return xerr
-		// }
-	} else {
+	} else if !w.host.IsNull() {
+		if rs, xerr = w.host.GetDefaultSubnet(task); xerr != nil {
+			return xerr
+		}
+		defer rs.Dispose() // will not used the instance outside of the function
 	}
 
 	gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
@@ -1250,17 +1251,12 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 	}
 
 	for k, r := range rules {
-		rule, ok := r.(map[string]interface{})
-		if !ok {
-			return fail.InvalidParameterError("r", "is not a rule (map)")
-		}
-
-		targets := w.interpretRuleTargets(rule)
+		targets := w.interpretRuleTargets(r)
 
 		// If security rules concerns gateways, update subnet Security Group for gateways
 		if _, ok := targets["gateways"]; ok {
 
-			description, ok := rule["name"].(string)
+			description, ok := r["name"].(string)
 			if !ok {
 				return fail.SyntaxError("missing field 'name' of rule #%d in 'feature.security.network'", k+1)
 			}
@@ -1275,11 +1271,11 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
 			sgRule.EtherType = ipversion.IPv4
-			sgRule.Protocol, _ = rule["protocol"].(string)
+			sgRule.Protocol, _ = r["protocol"].(string)
 			sgRule.Targets = gatewayPublicIPs
 
 			var commaSplitted []string
-			ports, ok := rule["ports"].(string)
+			ports, ok := r["ports"].(string)
 			if ok {
 				commaSplitted = strings.Split(ports, ",")
 			}
@@ -1366,7 +1362,7 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 	//
 	// 		primaryGatewayVariables["Hostname"] = h.GetName() + domain
 	//
-	// 		tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
+	// 		tP, xerr := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
 	// 			"ctrl": primaryKongController,
 	// 			"rule": rule,
 	// 			"vars": &primaryGatewayVariables,
@@ -1400,7 +1396,7 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 	// 			}
 	// 			secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 	//
-	// 			tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
+	// 			tS, errOp := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
 	// 				"ctrl": secondaryKongController,
 	// 				"rule": rule,
 	// 				"vars": &secondaryGatewayVariables,

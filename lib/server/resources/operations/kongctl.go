@@ -123,7 +123,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
 // Returns rule name and error
-func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Map) (string, fail.Error) {
+func (k *KongController) Apply(rule map[string]interface{}, values *data.Map) (string, fail.Error) {
 	ruleType, ok := rule["type"].(string)
 	if !ok {
 		return "", fail.InvalidParameterError("rule['type']", "is not a string")
