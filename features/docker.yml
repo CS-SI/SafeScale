@@ -127,7 +127,7 @@ feature:
                             op=-1
                             # get glib version
                             glibver=$(ldd --version | head -n 1 | awk {'print $NF'})
-                            testvercomp $glibver 2.27 '>' && op=$? || true
+                            sfTestvercomp $glibver 2.27 '>' && op=$? || true
                             if [ $op -ne 0 ]; then
                                 VERSION=1.27.4
                                 URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"

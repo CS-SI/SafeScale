@@ -26,57 +26,50 @@ export LINUX_KIND=
 export VERSION_ID=
 export FULL_VERSION_ID=
 
-function versionchk { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+function versionchk() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 export -f versionchk
 
-function vercomp () {
-    if [[ $1 == $2 ]]
-    then
+function sfVercomp() {
+    if [[ $1 == $2 ]]; then
         return 0
     fi
     local IFS=.
     local i ver1=($1) ver2=($2)
     # fill empty fields in ver1 with zeros
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++))
-    do
+    for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
         ver1[i]=0
     done
-    for ((i=0; i<${#ver1[@]}; i++))
-    do
-        if [[ -z ${ver2[i]} ]]
-        then
+    for ((i = 0; i < ${#ver1[@]}; i++)); do
+        if [[ -z ${ver2[i]} ]]; then
             # fill empty fields in ver2 with zeros
             ver2[i]=0
         fi
-        if ((10#${ver1[i]} > 10#${ver2[i]}))
-        then
+        if ((10#${ver1[i]} > 10#${ver2[i]})); then
             return 1
         fi
-        if ((10#${ver1[i]} < 10#${ver2[i]}))
-        then
+        if ((10#${ver1[i]} < 10#${ver2[i]})); then
             return 2
         fi
     done
     return 0
 }
-export -f vercomp
+export -f sfVercomp
 
-function testvercomp () {
-    vercomp $1 $2
+function sfTestvercomp() {
+    sfVercomp $1 $2
     case $? in
-        0) ope='=';;
-        1) ope='>';;
-        2) ope='<';;
+    0) ope='=' ;;
+    1) ope='>' ;;
+    2) ope='<' ;;
     esac
-    if [[ $ope != $3 ]]
-    then
+    if [[ $ope != $3 ]]; then
         echo "FAIL: Expected '$3', Actual '$ope', Arg1 '$1', Arg2 '$2'"
         return 1
     else
         return 0
     fi
 }
-export -f testvercomp
+export -f sfTestvercomp
 
 function sfFail() {
     if [ $# -eq 1 ]; then
@@ -385,13 +378,19 @@ function sfDownload() {
     { code=$(</dev/stdin); } <<-EOF
         $fn() {
             while true; do
-                #wget -q -nc -O "$filename" "$url"
                 curl -L -k -SsL "$url" >"$filename"
                 rc=\$?
-                # if $filename exists, remove it and restart without delay
-                [ \$rc -eq 1 ] && rm -f $filename && continue
-                # break if download succeeded or if not found (no benefit to loop on this kind of error)
-                [ \$rc -eq 0 -o \$rc -eq 8 ] && break
+                # break if succeeded
+                [ \$rc -eq 0 ] && break
+                rm -f $filename
+                if which wget; then
+                    # try with wget
+                    wget -q -nc -O "$filename" "$url"
+                    rc=\$?
+                    # break if succeeded
+                    [ \$rc -eq 0 ] && break
+                    rm -f $filename
+                fi
                 sleep $delay
             done
             return \$rc
