@@ -126,6 +126,9 @@ type ConfigurationOptions struct {
 	// OperatorUsername contain the name of the safescale created user
 	OperatorUsername string
 
+	// Specify limited life for some resources
+	MaxLifetimeInHours int
+
 	// Customizations map[string]string
 
 	// WhitelistTemplateRegexp contains the regexp string to white list host templates

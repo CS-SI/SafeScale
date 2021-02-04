@@ -19,6 +19,7 @@ package ovh
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -43,19 +44,19 @@ type gpuCfg struct {
 }
 
 var gpuMap = map[string]gpuCfg{
-	"g2-15": gpuCfg{
+	"g2-15": {
 		GPUNumber: 1,
 		GPUType:   "NVIDIA 1070",
 	},
-	"g2-30": gpuCfg{
+	"g2-30": {
 		GPUNumber: 1,
 		GPUType:   "NVIDIA 1070",
 	},
-	"g3-120": gpuCfg{
+	"g3-120": {
 		GPUNumber: 3,
 		GPUType:   "NVIDIA 1080 TI",
 	},
-	"g3-30": gpuCfg{
+	"g3-30": {
 		GPUNumber: 1,
 		GPUType:   "NVIDIA 1080 TI",
 	},
@@ -115,6 +116,11 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		alternateAPIConsumerKey = val3.(string)
 	}
 
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
@@ -167,9 +173,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"classic":    volumespeed.COLD,
 			"high-speed": volumespeed.HDD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:     metadataBucketName,
+		OperatorUsername:   operatorUsername,
+		ProviderName:       providerName,
+		MaxLifetimeInHours: maxLifeTime,
 	}
 
 	serviceVersions := map[string]string{"volume": "v1"}
@@ -266,6 +273,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
 	return cfg, nil
 }
 
@@ -306,7 +314,7 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 	// check flavor disponibilities through OVH-API
 	authOpts, err := p.GetAuthenticationOptions()
 	if err != nil {
-		log.Warn(fmt.Sprintf("failed to get Authentication options, flavors availability won't be checked: %v", err))
+		log.Warnf("failed to get Authentication options, flavors availability won't be checked: %v", err)
 		return allTemplates, nil
 	}
 	service := authOpts.GetString("TenantID")

@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -45,15 +46,15 @@ type gpuCfg struct {
 }
 
 var gpuMap = map[string]gpuCfg{
-	"g1.xlarge": gpuCfg{
+	"g1.xlarge": {
 		GPUNumber: 1,
 		GPUType:   "UNKNOW",
 	},
-	"g1.2xlarge": gpuCfg{
+	"g1.2xlarge": {
 		GPUNumber: 1,
 		GPUType:   "UNKNOW",
 	},
-	"g1.2xlarge.8": gpuCfg{
+	"g1.2xlarge.8": {
 		GPUNumber: 1,
 		GPUType:   "NVIDIA 1080 TI",
 	},
@@ -92,6 +93,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	vpcCIDR, _ := network["VPCCIDR"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
@@ -147,9 +152,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"SATA": volumespeed.COLD,
 			"SSD":  volumespeed.SSD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:     metadataBucketName,
+		OperatorUsername:   operatorUsername,
+		ProviderName:       providerName,
+		MaxLifetimeInHours: maxLifeTime,
 		// WhitelistTemplateRegexp: whitelistTemplatePattern,
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
@@ -292,8 +298,9 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 
 	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
-		addGPUCfg(&tpl)
-		tpls = append(tpls, tpl)
+		theTemplate := tpl
+		addGPUCfg(&theTemplate)
+		tpls = append(tpls, theTemplate)
 	}
 
 	return tpls, nil
@@ -350,6 +357,8 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
+
 	// cfg.Set("Customizations", opts.Customizations)
 
 	return cfg, nil

@@ -39,11 +39,6 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
-// New creates a new instance of local provider
-func New() apiprovider.Provider {
-	return &provider{}
-}
-
 // AuthOptions fields are the union of those recognized by each identity implementation and provider.
 type AuthOptions struct {
 }

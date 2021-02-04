@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
@@ -67,20 +68,24 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
 	if zone == "" {
-	    zone = "nova"
-    }
+		zone = "nova"
+	}
 	providerNetwork, _ := network["ExternalNetwork"].(string)
 	if providerNetwork == "" {
 		providerNetwork = "public"
 	}
-    floatingIPPool, _ := network["FloatingIPPool"].(string)
-    if floatingIPPool == "" {
-        floatingIPPool = providerNetwork
-    }
+	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	if floatingIPPool == "" {
+		floatingIPPool = providerNetwork
+	}
 	defaultImage, _ := compute["DefaultImage"].(string)
 	dnsServers, _ := network["DNSServers"].([]string)
 	if len(dnsServers) == 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
+	}
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
@@ -124,11 +129,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"standard":   volumespeed.COLD,
 			"performant": volumespeed.HDD,
 		},
-		DNSList:          dnsServers,
-		DefaultImage:     defaultImage,
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		DNSList:            dnsServers,
+		DefaultImage:       defaultImage,
+		MetadataBucket:     metadataBucketName,
+		OperatorUsername:   operatorUsername,
+		ProviderName:       providerName,
+		MaxLifetimeInHours: maxLifeTime,
 	}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -222,6 +228,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
 
 	return cfg, nil
 }

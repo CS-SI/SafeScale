@@ -19,6 +19,7 @@ package opentelekom
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -64,6 +65,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	zone, _ := compute["AvailabilityZone"].(string)
 	vpcName, _ := network["VPCName"].(string)
 	vpcCIDR, _ := network["VPCCIDR"].(string)
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
 
 	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
 	if identityEndpoint == "" {
@@ -126,9 +131,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"SAS":  volumespeed.HDD,
 			"SSD":  volumespeed.SSD,
 		},
-		MetadataBucket:   metadataBucketName,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:     metadataBucketName,
+		OperatorUsername:   operatorUsername,
+		ProviderName:       providerName,
+		MaxLifetimeInHours: maxLifeTime,
 	}
 	stack, err := huaweicloud.New(authOptions, cfgOptions)
 	if err != nil {
@@ -238,6 +244,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
 
 	return cfg, nil
 }

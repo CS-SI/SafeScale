@@ -29,6 +29,7 @@ type ComputeConfiguration struct {
 	DefaultTenancy          string
 	DNSList                 []string
 	OperatorUsername        string
+	MaxLifetimeInHours      string
 	WhitelistTemplateRegexp *regexp.Regexp
 	BlacklistTemplateRegexp *regexp.Regexp
 	WhitelistImageRegexp    *regexp.Regexp

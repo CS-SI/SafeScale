@@ -130,6 +130,7 @@ func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, erro
 			DefaultImage:            get(compute, "DefaultImage"),
 			DefaultVolumeSpeed:      volumeSpeed(get(compute, "DefaultVolumeSpeed", "HDD")),
 			OperatorUsername:        get(compute, "OperatorUsername", "safescale"),
+			MaxLifetimeInHours:      get(compute, "MaxLifetimeInHours", "0"),
 			BlacklistImageRegexp:    regexp.MustCompile(get(compute, "BlacklistImageRegexp")),
 			BlacklistTemplateRegexp: regexp.MustCompile(get(compute, "BlacklistTemplateRegexp")),
 			WhitelistImageRegexp:    regexp.MustCompile(get(compute, "WhitelistImageRegexp")),
@@ -204,6 +205,8 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("OperatorUsername", p.Options.Compute.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("BuildSubnetworks", false)
+	cfg.Set("MaxLifetimeInHours", p.Options.Compute.MaxLifetimeInHours)
+
 	return cfg, nil
 }
 

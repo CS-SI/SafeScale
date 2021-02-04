@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -69,6 +70,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	// zone, _ := compute["AvailabilityZone"].(string)
 	zone := "nova"
 	projectName, _ := compute["ProjectName"].(string)
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
 	// projectID, _ := compute["ProjectID"].(string)
 	defaultImage, _ := compute["DefaultImage"].(string)
 	if defaultImage == "" {
@@ -87,10 +92,10 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	if providerNetwork == "" {
 		providerNetwork = "external"
 	}
-    floatingIPPool, _ := network["FloatingIPPool"].(string)
-    if floatingIPPool == "" {
-        floatingIPPool = providerNetwork
-    }
+	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	if floatingIPPool == "" {
+		floatingIPPool = providerNetwork
+	}
 
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
@@ -139,11 +144,12 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"HDD": volumespeed.HDD,
 			"SSD": volumespeed.SSD,
 		},
-		MetadataBucket:   metadataBucketName,
-		DNSList:          cloudferroDNSServers,
-		DefaultImage:     defaultImage,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:     metadataBucketName,
+		DNSList:            cloudferroDNSServers,
+		DefaultImage:       defaultImage,
+		OperatorUsername:   operatorUsername,
+		ProviderName:       providerName,
+		MaxLifetimeInHours: maxLifeTime,
 	}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -233,6 +239,8 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
+
 	return cfg, nil
 }
 
