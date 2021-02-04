@@ -965,7 +965,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 		// defer func() {
 		// 	if innerXErr != nil && !req.KeepOnFailure {
 		// 		if derr := hostSG.UnbindFromHost(task, rh); derr != nil {
-		// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", hostSG.GetName(), rh.GetName()))
+		// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), hostSG.GetName(), rh.GetName()))
 		// 		}
 		// 	}
 		// }()
@@ -1685,7 +1685,6 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 		}
 
 		// Unbind Security Groups from Host
-		// Unbind Security Group from Host
 		innerXErr = props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
@@ -2512,128 +2511,6 @@ func (rh host) getAccessIP(task concurrency.Task) string {
 	return rh.accessIP
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-// satisfies interface install.Targetable
-func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
-	if rh.IsNull() {
-		logrus.Error(fail.InvalidInstanceError().Error())
-		return map[uint8]installmethod.Enum{}
-	}
-	if task.IsNull() {
-		logrus.Error(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
-		return map[uint8]installmethod.Enum{}
-	}
-
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
-
-	if rh.installMethods == nil {
-		rh.installMethods = map[uint8]installmethod.Enum{}
-
-		_ = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// props, inErr := rh.properties(task)
-			// if inErr != nil {
-			// 	return inErr
-			// }
-
-			// Ignore error in this special case; will fallback to use bash method if cannot determine operating system type and flavor
-			var index uint8
-			_ = props.Inspect(task, hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
-				systemV1, ok := clonable.(*propertiesv1.HostSystem)
-				if !ok {
-					logrus.Error(fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
-				}
-				if systemV1.Type == "linux" {
-					switch systemV1.Flavor {
-					case "centos", "redhat":
-						index++
-						rh.installMethods[index] = installmethod.Yum
-					case "debian":
-						fallthrough
-					case "ubuntu":
-						index++
-						rh.installMethods[index] = installmethod.Apt
-					case "fedora", "rhel":
-						index++
-						rh.installMethods[index] = installmethod.Dnf
-					}
-				}
-				return nil
-			})
-			index++
-			rh.installMethods[index] = installmethod.Bash
-			return nil
-		})
-	}
-	return rh.installMethods
-}
-
-// RegisterFeature registers an installed Feature in metadata of Host
-func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if feat.IsNull() {
-		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
-	}
-
-	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			var item *propertiesv1.HostInstalledFeature
-			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.GetRequirements()
-				if innerXErr != nil {
-					return innerXErr
-				}
-				item = &propertiesv1.HostInstalledFeature{
-					Requires: requirements,
-				}
-				featuresV1.Installed[feat.GetName()] = item
-			}
-			if !requiredBy.IsNull() {
-				item.RequiredBy[requiredBy.GetName()] = struct{}{}
-			}
-			return nil
-		})
-	})
-}
-
-// DeregisterFeature deregisters a Feature from Cluster metadata
-func (rh *host) DeregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if feat == "" {
-		return fail.InvalidParameterError("feat", "cannot be empty string")
-	}
-
-	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			if _, ok := featuresV1.Installed[feat]; ok {
-				delete(featuresV1.Installed, feat)
-			}
-			for _, v := range featuresV1.Installed {
-				delete(v.RequiredBy, feat)
-			}
-			return nil
-		})
-	})
-}
-
 // GetShares returns the information about the shares hosted by the host
 func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -2690,100 +2567,6 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 func (rh host) getMounts(task concurrency.Task) *propertiesv1.HostMounts {
 	mounts, _ := rh.GetMounts(task)
 	return mounts
-}
-
-// InstalledFeatures returns a list of installed features
-//
-// satisfies interface install.Targetable
-func (rh host) InstalledFeatures(task concurrency.Task) []string {
-	var list []string
-	return list
-}
-
-// ComplementFeatureParameters configures parameters that are appropriate for the target
-// satisfies interface install.Targetable
-func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	}
-	if v == nil {
-		return fail.InvalidParameterError("v", "cannot be nil")
-	}
-
-	v["ShortHostname"] = rh.GetName()
-	domain := ""
-	xerr = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			domain = hostDescriptionV1.Domain
-
-			if domain != "" {
-				domain = "." + domain
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	v["Hostname"] = rh.GetName() + domain
-
-	v["HostIP"] = rh.getPrivateIP(task)
-	v["PublicIP"] = rh.getPublicIP(task)
-
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = abstract.DefaultUser
-	}
-
-	rs, xerr := rh.GetDefaultSubnet(task)
-	if xerr != nil {
-		return xerr
-	}
-
-	rgw, xerr := rs.InspectGateway(task, true)
-	if xerr != nil {
-		return xerr
-	}
-	defer rgw.Dispose()
-
-	rgwi := rgw.(*host)
-	v["PrimaryGatewayIP"] = rgwi.getPrivateIP(task)
-	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	v["PrimaryPublicIP"] = rgwi.getPublicIP(task)
-	if rgw, xerr = rs.InspectGateway(task, false); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-		default:
-			return xerr
-		}
-	} else {
-		defer rgw.Dispose()
-
-		rgwi = rgw.(*host)
-		v["SecondaryGatewayIP"] = rgwi.getPrivateIP(task)
-		v["SecondaryPublicIP"] = rgwi.getPublicIP(task)
-	}
-
-	if v["EndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
-		return xerr
-	}
-
-	v["PublicIP"] = v["EndpointIP"]
-	if v["DefaultRouteIP"], xerr = rs.GetDefaultRouteIP(task); xerr != nil {
-		return xerr
-	}
-
-	return nil
 }
 
 // IsClusterMember returns true if the host is member of a cluster

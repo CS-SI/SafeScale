@@ -1423,7 +1423,7 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		}
 
 		var (
-			id string
+			id  string
 			rgw resources.Host
 		)
 
@@ -1441,8 +1441,8 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		}
 
 		if ip, innerXErr = rgw.GetPublicIP(task); innerXErr != nil {
-				return innerXErr
-			}
+			return innerXErr
+		}
 
 		return nil
 	})
