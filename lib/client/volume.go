@@ -24,6 +24,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // volume is the part of safescale client handing volumes
@@ -73,7 +74,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []string
+		errs  []error
 	)
 
 	volumeDeleter := func(aname string) {
@@ -82,8 +83,8 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			mutex.Lock()
-			errs = append(errs, err.Error())
-			mutex.Unlock()
+			defer mutex.Unlock()
+			errs = append(errs, err)
 		}
 	}
 
@@ -94,7 +95,11 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
 	}
 	return nil
 

@@ -63,7 +63,7 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 
 	_, cancel, err := utils.GetTimeoutContext(executionTimeout)
 	if err != nil {
-		return -1, "", "", err
+		return -1, "", "", fmt.Errorf("error getting timeout context: %w", err)
 	}
 	defer cancel()
 
@@ -74,7 +74,7 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 			var sshCmd *system.SSHCommand
 			sshCmd, err := sshCfg.Command(command)
 			if err != nil {
-				return err
+				return fmt.Errorf("error creating sshCmd command: %w", err)
 			}
 
 			retcode, stdout, stderr, breakErr = sshCmd.RunWithTimeout(nil, outs, executionTimeout)
@@ -87,6 +87,7 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 				retcode = -1
 				return nil
 			}
+
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
 				return fmt.Errorf("failed to connect")

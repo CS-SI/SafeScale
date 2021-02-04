@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -134,6 +135,18 @@ func (h *host) Create(def *pb.HostDefinition, timeout time.Duration) (*pb.Host, 
 	return service.Create(ctx, def)
 }
 
+func (h *host) CreateWithCancel(ctx context.Context, def *pb.HostDefinition, timeout time.Duration) (*pb.Host, error) {
+	if def == nil {
+		return nil, fail.InvalidParameterError("def", "cannot be nil")
+	}
+
+	h.session.Connect()
+	defer h.session.Disconnect()
+	service := pb.NewHostServiceClient(h.session.connection)
+
+	return service.Create(ctx, def)
+}
+
 // Delete deletes several hosts at the same time in goroutines
 func (h *host) Delete(names []string, timeout time.Duration) error {
 	h.session.Connect()
@@ -147,7 +160,7 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []string
+		errs  []error
 	)
 
 	hostDeleter := func(aname string) {
@@ -155,8 +168,8 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &pb.Reference{Name: aname})
 		if err != nil {
 			mutex.Lock()
-			errs = append(errs, err.Error())
-			mutex.Unlock()
+			defer mutex.Unlock()
+			errs = append(errs, err)
 		}
 	}
 
@@ -167,7 +180,11 @@ func (h *host) Delete(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
 	}
 	return nil
 }

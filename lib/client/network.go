@@ -17,6 +17,7 @@
 package client
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -63,7 +64,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []string
+		errs  []error
 	)
 
 	networkDeleter := func(aname string) {
@@ -73,7 +74,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
-			errs = append(errs, err.Error())
+			errs = append(errs, err)
 		}
 	}
 
@@ -84,7 +85,11 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
 	}
 	return nil
 }
@@ -102,7 +107,7 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []string
+		errs  []error
 	)
 
 	networkDeleter := func(aname string) {
@@ -112,7 +117,7 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
-			errs = append(errs, err.Error())
+			errs = append(errs, err)
 		}
 	}
 
@@ -123,7 +128,11 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+		var errstrs []string
+		for _, aerr := range errs {
+			errstrs = append(errstrs, aerr.Error())
+		}
+		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
 	}
 	return nil
 }
@@ -140,6 +149,18 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 
+}
+
+func (n *network) CreateWithCancel(ctx context.Context, def *pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
+	if def == nil {
+		return nil, fail.InvalidParameterError("def", "cannot be nil")
+	}
+
+	n.session.Connect()
+	defer n.session.Disconnect()
+	service := pb.NewNetworkServiceClient(n.session.connection)
+
+	return service.Create(ctx, def)
 }
 
 // Create ...
