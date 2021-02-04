@@ -17,9 +17,14 @@
 package objectstorage
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"strings"
+
+	"github.com/ncw/swift"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -47,6 +52,54 @@ type location struct {
 	Region           string
 }
 
+func transformErrors(in error) error {
+	if in == nil {
+		return nil
+	}
+
+	if in == stow.ErrNotFound {
+		return fail.NotFoundError(in.Error())
+	}
+
+	if ne, ok := in.(net.Error); ok {
+		if ne.Temporary() || ne.Timeout() {
+			return fail.TimeoutError("timeout accessing object storage", 0, ne)
+		}
+
+		return in
+	}
+
+	if se, ok := in.(*swift.Error); ok {
+		if se.StatusCode == 404 {
+			return fail.NotFoundError(se.Error())
+		}
+
+		if se.StatusCode == 408 {
+			return fail.TimeoutError("timeout accessing object storage", 0, se)
+		}
+
+		if errors.Is(se, swift.TimeoutError) {
+			return fail.TimeoutError("timeout accessing object storage", 0, se)
+		}
+
+		return in
+	}
+
+	if ue, ok := in.(*url.Error); ok {
+		if ue.Timeout() || ue.Temporary() {
+			return fail.TimeoutError("timeout accessing object storage", 0, ue)
+		}
+
+		return in
+	}
+
+	if strings.Contains(in.Error(), "imeout") {
+		return fail.TimeoutError("timeout accessing object storage", 0, in)
+	}
+
+	return in
+}
+
 // NewLocation creates an Object Storage Location based on config
 func NewLocation(conf Config) (Location, error) {
 	location := &location{
@@ -54,7 +107,7 @@ func NewLocation(conf Config) (Location, error) {
 	}
 	err := location.connect()
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	return location, nil
 }
@@ -92,14 +145,13 @@ func (l *location) connect() error {
 	// Check config location
 	err := stow.Validate(kind, config)
 	if err != nil {
-		log.Debugf("invalid config: %v", err)
-		return err
+		return transformErrors(err)
 	}
 	l.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
-		log.Debugf("failed dialing location: %v", err)
+		return transformErrors(err)
 	}
-	return err
+	return transformErrors(err)
 }
 
 // GetType returns the type of ObjectStorage
@@ -120,7 +172,7 @@ func (l *location) ListBuckets(prefix string) ([]string, error) {
 		l.stowLocation, stow.NoPrefix, 100,
 		func(c stow.Container, err error) error {
 			if err != nil {
-				return err
+				return transformErrors(err)
 			}
 			if strings.Index(c.Name(), prefix) == 0 {
 				list = append(list, c.Name())
@@ -129,7 +181,7 @@ func (l *location) ListBuckets(prefix string) ([]string, error) {
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	return list, nil
 }
@@ -163,7 +215,7 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 	if found {
 		return true, nil
 	}
-	return false, err
+	return false, transformErrors(err)
 }
 
 // GetBucket ...
@@ -179,12 +231,12 @@ func (l *location) GetBucket(bucketName string) (Bucket, error) {
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	return b, nil
 }
@@ -202,7 +254,7 @@ func (l *location) CreateBucket(bucketName string) (Bucket, error) {
 
 	c, err := l.stowLocation.CreateContainer(bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	return &bucket{
 		location:  l.stowLocation,
@@ -223,10 +275,7 @@ func (l *location) DeleteBucket(bucketName string) error {
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
 
 	err := l.stowLocation.RemoveContainer(bucketName)
-	if err != nil {
-		return err
-	}
-	return nil
+	return transformErrors(err)
 }
 
 // GetObject ...
@@ -247,15 +296,16 @@ func (l *location) GetObject(bucketName string, objectName string) (Object, erro
 
 	bucket, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 
 	bucket.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 
-	return newObject(bucket, objectName)
+	ob, err := newObject(bucket, objectName)
+	return ob, transformErrors(err)
 }
 
 // DeleteObject ...
@@ -276,15 +326,16 @@ func (l *location) DeleteObject(bucketName, objectName string) error {
 
 	bucket, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 
 	bucket.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 
-	return bucket.DeleteObject(objectName)
+	err = bucket.DeleteObject(objectName)
+	return transformErrors(err)
 }
 
 // ListObjects lists the objects in a Bucket
@@ -302,15 +353,16 @@ func (l *location) ListObjects(bucketName string, path, prefix string) ([]string
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 
-	return b.List(path, prefix)
+	ob, err := b.List(path, prefix)
+	return ob, transformErrors(err)
 }
 
 // Browse walks through the objects in a Bucket and apply callback to each object
@@ -328,15 +380,16 @@ func (l *location) BrowseBucket(bucketName string, path, prefix string, callback
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 
-	return b.Browse(path, prefix, callback)
+	err = b.Browse(path, prefix, callback)
+	return transformErrors(err)
 }
 
 // ClearBucket ...
@@ -354,15 +407,16 @@ func (l *location) ClearBucket(bucketName string, path, prefix string) error {
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 
-	return b.Clear(path, prefix)
+	err = b.Clear(path, prefix)
+	return transformErrors(err)
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
@@ -383,21 +437,18 @@ func (l *location) ReadObject(bucketName, objectName string, writer io.Writer, f
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 	o, err := newObject(b, objectName)
 	if err != nil {
-		return err
+		return transformErrors(err)
 	}
 	err = o.Read(writer, from, to)
-	if err != nil {
-		return err
-	}
-	return nil
+	return transformErrors(err)
 }
 
 // WriteObject writes the content of reader in the Object
@@ -426,13 +477,14 @@ func (l *location) WriteObject(
 
 	b, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	b.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
-	return b.WriteObject(objectName, source, size, metadata)
+	ob, err := b.WriteObject(objectName, source, size, metadata)
+	return ob, transformErrors(err)
 }
 
 // WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
@@ -461,11 +513,12 @@ func (l *location) WriteMultiPartObject(
 
 	bucket, err := newBucket(l.stowLocation, bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
 	bucket.container, err = l.stowLocation.Container(bucketName)
 	if err != nil {
-		return nil, err
+		return nil, transformErrors(err)
 	}
-	return bucket.WriteMultiPartObject(objectName, source, sourceSize, chunkSize, metadata)
+	ob, err := bucket.WriteMultiPartObject(objectName, source, sourceSize, chunkSize, metadata)
+	return ob, transformErrors(err)
 }

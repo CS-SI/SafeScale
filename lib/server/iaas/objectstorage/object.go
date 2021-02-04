@@ -18,9 +18,14 @@ package objectstorage
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -207,15 +212,97 @@ func (o *object) Write(source io.Reader, sourceSize int64) error {
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%d)", sourceSize), false /*Trace.Controller*/).GoingIn().OnExitTrace()()
 
+	withLogs := false
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		withLogs = true
+	}
+
 	metaData, err := o.GetMetadata()
 	if err != nil {
 		return err
 	}
 
-	item, err := o.bucket.container.Put(o.Name, source, sourceSize, metaData)
+	var buf bytes.Buffer
+	tee := io.TeeReader(source, &buf)
+	bodyBytes, err := ioutil.ReadAll(tee)
 	if err != nil {
 		return err
 	}
+	theMD5, err := getMD5Hash(string(bodyBytes))
+	if err != nil {
+		return err
+	}
+
+	item, err := o.bucket.container.Put(o.Name, &buf, sourceSize, metaData)
+	if err != nil {
+		return err
+	}
+
+	go func(theSourceHash string) {
+		begin := time.Now()
+
+		finished := false
+		doneCh := make(chan bool)
+		iterations := 0
+
+		go func() {
+			result := false
+			for !finished {
+				recItem, err := o.bucket.container.Item(item.ID())
+				if err != nil {
+					iterations++
+					continue
+				}
+				rc, err := recItem.Open()
+				if err != nil {
+					iterations++
+					continue
+				}
+				ct, err := ioutil.ReadAll(rc)
+				if err != nil {
+					iterations++
+					continue
+				}
+				finished = true // we cannot re-read the buffer, next time will be empty
+
+				theHash, err := getMD5Hash(string(ct))
+				if err != nil {
+					iterations++
+					doneCh <- result
+					return
+				}
+
+				if strings.Compare(theHash, theMD5) == 0 {
+					result = true
+					doneCh <- result
+					return
+				}
+			}
+
+			doneCh <- result
+			return
+		}()
+
+		select {
+		case val := <-doneCh:
+			finished = true
+			if withLogs {
+				if val {
+					log.Debugf("Consistency achieved after %s and %d iterations", time.Since(begin), iterations)
+				} else {
+					log.Debugf("Consistency failed because of error after %s and %d iterations", time.Since(begin), iterations)
+				}
+			}
+			return
+		case <-time.After(5 * time.Second):
+			if withLogs {
+				log.Debugf("Consistency not achieved after a few seconds")
+			}
+			finished = true
+			return
+		}
+	}(theMD5)
+
 	return o.reloadFromItem(item)
 }
 
@@ -264,7 +351,7 @@ func writeChunk(
 	metadata ObjectMetadata,
 	chunkIndex int,
 ) error {
-
+	// FIXME: use io.tee
 	buf := make([]byte, nBytesToRead)
 	nBytesRead, err := source.Read(buf)
 	if err == io.EOF {
@@ -278,6 +365,7 @@ func writeChunk(
 	r := bytes.NewReader(buf)
 	objectNamePart := objectName + strconv.Itoa(chunkIndex)
 	metadata["Split"] = objectName
+
 	_, err = container.Put(objectNamePart, r, int64(nBytesRead), metadata)
 	if err != nil {
 		return err
@@ -286,6 +374,16 @@ func writeChunk(
 		"written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName,
 	)
 	return err
+}
+
+// getMD5Hash returns the MD5 of the string 'text'
+func getMD5Hash(text string) (_ string, err error) {
+	hasher := md5.New()
+	_, err = hasher.Write([]byte(text))
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // Delete deletes the object from Object Storage
