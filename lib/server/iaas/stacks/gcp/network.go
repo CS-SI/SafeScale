@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -331,8 +332,10 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		)
 	}
 
-	if !theNetwork.OK() {
-		logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if !theNetwork.OK() {
+			logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
+		}
 	}
 
 	compuService := s.ComputeService
@@ -357,7 +360,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	if err != nil {
 		switch err.(type) {
 		case fail.ErrTimeout:
-			logrus.Warnf("Timeout waiting for subnetwork deletion")
+			logrus.Warnf("timeout waiting for subnetwork deletion")
 			return err
 		default:
 			return err
@@ -381,12 +384,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
 			)
 			if operr != nil {
-				logrus.Warn(operr)
+				logrus.Warnf("error waiting for firewall rule deletion: %v", operr)
 			}
 		}
 	}
 	if err != nil {
-		logrus.Warn(err)
+		logrus.Warnf("error getting firewall rules: %v", err)
 	}
 
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
@@ -405,12 +408,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
 			)
 			if operr != nil {
-				logrus.Warn(operr)
+				logrus.Warnf("error deleting routes: %v", operr)
 			}
 		}
 	}
 	if err != nil {
-		logrus.Warn(err)
+		logrus.Warnf("error getting routes: %v", err)
 	}
 
 	return nil

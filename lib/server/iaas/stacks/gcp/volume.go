@@ -83,6 +83,9 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
+	nvol.Tags["CreationDate"] = gcpDisk.CreationTimestamp
+	nvol.Tags["ManagedBy"] = "safescale"
+	nvol.Tags["DeclaredInBucket"] = s.Config.MetadataBucket
 	nvol.State, err = volumeStateConvert(gcpDisk.Status)
 	if err != nil {
 		return nil, err
@@ -111,6 +114,9 @@ func (s *Stack) GetVolume(ref string) (*abstract.Volume, fail.Error) {
 	}
 	nvol.Size = int(gcpDisk.SizeGb)
 	nvol.ID = strconv.FormatUint(gcpDisk.Id, 10)
+	nvol.Tags["CreationDate"] = gcpDisk.CreationTimestamp
+	nvol.Tags["ManagedBy"] = "safescale"
+	nvol.Tags["DeclaredInBucket"] = s.Config.MetadataBucket
 
 	return nvol, nil
 }
@@ -149,6 +155,9 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 			nvolume.ID = strconv.FormatUint(instance.Id, 10)
 			nvolume.Name = instance.Name
 			nvolume.Size = int(instance.SizeGb)
+			nvolume.Tags["CreationDate"] = instance.CreationTimestamp
+			nvolume.Tags["ManagedBy"] = "safescale"
+			nvolume.Tags["DeclaredInBucket"] = s.Config.MetadataBucket
 			nvolume.State, _ = volumeStateConvert(instance.Status)
 			if strings.Contains(instance.Type, "pd-ssd") {
 				nvolume.Speed = volumespeed.SSD
@@ -285,10 +294,6 @@ func (s *Stack) DeleteVolumeAttachment(serverID, id string) error {
 	}
 
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostTimeout())
-	if err != nil {
-		return err
-	}
-
 	return err
 }
 
