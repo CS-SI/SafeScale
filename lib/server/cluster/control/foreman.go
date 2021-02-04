@@ -74,12 +74,6 @@ var (
 			return i + 1
 		},
 	}
-
-	// // systemTemplateBox ...
-	// systemTemplateBox *rice.Box
-
-	// // bashLibraryContent contains the script containing bash library
-	// bashLibraryContent *string
 )
 
 // Makers ...
