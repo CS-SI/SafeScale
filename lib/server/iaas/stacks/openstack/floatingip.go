@@ -6,10 +6,11 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
+
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 )
 
 type bandwidthCreateOpts struct {

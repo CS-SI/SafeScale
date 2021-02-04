@@ -314,5 +314,3 @@ func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) 
 		return "", gophercloud.ErrMultipleResourcesFound{Name: name, Count: count, ResourceType: "network"}
 	}
 }
-
-

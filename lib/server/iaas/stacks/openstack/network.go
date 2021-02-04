@@ -296,21 +296,42 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	sns, err := s.listSubnets(id)
 	if err != nil {
-		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+		msg := fmt.Sprintf("failed to delete subnetwork '%s': %s", network.Name, ProviderErrorToString(err))
 		return fail.Errorf(fmt.Sprintf(msg), err)
 	}
 	for _, sn := range sns {
-		err := s.deleteSubnet(sn.ID)
+		remainingPorts, err := s.listPorts(
+			ports.ListOpts{
+				NetworkID: id,
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		var errs []error
+		for _, port := range remainingPorts {
+			err = ports.Delete(s.NetworkClient, port.ID).ExtractErr()
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if len(errs) > 0 {
+			return fail.ErrListError(errs)
+		}
+
+		err = s.deleteSubnet(sn.ID)
 		if err != nil {
 			switch err.(type) {
 			case fail.ErrNotAvailable:
 				return err
 			default:
-				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
+				msg := fmt.Sprintf("failed to delete subnetwork '%s': %s", network.Name, ProviderErrorToString(err))
 				return fail.Errorf(fmt.Sprintf(msg), err)
 			}
 		}
 	}
+
 	err = networks.Delete(s.NetworkClient, id).ExtractErr()
 	if err != nil {
 		switch err.(type) {
@@ -601,8 +622,9 @@ func (s *Stack) deleteSubnet(id string) error {
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
-		if r.Name == id {
-			router = &r
+		theR := r
+		if theR.Name == id {
+			router = &theR
 			break
 		}
 	}

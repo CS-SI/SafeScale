@@ -29,6 +29,7 @@ import (
 	gc "github.com/gophercloud/gophercloud"
 	volumesv1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
+	volumesv3 "github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/gophercloud/gophercloud/pagination"
 
@@ -106,6 +107,12 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
+	// Add tags to volume
+	tags := make(map[string]string)
+	tags["Name"] = request.Name
+	tags["ManagedBy"] = "safescale"
+	tags["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
+
 	var v abstract.Volume
 	switch s.versions["volume"] {
 	case "v1":
@@ -116,6 +123,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 				Name:             request.Name,
 				Size:             request.Size,
 				VolumeType:       s.getVolumeType(request.Speed),
+				Metadata:         tags,
 			},
 		).Extract()
 		if err != nil {
@@ -133,6 +141,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 			Size:  vol.Size,
 			Speed: s.getVolumeSpeed(vol.VolumeType),
 			State: toVolumeState(vol.Status),
+			Tags:  tags,
 		}
 	case "v2":
 		var vol *volumesv2.Volume
@@ -142,6 +151,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 				Name:             request.Name,
 				Size:             request.Size,
 				VolumeType:       s.getVolumeType(request.Speed),
+				Metadata:         tags,
 			},
 		).Extract()
 		if err != nil {
@@ -159,6 +169,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.V
 			Size:  vol.Size,
 			Speed: s.getVolumeSpeed(vol.VolumeType),
 			State: toVolumeState(vol.Status),
+			Tags:  tags,
 		}
 	default:
 		err = fail.Errorf(fmt.Sprintf("unmanaged service 'volume' version '%s'", s.versions["volume"]), nil)
@@ -210,6 +221,7 @@ func (s *Stack) GetVolume(id string) (volume *abstract.Volume, xerr fail.Error) 
 		Size:  vol.Size,
 		Speed: s.getVolumeSpeed(vol.VolumeType),
 		State: toVolumeState(vol.Status),
+		Tags:  vol.Metadata,
 	}
 	return &av, nil
 }
@@ -219,12 +231,12 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	defer debug.NewTracer(nil, "", true).WithStopwatch().GoingIn().OnExitTrace()()
 
 	var vs []abstract.Volume
-	err := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(
+	err := volumesv3.List(s.VolumeClient, volumesv3.ListOpts{}).EachPage(
 		func(page pagination.Page) (bool, fail.Error) {
-			list, err := volumesv2.ExtractVolumes(page)
-			if err != nil {
-				log.Errorf("Error listing volumes: volume extraction: %+v", err)
-				return false, err
+			list, ierr := volumesv3.ExtractVolumes(page)
+			if ierr != nil {
+				log.Errorf("Error listing volumes: volume extraction: %+v", ierr)
+				return false, ierr
 			}
 			for _, vol := range list {
 				av := abstract.Volume{
@@ -233,6 +245,7 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 					Size:  vol.Size,
 					Speed: s.getVolumeSpeed(vol.VolumeType),
 					State: toVolumeState(vol.Status),
+					Tags:  vol.Metadata,
 				}
 				vs = append(vs, av)
 			}
