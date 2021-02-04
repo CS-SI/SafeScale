@@ -157,9 +157,10 @@ func (s *Stack) findVPCID() (*string, fail.Error) {
 		return nil, fail.Errorf(fmt.Sprintf("error listing routers: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	for _, r := range routers {
-		if r.Name == s.authOpts.VPCName {
+		theR := r
+		if theR.Name == s.authOpts.VPCName {
 			found = true
-			router = &r
+			router = &theR
 			break
 		}
 	}

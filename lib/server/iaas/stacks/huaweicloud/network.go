@@ -161,9 +161,10 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, fail.Er
 		return nil, fail.Errorf(fmt.Sprintf("failed to list routers: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	for _, r := range routerList {
-		if r.Name == vpcName {
+		theR := r
+		if theR.Name == vpcName {
 			found = true
-			router = &r
+			router = &theR
 			break
 		}
 	}
@@ -460,12 +461,6 @@ func convertNumberToIPv4(n uint32) net.IP {
 	IP := net.IPv4(a, b, c, d)
 	return IP
 }
-
-// VPL: replaced by utils.DoCIDRsIntersect
-// // cidrIntersects tells if the 2 CIDR passed as parameter intersect
-// func cidrIntersects(n1, n2 *net.IPNet) bool {
-//	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
-// }
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Error) {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -417,11 +418,18 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		VolumeType:          "SSD",
 		VolumeSize:          template.DiskSize,
 	}
+
 	// Defines server
 	userDataPhase1, err := userData.Generate("phase1")
 	if err != nil {
 		return nil, userData, err
 	}
+
+	// FIXME: Change volume size
+	metadata := make(map[string]string)
+	metadata["ManagedBy"] = "safescale"
+	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
+
 	srvOpts := serverCreateOpts{
 		Name:             request.ResourceName,
 		SecurityGroups:   []string{s.SecurityGroup.Name},
@@ -429,7 +437,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		FlavorRef:        request.TemplateID,
 		UserData:         userDataPhase1,
 		AvailabilityZone: az,
+		Metadata:         metadata,
 	}
+
 	// Defines host "Extension bootfromvolume" options
 	bdOpts := bootdiskCreateOptsExt{
 		CreateOptsBuilder: srvOpts,
@@ -551,8 +561,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		err = retryErr
-		return nil, userData, err
+		return nil, userData, retryErr
 	}
 	if host == nil {
 		return nil, userData, fail.Errorf(fmt.Sprintf("unexpected problem creating host"), nil)
@@ -697,19 +706,94 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 			return nil, err
 		}
 
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			// FIXME: Get creation time and/or metadata
+			logrus.Warn(spew.Sdump(server))
+			logrus.Warn(spew.Sdump(server.Created))
+		}
+
 		err = s.complementHost(host, server)
 		if err != nil {
 			return nil, err
 		}
 
-		if !host.OK() {
-			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			if !host.OK() {
+				logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+			}
 		}
 	default:
 		host.LastState = serverState
 	}
 
 	return host, err
+}
+
+// getMetadata retrieves host metadata
+// hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
+func (s *Stack) getMetadata(hostParam interface{}, timeout time.Duration) (_ map[string]string, xerr fail.Error) {
+	var host *abstract.Host
+
+	switch hostParam := hostParam.(type) {
+	case string:
+		host = abstract.NewHost()
+		host.ID = hostParam
+	case *abstract.Host:
+		host = hostParam
+	}
+	if host == nil {
+		return nil, fail.InvalidParameterError(
+			"hostParam", "must be a not-empty string or a *abstract.Host!",
+		)
+	}
+
+	hostRef := host.Name
+	if hostRef == "" {
+		hostRef = host.ID
+	}
+
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	var lastState map[string]string
+
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			server, err := servers.Get(s.ComputeClient, host.ID).Extract()
+			if err != nil {
+				return openstack.ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
+						return fail.AbortedError("", ferr)
+					},
+				)
+			}
+
+			if server == nil {
+				return fail.Errorf("error getting host, nil response from gophercloud", nil)
+			}
+
+			lastState = server.Metadata
+
+			return nil
+		},
+		temporal.GetMinDelay(),
+		timeout,
+	)
+	if retryErr != nil {
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
+			return nil, abstract.TimeoutError(
+				fmt.Sprintf(
+					"timeout waiting to get host '%s' information after %v", hostRef, timeout,
+				), timeout,
+			)
+		}
+
+		if aborted, ok := retryErr.(retry.ErrAborted); ok {
+			return nil, aborted.Cause()
+		}
+
+		return nil, retryErr
+	}
+
+	return lastState, nil
 }
 
 // complementHost complements Host data with content of server parameter
@@ -728,14 +812,20 @@ func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) erro
 	}
 
 	host.LastState = toHostState(server.Status)
-	// VPL: I don't get the point of this...
-	// switch host.LastState {
-	// case hoststate.STARTED, hoststate.STOPPED:
-	//	// continue
-	// default:
-	//	logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
-	// }
-	// ENDVPL
+
+	// retrieve host metadata
+	var ferr fail.Error
+	host.Tags, ferr = s.getMetadata(host, temporal.GetDefaultDelay())
+	if ferr != nil {
+		return ferr
+	}
+
+	// Add CreationDate to MetaData
+	host.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		logrus.Warnf("Tags content: %s", spew.Sdump(host.Tags))
+	}
 
 	// Updates Host Property propsv1.HostDescription
 	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
@@ -890,9 +980,10 @@ func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 			}
 
 			for _, srv := range list {
+				theSrv := srv
 				h := abstract.NewHost()
-				h.ID = srv.ID
-				err := s.complementHost(h, &srv)
+				h.ID = theSrv.ID
+				err := s.complementHost(h, &theSrv)
 				if err != nil {
 					return false, err
 				}

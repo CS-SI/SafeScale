@@ -263,7 +263,7 @@ func (s *Stack) DeleteFloatingIP(id string) error {
 		return fail.Wrap(err, "error deleting floating ip")
 	}
 
-	return err
+	return nil
 }
 
 // AssociateFloatingIP to host
