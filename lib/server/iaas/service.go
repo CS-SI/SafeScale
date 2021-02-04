@@ -167,6 +167,10 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 		for {
 			host, err = svc.InspectHost(host)
 			if err != nil {
+				if _, ok := err.(fail.ErrInvalidParameter); ok {
+					c <- err
+					break
+				}
 				continue
 			}
 			if host.LastState == state {
