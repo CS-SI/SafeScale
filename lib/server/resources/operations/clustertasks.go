@@ -302,7 +302,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove master from Cluster metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -777,7 +777,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove master from Cluster metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -825,7 +825,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			if derr := rh.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", rh.GetName()))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), rh.GetName()))
 			}
 		}
 	}()
@@ -1057,11 +1057,14 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 }
 
 type taskDeleteNodeParameters struct {
-	node *propertiesv3.ClusterNode
+	node   *propertiesv3.ClusterNode
 	master *host
 }
 
 func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnExitLogError(&xerr)
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1077,9 +1080,12 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	if p.node == nil {
 		return nil, fail.InvalidParameterError("params.node", "cannot be nil")
 	}
-	// if p.master.IsNull() {
-	// 	return nil, fail.InvalidParameterError("params.master", "cannot be null value of 'resources.Host'")
-	// }
+
+	defer func() {
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
+		}
+	}()
 
 	logrus.Debugf("Deleting Node '%s'", p.node.Name)
 	var host resources.Host
@@ -1090,9 +1096,11 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if xerr := c.deleteNode(task, host, p.master); xerr != nil {
-		logrus.Errorf("Failed to delete Node '%s'", p.node.Name)
 		return nil, xerr
 	}
 
@@ -1124,6 +1132,9 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
+	}
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	logrus.Debugf("Deleting Master '%s'", p.node.Name)

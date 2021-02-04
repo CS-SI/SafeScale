@@ -665,7 +665,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	srvOpts := servers.CreateOpts{
-		Name: request.ResourceName,
+		Name:             request.ResourceName,
 		Networks:         hostNets,
 		FlavorRef:        request.TemplateID,
 		ImageRef:         request.ImageID,
@@ -701,6 +701,8 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				case *retry.ErrStopRetry:
 					innerXErr = fail.ToError(innerXErr.Cause())
 				case *fail.ErrInvalidRequest: // useless to retry on bad request...
+					return retry.StopRetryError(innerXErr)
+				case *fail.ErrDuplicate: // useless to retry on duplicate (no matter on what resource the duplicate is found)...
 					return retry.StopRetryError(innerXErr)
 				}
 				if server != nil {
