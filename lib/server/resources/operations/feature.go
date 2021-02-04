@@ -390,7 +390,7 @@ func checkParameters(f feature, v data.Map) fail.Error {
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (f *feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if f.IsNull() {
@@ -431,11 +431,7 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 		return nil, fail.NotAvailableError("failed to find a way to install '%s'", featureName)
 	}
 
-	// 'v' may be updated by parallel tasks, so use copy of it
-	// myV := make(data.Map, len(v))
-	// for key, value := range v {
-	// 	myV[key] = value
-	// }
+	// 'v' may be updated by concurrent tasks, so use copy of it
 	myV := v.Clone()
 
 	// Inits target parameters
@@ -444,7 +440,7 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 	}
 
 	// Checks required parameters have value
-	if xerr = checkParameters(f, myV); xerr != nil {
+	if xerr = checkParameters(*f, myV); xerr != nil {
 		return nil, xerr
 	}
 
@@ -464,13 +460,14 @@ func (f feature) Add(target resources.Targetable, v data.Map, s resources.Featur
 			return nil, fail.Wrap(xerr, "failed to install requirements")
 		}
 	}
-	results, xerr := installer.Add(&f, target, myV, s)
+	results, xerr := installer.Add(f, target, myV, s)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
 
-	return results, xerr
+	return results, target.RegisterFeature(f.task, f, nil)
 }
 
 // Remove uninstalls the feature from the target
@@ -532,10 +529,14 @@ func (f feature) Remove(target resources.Targetable, v data.Map, s resources.Fea
 	}
 
 	results, xerr = installer.Remove(&f, target, myV, s)
+	if xerr != nil {
+		return results, xerr
+	}
+
 	// if xerr == nil {
 	// 	checkCache.Reset(f.DisplayName() + "@" + targetName)
 	// }
-	return results, xerr
+	return results, target.UnregisterFeature(f.task, f.GetName())
 }
 
 const yamlKey = "feature.requirements.features"

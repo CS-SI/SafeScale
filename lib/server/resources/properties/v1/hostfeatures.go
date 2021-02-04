@@ -51,7 +51,7 @@ func (hif *HostInstalledFeature) Reset() {
 // Clone ...
 // satisfies interface data.Clonable
 func (hif HostInstalledFeature) Clone() data.Clonable {
-	return newClusterInstalledFeature().Replace(&hif)
+	return NewClusterInstalledFeature().Replace(&hif)
 }
 
 // Replace ...

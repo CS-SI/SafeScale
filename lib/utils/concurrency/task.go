@@ -556,7 +556,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		return nil, err
 	}
 
-	if status == READY {  // Waiting a ready task always succeed by design
+	if status == READY { // Waiting a ready task always succeed by design
 		return nil, nil
 	}
 	if status == DONE {

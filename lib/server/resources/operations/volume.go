@@ -293,7 +293,7 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 	defer func() {
 		if xerr != nil {
 			if derr := svc.DeleteVolume(av.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete volume '%s'", req.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", actionFromError(xerr), req.Name))
 			}
 		}
 	}()
@@ -452,7 +452,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 	defer func() {
 		if xerr != nil {
 			if derr := svc.DeleteVolumeAttachment(targetID, vaID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to detach Volume '%s' from Host '%s'", volumeName, targetName))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", actionFromError(xerr), volumeName, targetName))
 			}
 		}
 	}()
@@ -517,7 +517,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 			defer func() {
 				if xerr != nil {
 					if derr := server.UnmountBlockDevice(task, volumeUUID); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount volume '%s' from host '%s'", volumeName, targetName))
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(xerr), volumeName, targetName))
 					}
 				}
 			}()
@@ -559,7 +559,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 	defer func() {
 		if xerr != nil {
 			if derr := server.UnmountBlockDevice(task, volumeUUID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount volume '%s' from host '%s'", volumeName, targetName))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(xerr), volumeName, targetName))
 			}
 			derr := host.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -587,7 +587,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to update metadata of host '%s'", targetName))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to update metadata of host '%s'", actionFromError(xerr), targetName))
 			}
 		}
 	}()

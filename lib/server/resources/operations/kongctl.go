@@ -123,7 +123,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
 // Returns rule name and error
-func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Map) (string, fail.Error) {
+func (k *KongController) Apply(rule map[string]interface{}, values *data.Map) (string, fail.Error) {
 	ruleType, ok := rule["type"].(string)
 	if !ok {
 		return "", fail.InvalidParameterError("rule['type']", "is not a string")
@@ -133,6 +133,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	if xerr != nil {
 		return rule["name"].(string), xerr
 	}
+
 	content, xerr := k.realizeRuleData(strings.Trim(rule["content"].(string), "\n"), *values)
 	if xerr != nil {
 		return ruleName, xerr
@@ -169,7 +170,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	(*values)["PublicIP"] = (*values)["EndpointIP"]
 	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
 
-	// Analyzes the rule...
+	// Analyze the rule...
 	switch ruleType {
 	case "service":
 		unjsoned := map[string]interface{}{}

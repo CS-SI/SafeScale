@@ -298,7 +298,7 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 // Delete a cluster
 func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete cluster")
+	defer fail.OnExitWrapError(&err, "cannot delete Cluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -567,7 +567,7 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 // DeleteNode removes node(s) from a cluster
 func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot delete cluster node")
+	defer fail.OnExitWrapError(&err, "cannot delete Cluster Node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {

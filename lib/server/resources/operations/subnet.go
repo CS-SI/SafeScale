@@ -360,7 +360,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer func() {
 		if xerr != nil && as != nil && !req.KeepOnFailure {
 			if derr := svc.DeleteSubnet(as.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -374,7 +374,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := rs.core.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -402,7 +402,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := subnetGWSG.UnbindFromSubnet(task, rs); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group for gateway from subnet"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateway from subnet", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -414,7 +414,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := subnetInternalSG.UnbindFromSubnet(task, rs); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group for Hosts from Subnet"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for Hosts from Subnet", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -447,7 +447,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		defer func() {
 			if xerr != nil && as != nil && as.VIP != nil && !req.KeepOnFailure {
 				if derr := svc.DeleteVIP(as.VIP); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete VIP"))
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", actionFromError(xerr)))
 				}
 			}
 		}()
@@ -524,7 +524,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 					})
 				})
 				if derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to detach Subnet from Network"))
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Subnet from Network", actionFromError(xerr)))
 				}
 			}
 		}()
@@ -612,8 +612,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	gwRequest := abstract.HostRequest{
-		ImageID:          img.ID,
-		Subnets:          []*abstract.Subnet{as},
+		ImageID: img.ID,
+		Subnets: []*abstract.Subnet{as},
 		// KeyPair:          keypair,
 		SshPort:          req.DefaultSshPort,
 		TemplateID:       template.ID,
@@ -684,7 +684,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 				}
 				if failover {
 					if derr := rs.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind VIP from gateway"))
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
 					}
 				}
 			}
@@ -714,7 +714,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 						_ = xerr.AddConsequence(derr)
 					}
 					if derr := rs.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind VIP from gateway"))
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
 					}
 				}
 			}()
@@ -977,7 +977,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := sg.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", req.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), req.Name))
 			}
 		}
 	}()
@@ -1058,7 +1058,7 @@ func (rs subnet) createPublicIPSecurityGroup(task concurrency.Task, req abstract
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := sg.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", req.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), req.Name))
 			}
 		}
 	}()
@@ -1095,7 +1095,7 @@ func (rs subnet) undoCreateSecurityGroup(task concurrency.Task, errorPtr *fail.E
 	if *errorPtr != nil && !keepOnFailure {
 		sgName := sg.GetName()
 		if derr := sg.Delete(task); derr != nil {
-			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Subnet's Security Group for gateways '%s'", sgName))
+			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", actionFromError(*errorPtr), sgName))
 		}
 	}
 }
@@ -1117,7 +1117,7 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := sg.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Subnet's Security Group for gateways '%s'", req.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", actionFromError(xerr), req.Name))
 			}
 		}
 	}()
@@ -1166,7 +1166,7 @@ func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host)
 	defer fail.OnPanic(&xerr)
 
 	if xerr := rs.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
-		return fail.Wrap(xerr, "cleaning up on failure, failed to unbind gateway '%s' from VIP", host.GetName())
+		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", actionFromError(xerr), host.GetName())
 	}
 
 	return nil
@@ -1380,7 +1380,7 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		}
 
 		var (
-			id string
+			id  string
 			rgw resources.Host
 		)
 
@@ -1398,8 +1398,8 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		}
 
 		if ip, innerXErr = rgw.GetPublicIP(task); innerXErr != nil {
-				return innerXErr
-			}
+			return innerXErr
+		}
 
 		return nil
 	})
@@ -1544,7 +1544,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
-				logrus.Warnf("Subnet not found on provider side, cleaning up metadata")
+				logrus.Debugf("Subnet not found on provider side, cleaning up metadata")
 			default:
 				return innerXErr
 			}

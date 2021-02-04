@@ -40,7 +40,10 @@ type genericPackager struct {
 }
 
 // Check checks if the feature is installed
-func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
+func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (results resources.Results, xerr fail.Error) {
+	results = nil
+	defer fail.OnPanic(xerr)
+
 	if f.IsNull() {
 		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
@@ -63,11 +66,18 @@ func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v d
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
-	return worker.Proceed(v, s)
+
+	if results, xerr = worker.Proceed(v, s); xerr != nil {
+		xerr = fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+	}
+	return results, xerr
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
+func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (results resources.Results, xerr fail.Error) {
+	results = nil
+	defer fail.OnPanic(&xerr)
+
 	if f.IsNull() {
 		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
@@ -92,11 +102,17 @@ func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v dat
 		return nil, xerr
 	}
 
-	return worker.Proceed(v, s)
+	if results, xerr = worker.Proceed(v, s); xerr != nil {
+		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+	}
+	return results, xerr
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
+func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (results resources.Results, xerr fail.Error) {
+	results = nil
+	defer fail.OnPanic(&xerr)
+
 	if f.IsNull() {
 		return nil, fail.InvalidParameterError("f", "cannot be nil")
 	}
@@ -119,7 +135,11 @@ func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v 
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
-	return worker.Proceed(v, s)
+
+	if results, xerr = worker.Proceed(v, s); xerr != nil {
+		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+	}
+	return results, xerr
 }
 
 // aptInstaller is an installer using script to add and remove a feature
