@@ -346,6 +346,8 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			cloneV["HostIP"] = h.PrivateIp
 			cloneV["Hostname"] = h.Name
 			cloneV["ShortHostname"] = h.Name
+			cloneV["StepID"] = fmt.Sprintf("%s(%s):step(%s)@%s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
 				return nil, err
@@ -379,6 +381,12 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				)
 				continue
 			}
+
+			if _, ok := result.(StepResult); !ok {
+				stepID := fmt.Sprintf("%s(%s):step(%s)@%s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, k)
+				return nil, fmt.Errorf("result of step %s was not of type StepResult: %v", stepID, result)
+			}
+
 			results[k] = result.(StepResult)
 
 			if !results[k].Successful() {
