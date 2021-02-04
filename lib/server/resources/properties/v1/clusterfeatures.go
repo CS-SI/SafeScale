@@ -31,8 +31,8 @@ type ClusterInstalledFeature struct {
 	Requires   map[string]struct{} `json:"requires,omitempty"`
 }
 
-// newClusterInstalledFeature ...
-func newClusterInstalledFeature() *ClusterInstalledFeature {
+// NewClusterInstalledFeature ...
+func NewClusterInstalledFeature() *ClusterInstalledFeature {
 	return &ClusterInstalledFeature{
 		RequiredBy: map[string]struct{}{},
 		Requires:   map[string]struct{}{},
@@ -42,7 +42,7 @@ func newClusterInstalledFeature() *ClusterInstalledFeature {
 // Clone ...
 // satisfies interface data.Clonable
 func (cif ClusterInstalledFeature) Clone() data.Clonable {
-	return newClusterInstalledFeature().Replace(&cif)
+	return NewClusterInstalledFeature().Replace(&cif)
 }
 
 // Replace ...

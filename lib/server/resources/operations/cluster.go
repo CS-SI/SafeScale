@@ -82,6 +82,8 @@ func nullCluster() *cluster {
 
 // NewCluster ...
 func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if task.IsNull() {
 		return nullCluster(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
@@ -89,22 +91,22 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	defer fail.OnPanic(&xerr)
-
-	core, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
+	c, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
 
-	c := cluster{
+	rc := cluster{
 		service: svc,
-		core:    core,
+		core:    c,
 	}
-	return &c, nil
+	return &rc, nil
 }
 
 // LoadCluster ...
 func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if task.IsNull() {
 		return nullCluster(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
@@ -115,14 +117,12 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 		return nullCluster(), fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer fail.OnPanic(&xerr)
-
-	instance, xerr := NewCluster(task, svc)
+	rc, xerr := NewCluster(task, svc)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
 
-	if xerr = instance.Read(task, name); xerr != nil {
+	if xerr = rc.Read(task, name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -133,21 +133,21 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 	}
 
 	// From here, we can deal with legacy
-	if xerr = instance.(*cluster).updateNodesPropertyIfNeeded(task); xerr != nil {
+	if xerr = rc.(*cluster).updateClusterNodesPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
-	if xerr = instance.(*cluster).updateNetworkPropertyIfNeeded(task); xerr != nil {
+	if xerr = rc.(*cluster).updateClusterNetworkPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
-	if xerr = instance.(*cluster).updateDefaultsPropertyIfNeeded(task); xerr != nil {
+	if xerr = rc.(*cluster).updateClusterDefaultsPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
 
-	return instance, nil
+	return rc, nil
 }
 
-// updateNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
-func (c *cluster) updateNodesPropertyIfNeeded(task concurrency.Task) fail.Error {
+// updateClusterNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
+func (c *cluster) updateClusterNodesPropertyIfNeeded(task concurrency.Task) fail.Error {
 	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.NodesV3) {
 			return nil
@@ -267,8 +267,8 @@ func (c *cluster) updateNodesPropertyIfNeeded(task concurrency.Task) fail.Error 
 	})
 }
 
-// updateNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
-func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Error {
+// updateClusterNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
+func (c *cluster) updateClusterNetworkPropertyIfNeeded(task concurrency.Task) fail.Error {
 	xerr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(clusterproperty.NetworkV3) {
 			return fail.AlteredNothingError()
@@ -352,8 +352,8 @@ func (c *cluster) updateNetworkPropertyIfNeeded(task concurrency.Task) fail.Erro
 	return xerr
 }
 
-// updateDefaultsPropertyIfNeeded ...
-func (c *cluster) updateDefaultsPropertyIfNeeded(task concurrency.Task) fail.Error {
+// updateClusterDefaultsPropertyIfNeeded ...
+func (c *cluster) updateClusterDefaultsPropertyIfNeeded(task concurrency.Task) fail.Error {
 	return c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV2) {
 			return fail.AlteredNothingError()
@@ -416,17 +416,25 @@ func (c *cluster) IsNull() bool {
 // GetName returns the name if the cluster
 // Satisfies interface data.Identifiable
 func (c cluster) GetName() string {
+	if c.IsNull() {
+		return ""
+	}
 	return c.core.GetName()
 }
 
 // GetID returns the name of the cluster
 // Satisfies interface data.Identifiable
 func (c cluster) GetID() string {
+	if c.IsNull() {
+		return ""
+	}
 	return c.core.GetName()
 }
 
 // Create creates the necessary infrastructure of the Cluster
 func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -440,14 +448,14 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		fmt.Sprintf("Starting creation of infrastructure of cluster '%s'...", req.Name),
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage("failed to create cluster infrastructure:"))
-	defer fail.OnPanic(&xerr)
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage("failed to create cluster infrastructure:"))
 
-	if _, xerr := LoadCluster(task, c.GetService(), req.Name); xerr == nil {
+	// Check if cluster exists in metadata; if yes, error
+	if _, xerr = LoadCluster(task, c.GetService(), req.Name); xerr == nil {
 		return fail.DuplicateError("a cluster named '%s' already exist", req.Name)
 	}
 
-	// Creates first metadata of cluster after initialization
+	// Create first metadata of Cluster after initialization
 	if xerr = c.firstLight(task, req); xerr != nil {
 		return xerr
 	}
@@ -455,12 +463,12 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	// Starting from here, delete metadata if exiting with error
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			logrus.Debugf("Cleaning up on failure, deleting metadata of Cluster '%s'...", req.Name)
+			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", actionFromError(xerr), req.Name)
 			if derr := c.core.Delete(task); derr != nil {
-				logrus.Errorf("cleaning up on failure, failed to delete metadata of Cluster '%s'", req.Name)
+				logrus.Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", actionFromError(xerr), req.Name)
 				_ = xerr.AddConsequence(derr)
 			} else {
-				logrus.Debugf("Cleaning up on failure, successfully deleted metadata of Cluster '%s'", req.Name)
+				logrus.Debugf("Cleaning up on failure, successfully deleted metadata of Cluster '%s'", actionFromError(xerr), req.Name)
 			}
 		}
 	}()
@@ -469,6 +477,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	// Obtain number of nodes to create
 	_, privateNodeCount, _, xerr := c.determineRequiredNodes(task)
 	if xerr != nil {
 		return xerr
@@ -498,17 +507,17 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		if xerr != nil && !req.KeepOnFailure {
 			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
 			if derr := rs.Delete(task); derr != nil {
-				logrus.Errorf("Cleaning up on failure, failed to delete Subnet '%s'", rs.GetName())
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
+				logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", actionFromError(xerr), rs.GetName())
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", actionFromError(xerr)))
 			} else {
-				logrus.Debugf("Cleaning up on failure, successfully deleted Subnet '%s'", rs.GetName())
+				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", actionFromError(xerr), rs.GetName())
 				if req.NetworkID == "" {
-					logrus.Debugf("Cleaning up on failure, deleting Network '%s'...", rn.GetName())
+					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", actionFromError(xerr), rn.GetName())
 					if derr := rn.Delete(task); derr != nil {
-						logrus.Errorf("cleaning up on failure, failed to delete Network '%s'", rn.GetName())
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+						logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", actionFromError(xerr), rn.GetName())
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", actionFromError(xerr)))
 					} else {
-						logrus.Debugf("Cleaning up on failure, successfully deleted Network '%s'", rn.GetName())
+						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", actionFromError(xerr), rn.GetName())
 					}
 				}
 			}
@@ -1515,6 +1524,8 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv3.
 
 // Start starts the cluster
 func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1524,8 +1535,7 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// If the cluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
@@ -2830,7 +2840,7 @@ func (c *cluster) deleteMaster(task concurrency.Task, host resources.Host) fail.
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to restore master '%s' in cluster metadata", master.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore master '%s' in cluster metadata", actionFromError(xerr), master.Name))
 			}
 		}
 	}()
@@ -2916,7 +2926,7 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 			})
 			if derr != nil {
 				logrus.Errorf("failed to restore node ownership in cluster")
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to restore node ownership in cluster metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore node ownership in cluster metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -2980,7 +2990,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to set cluster state to DEGRADED"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to set cluster state to DEGRADED", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -3095,7 +3105,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 		}
 	}
 	if len(cleaningErrors) > 0 {
-		return fail.NewErrorList(cleaningErrors)
+		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
 	}
 
 	// --- Deletes the Network, Subnet and gateway ---
@@ -3136,7 +3146,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 			case *fail.ErrNotFound:
 				// Subnet not found, consider as a successful deletion and continue
 			default:
-				return xerr
+				return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 			}
 		}
 	}
@@ -3173,7 +3183,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 				// network not found, consider as a successful deletion and continue
 			default:
 				logrus.Errorf("Failed to delete Network '%s'", networkName)
-				return xerr
+				return fail.Wrap(xerr, "failed to delete Network '%s'", networkName)
 			}
 		}
 		logrus.Infof("Network '%s' successfully deleted.", networkName)
@@ -3273,13 +3283,14 @@ func (c *cluster) configureCluster(task concurrency.Task) (xerr fail.Error) {
 	return nil
 }
 
-func (c *cluster) determineRequiredNodes(task concurrency.Task) (uint, uint, uint, fail.Error) {
+func (c cluster) determineRequiredNodes(task concurrency.Task) (uint, uint, uint, fail.Error) {
 	if c.makers.MinimumRequiredServers != nil {
-		a, b, c, xerr := c.makers.MinimumRequiredServers(task, c)
+		g, m, n, xerr := c.makers.MinimumRequiredServers(task, &c)
 		if xerr != nil {
 			return 0, 0, 0, xerr
 		}
-		return a, b, c, nil
+
+		return g, m, n, nil
 	}
 	return 0, 0, 0, nil
 }
@@ -3644,7 +3655,7 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to restore cluster nodes metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore cluster nodes metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -3662,4 +3673,29 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 	}
 
 	return removedNodes, nil
+}
+
+// IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
+func (rc cluster) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
+	found = false
+	defer fail.OnPanic(&xerr)
+
+	if rc.IsNull() {
+		return false, fail.InvalidInstanceError()
+	}
+	if name = strings.TrimSpace(name); name == "" {
+		return false, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	return found, rc.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("`propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			_, found = featuresV1.Installed[name]
+			return nil
+		})
+	})
 }
