@@ -40,6 +40,9 @@ func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, fail.Error) {
 func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
 	// Delete DHCP options
 	namedDHCPOptions, err := s.checkDHCPOptionsName(onet)
+	if err != nil {
+		return err
+	}
 	// prevent deleting default dhcp options
 	if checkName && !namedDHCPOptions {
 		return nil

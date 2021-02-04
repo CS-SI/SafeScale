@@ -247,7 +247,8 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	}
 	var nets []*abstract.Network
 	for _, onet := range res.Subnets {
-		nets = append(nets, toNetwork(&onet))
+		theSubnet := onet
+		nets = append(nets, toNetwork(&theSubnet))
 	}
 
 	return nets, nil

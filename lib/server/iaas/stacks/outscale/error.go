@@ -50,6 +50,8 @@ func normalizeErrorWithReason(reason string, err error) error {
 				return fail.InvalidRequestError("not included in VPC CIDR")
 			case "9058":
 				return fail.DuplicateError("network already exist")
+			case "10042":
+				return fail.ForbiddenError("quota exceeded")
 			default:
 				merr := model.Errors[0]
 				reqId := model.ResponseContext.RequestId
@@ -96,6 +98,8 @@ func normalizeError(err error) error {
 				return fail.InvalidRequestError("not included in VPC CIDR")
 			case "9058":
 				return fail.DuplicateError("network already exist")
+			case "10042":
+				return fail.ForbiddenError("quota exceeded")
 			default:
 				merr := model.Errors[0]
 				reqId := model.ResponseContext.RequestId
