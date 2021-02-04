@@ -31,41 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// // ProviderErrorToString creates an error string from openstack api error
-// func ProviderErrorToString(err error) string {
-//     if err == nil {
-//         return ""
-//     }
-//     if _, ok := err.(gophercloud.ErrUnexpectedResponseCode); ok {
-//         switch e := err.(type) {
-//         case gophercloud.ErrDefault401:
-//             return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
-//         case *gophercloud.ErrDefault401:
-//             return fmt.Sprintf("code: 401, reason: %s", string(e.Body))
-//         case gophercloud.ErrDefault404:
-//             return fmt.Sprintf("code: 404, reason: %s", string(e.Body))
-//         case *gophercloud.ErrDefault404:
-//             return fmt.Sprintf("code: 404, reason: %s", string(e.Body))
-//         case gophercloud.ErrDefault409:
-//             return fmt.Sprintf("code: 409, reason: %s", string(e.Body))
-//         case *gophercloud.ErrDefault409:
-//             return fmt.Sprintf("code: 409, reason: %s", string(e.Body))
-//         case gophercloud.ErrDefault500:
-//             return fmt.Sprintf("code: 500, reason: %s", string(e.Body))
-//         case *gophercloud.ErrDefault500:
-//             return fmt.Sprintf("code: 500, reason: %s", string(e.Body))
-//         case gophercloud.ErrUnexpectedResponseCode:
-//             return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
-//         case *gophercloud.ErrUnexpectedResponseCode:
-//             return fmt.Sprintf("code: %d, reason: %s", e.Actual, string(e.Body))
-//         default:
-//             logrus.Debugf("Error code not yet handled specifically: ProviderErrorToString(%s, %+v)\n", reflect.TypeOf(err).String(), err)
-//             return err.Error()
-//         }
-//     }
-//     return ""
-// }
-
 // NormalizeError translates gophercloud or openstack error to SafeScale error
 func NormalizeError(err error) fail.Error {
 	if err == nil {
@@ -213,6 +178,8 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 					}
 				}
 			}
+		} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
+			msg = lvl1["message"].(string)
 		} else if lvl1, ok := body["message"].(string); ok {
 			msg = lvl1
 		}

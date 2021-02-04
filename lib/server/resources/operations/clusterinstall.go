@@ -84,7 +84,7 @@ func (c *cluster) TargetType() featuretargettype.Enum {
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-// satisfies feature.Targetable interface
+// satisfies resources.Targetable interface
 func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	if c == nil {
 		logrus.Error(fail.InvalidInstanceError().Error())
@@ -119,7 +119,8 @@ func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
 }
 
 // FIXME: include the cluster part of setImplicitParameters() from feature
-// ComplementFeatureParameters configures parameters that are implicitely defined, based on target
+// ComplementFeatureParameters configures parameters that are implicitly defined, based on target
+// satisfies interface resources.Targetable
 func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
 	if c == nil {
 		return fail.InvalidInstanceError()
@@ -225,11 +226,15 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 }
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
+// satisfies interface resources.Targetable
 func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if feat.IsNull() {
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
@@ -248,25 +253,28 @@ func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature,
 				if innerXErr != nil {
 					return innerXErr
 				}
-				item = &propertiesv1.ClusterInstalledFeature{
-					Requires: requirements,
-				}
+				item = propertiesv1.NewClusterInstalledFeature()
+				item.Requires = requirements
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if !requiredBy.IsNull() {
-				item.RequiredBy[requiredBy.GetName()] = struct{}{}
+			if rf, ok := requiredBy.(*feature); ok && !rf.IsNull() {
+				item.RequiredBy[rf.GetName()] = struct{}{}
 			}
 			return nil
 		})
 	})
 }
 
-// DeregisterFeature deregisters a Feature from Cluster metadata
-func (c *cluster) DeregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+// UnregisterFeature unregisters a Feature from Cluster metadata
+// satisfies interface resources.Targetable
+func (c *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
+	}
+	if task.IsNull() {
+		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
@@ -279,9 +287,7 @@ func (c *cluster) DeregisterFeature(task concurrency.Task, feat string) (xerr fa
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			if _, ok := featuresV1.Installed[feat]; ok {
-				delete(featuresV1.Installed, feat)
-			}
+			delete(featuresV1.Installed, feat)
 			for _, v := range featuresV1.Installed {
 				delete(v.RequiredBy, feat)
 			}
@@ -346,7 +352,7 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 	return feat.Add(c, vars, settings)
 }
 
-// CheckFeature tells if a feature is installed on the cluster
+// IsFeatureInstalled tells if a feature is installed on the cluster
 func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()

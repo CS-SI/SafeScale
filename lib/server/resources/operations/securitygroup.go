@@ -230,7 +230,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 		// case *fail.ErrNotFound:
 		// 	// not found, good, continue
 		// default:
-			return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
 		// }
 	}
 	if found {
@@ -263,7 +263,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	defer func() {
 		if xerr != nil {
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s'", name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), name))
 			}
 		}
 	}()
@@ -276,7 +276,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	defer func() {
 		if xerr != nil {
 			if derr := sg.core.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s' metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", actionFromError(xerr)))
 			}
 		}
 	}()

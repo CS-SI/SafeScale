@@ -56,6 +56,7 @@ type Host interface {
 	GetState(task concurrency.Task) hoststate.Enum                                                                                                 // returns the current state of the host, with error handling
 	GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error)                                                                      // returns the volumes attached to the host
 	IsClusterMember(task concurrency.Task) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
+	IsFeatureInstalled(task concurrency.Task, f string) (bool, fail.Error)                                                                         // tells if a feature is installed on Host, using only metadata
 	IsGateway(task concurrency.Task) (bool, fail.Error)                                                                                            // tells of  the host acts as a gateway
 	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                       // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host

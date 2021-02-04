@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
@@ -60,7 +59,7 @@ const (
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
 
-	defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
+	// defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
 )
 
 // host ...
@@ -601,13 +600,13 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
 			return nil, xerr
 		}
-		return nil, fail.Wrap(xerr, "failed to create compute resource '%s'", hostReq.ResourceName)
+		return nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)
 	}
 
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete host '%s'", ahf.Core.Name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), ahf.Core.Name))
 			}
 		}
 	}()
@@ -627,7 +626,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
 			if derr := rh.core.Delete(task); derr != nil {
-				logrus.Errorf("cleaning up after failure, failed to delete host '%s' metadata: %v", ahf.Core.Name, derr)
+				logrus.Errorf("cleaning up on %s, failed to delete host '%s' metadata: %v", actionFromError(xerr), ahf.Core.Name, derr)
 				_ = xerr.AddConsequence(derr)
 			}
 		}
@@ -701,7 +700,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer rh.onFailureUndoSetSecurityGroups(task, &xerr, hostReq.KeepOnFailure)
+	defer rh.undoSetSecurityGroups(task, &xerr, hostReq.KeepOnFailure)
 
 	if xerr = rh.cacheAccessInformation(task); xerr != nil {
 		return nil, xerr
@@ -804,7 +803,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					if derr := gwsg.UnbindFromHost(task, rh); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", gwsg.GetName(), rh.GetName()))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), gwsg.GetName(), rh.GetName()))
 					}
 				}
 			}()
@@ -831,7 +830,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					if derr := pubipsg.UnbindFromHost(task, rh); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", pubipsg.GetName(), rh.GetName()))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), pubipsg.GetName(), rh.GetName()))
 					}
 				}
 			}()
@@ -934,7 +933,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 		// defer func() {
 		// 	if innerXErr != nil && !req.KeepOnFailure {
 		// 		if derr := hostSG.UnbindFromHost(task, rh); derr != nil {
-		// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Security Group '%s' from Host '%s'", hostSG.GetName(), rh.GetName()))
+		// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), hostSG.GetName(), rh.GetName()))
 		// 		}
 		// 	}
 		// }()
@@ -974,7 +973,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 	})
 }
 
-func (rh *host) onFailureUndoSetSecurityGroups(task concurrency.Task, errorPtr *fail.Error, keepOnFailure bool) {
+func (rh *host) undoSetSecurityGroups(task concurrency.Task, errorPtr *fail.Error, keepOnFailure bool) {
 	if errorPtr == nil {
 		logrus.Errorf("trying to call a cancel function from a nil error; cancel not run")
 		return
@@ -1003,7 +1002,7 @@ func (rh *host) onFailureUndoSetSecurityGroups(task concurrency.Task, errorPtr *
 					}
 				}
 				if len(errors) > 0 {
-					return fail.Wrap(fail.NewErrorList(errors), "cleaning up on failure, failed to unbind Security Groups from Host")
+					return fail.Wrap(fail.NewErrorList(errors), "cleaning up on %s, failed to unbind Security Groups from Host", actionFromError(*errorPtr))
 				}
 
 				// // delete host default security group
@@ -1026,7 +1025,7 @@ func (rh *host) onFailureUndoSetSecurityGroups(task concurrency.Task, errorPtr *
 			})
 		})
 		if derr != nil {
-			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to cleanup Security Groups"))
+			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to cleanup Security Groups", actionFromError(*errorPtr)))
 		}
 	}
 }
@@ -1247,7 +1246,7 @@ func (rh *host) undoUpdateSubnets(task concurrency.Task, req abstract.HostReques
 			})
 		})
 		if xerr != nil {
-			_ = (*errorPtr).AddConsequence(fail.Wrap(xerr, "cleaning up on failure, failed to remove Host relationships with Subnets"))
+			_ = (*errorPtr).AddConsequence(fail.Wrap(xerr, "cleaning up on %s, failed to remove Host relationships with Subnets", actionFromError(xerr)))
 		}
 	}
 }
@@ -1414,7 +1413,7 @@ func getOrCreateDefaultSubnet(task concurrency.Task, svc iaas.Service) (rs resou
 			if xerr != nil {
 				derr := rs.Delete(task)
 				if derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete subnet '%s'", abstract.SingleHostSubnetName))
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet '%s'", actionFromError(xerr), abstract.SingleHostSubnetName))
 				}
 			}
 		}()
@@ -1627,14 +1626,14 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			return innerXErr
 		}
 
-		// Unbind Security Group from Host
+		// Unbind Security Groups from Host
 		innerXErr = props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			// Unbind Security Groups from IPAddress
+			// Unbind Security Groups from Host
 			var errors []error
 			for _, v := range hsgV1.ByID {
 				rsg, derr := LoadSecurityGroup(task, svc, v.ID)
@@ -2180,159 +2179,6 @@ func (rh *host) Resize(hostSize abstract.HostSizingRequirements) (xerr fail.Erro
 	return fail.NotImplementedError("Host.Resize() not yet implemented")
 }
 
-// AddFeature handles 'safescale host add-feature <host name or id> <feature name>'
-func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
-	defer tracer.Exiting()
-
-	feat, xerr := NewFeature(task, name)
-	if xerr != nil {
-		return nil, xerr
-	}
-	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		var innerXErr fail.Error
-		outcomes, innerXErr = feat.Add(rh, vars, settings)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// updates HostFeatures property for host
-		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
-			}
-			requires, innerXErr := feat.GetRequirements()
-			if innerXErr != nil {
-				return innerXErr
-			}
-			hostFeaturesV1.Installed[name] = &propertiesv1.HostInstalledFeature{
-				HostContext: true,
-				Requires:    requires,
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-	return outcomes, nil
-}
-
-// CheckFeature ...
-func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
-	defer tracer.Exiting()
-
-	feat, xerr := NewFeature(task, name)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// Wait for SSH service on remote host first
-	// ssh, err := mh.GetSSHConfig(task)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-	// _, err = ssh.WaitServerReady(2 * time.Minute)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-
-	return feat.Check(&rh, vars, settings)
-}
-
-// DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
-	}
-
-	tracer := debug.NewTracer(task, false /*Trace.IPAddress, */, "(%s)", name).Entering()
-	defer tracer.Exiting()
-
-	feat, xerr := NewFeature(task, name)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// // Wait for SSH service on remote host first
-	// ssh, err := mh.GetSSHConfig(task)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-	// _, err = ssh.WaitServerReady(2 * time.Minute)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-
-	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		outcomes, innerXErr := feat.Remove(rh, vars, settings)
-		if innerXErr != nil {
-			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, rh.GetName())
-		}
-
-		if !outcomes.Successful() {
-			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, rh.GetName())
-			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
-			return fail.NewError(msg)
-		}
-
-		// updates HostFeatures property for host
-		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
-			}
-
-			delete(hostFeaturesV1.Installed, name)
-			return nil
-		})
-	})
-	return nil, xerr
-}
-
-// TargetType returns the type of the target.
-// satisfies install.Targetable interface.
-func (rh host) TargetType() featuretargettype.Enum {
-	if rh.IsNull() {
-		return featuretargettype.UNKNOWN
-	}
-	return featuretargettype.HOST
-}
-
 // GetPublicIP returns the public IP address of the host
 func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -2462,128 +2308,6 @@ func (rh host) getAccessIP(task concurrency.Task) string {
 	return rh.accessIP
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-// satisfies interface install.Targetable
-func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
-	if rh.IsNull() {
-		logrus.Error(fail.InvalidInstanceError().Error())
-		return map[uint8]installmethod.Enum{}
-	}
-	if task.IsNull() {
-		logrus.Error(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
-		return map[uint8]installmethod.Enum{}
-	}
-
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
-
-	if rh.installMethods == nil {
-		rh.installMethods = map[uint8]installmethod.Enum{}
-
-		_ = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// props, inErr := rh.properties(task)
-			// if inErr != nil {
-			// 	return inErr
-			// }
-
-			// Ignore error in this special case; will fallback to use bash method if cannot determine operating system type and flavor
-			var index uint8
-			_ = props.Inspect(task, hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
-				systemV1, ok := clonable.(*propertiesv1.HostSystem)
-				if !ok {
-					logrus.Error(fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
-				}
-				if systemV1.Type == "linux" {
-					switch systemV1.Flavor {
-					case "centos", "redhat":
-						index++
-						rh.installMethods[index] = installmethod.Yum
-					case "debian":
-						fallthrough
-					case "ubuntu":
-						index++
-						rh.installMethods[index] = installmethod.Apt
-					case "fedora", "rhel":
-						index++
-						rh.installMethods[index] = installmethod.Dnf
-					}
-				}
-				return nil
-			})
-			index++
-			rh.installMethods[index] = installmethod.Bash
-			return nil
-		})
-	}
-	return rh.installMethods
-}
-
-// RegisterFeature registers an installed Feature in metadata of Host
-func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if feat.IsNull() {
-		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
-	}
-
-	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			var item *propertiesv1.HostInstalledFeature
-			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
-				requirements, innerXErr := feat.GetRequirements()
-				if innerXErr != nil {
-					return innerXErr
-				}
-				item = &propertiesv1.HostInstalledFeature{
-					Requires: requirements,
-				}
-				featuresV1.Installed[feat.GetName()] = item
-			}
-			if !requiredBy.IsNull() {
-				item.RequiredBy[requiredBy.GetName()] = struct{}{}
-			}
-			return nil
-		})
-	})
-}
-
-// DeregisterFeature deregisters a Feature from Cluster metadata
-func (rh *host) DeregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if feat == "" {
-		return fail.InvalidParameterError("feat", "cannot be empty string")
-	}
-
-	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			if _, ok := featuresV1.Installed[feat]; ok {
-				delete(featuresV1.Installed, feat)
-			}
-			for _, v := range featuresV1.Installed {
-				delete(v.RequiredBy, feat)
-			}
-			return nil
-		})
-	})
-}
-
 // GetShares returns the information about the shares hosted by the host
 func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -2639,100 +2363,6 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 func (rh host) getMounts(task concurrency.Task) *propertiesv1.HostMounts {
 	mounts, _ := rh.GetMounts(task)
 	return mounts
-}
-
-// InstalledFeatures returns a list of installed features
-//
-// satisfies interface install.Targetable
-func (rh host) InstalledFeatures(task concurrency.Task) []string {
-	var list []string
-	return list
-}
-
-// ComplementFeatureParameters configures parameters that are appropriate for the target
-// satisfies interface install.Targetable
-func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if rh.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	}
-	if v == nil {
-		return fail.InvalidParameterError("v", "cannot be nil")
-	}
-
-	v["ShortHostname"] = rh.GetName()
-	domain := ""
-	xerr = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			domain = hostDescriptionV1.Domain
-
-			if domain != "" {
-				domain = "." + domain
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	v["Hostname"] = rh.GetName() + domain
-
-	v["HostIP"] = rh.getPrivateIP(task)
-	v["PublicIP"] = rh.getPublicIP(task)
-
-	if _, ok := v["Username"]; !ok {
-		v["Username"] = abstract.DefaultUser
-	}
-
-	rs, xerr := rh.GetDefaultSubnet(task)
-	if xerr != nil {
-		return xerr
-	}
-
-	rgw, xerr := rs.InspectGateway(task, true)
-	if xerr != nil {
-		return xerr
-	}
-	defer rgw.Dispose()
-
-	rgwi := rgw.(*host)
-	v["PrimaryGatewayIP"] = rgwi.getPrivateIP(task)
-	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	v["PrimaryPublicIP"] = rgwi.getPublicIP(task)
-	if rgw, xerr = rs.InspectGateway(task, false); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-		default:
-			return xerr
-		}
-	} else {
-		defer rgw.Dispose()
-
-		rgwi = rgw.(*host)
-		v["SecondaryGatewayIP"] = rgwi.getPrivateIP(task)
-		v["SecondaryPublicIP"] = rgwi.getPublicIP(task)
-	}
-
-	if v["EndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
-		return xerr
-	}
-
-	v["PublicIP"] = v["EndpointIP"]
-	if v["DefaultRouteIP"], xerr = rs.GetDefaultRouteIP(task); xerr != nil {
-		return xerr
-	}
-
-	return nil
 }
 
 // IsClusterMember returns true if the host is member of a cluster
@@ -3256,6 +2886,31 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 
 			// found, update properties
 			hsgV1.ByID[asg.ID].Disabled = true
+			return nil
+		})
+	})
+}
+
+// IsFeatureInstalled ...
+func (rh *host) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
+	found = false
+	defer fail.OnPanic(&xerr)
+
+	if rh.IsNull() {
+		return false, fail.InvalidInstanceError()
+	}
+	if name = strings.TrimSpace(name); name == "" {
+		return false, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	return found, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+			if !ok {
+				return fail.InconsistentError("``ropertoesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			_, found = featuresV1.Installed[name]
 			return nil
 		})
 	})
