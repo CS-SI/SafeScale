@@ -138,6 +138,9 @@ func (s *StackEbrc) findVMByIDS(id string) (govcd.VM, fail.Error) {
 
 func (s *StackEbrc) findVMByName(id string) (govcd.VM, fail.Error) {
 	_, vdc, err := s.getOrgVdc()
+	if err != nil {
+		return govcd.VM{}, err
+	}
 
 	appNames, err := s.findVAppNames()
 	if err != nil {

@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
@@ -657,6 +660,12 @@ func (s *StackEbrc) InspectHost(hostParam interface{}) (*abstract.Host, fail.Err
 		return nil, abstract.ResourceNotFoundError("host", host.Name)
 	}
 
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		// FIXME: Get creation time and/or metadata
+		logrus.Warn(spew.Sdump(vapp.VApp))
+		logrus.Warn(spew.Sdump(vapp.VApp.DateCreated))
+	}
+
 	// FIXME: Populate this
 	newHost := &abstract.Host{
 		ID:         vapp.VApp.ID,
@@ -762,7 +771,7 @@ func (s *StackEbrc) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	return hr, nil
 }
 
-// GetHostByID returns the host identified by ref (name or id)
+// GetHostByName returns the host identified by ref (name or id)
 func (s *StackEbrc) GetHostByID(name string) (*abstract.Host, fail.Error) {
 	return s.GetHostByName(name)
 }
