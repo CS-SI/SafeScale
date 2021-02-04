@@ -272,6 +272,12 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	defer func() {
+		if volume == nil && err == nil {
+			logrus.Errorf("volume is nil, should not without an error")
+		}
+	}()
+
 	_, err = metadata.LoadVolume(handler.service, name)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); !ok {
@@ -1471,7 +1477,7 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 
 	if incrementType == "uv" {
 		numberOfVolumeUnitsAffected = increment
-		logrus.Debugf("We have to add %d volumes of %d Gb each", increment, vuSize)
+		logrus.Debugf("We have to add %d volumes of %d Gb each", numberOfVolumeUnitsAffected, vuSize)
 		wantedSizeInGb = wantedSizeInGb - (int(increment) * int(vuSize))
 	}
 

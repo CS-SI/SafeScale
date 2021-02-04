@@ -90,6 +90,12 @@ func (handler *ShareHandler) Create(
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	defer func() {
+		if share == nil && err == nil {
+			log.Errorf("share is nil, should not without an error")
+		}
+	}()
+
 	// Check if a share already exists with the same name
 	server, _, _, err := handler.Inspect(ctx, shareName)
 	if err != nil {
@@ -170,7 +176,6 @@ func (handler *ShareHandler) Create(
 		if err != nil {
 			err2 := nfsServer.RemoveShare(sharePath)
 			if err2 != nil {
-				log.Warn("failed to RemoveShare")
 				err = fail.AddConsequence(err, err2)
 			}
 		}
@@ -384,7 +389,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 		host, err := hostSvc.Inspect(ctx, serverID)
 		if err != nil {
 			warnings = append(warnings, err)
-			log.Warn(err)
+			log.Warnf("ignoring error inspecting host: %v", err)
 			continue
 		}
 
@@ -397,7 +402,7 @@ func (handler *ShareHandler) List(ctx context.Context) (props map[string]map[str
 		)
 		if err != nil {
 			warnings = append(warnings, err)
-			log.Warn(err)
+			log.Warnf("ignoring error inspecting host: %v", err)
 		}
 	}
 

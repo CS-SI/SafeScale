@@ -59,7 +59,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
 	return tplcmd, nil
 }
 
-// Execute the given script (embeded in a rice-box) with the given data on the host identified by hostid
+// Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
 func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
