@@ -20,7 +20,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"log"
+	"os"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -248,23 +249,23 @@ func (s *Stack) GetTemplate(id string) (*abstract.HostTemplate, fail.Error) {
 
 func createFilters() []*ec2.Filter {
 	filters := []*ec2.Filter{
-		&ec2.Filter{
+		{
 			Name:   aws.String("state"),
 			Values: []*string{aws.String("available")},
 		},
-		&ec2.Filter{
+		{
 			Name:   aws.String("architecture"),
 			Values: []*string{aws.String("x86_64")},
 		},
-		&ec2.Filter{
+		{
 			Name:   aws.String("virtualization-type"),
 			Values: []*string{aws.String("hvm")},
 		},
-		&ec2.Filter{
+		{
 			Name:   aws.String("root-device-type"),
 			Values: []*string{aws.String("ebs")},
 		},
-		&ec2.Filter{
+		{
 			Name:   aws.String("ena-support"),
 			Values: []*string{aws.String("true")},
 		},
@@ -294,11 +295,11 @@ func (s *Stack) ListImages() ([]abstract.Image, fail.Error) {
 	var images []abstract.Image
 
 	filters := []*ec2.Filter{
-		&ec2.Filter{
+		{
 			Name:   aws.String("architecture"),
 			Values: []*string{aws.String("x86_64")},
 		},
-		&ec2.Filter{
+		{
 			Name:   aws.String("state"),
 			Values: []*string{aws.String("available")},
 		},
@@ -427,7 +428,7 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*ab
 		func() error {
 			hostTmp, err := s.InspectHost(host)
 			if err != nil {
-				logrus.Warn(err)
+				logrus.Warnf("error inspecting host '%s': %v", host.ID, err)
 				return err
 			}
 
@@ -438,13 +439,11 @@ func (s *Stack) WaitHostReady(hostParam interface{}, timeout time.Duration) (*ab
 					"error waiting for host in ready state",
 					fail.Errorf(fmt.Sprintf("last state: %s", host.LastState), nil),
 				)
-				logrus.Warn(err)
 				return err
 			}
 
 			if host.LastState != hoststate.STARTED {
 				err = fail.Errorf(fmt.Sprintf("not in ready state (current state: %s)", host.LastState.String()), nil)
-				logrus.Warn(err)
 				return err
 			}
 			return nil
@@ -489,18 +488,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		}
 		request.Password = password
 	}
-
-	// FIXME: AWS Remove logs
-	/*
-		if len(request.Networks) == 1 {
-			if s.Config.BuildSubnetworks {
-				logrus.Warnf("We need either recalculate network segments here or pass the data through metadata")
-				logrus.Warnf("Working network: %s", spew.Sdump(request.Networks[0]))
-			}
-		} else {
-			logrus.Warnf("Choosing between networks: %s", spew.Sdump(request.Networks))
-		}
-	*/
 
 	xerr = s.ImportKeyPair(request.KeyPair)
 	if xerr != nil {
@@ -675,6 +662,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 
 			// FIXME: AWS Here the defaultNetwork.ID must be different if the network is splitted
 			trick := request.Spot
+
 			if trick {
 				netID := defaultNetwork.ID
 				if s.Config.BuildSubnetworks && len(defaultNetwork.Subnetworks) >= 2 {
@@ -685,7 +673,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 					}
 				}
 
-				server, err = buildAwsSpotMachine(
+				server, err = buildAwsSpotMachine(s.Config.MetadataBucket,
 					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID,
 					string(userDataPhase1), isGateway, template, sgID,
 				)
@@ -699,13 +687,13 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 					}
 				}
 
-				server, err = buildAwsMachine(
+				server, err = buildAwsMachine(s.Config.MetadataBucket,
 					s.EC2Service, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, netID,
 					string(userDataPhase1), isGateway, template, sgID,
 				)
 			}
 			if err != nil {
-				logrus.Warnf("error creating host: %+v", err)
+				logrus.Warnf("error creating host '%s': %+v", request.ResourceName, err)
 
 				if server != nil {
 					killErr := s.DeleteHost(server.ID)
@@ -758,7 +746,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 			logrus.Infof("Cleanup, deleting host '%s'", host.Name)
 			derr := s.DeleteHost(host.ID)
 			if derr != nil {
-				logrus.Warnf("Error deleting host: %v", derr)
+				logrus.Warnf("error deleting host '%s': %v", host.Name, derr)
 			}
 		}
 	}()
@@ -775,15 +763,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 
 }
 
-// Returns true if the error is of type awserr.Error
-func isSpecificAWSErr(err error, code string, message string) bool {
-	if err, ok := err.(awserr.Error); ok {
-		logrus.Warnf("Received AWS error code: %s", err.Code())
-		return err.Code() == code && strings.Contains(err.Message(), message)
-	}
-	return false
-}
-
 /*
 Returns true if the error matches all these conditions:
 - err if of type awserr.Error
@@ -792,7 +771,7 @@ Returns true if the error matches all these conditions:
 */
 func isAWSErr(err error) bool {
 	if err, ok := err.(awserr.Error); ok {
-		logrus.Warnf("Received AWS error code: %s", err.Code())
+		logrus.Warnf("Received AWS error code: %s, %v", err.Code(), err)
 		return true
 	}
 
@@ -803,7 +782,7 @@ func hasSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) (bool, fai
 	dgo, err := EC2Service.DescribeSecurityGroups(
 		&ec2.DescribeSecurityGroupsInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name:   aws.String("group-name"),
 					Values: []*string{aws.String(name)},
 				},
@@ -827,7 +806,7 @@ func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string,
 	dgo, err := EC2Service.DescribeSecurityGroups(
 		&ec2.DescribeSecurityGroupsInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name:   aws.String("group-name"),
 					Values: []*string{aws.String(name)},
 				},
@@ -848,7 +827,7 @@ func getSecurityGroupID(EC2Service *ec2.EC2, vpcID string, name string) (string,
 }
 
 func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
-	logrus.Warnf("Creating security group for vpc %s with name %s", vpcID, name)
+	logrus.Debugf("Creating security group for vpc %s with name %s", vpcID, name)
 
 	// Create the security group with the VPC, name and description.
 	createRes, err := EC2Service.CreateSecurityGroup(
@@ -940,7 +919,7 @@ func createSecurityGroup(EC2Service *ec2.EC2, vpcID string, name string) error {
 	return nil
 }
 
-func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, fail.Error) {
+func buildAwsSpotMachine(metadatabucket string, EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, fail.Error) {
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
@@ -960,7 +939,7 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 	}
 
 	lastPrice := dspho.SpotPriceHistory[len(dspho.SpotPriceHistory)-1]
-	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
+	logrus.Debugf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
 	input := &ec2.RequestSpotInstancesInput{
 		InstanceCount: aws.Int64(1),
@@ -969,7 +948,7 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 			InstanceType: aws.String(template.ID),
 			KeyName:      aws.String(keypairName),
 			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
-				&ec2.BlockDeviceMapping{
+				{
 					DeviceName: aws.String("/dev/sda1"),
 					NoDevice:   aws.String(""),
 					Ebs: &ec2.EbsBlockDevice{
@@ -1002,25 +981,96 @@ func buildAwsSpotMachine(EC2Service *ec2.EC2, keypairName string, name string, i
 		}
 	}
 
-	instance := result.SpotInstanceRequests[0]
-
-	// FIXME: Listen to result.SpotInstanceRequests[0].State
-
-	host := abstract.Host{
-		ID:   aws.StringValue(instance.InstanceId),
-		Name: name,
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		logrus.Warn(spew.Sdump(result))
 	}
-	return &host, nil
+
+	req := result.SpotInstanceRequests[0]
+	err = EC2Service.WaitUntilSpotInstanceRequestFulfilled(&ec2.DescribeSpotInstanceRequestsInput{
+		SpotInstanceRequestIds: []*string{req.SpotInstanceRequestId},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := EC2Service.DescribeSpotInstanceRequests(&ec2.DescribeSpotInstanceRequestsInput{
+		SpotInstanceRequestIds: []*string{req.SpotInstanceRequestId},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[debug] Launched spot instance params:\n%v", resp)
+	instance := resp.SpotInstanceRequests[0]
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		logrus.Warn(spew.Sdump(instance))
+	}
+
+	_, err = EC2Service.CreateTags(&ec2.CreateTagsInput{
+		Resources: []*string{instance.InstanceId},
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String("Name"),
+				Value: aws.String(name),
+			},
+			{
+				Key:   aws.String("ManagedBy"),
+				Value: aws.String("safescale"),
+			},
+			{
+				Key:   aws.String("DeclaredInBucket"),
+				Value: aws.String(metadatabucket),
+			},
+		},
+	})
+	if err != nil {
+		logrus.Warnf("Failure creating tags...: %v", err)
+	}
+
+	host := abstract.NewHost()
+	host.ID = aws.StringValue(instance.InstanceId)
+	host.Name = name
+
+	return host, nil
 }
 
-func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, fail.Error) {
-	logrus.Warnf("Using %s as subnetwork, looking for group %s", netID, sgID)
+func buildAwsMachine(metadatabucket string, EC2Service *ec2.EC2, keypairName string, name string, imageId string, zone string, netID string, data string, isGateway bool, template *abstract.HostTemplate, sgID string) (*abstract.Host, fail.Error) {
+	logrus.Debugf("Using %s as subnetwork, looking for group %s", netID, sgID)
 
 	ni := &ec2.InstanceNetworkInterfaceSpecification{
 		DeviceIndex:              aws.Int64(int64(0)),
 		SubnetId:                 aws.String(netID),
 		AssociatePublicIpAddress: aws.Bool(isGateway),
 		Groups:                   []*string{aws.String(sgID)},
+	}
+
+	// Use static ip only for gateways
+	var eip *ec2.AllocateAddressOutput
+	if isGateway {
+		var err error
+		// Attach EIP to network, only for gateways
+		eip, err = EC2Service.AllocateAddress(&ec2.AllocateAddressInput{
+			Domain: aws.String("vpc"),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = EC2Service.CreateTags(
+			&ec2.CreateTagsInput{
+				Resources: []*string{eip.AllocationId},
+				Tags: []*ec2.Tag{
+					{
+						Key:   aws.String("Name"),
+						Value: aws.String("staticip-" + name),
+					},
+				},
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Run instance
@@ -1035,7 +1085,7 @@ func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, image
 				AvailabilityZone: aws.String(zone),
 			},
 			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
-				&ec2.BlockDeviceMapping{
+				{
 					DeviceName: aws.String("/dev/sda1"),
 					NoDevice:   aws.String(""),
 					Ebs: &ec2.EbsBlockDevice{
@@ -1046,12 +1096,20 @@ func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, image
 			},
 			NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
 			TagSpecifications: []*ec2.TagSpecification{
-				&ec2.TagSpecification{
+				{
 					ResourceType: aws.String("instance"),
 					Tags: []*ec2.Tag{
 						{
 							Key:   aws.String("Name"),
 							Value: aws.String(name),
+						},
+						{
+							Key:   aws.String("ManagedBy"),
+							Value: aws.String("safescale"),
+						},
+						{
+							Key:   aws.String("DeclaredInBucket"),
+							Value: aws.String(metadatabucket),
 						},
 					},
 				},
@@ -1078,14 +1136,36 @@ func buildAwsMachine(EC2Service *ec2.EC2, keypairName string, name string, image
 
 	instance := out.Instances[0]
 
-	host := abstract.Host{
-		ID:   aws.StringValue(instance.InstanceId),
-		Name: name,
+	err = EC2Service.WaitUntilInstanceRunning(&ec2.DescribeInstancesInput{
+		InstanceIds: []*string{instance.InstanceId},
+	})
+	if err != nil {
+		return nil, err
 	}
-	return &host, nil
+
+	// only gateways
+	if isGateway {
+		if eip != nil {
+			_, err = EC2Service.AssociateAddress(&ec2.AssociateAddressInput{
+				AllocationId: eip.AllocationId,
+				InstanceId:   instance.InstanceId,
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	host := abstract.NewHost()
+	host.ID = aws.StringValue(instance.InstanceId)
+	host.Name = name
+
+	return host, nil
 }
 
-func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fail.Error) {
+func (s *Stack) InspectHost(hostParam interface{}) (rhost *abstract.Host, xerr fail.Error) {
+	var host *abstract.Host
+
 	switch hostParam := hostParam.(type) {
 	case string:
 		host = abstract.NewHost()
@@ -1107,7 +1187,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 	awsHost, err := s.EC2Service.DescribeInstances(
 		&ec2.DescribeInstancesInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name:   aws.String("instance-id"),
 					Values: []*string{aws.String(hostRef)},
 				},
@@ -1122,7 +1202,7 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 		awsHost, err = s.EC2Service.DescribeInstances(
 			&ec2.DescribeInstancesInput{
 				Filters: []*ec2.Filter{
-					&ec2.Filter{
+					{
 						Name: aws.String("tag:Name"),
 						Values: []*string{
 							aws.String(hostRef),
@@ -1143,11 +1223,19 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 	instanceName := ""
 	instanceType := ""
 
+	collectedTags := make(map[string]string)
+
 	for _, r := range awsHost.Reservations {
 		for _, i := range r.Instances {
 			host.LastState, err = getAwsInstanceState(i.State)
 			if err != nil {
 				return nil, err
+			}
+
+			if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+				// FIXME: Get creation time and/or metadata
+				logrus.Warn(spew.Sdump(i))
+				logrus.Warn(spew.Sdump(i.LaunchTime))
 			}
 
 			for _, tag := range i.Tags {
@@ -1157,6 +1245,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 							instanceName = aws.StringValue(tag.Value)
 						}
 					}
+				}
+			}
+
+			for _, tag := range i.Tags {
+				if tag != nil {
+					collectedTags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 				}
 			}
 
@@ -1240,9 +1334,12 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 	}
 
 	host.Name = instanceName
+	host.Tags = collectedTags
 
-	if !host.OK() {
-		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if !host.OK() {
+			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		}
 	}
 
 	return host, nil
@@ -1355,13 +1452,23 @@ func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 						}
 					}
 
+					customTags := make(map[string]string)
+
+					for _, tag := range instance.Tags {
+						customTags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
+					}
+
+					// Add CreationDate to MetaData
+					customTags["CreationDate"] = aws.TimeValue(instance.LaunchTime).Format(time.RFC3339)
+
+					newHost := abstract.NewHost()
+					newHost.ID = aws.StringValue(instance.InstanceId)
+					newHost.Name = name
+					newHost.LastState = state
+					newHost.Tags = customTags
+
 					hosts = append(
-						hosts, &abstract.Host{
-							ID:         aws.StringValue(instance.InstanceId),
-							Name:       name,
-							LastState:  state,
-							Properties: nil,
-						},
+						hosts, newHost,
 					)
 				}
 			}
@@ -1375,7 +1482,7 @@ func (s *Stack) DeleteHost(id string) error {
 	ips, err := s.EC2Service.DescribeAddresses(
 		&ec2.DescribeAddressesInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name:   aws.String("instance-id"),
 					Values: []*string{aws.String(id)},
 				},
@@ -1488,7 +1595,30 @@ func (s *Stack) DeleteHost(id string) error {
 			},
 		)
 		if err != nil {
-			logrus.Warnf("problem cleaning up, deleting volume %s", volume)
+			logrus.Warnf("problem cleaning up, deleting volume %s: %v", volume, err)
+		}
+	}
+
+	// Delete static ip if there
+	ipstatic, err := s.EC2Service.DescribeAddresses(
+		&ec2.DescribeAddressesInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("Name"),
+					Values: []*string{aws.String(id)},
+				},
+			},
+		},
+	)
+	if err != nil {
+		if ipstatic != nil {
+			for _, ip := range ips.Addresses {
+				_, _ = s.EC2Service.ReleaseAddress(
+					&ec2.ReleaseAddressInput{
+						AllocationId: ip.AllocationId,
+					},
+				)
+			}
 		}
 	}
 
@@ -1646,7 +1776,7 @@ func (s *Stack) RebootHost(id string) error {
 		return retryErr
 	}
 
-	return err
+	return nil
 }
 
 func (s *Stack) ResizeHost(id string, request abstract.SizingRequirements) (*abstract.Host, fail.Error) {
