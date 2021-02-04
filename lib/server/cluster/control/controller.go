@@ -705,27 +705,29 @@ func deleteNodeFromListByID(list []*clusterpropsv1.Node, ID string) (*clusterpro
 		return nil, nil, fail.NotFoundError(fmt.Sprintf("failed to find node with ID '%s'", ID))
 	}
 	node := list[idx]
+	var outList []*clusterpropsv1.Node
 	if idx < length-1 {
-		list = append(list[:idx], list[idx+1:]...)
+		outList = append(list[:idx], list[idx+1:]...)
 	} else {
-		list = list[:idx]
+		outList = list[:idx]
 	}
-	return node, list, nil
+	return node, outList, nil
 }
 
-func deleteNodeFromListByName(list []*clusterpropsv1.Node, name string) (*clusterpropsv1.Node, error) {
+func deleteNodeFromListByName(list []*clusterpropsv1.Node, name string) (*clusterpropsv1.Node, []*clusterpropsv1.Node, error) {
 	length := len(list)
 	found, idx := findNodeByName(list, name)
 	if !found {
-		return nil, fail.NotFoundError(fmt.Sprintf("failed to find node with name '%s'", name))
+		return nil, nil, fail.NotFoundError(fmt.Sprintf("failed to find node with name '%s'", name))
 	}
 	node := list[idx]
+	var outList []*clusterpropsv1.Node
 	if idx < length-1 {
-		list = append(list[:idx], list[idx+1:]...)
+		outList = append(list[:idx], list[idx+1:]...)
 	} else {
-		list = list[:idx]
+		outList = list[:idx]
 	}
-	return node, nil
+	return node, outList, nil
 }
 
 // Serialize converts cluster data to JSON
@@ -921,7 +923,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 	}()
 
 	if len(errors) > 0 {
-		err = fmt.Errorf(
+		err = fail.Wrapf(
 			"errors occurred on %s node%s addition: %s", nodeTypeStr, utils.Plural(len(errors)),
 			strings.Join(errors, "\n"),
 		)
