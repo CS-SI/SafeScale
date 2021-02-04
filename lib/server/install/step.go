@@ -44,33 +44,34 @@ const (
 	targetGateways = "gateways"
 )
 
-type stepResult struct {
-	completed bool  // if true, the script has been run to completion
-	success   bool  // if true, the script has been run successfully and the result is a success
-	err       error // if an error occured, contains the err
+type StepResult struct {
+	Iscompleted bool  // if true, the script has been run to completion
+	Success     bool  // if true, the script has been run successfully and the result is a Success
+	Err         error // if an error occurred, contains the Err
+	Output      string
 }
 
-func (sr stepResult) Successful() bool {
-	return sr.success
+func (sr StepResult) Successful() bool {
+	return sr.Success
 }
 
-func (sr stepResult) Completed() bool {
-	return sr.completed
+func (sr StepResult) Completed() bool {
+	return sr.Iscompleted
 }
 
-func (sr stepResult) Error() error {
-	return sr.err
+func (sr StepResult) Error() error {
+	return sr.Err
 }
 
-func (sr stepResult) ErrorMessage() string {
-	if sr.err != nil {
-		return sr.err.Error()
+func (sr StepResult) ErrorMessage() string {
+	if sr.Err != nil {
+		return sr.Err.Error()
 	}
 	return ""
 }
 
 // StepResults contains the errors of the step for each host target
-type StepResults map[string]stepResult
+type StepResults map[string]StepResult
 
 // ErrorMessages returns a string containing all the errors registered
 func (s StepResults) ErrorMessages() string {
@@ -293,18 +294,21 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
-			// if h.Domain != "" {
-			// 	cloneV["Hostname"] = h.Name+"."+h.Domain
-			// } else {
 			cloneV["Hostname"] = h.Name
-			// }
 			cloneV["ShortHostname"] = h.Name
+			cloneV["StepID"] = fmt.Sprintf("%s(%s):step(%s)@%s", is.Worker.action.String(), is.Worker.feature.DisplayName(), is.Name, h.Name)
+
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
 				return nil, err
 			}
 			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
-			results[h.Name] = result.(stepResult)
+			
+			if _, ok := result.(StepResult); !ok {
+				return nil, fmt.Errorf("result of step %s was not of type StepResult: %v", cloneV["StepID"], result)
+			}
+
+			results[h.Name] = result.(StepResult)
 
 			if !results[h.Name].Successful() {
 				if is.Worker.action == action.Check { // Checks can fail and it's ok
@@ -340,11 +344,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 			cloneV := v.Clone()
 			cloneV["HostIP"] = h.PrivateIp
-			// if h.Domain != "" {
-			// 	cloneV["Hostname"] = h.Name+"."+h.Domain
-			// } else {
 			cloneV["Hostname"] = h.Name
-			// }
 			cloneV["ShortHostname"] = h.Name
 			cloneV, err = realizeVariables(cloneV)
 			if err != nil {
@@ -379,7 +379,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 				)
 				continue
 			}
-			results[k] = result.(stepResult)
+			results[k] = result.(StepResult)
 
 			if !results[k].Successful() {
 				if is.Worker.action == action.Check { // Checks can fail and it's ok
@@ -410,7 +410,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
-// func (is *step) runOnHost(host *pb.Host, v Variables) stepResult {
+// func (is *step) runOnHost(host *pb.Host, v Variables) StepResult {
 func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
 	var (
 		p  = data.Map{}
@@ -427,7 +427,6 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	host := p["host"].(*pb.Host)
 	variables := p["variables"].(Variables)
 
-	// FIXME: Time and again
 	variables["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
 	variables["TemplateOperationTimeout"] = strings.Replace(
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
@@ -442,8 +441,8 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	// Updates variables in step script
 	command, err := replaceVariablesInString(is.Script, variables)
 	if err != nil {
-		return stepResult{
-			err: fmt.Errorf(
+		return StepResult{
+			Err: fmt.Errorf(
 				"failed to finalize installer script for step '%s': %s", is.Name, err.Error(),
 			),
 		}, nil
@@ -455,7 +454,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 			is.OptionsFileContent, host, utils.TempFolder+"/options.json", "cladm", "safescale", "ug+rw-x,o-rwx",
 		)
 		if err != nil {
-			return stepResult{err: err}, nil
+			return StepResult{Err: err}, nil
 		}
 	}
 
@@ -466,7 +465,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	)
 	err = UploadStringToRemoteFile(command, host, filename, "", "", "")
 	if err != nil {
-		return stepResult{err: err}, nil
+		return StepResult{Err: err}, nil
 	}
 
 	// command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
@@ -477,12 +476,12 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 		host.Name, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime,
 	)
 	if err != nil {
-		return stepResult{err: err}, nil
+		return StepResult{Err: err}, nil
 	}
 	err = nil
 	ok = retcode == 0
 	if !ok {
 		err = fmt.Errorf("failure: retcode=%d", retcode)
 	}
-	return stepResult{success: ok, completed: true, err: err}, nil
+	return StepResult{Success: ok, Iscompleted: true, Err: err}, nil
 }
