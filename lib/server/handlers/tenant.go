@@ -126,7 +126,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // ScannerHandler defines API to manipulate images
 type ScannerHandler interface {
-	Scan() fail.Error
+	Scan(string) fail.Error
 }
 
 // scannerHandler service
@@ -139,13 +139,16 @@ func NewScannerHandler(job server.Job) ScannerHandler {
 	return &scannerHandler{job: job}
 }
 
-// Scan scans the tenant and update the database
-func (handler *scannerHandler) Scan() (xerr fail.Error) {
+// Scan scans the tenant and updates the database
+func (handler *scannerHandler) Scan(tenantName string) (xerr fail.Error) {
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+	if tenantName == "" {
+		return fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
@@ -154,21 +157,17 @@ func (handler *scannerHandler) Scan() (xerr fail.Error) {
 
 	svc := handler.job.GetService()
 
-	// FIXME: Check if tenant is scannable
+	params := svc.GetTenantParameters()
 
-	// for _, tenant := range theProviders {
-	// 	isScannable, err := isTenantScannable(tenant.(map[string]interface{}))
-	// 	if err != nil {
-	// 		panic(fmt.Sprint(err.Error()))
-	// 	}
-	// 	if isScannable {
-	// 		tenantName, found := tenant.(map[string]interface{})["name"].(string)
-	// 		if !found {
-	// 			panic(fmt.Sprintf("There is a scannable tenant without name"))
-	// 		}
-	// 		targetedProviders = append(targetedProviders, tenantName)
-	// 	}
-	// }
+	compute, ok1 := params["compute"].(map[string]interface{})
+	isScannable, ok2 := compute["Scannable"].(bool)
+	if !(ok1 && ok2) {
+		return fail.InvalidParameterError("scannable", "not set")
+	}
+
+	if !isScannable {
+		return fail.ForbiddenError("tenant is not scannable")
+	}
 
 	if err := handler.analyze(); err != nil {
 		return err
@@ -191,7 +190,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		return xerr
 	}
 
-	templates, xerr := svc.ListTemplates(true)
+	templates, xerr := svc.ListTemplates(false)
 	if xerr != nil {
 		return xerr
 	}
@@ -232,6 +231,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	//	}()
 	//}
 
+	// already done by dump functions above
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ToError(err)
 	}
@@ -367,6 +367,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	for _, target := range templates {
 		sem <- true
 		localTarget := target
+
 		go func(inner abstract.HostTemplate) {
 			defer func() { <-sem }()
 			lerr := hostAnalysis(inner)
@@ -579,11 +580,12 @@ func (handler *scannerHandler) collect() (xerr fail.Error) {
 				return fail.ToError(err)
 			}
 		}
-		if !file.IsDir() {
-			if err = os.Remove(theFile); err != nil {
-				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
-			}
-		}
+		// Don't remove for testing
+		//if !file.IsDir() {
+		//	if err = os.Remove(theFile); err != nil {
+		//		logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
+		//	}
+		//}
 	}
 	return nil
 }
