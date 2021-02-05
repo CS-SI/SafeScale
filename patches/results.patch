@@ -1,0 +1,4 @@
+82c82
+< 	Multiattach bool `json:"multiattach"`
+---
+> 	Multiattach string `json:"multiattach"`
