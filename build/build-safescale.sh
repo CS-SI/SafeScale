@@ -2,7 +2,8 @@
 
 echo "Checks..."
 if [[ ! -v BUILD_ENV ]]; then
-    echo "BUILD_ENV is not set, this script is intented to run inside a docker container" && return 1
+    echo "BUILD_ENV is not set, this script is intented to run inside a docker container"
+    [[ $SHLVL -gt 2 ]] && return 1 || exit 1
 fi
 
 # ----------------------
