@@ -31,7 +31,7 @@ const (
 	HostTimeout = 5 * time.Minute
 
 	// LongHostOperationTimeout is a Long timeout
-	LongHostOperationTimeout = 15 * time.Minute
+	LongHostOperationTimeout = 8 * time.Minute
 
 	// DefaultSSHConnectionTimeout is the default ssh timeout connection
 	DefaultSSHConnectionTimeout = 2 * time.Minute

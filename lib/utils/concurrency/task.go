@@ -435,7 +435,7 @@ func (t *task) Run(action TaskAction, params TaskParameters) (_ TaskResult, err 
 	if err != nil {
 		return nil, err
 	}
-	result, err := t.Wait() // FIXME: OPP More potential blockings
+	result, err := t.Wait() // FIXME: Use waitFor instead
 	return result, err
 }
 

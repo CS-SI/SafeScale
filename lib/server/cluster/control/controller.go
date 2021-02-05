@@ -892,7 +892,6 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			}
 		}
 	}
-	// FIXME: Make sure all AddConsequence works...
 
 	// Starting from here, delete nodes if exiting with error
 	newHosts := hosts

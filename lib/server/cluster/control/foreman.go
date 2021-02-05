@@ -32,6 +32,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
@@ -78,12 +79,16 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers      func(task concurrency.Task, b Foreman) (int, int, int)    // returns masterCount, pruvateNodeCount, publicNodeCount
-	DefaultGatewaySizing        func(task concurrency.Task, b Foreman) *pb.HostDefinition // sizing of Gateway(s)
-	DefaultMasterSizing         func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of master(s)
-	DefaultNodeSizing           func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of node(s)
-	DefaultImage                func(task concurrency.Task, b Foreman) string             // default image of server(s)
-	GetNodeInstallationScript   func(task concurrency.Task, b Foreman, nodeType nodetype.Enum) (string, map[string]interface{})
+	MinimumRequiredServers func(task concurrency.Task, b Foreman) (
+		int, int, int,
+	) // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing      func(task concurrency.Task, b Foreman) *pb.HostDefinition // sizing of Gateway(s)
+	DefaultMasterSizing       func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of master(s)
+	DefaultNodeSizing         func(task concurrency.Task, b Foreman) *pb.HostDefinition // default sizing of node(s)
+	DefaultImage              func(task concurrency.Task, b Foreman) string             // default image of server(s)
+	GetNodeInstallationScript func(task concurrency.Task, b Foreman, nodeType nodetype.Enum) (
+		string, map[string]interface{},
+	)
 	GetGlobalSystemRequirements func(task concurrency.Task, f Foreman) (string, error)
 	GetTemplateBox              func() (*rice.Box, error)
 	ConfigureGateway            func(task concurrency.Task, f Foreman) error
@@ -107,7 +112,9 @@ type Makers struct {
 // Foreman interface, exposes public method
 type Foreman interface {
 	Cluster() api.Cluster
-	ExecuteScript(*rice.Box, map[string]interface{}, string, map[string]interface{}, string) (int, string, string, error)
+	ExecuteScript(*rice.Box, map[string]interface{}, string, map[string]interface{}, string) (
+		int, string, string, error,
+	)
 }
 
 // foreman is the private side of Foreman...
@@ -141,11 +148,12 @@ func (b *foreman) ExecuteScript(
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, err := system.GetBashLibrary()
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return 0, "", "", err
 	}
-	data["reserved_BashLibrary"] = bashLibrary
 
+	data["reserved_BashLibrary"] = bashLibrary
 	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
 	data["TemplateOperationTimeout"] = strings.Replace(
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
@@ -158,16 +166,38 @@ func (b *foreman) ExecuteScript(
 	)
 
 	path, err := uploadTemplateToFile(box, funcMap, tmplName, data, hostID, tmplName)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return 0, "", "", err
 	}
 
-	// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
-	cmd := fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", path)
+	var rc int
+	var stout string
+	var sterr string
 
-	return client.New().SSH.Run(
-		hostID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout(),
-	)
+	rounds := 3
+	err = retry.WhileUnsuccessful(func() error {
+		rounds = rounds -1
+		if rounds < 0 {
+			return fail.AbortedError("foreman failed 3 times", nil)
+		}
+		// cmd = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then rm %s; fi; exit $rc", path, path)
+		cmd := fmt.Sprintf("sudo bash %s", path)
+		logrus.Debugf("foreman about to run '%s', iteration %d", cmd, rounds)
+
+		// FIXME: ExecuteScript sometimes blocks 4 ever..., add a retry here and a pertinent timeout
+		rc, stout, sterr, err = client.New().SSH.Run(
+			hostID, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 3*time.Minute,
+		)
+		if rc != 0 || err != nil {
+			logrus.Warnf("Execute script: %s, rc=%d, err=%v, stdout='%s', stderr='%s'", cmd, rc, err, stout, sterr)
+			return fmt.Errorf("failure")
+		}
+
+		return nil
+	},temporal.GetDefaultDelay(), temporal.GetLongOperationTimeout())
+
+	return rc, stout, sterr, err
 }
 
 // construct ...
@@ -178,11 +208,44 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	// Wants to inform about the duration of the operation
 	defer temporal.NewStopwatch().OnExitLogInfo(
-		fmt.Sprintf("Starting construction of cluster '%s'...", req.Name),
+		fmt.Sprintf("Starting construction of cluster '%s'", req.Name),
 		fmt.Sprintf("Ending construction of cluster '%s'", req.Name),
 	)()
 
+	begin := time.Now()
+
+	crashPlan := ""
+	if crashPlanCandidate := os.Getenv("SAFESCALE_PLANNED_CRASHES"); crashPlanCandidate != "" {
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			logrus.Warnf("Reloading crashplan: %s", crashPlanCandidate)
+		}
+		crashPlan = crashPlanCandidate
+	}
+	_ = errcontrol.CrashSetup(crashPlan)
+
+	defer func() {
+		_ = task.Abort()
+	}()
+
 	state := clusterstate.Unknown
+
+	taskTrack := []*concurrency.Task{}
+	cleanTrackedTasks := func() {
+		if err != nil {
+			for _, tp := range taskTrack {
+				if tp != nil {
+					theTask := *tp
+					if !theTask.Aborted() {
+						abortError := theTask.Abort()
+						taskId, _ := theTask.GetID()
+						if abortError != nil {
+							logrus.Warnf("error aborting task '%s': %s", taskId, abortError)
+						}
+					}
+				}
+			}
+		}
+	}
 
 	defer func() {
 		if err != nil {
@@ -191,31 +254,30 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			state = clusterstate.Nominal
 		}
 
-		metaErr := b.cluster.UpdateMetadata(
-			task, func() error {
-				// Cluster created and configured successfully
-				return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(
-					func(clonable data.Clonable) error {
-						clonable.(*clusterpropsv1.State).State = state
-						return nil
-					},
-				)
-			},
-		)
+		if err == nil || req.KeepOnFailure {
+			metaErr := b.cluster.UpdateMetadata(
+				task, func() error {
+					// Cluster created and configured successfully
+					return b.cluster.GetProperties(task).LockForWrite(property.StateV1).ThenUse(
+						func(clonable data.Clonable) error {
+							clonable.(*clusterpropsv1.State).State = state
+							return nil
+						},
+					)
+				},
+			)
 
-		if metaErr != nil {
-			err = fail.AddConsequence(err, metaErr)
+			if metaErr != nil {
+				err = fail.AddConsequence(err, metaErr)
+			}
 		}
 	}()
 
-	if task == nil {
-		task = concurrency.RootTask()
-	}
-
 	// Generate needed password for account cladm
 	cladmPassword, err := utils.GeneratePassword(16)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error generating password: %w", err)
 	}
 
 	// Determine default image
@@ -250,7 +312,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 
 	gatewaysDef := complementHostDefinition(
 		req.GatewaysDef, gatewaysDefault,
-	) // FIXME: OPP Issue warning if not enough size
+	)
 
 	if lower, err := gatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
 		if !req.Force {
@@ -281,7 +343,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 	// Note: no way yet to define master sizing from cli...
 	mastersDefault.ImageId = imageID
-	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault) // FIXME: OPP Issue warning if not enough size
+	mastersDef := complementHostDefinition(req.MastersDef, mastersDefault)
 
 	if lower, err := mastersDef.LowerThan(mastersDefault); err == nil && lower {
 		if !req.Force {
@@ -306,7 +368,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		}
 	}
 	nodesDefault.ImageId = imageID
-	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault) // FIXME: OPP Issue warning if not enough size
+	nodesDef := complementHostDefinition(req.NodesDef, nodesDefault)
 
 	if lower, err := nodesDef.LowerThan(nodesDefault); err == nil && lower {
 		if !req.Force {
@@ -315,14 +377,16 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	}
 
 	// Initialize service to use
-	clientInstance := client.New() // FIXME: Mock calls to client.New
+	clientInstance := client.New()
 	tenant, err := clientInstance.Tenant.Get(temporal.GetExecutionTimeout())
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error getting tenant: %w", err)
 	}
 	svc, err := iaas.UseService(tenant.Name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error using service: %w", err)
 	}
 
 	// Determine if Gateway Failover must be set
@@ -334,6 +398,43 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			break
 		}
 	}
+
+	defer func() {
+		niter := 0
+		if err != nil && !req.KeepOnFailure {
+			logrus.Debugf("Deleting network because of: %v", err)
+			logrus.Debugf("Waiting %s for pending tasks...", temporal.GetHostCleanupTimeout())
+
+			if time.Since(begin) > 60*time.Second {
+				// if there are machines running we have a race condition...
+				time.Sleep(temporal.GetHostCleanupTimeout()) // FIXME: Replace this by a WaitForAllSubtasksDone...
+			} else {
+				time.Sleep(60 * time.Second)
+			}
+
+			for {
+				if niter == 2 {
+					break
+				}
+				derr := b.wipe(task)
+				derr = errcontrol.Crasher(derr)
+				if derr != nil {
+					err = fail.AddConsequence(err, derr)
+				}
+				pc, derr := b.cluster.service.GetConfigurationOptions()
+				if derr != nil {
+					err = fail.AddConsequence(err, derr)
+				} else {
+					if mbn, ok := pc.Get("MetadataBucketName"); ok {
+						if mbns, ok := mbn.(string); ok {
+							_ = client.New().Bucket.Prune([]string{mbns}, 2*time.Minute)
+						}
+					}
+				}
+				niter++
+			}
+		}
+	}()
 
 	// Creates network
 	logrus.Debugf("[cluster %s] creating network 'net-%s'", req.Name, req.Name)
@@ -349,21 +450,15 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 		KeepOnFailure: req.KeepOnFailure,
 	}
 	clientNetwork := clientInstance.Network
-	network, err := clientNetwork.Create(&def, temporal.GetExecutionTimeout())
+
+	cancellableCtx := task.GetContext()
+	network, err := clientNetwork.CreateWithCancel(cancellableCtx, &def, temporal.GetExecutionTimeout())
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error getting the network client: %w", err)
 	}
 	logrus.Debugf("[cluster %s] network '%s' creation successful.", req.Name, networkName)
 	req.NetworkID = network.Id
-
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			derr := clientNetwork.Delete([]string{network.Id}, temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = fail.AddConsequence(err, derr)
-			}
-		}
-	}()
 
 	// Saving Cluster parameters, with status 'Creating'
 	var (
@@ -373,20 +468,20 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	)
 
 	// Loads primary gateway metadata
+	logrus.Debugf("[cluster %s] loading gateway metadata", req.Name)
 	primaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.GatewayId)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			if !ok {
-				return err
-			}
-		}
-		return err
+		return fail.Wrapf("error loading primary gateway metadata: %w", err)
 	}
 	primaryGateway, err = primaryGatewayMetadata.Get()
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error getting primary gateway metadata: %w", err)
 	}
+	logrus.Debugf("[cluster %s] waiting for primary gateway ready through SSH", req.Name)
 	err = clientInstance.SSH.WaitReady(primaryGateway.ID, temporal.GetExecutionTimeout())
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 	}
@@ -394,19 +489,17 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Loads secondary gateway metadata
 	if !gwFailoverDisabled {
 		secondaryGatewayMetadata, err := providermetadata.LoadHost(svc, network.SecondaryGatewayId)
+		err = errcontrol.Crasher(err)
 		if err != nil {
-			if _, ok := err.(fail.ErrNotFound); ok {
-				if !ok {
-					return err
-				}
-			}
-			return err
+			return fail.Wrapf("error loading secondary gateway metadata: %w", err)
 		}
 		secondaryGateway, err = secondaryGatewayMetadata.Get()
+		err = errcontrol.Crasher(err)
 		if err != nil {
-			return err
+			return fail.Wrapf("error getting secondary gateway metadata: %w", err)
 		}
 		err = clientInstance.SSH.WaitReady(primaryGateway.ID, temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return client.DecorateError(err, "wait for remote ssh service to be ready", false)
 		}
@@ -415,13 +508,16 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// Create a KeyPair for the user cladm
 	kpName = "cluster_" + req.Name + "_cladm_key"
 	kp, err = abstract.NewKeyPair(kpName)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error creating keypair: %w", err)
 	}
 
 	defer func() {
 		if err != nil && !req.KeepOnFailure {
+			logrus.Debug("deleting keypair")
 			derr := svc.DeleteKeyPair(kpName)
+			derr = errcontrol.Crasher(derr)
 			if derr != nil {
 				err = fail.AddConsequence(err, derr)
 			}
@@ -441,6 +537,24 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	b.cluster.Identity.Keypair = kp
 	b.cluster.Identity.AdminPassword = cladmPassword
 	b.cluster.Identity.DisabledProperties = disabledFeatures
+
+	defer func() {
+		if err != nil {
+			logrus.Warnf("Cleaning cluster metadata because of: %v", err)
+		}
+		if err != nil && !req.KeepOnFailure {
+			derr := b.cluster.DeleteMetadata(task)
+			derr = errcontrol.Crasher(derr)
+			if derr != nil {
+				err = fail.AddConsequence(err, derr)
+			}
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+	}()
+
+	logrus.Debugf("[cluster %s] Updating cluster metadata", req.Name)
 	err = b.cluster.UpdateMetadata(
 		task, func() error {
 			err := b.cluster.GetProperties(task).LockForWrite(property.DefaultsV2).ThenUse(
@@ -463,6 +577,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 					return nil
 				},
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
@@ -473,6 +588,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 					return nil
 				},
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
@@ -483,6 +599,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 					return nil
 				},
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
@@ -513,56 +630,71 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			)
 		},
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error updating cluster metadata: %w", err)
 	}
-
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			derr := b.cluster.DeleteMetadata(task)
-			if derr != nil {
-				err = fail.AddConsequence(err, derr)
-			}
-		}
-	}()
-
 	masterCount, privateNodeCount, _ := b.determineRequiredNodes(task)
 	var (
-		primaryGatewayStatus   error
-		secondaryGatewayStatus error
-		mastersStatus          error
-		privateNodesStatus     error
-		secondaryGatewayTask   concurrency.Task
+		primaryGatewayErr       error
+		secondaryGatewayCfgErr  error
+		mastersErr              error
+		privateNodesCreationErr error
+		secondaryGatewayCfgTask concurrency.Task
 	)
 
+	// From now on, if there is an error, clean tasks we are about to create
+	defer cleanTrackedTasks()
+
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
-	primaryGatewayTask, err := task.New()
+	primaryGatewayTask, err := task.NewWithContext(cancellableCtx)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error creating primary gateway task: %w", err)
 	}
 	pbPrimaryGateway, err := srvutils.ToPBHost(primaryGateway)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("protobuf error: %w", err)
 	}
+
+	logrus.Debugf("[cluster %s] Installing in primary gateway", req.Name)
 	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskInstallGateway, pbPrimaryGateway)
+	taskTrack = append(taskTrack, &primaryGatewayTask)
+	err = errcontrol.Crasher(err) // verified
 	if err != nil {
-		return err
+		return fail.Wrapf("error creating primary gateway task: %w", err)
 	}
 	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.New()
+		secondaryGatewayCfgTask, err = task.NewWithContext(cancellableCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		pbSecondaryGateway, err := srvutils.ToPBHost(secondaryGateway)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskInstallGateway, pbSecondaryGateway)
+		secondaryGatewayCfgTask, err = secondaryGatewayCfgTask.Start(b.taskInstallGateway, pbSecondaryGateway)
+		err = errcontrol.Crasher(err)
 		if err != nil {
+			defer func() {
+				if pbSecondaryGateway != nil {
+					derr := clientInstance.Host.Delete([]string{pbSecondaryGateway.Id}, temporal.GetLongOperationTimeout())
+					derr = errcontrol.Crasher(derr)
+					if derr != nil {
+						err = fail.AddConsequence(err, derr)
+					}
+				}
+			}()
 			return err
 		}
 	}
-	mastersTask, err := task.New()
+
+	logrus.Debugf("[cluster %s] creating masters", req.Name)
+	mastersTask, err := task.NewWithContext(cancellableCtx)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -573,15 +705,19 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			"nokeep":    !req.KeepOnFailure,
 		},
 	)
+	taskTrack = append(taskTrack, &mastersTask)
+	err = errcontrol.Crasher(err) // validated
 	if err != nil {
-		return err
+		return fail.Wrapf("error starting master creation task: %w", err)
 	}
 
-	privateNodesTask, err := task.New()
+	logrus.Debugf("[cluster %s] creating nodes", req.Name)
+	privateNodesCreationTask, err := task.NewWithContext(cancellableCtx)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error creating private nodes task: %w", err)
 	}
-	privateNodesTask, err = privateNodesTask.Start(
+	privateNodesCreationTask, err = privateNodesCreationTask.Start(
 		b.taskCreateNodes, data.Map{
 			"count":   privateNodeCount,
 			"public":  false,
@@ -589,138 +725,158 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			"nokeep":  !req.KeepOnFailure,
 		},
 	)
+	taskTrack = append(taskTrack, &privateNodesCreationTask)
+	err = errcontrol.Crasher(err) // validated
 	if err != nil {
-		return err
+		return fail.Wrapf("error starting private nodes task: %w", err)
 	}
 
-	// FIXME: What about cleanup ?, unit test Task class
-
 	// Step 2: waits for gateway installation end and masters installation end
-	_, primaryGatewayStatus = primaryGatewayTask.Wait()
-	if primaryGatewayStatus != nil {
-		_ = mastersTask.Abort() // FIXME: Handle aborts
-		_ = privateNodesTask.Abort()
-		return primaryGatewayStatus
+	logrus.Debugf("[cluster %s] waiting for primary gateway finishes its install", req.Name)
+	_, primaryGatewayErr = primaryGatewayTask.Wait()
+	primaryGatewayErr = errcontrol.Crasher(primaryGatewayErr) // validated
+	if primaryGatewayErr != nil {
+		return fail.Wrapf("error waiting for primary gateway task: %w", primaryGatewayErr)
 	}
 	logrus.Debugf("Primary gateway created")
 	if !gwFailoverDisabled {
-		if secondaryGatewayTask != nil {
-			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
-			if secondaryGatewayStatus != nil {
-				_ = mastersTask.Abort()
-				_ = privateNodesTask.Abort()
-				return secondaryGatewayStatus
+		if secondaryGatewayCfgTask != nil {
+			_, secondaryGatewayCfgErr = secondaryGatewayCfgTask.Wait()
+			secondaryGatewayCfgErr = errcontrol.Crasher(secondaryGatewayCfgErr) // FIXME: Test for wait error
+			if secondaryGatewayCfgErr != nil {
+				defer func() {
+					if secondaryGateway != nil {
+						derr := clientInstance.Host.Delete([]string{secondaryGateway.ID}, temporal.GetLongOperationTimeout())
+						derr = errcontrol.Crasher(derr)
+						if derr != nil {
+							secondaryGatewayCfgErr = fail.AddConsequence(secondaryGatewayCfgErr, derr)
+						}
+					}
+				}()
+				return fail.Wrapf("error waiting for secondary gateway task: %w", secondaryGatewayCfgErr)
 			}
 		}
 		logrus.Debugf("Secondary gateway created")
 	}
 
-	// Starting from here, delete masters if exiting with error and req.KeepOnFailure is not true
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			derr := client.New().Host.Delete(b.cluster.ListMasterIDs(task), temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = fail.AddConsequence(err, derr)
-			}
-		}
-	}()
-
 	// waits the masters creation
 	logrus.Debugf("Waiting for masters to be created...")
-	_, mastersStatus = mastersTask.Wait()
-	if mastersStatus != nil {
-		_ = privateNodesTask.Abort()
-		return mastersStatus
+	_, mastersErr = mastersTask.Wait()
+	mastersErr = errcontrol.Crasher(mastersErr) // FIXME: OPP Test for wait error
+	if mastersErr != nil {
+		return fail.Wrapf("error waiting for masters task: %w", mastersErr)
 	}
 	logrus.Debugf("Masters created")
 
 	// Step 3: start gateway(s) configuration (needs ClusterMasterIPs so masters must be installed first)
 	// Configure Gateway(s) and waits for the result
-	primaryGatewayTask, err = task.New()
+	primaryGatewayTask, err = task.NewWithContext(cancellableCtx)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error creating new task: %w", err)
 	}
 	pbPrimaryGateway, err = srvutils.ToPBHost(primaryGateway)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error dealing with protobuf: %w", err)
 	}
 
+	logrus.Debugf("[cluster %s] configuring gateway", req.Name)
 	primaryGatewayTask, err = primaryGatewayTask.Start(b.taskConfigureGateway, pbPrimaryGateway)
+	taskTrack = append(taskTrack, &primaryGatewayTask)
+	err = errcontrol.Crasher(err) // validated
 	if err != nil {
-		return err
+		return fail.Wrapf("error starting primary gateway configuration task: %w", err)
 	}
 	if !gwFailoverDisabled {
-		secondaryGatewayTask, err = task.New()
+		secondaryGatewayCfgTask, err = task.NewWithContext(cancellableCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		pbSecondaryGateway, err := srvutils.ToPBHost(secondaryGateway)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
-		secondaryGatewayTask, err = secondaryGatewayTask.Start(b.taskConfigureGateway, pbSecondaryGateway)
+		secondaryGatewayCfgTask, err = secondaryGatewayCfgTask.Start(b.taskConfigureGateway, pbSecondaryGateway)
+		taskTrack = append(taskTrack, &secondaryGatewayCfgTask)
+		err = errcontrol.Crasher(err)
 		if err != nil {
-			return err
+			defer func() {
+				if pbSecondaryGateway != nil {
+					derr := clientInstance.Host.Delete([]string{pbSecondaryGateway.Id}, temporal.GetLongOperationTimeout())
+					derr = errcontrol.Crasher(derr)
+					if derr != nil {
+						err = fail.AddConsequence(err, derr)
+					}
+				}
+			}()
+			return fail.Wrapf("error configuring secondary gateway: %w", err)
 		}
 	}
-	_, primaryGatewayStatus = primaryGatewayTask.Wait()
-	if primaryGatewayStatus != nil {
-		if !gwFailoverDisabled {
-			if secondaryGatewayTask != nil {
-				_ = secondaryGatewayTask.Abort()
-			}
-		}
-		return primaryGatewayStatus
+
+	logrus.Debugf("[cluster %s] waiting until gateway configuration is finished", req.Name)
+	_, primaryGatewayErr = primaryGatewayTask.Wait()
+	primaryGatewayErr = errcontrol.Crasher(primaryGatewayErr) // validated
+	if primaryGatewayErr != nil {
+		return fail.Wrapf("error creating primary gateway: %w", primaryGatewayErr)
 	}
 	logrus.Debugf("Primary gateway configured")
 	if !gwFailoverDisabled {
-		if secondaryGatewayTask != nil {
-			_, secondaryGatewayStatus = secondaryGatewayTask.Wait()
-			if secondaryGatewayStatus != nil {
-				return secondaryGatewayStatus
+		if secondaryGatewayCfgTask != nil {
+			_, secondaryGatewayCfgErr = secondaryGatewayCfgTask.Wait()
+			secondaryGatewayCfgErr = errcontrol.Crasher(secondaryGatewayCfgErr) // validated...
+			if secondaryGatewayCfgErr != nil {
+				defer func() {
+					if secondaryGateway != nil {
+						derr := clientInstance.Host.Delete([]string{secondaryGateway.ID}, temporal.GetLongOperationTimeout())
+						derr = errcontrol.Crasher(derr)
+						if derr != nil {
+							secondaryGatewayCfgErr = fail.AddConsequence(secondaryGatewayCfgErr, derr)
+						}
+					}
+				}()
+				return fail.Wrapf("error creating secondary gateway: %w", secondaryGatewayCfgErr)
 			}
 		}
 		logrus.Debugf("Secondary gateway configured")
 	}
 
 	// Step 4: configure masters
-	logrus.Debugf("Configuring Masters...") // VPL
-	mt, err := task.New()
+	logrus.Debugf("Configuring Masters...")
+	mt, err := task.NewWithContext(cancellableCtx)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error creating master configuration task: %w", err)
 	}
-	_, mastersStatus = mt.Run(b.taskConfigureMasters, nil)
-	if mastersStatus != nil {
-		return mastersStatus
+	_, mastersErr = mt.Run(b.taskConfigureMasters, nil)
+	mastersErr = errcontrol.Crasher(mastersErr) // validated
+	if mastersErr != nil {
+		return fail.Wrapf("error configurating masters: %w", mastersErr)
 	}
 	logrus.Debugf("Masters configured")
 
-	// Starting from here, delete nodes on failure if exits with error and req.KeepOnFailure is false
-	defer func() {
-		if err != nil && !req.KeepOnFailure {
-			clientHost := clientInstance.Host
-			derr := clientHost.Delete(b.cluster.ListNodeIDs(task), temporal.GetExecutionTimeout())
-			if derr != nil {
-				err = fail.AddConsequence(err, derr)
-			}
-		}
-	}()
-
 	// Step 5: awaits nodes creation
-	_, privateNodesStatus = privateNodesTask.Wait()
-	if privateNodesStatus != nil {
-		return privateNodesStatus
+	logrus.Debugf("[cluster %s] waiting until nodes are created", req.Name)
+	_, privateNodesCreationErr = privateNodesCreationTask.Wait()
+	privateNodesCreationErr = errcontrol.Crasher(privateNodesCreationErr) // validated
+	if privateNodesCreationErr != nil {
+		return fail.Wrapf("error creating private nodes: %w", privateNodesCreationErr)
 	}
 
 	// Step 6: Starts nodes configuration, if all masters and nodes
 	// have been created and gateway has been configured with success
-	pnt, privateNodesStatus := task.New()
-	if privateNodesStatus != nil {
-		return privateNodesStatus
+	logrus.Debugf("[cluster %s] configuring nodes", req.Name)
+	pnt, privateNodesCfgErr := task.NewWithContext(cancellableCtx)
+	privateNodesCfgErr = errcontrol.Crasher(privateNodesCfgErr)
+	if privateNodesCfgErr != nil {
+		return fail.Wrapf("error creating private nodes configuration task: %w", privateNodesCfgErr)
 	}
-	_, privateNodesStatus = pnt.Run(b.taskConfigureNodes, nil)
-	if privateNodesStatus != nil {
-		return privateNodesStatus
+	_, privateNodesCfgErr = pnt.Run(b.taskConfigureNodes, nil)
+	privateNodesCfgErr = errcontrol.Crasher(privateNodesCfgErr) // metadata cleanup, +1 min
+	if privateNodesCfgErr != nil {
+		return fail.Wrapf("error in task configuring private nodes: %w", privateNodesCfgErr)
 	}
 	logrus.Debugf("Nodes configured")
 
@@ -733,8 +889,9 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 			"SecondaryGateway": secondaryGateway,
 		},
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return err
+		return fail.Wrapf("error configuring cluster: %w", err)
 	}
 	logrus.Debugf("Cluster configured")
 	return nil
@@ -747,6 +904,10 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	theCtx := task.GetContext()
+
+	logrus.Debugf("wipe: updating metadata")
+
 	// Updates metadata
 	err = cluster.UpdateMetadata(
 		task, func() error {
@@ -758,12 +919,13 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 			)
 		},
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return fail.Wrap(err, "")
 	}
 
-	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		funcErr := cluster.wipeMaster(t, params.(string))
+	deleteMasterFunc := func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := cluster.wipeMaster(task, params.(string))
 		if funcErr != nil {
 			return nil, fail.Wrap(funcErr, "")
 		}
@@ -772,16 +934,19 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 
 	var cleaningErrors []error
 
+	logrus.Debugf("wipe: listing node ids")
+
 	// check if nodes and/or masters have volumes attached (which would forbid the deletion)
 	nodeList := cluster.ListNodeIDs(task)
 	nodeLength := len(nodeList)
 	if nodeLength > 0 {
+		logrus.Warnf("wipe: looking for attached volumes")
 		if err := checkForAttachedVolumes(task, cluster, nodeList, "node"); err != nil {
 			return err
 		}
 	}
 
-	logrus.Infof("[cluster %s] detected %d nodes ...", b.cluster.Name, nodeLength)
+	logrus.Debugf("[cluster %s] detected %d nodes ...", b.cluster.Name, nodeLength)
 
 	masterList := cluster.ListMasterIDs(task)
 	masterLength := len(masterList)
@@ -791,21 +956,15 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 		}
 	}
 
-	logrus.Infof("[cluster %s] detected %d masters ...", b.cluster.Name, masterLength)
+	logrus.Debugf("[cluster %s] detected %d masters ...", b.cluster.Name, masterLength)
 
-	logrus.Infof("[cluster %s] deleting nodes ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting nodes ...", b.cluster.Name)
+
+	expectedMasters, expectedNodes, _ := b.determineRequiredNodes(task)
 
 	// If no nodes, generate the names, look for its id, add it to nodeList
-	if nodeLength == 0 {
-		num := 0
-		switch b.cluster.Complexity {
-		case complexity.Small:
-			num = 1
-		case complexity.Normal:
-			num = 3
-		case complexity.Large:
-			num = 5
-		}
+	if nodeLength != expectedNodes {
+		num := expectedNodes
 		for i := 1; i <= num; i++ {
 			nodeList = append(nodeList, fmt.Sprintf("%s-node-%d", b.cluster.Name, i))
 		}
@@ -816,37 +975,31 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 	if nodeLength > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < nodeLength; i++ {
-			subtask, err := task.New()
+			subtask, err := task.NewWithContext(theCtx)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
 			subtask, err = subtask.Start(b.taskWipeNode, nodeList[i])
+			subtasks = append(subtasks, subtask)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
-			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, subErr := s.Wait()
+			_, _, subErr := s.WaitFor(3*time.Minute)
+			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
 			if subErr != nil {
-				logrus.Warn(subErr)
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
 	}
 
-	logrus.Infof("[cluster %s] deleting masters ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting masters ...", b.cluster.Name)
 
-	if masterLength == 0 {
-		num := 0
-		switch b.cluster.Complexity {
-		case complexity.Small:
-			num = 1
-		case complexity.Normal:
-			num = 3
-		case complexity.Large:
-			num = 5
-		}
+	if masterLength != expectedMasters {
+		num := expectedMasters
 		for i := 1; i <= num; i++ {
 			masterList = append(masterList, fmt.Sprintf("%s-master-%d", b.cluster.Name, i))
 		}
@@ -857,21 +1010,23 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 	if masterLength > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < masterLength; i++ {
-			subtask, err := task.New()
+			subtask, err := task.NewWithContext(theCtx)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
 
 			subtask, err = subtask.Start(deleteMasterFunc, masterList[i])
+			subtasks = append(subtasks, subtask)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
-			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, subErr := s.Wait()
+			_, _, subErr := s.WaitFor(3*time.Minute)
+			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
 			if subErr != nil {
-				logrus.Warn(subErr)
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
@@ -887,6 +1042,7 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 				return nil
 			},
 		)
+		err = errcontrol.Crasher(err)
 	} else {
 		err = cluster.Properties.LockForRead(property.NetworkV1).ThenUse(
 			func(clonable data.Clonable) error {
@@ -894,6 +1050,7 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 				return nil
 			},
 		)
+		err = errcontrol.Crasher(err)
 	}
 	cluster.RUnlock(task)
 	if err != nil {
@@ -901,25 +1058,39 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 		return fail.ErrListError(cleaningErrors)
 	}
 
-	logrus.Infof("[cluster %s] deleting network ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting network ...", b.cluster.Name)
 
 	// Deletes the network
-	clientNetwork := client.New().Network
-	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
-		func() error {
-			return clientNetwork.Delete([]string{networkID}, temporal.GetExecutionTimeout())
-		},
-		temporal.GetHostTimeout(),
-	)
-	if retryErr != nil {
-		cleaningErrors = append(cleaningErrors, retryErr)
-		return fail.ErrListError(cleaningErrors)
+	if networkID != "" {
+		clientNetwork := client.New().Network
+		retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+			func() error {
+				netCleanErr := clientNetwork.Destroy([]string{networkID}, temporal.GetExecutionTimeout())
+				if netCleanErr != nil {
+					if nceArr, ok := netCleanErr.(fail.ErrList); ok {
+						theErr := nceArr.Errors()
+						if len(theErr) > 0 {
+							if _, ok := theErr[0].(fail.ErrNotFound); ok {
+								return fail.AbortedError("not found", netCleanErr)
+							}
+						}
+					}
+				}
+				return netCleanErr
+			},
+			temporal.GetHostTimeout(),
+		)
+		if retryErr != nil {
+			cleaningErrors = append(cleaningErrors, retryErr)
+			return fail.ErrListError(cleaningErrors)
+		}
 	}
 
-	logrus.Infof("[cluster %s] deleting metadata ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting metadata ...", b.cluster.Name)
 
 	// Deletes the metadata
 	err = cluster.DeleteMetadata(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		cleaningErrors = append(cleaningErrors, err)
 		return fail.ErrListError(cleaningErrors)
@@ -938,6 +1109,8 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	theCtx := task.GetContext()
+
 	// Updates metadata
 	err = cluster.UpdateMetadata(
 		task, func() error {
@@ -949,6 +1122,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 			)
 		},
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return fail.Wrap(err, "")
 	}
@@ -956,13 +1130,14 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 	// Unconfigure cluster
 	if b.makers.UnconfigureCluster != nil {
 		err = b.makers.UnconfigureCluster(task, b)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return fail.Wrap(err, "")
 		}
 	}
 
-	deleteMasterFunc := func(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
-		funcErr := cluster.deleteMaster(t, params.(string))
+	deleteMasterFunc := func(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+		funcErr := cluster.deleteMaster(task, params.(string))
 		if funcErr != nil {
 			return nil, fail.Wrap(funcErr, "")
 		}
@@ -980,7 +1155,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		}
 	}
 
-	logrus.Infof("[cluster %s] detected %d nodes ...", b.cluster.Name, nodeLength)
+	logrus.Debugf("[cluster %s] detected %d nodes ...", b.cluster.Name, nodeLength)
 
 	masterList := cluster.ListMasterIDs(task)
 	masterLength := len(masterList)
@@ -990,54 +1165,58 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		}
 	}
 
-	logrus.Infof("[cluster %s] detected %d masters ...", b.cluster.Name, masterLength)
+	logrus.Debugf("[cluster %s] detected %d masters ...", b.cluster.Name, masterLength)
 
-	logrus.Infof("[cluster %s] deleting nodes ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting nodes ...", b.cluster.Name)
 
 	// No volumes attached, delete nodes
 	if nodeLength > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < nodeLength; i++ {
-			subtask, err := task.New()
+			subtask, err := task.NewWithContext(theCtx)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
 			subtask, err = subtask.Start(b.taskDeleteNode, nodeList[i])
+			subtasks = append(subtasks, subtask)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
-			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, subErr := s.Wait()
+			_, _, subErr := s.WaitFor(3*time.Minute)
+			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
 			if subErr != nil {
-				logrus.Warn(subErr)
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
 	}
 
-	logrus.Infof("[cluster %s] deleting masters ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting masters ...", b.cluster.Name)
 
 	// delete the Masters
 	if masterLength > 0 {
 		var subtasks []concurrency.Task
 		for i := 0; i < masterLength; i++ {
-			subtask, err := task.New()
+			subtask, err := task.NewWithContext(theCtx)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
 
 			subtask, err = subtask.Start(deleteMasterFunc, masterList[i])
+			subtasks = append(subtasks, subtask)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
-			subtasks = append(subtasks, subtask)
 		}
 		for _, s := range subtasks {
-			_, subErr := s.Wait()
+			_, _, subErr := s.WaitFor(3*time.Minute)
+			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
 			if subErr != nil {
-				logrus.Warn(subErr)
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
 		}
@@ -1053,6 +1232,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 				return nil
 			},
 		)
+		err = errcontrol.Crasher(err)
 	} else {
 		err = cluster.Properties.LockForRead(property.NetworkV1).ThenUse(
 			func(clonable data.Clonable) error {
@@ -1060,6 +1240,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 				return nil
 			},
 		)
+		err = errcontrol.Crasher(err)
 	}
 	cluster.RUnlock(task)
 	if err != nil {
@@ -1067,13 +1248,24 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		return fail.ErrListError(cleaningErrors)
 	}
 
-	logrus.Infof("[cluster %s] deleting network ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting network ...", b.cluster.Name)
 
 	// Deletes the network
 	clientNetwork := client.New().Network
 	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
-			return clientNetwork.Delete([]string{networkID}, temporal.GetExecutionTimeout())
+			netCleanErr := clientNetwork.Destroy([]string{networkID}, temporal.GetExecutionTimeout())
+			if netCleanErr != nil {
+				if nceArr, ok := netCleanErr.(fail.ErrList); ok {
+					theErr := nceArr.Errors()
+					if len(theErr) > 0 {
+						if _, ok := theErr[0].(fail.ErrNotFound); ok {
+							return fail.AbortedError("not found", netCleanErr)
+						}
+					}
+				}
+			}
+			return netCleanErr
 		},
 		temporal.GetHostTimeout(),
 	)
@@ -1082,10 +1274,11 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		return fail.ErrListError(cleaningErrors)
 	}
 
-	logrus.Infof("[cluster %s] deleting metadata ...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] deleting metadata ...", b.cluster.Name)
 
 	// Deletes the metadata
 	err = cluster.DeleteMetadata(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		cleaningErrors = append(cleaningErrors, err)
 		return fail.ErrListError(cleaningErrors)
@@ -1107,6 +1300,7 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
 			continue
 		}
 		mh, err := providermetadata.LoadHost(svc, list[i])
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			switch err.(type) {
 			case fail.ErrNotFound:
@@ -1116,6 +1310,7 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
 			}
 		}
 		host, err := mh.Get()
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1123,11 +1318,12 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
 			func(clonable data.Clonable) error {
 				nAttached := len(clonable.(*propsv1.HostVolumes).VolumesByID)
 				if nAttached > 0 {
-					return fmt.Errorf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
+					return fail.Wrapf("host has %d volume%s attached", nAttached, utils.Plural(nAttached))
 				}
 				return nil
 			},
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return fail.InvalidRequestError(
 				fmt.Sprintf(
@@ -1139,12 +1335,16 @@ func checkForAttachedVolumes(task concurrency.Task, cluster *Controller, list []
 	return nil
 }
 
-func (b *foreman) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (
+	concurrency.TaskResult, error,
+) {
 	funcErr := b.cluster.DeleteSpecificNode(task, params.(string), "")
 	return nil, funcErr
 }
 
-func (b *foreman) taskWipeNode(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, error) {
+func (b *foreman) taskWipeNode(task concurrency.Task, params concurrency.TaskParameters) (
+	concurrency.TaskResult, error,
+) {
 	funcErr := b.cluster.WipeSpecificNode(task, params.(string), "")
 	return nil, funcErr
 }
@@ -1218,6 +1418,7 @@ func (b *foreman) getState(task concurrency.Task) (clusterstate.Enum, error) {
 			return nil
 		},
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return clusterstate.Unknown, err
 	}
@@ -1236,6 +1437,7 @@ func (b *foreman) configureNode(task concurrency.Task, index int, pbHost *pb.Hos
 // unconfigureNode executes what has to be done to remove node from cluster
 func (b *foreman) unconfigureNode(task concurrency.Task, hostID string, selectedMasterID string) error {
 	pbHost, err := client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1271,12 +1473,12 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	logrus.Infof("[cluster %s] configuring cluster...", b.cluster.Name)
+	logrus.Debugf("[cluster %s] configuring cluster...", b.cluster.Name)
 	defer func() {
 		if err == nil {
-			logrus.Infof("[cluster %s] configuration successful.", b.cluster.Name)
+			logrus.Debugf("[cluster %s] configuration successful.", b.cluster.Name)
 		} else {
-			logrus.Errorf("[cluster %s] configuration failed: %s", b.cluster.Name, err.Error())
+			logrus.Debugf("[cluster %s] configuration failed: %s", b.cluster.Name, err.Error())
 		}
 	}()
 
@@ -1298,6 +1500,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	// Configure docker Swarm except if flavor is K8S (Kubernetes)
 	if req.Flavor != flavor.K8S {
 		err = b.createSwarm(task, params)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1305,12 +1508,14 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 
 	// Installs ntp server feature on cluster (masters)
 	err = b.installTimeServer(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
 
 	// Installs ntp client feature on cluster (anything but masters)
 	err = b.installTimeClient(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1318,6 +1523,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	// Installs reverseproxy feature on cluster (gateways)
 	if _, ok := req.DisabledDefaultFeatures["reverseproxy"]; !ok {
 		err = b.installReverseProxy(task)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1326,6 +1532,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	// configure what has to be done cluster-wide
 	if b.makers.ConfigureCluster != nil {
 		err = b.makers.ConfigureCluster(task, b, req)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1334,6 +1541,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	// Installs ansible feature on cluster (all masters)
 	if _, ok := req.DisabledDefaultFeatures["ansible"]; !ok {
 		err = b.installAnsible(task)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1342,6 +1550,7 @@ func (b *foreman) configureCluster(task concurrency.Task, params concurrency.Tas
 	// Installs remotedesktop feature on cluster (all masters)
 	if _, ok := req.DisabledDefaultFeatures["remotedesktop"]; !ok {
 		err = b.installRemoteDesktop(task)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1392,24 +1601,31 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	// Join masters in Docker Swarm as managers
 	joinCmd := ""
 	for _, hostID := range cluster.ListMasterIDs(task) {
+		if task != nil && task.Aborted() {
+			return fail.AbortedError("aborted by parent task", nil)
+		}
+
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		err = errcontrol.Crasher(err)
 		if err != nil {
-			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+			return fail.Wrapf("failed to get metadata of host: %s", err.Error())
 		}
 		if joinCmd == "" {
 			retcode, _, _, err := clientSSH.Run(
 				hostID, "docker swarm init && docker node update "+host.Name+" --label-add safescale.host.role=master",
 				outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to init docker swarm")
+				return fail.Wrapf("failed to init docker swarm")
 			}
 			retcode, token, stderr, err := clientSSH.Run(
 				hostID, "docker swarm join-token manager -q", outputs.COLLECT, client.DefaultConnectionTimeout,
 				client.DefaultExecutionTimeout,
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to generate token to join swarm as manager: %s", stderr)
+				return fail.Wrapf("failed to generate token to join swarm as manager: %s", stderr)
 			}
 			token = strings.Trim(token, "\n")
 			joinCmd = fmt.Sprintf("docker swarm join --token %s %s", token, host.PrivateIp)
@@ -1418,46 +1634,57 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 			retcode, _, stderr, err := clientSSH.Run(
 				hostID, masterJoinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil || retcode != 0 {
-				return fmt.Errorf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
+				return fail.Wrapf("failed to join host '%s' to swarm as manager: %s", host.Name, stderr)
 			}
 		}
 	}
 
 	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return fmt.Errorf("failed to find an available docker manager: %v", err)
+		return fail.Wrapf("failed to find an available docker manager: %v", err)
 	}
 	selectedMaster, err := clientHost.Inspect(selectedMasterID, client.DefaultExecutionTimeout)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return fmt.Errorf("failed to get metadata of docker manager: %s", err.Error())
+		return fail.Wrapf("failed to get metadata of docker manager: %s", err.Error())
 	}
 
 	// build command to join Docker Swarm as workers
 	joinCmd, err = b.getSwarmJoinCommand(task, selectedMaster, true)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
 
 	// Join private node in Docker Swarm as workers
 	for _, hostID := range cluster.ListNodeIDs(task) {
+		if task != nil && task.Aborted() {
+			return fail.AbortedError("aborted by parent task", nil)
+		}
+
 		host, err := clientHost.Inspect(hostID, client.DefaultExecutionTimeout)
+		err = errcontrol.Crasher(err)
 		if err != nil {
-			return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+			return fail.Wrapf("failed to get metadata of host: %s", err.Error())
 		}
 		retcode, _, stderr, err := clientSSH.Run(
 			hostID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
+			return fail.Wrapf("failed to join host '%s' to swarm as worker: %s", host.Name, stderr)
 		}
 		labelCmd := "docker node update " + host.Name + " --label-add safescale.host.role=node"
 		retcode, _, stderr, err = clientSSH.Run(
 			selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout,
 			client.DefaultExecutionTimeout,
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to label swarm worker '%s' as node: %s", host.Name, stderr)
+			return fail.Wrapf("failed to label swarm worker '%s' as node: %s", host.Name, stderr)
 		}
 	}
 
@@ -1465,15 +1692,17 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 	retcode, _, stderr, err := clientSSH.Run(
 		primaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
+		return fail.Wrapf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
 	}
 	labelCmd := "docker node update " + primaryGateway.Name + " --label-add safescale.host.role=gateway"
 	retcode, _, stderr, err = clientSSH.Run(
 		selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil || retcode != 0 {
-		return fmt.Errorf("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.Name, stderr)
+		return fail.Wrapf("failed to label docker Swarm worker '%s' as gateway: %s", primaryGateway.Name, stderr)
 	}
 
 	if secondaryGateway != nil {
@@ -1481,16 +1710,18 @@ func (b *foreman) createSwarm(task concurrency.Task, params concurrency.TaskPara
 			secondaryGateway.ID, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout,
 			client.DefaultExecutionTimeout,
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
+			return fail.Wrapf("failed to join host '%s' to swarm as worker: %s", primaryGateway.Name, stderr)
 		}
 		labelCmd := "docker node update " + secondaryGateway.Name + " --label-add safescale.host.role=gateway"
 		retcode, _, stderr, err = clientSSH.Run(
 			selectedMaster.Id, labelCmd, outputs.COLLECT, client.DefaultConnectionTimeout,
 			client.DefaultExecutionTimeout,
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
+			return fail.Wrapf("failed to label docker swarm worker '%s' as gateway: %s", secondaryGateway.Name, stderr)
 		}
 	}
 
@@ -1510,8 +1741,9 @@ func (b *foreman) getSwarmJoinCommand(task concurrency.Task, selectedMaster *pb.
 	retcode, token, stderr, err := clientInstance.SSH.Run(
 		selectedMaster.Id, tokenCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil || retcode != 0 {
-		return "", fmt.Errorf("failed to generate token to join swarm as worker: %s", stderr)
+		return "", fail.Wrapf("failed to generate token to join swarm as worker: %s", stderr)
 	}
 	token = strings.Trim(token, "\n")
 	return fmt.Sprintf("docker swarm join --token %s %s", token, selectedMaster.PrivateIp), nil
@@ -1527,21 +1759,23 @@ func uploadTemplateToFile(
 		return "", fail.InvalidParameterError("box", "cannot be nil!")
 	}
 	host, err := client.New().Host.Inspect(hostID, temporal.GetExecutionTimeout())
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return "", fmt.Errorf("failed to get host information: %s", err)
+		return "", fail.Wrapf("failed to get host information: %s", err)
 	}
 
 	tmplString, err := box.String(tmplName)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return "", fmt.Errorf("failed to load template: %s", err.Error())
-	}
-	// tmplCmd, err := txttmpl.New(fileName).Funcs(template.MergeFuncs(funcMap, false)).Parse(tmplString)
-	tmplCmd, err := template.Parse(fileName, tmplString, funcMap)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %s", err.Error())
+		return "", fail.Wrapf("failed to load template: %s", err.Error())
 	}
 
-	// FIXME: Time and again
+	tmplCmd, err := template.Parse(fileName, tmplString, funcMap)
+	err = errcontrol.Crasher(err)
+	if err != nil {
+		return "", fail.Wrapf("failed to parse template: %s", err.Error())
+	}
+
 	data["TemplateOperationDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
 	data["TemplateOperationTimeout"] = strings.Replace(
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
@@ -1555,13 +1789,15 @@ func uploadTemplateToFile(
 
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return "", fmt.Errorf("failed to realize template: %s", err.Error())
+		return "", fail.Wrapf("failed to realize template: %s", err.Error())
 	}
 	cmd := dataBuffer.String()
 	remotePath := utils.TempFolder + "/" + fileName
 
 	err = install.UploadStringToRemoteFile(cmd, host, remotePath, "", "", "")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", err
 	}
@@ -1580,15 +1816,28 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 		errs   []string
 	)
 
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	theCtx := task.GetContext()
+
 	var subtasks []concurrency.Task
 	clientHost := client.New().Host
 	length := len(hosts)
 	for i := 0; i < length; i++ {
+		if task != nil && task.Aborted() {
+			return fail.AbortedError("aborted by parent task", nil)
+		}
+
+		hostID = hosts[i]
 		host, err = clientHost.Inspect(hosts[i], temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			break
 		}
-		subtask, err := task.New()
+		subtask, err := task.NewWithContext(theCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			break
 		}
@@ -1598,10 +1847,11 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 				"host":  host,
 			},
 		)
+		subtasks = append(subtasks, subtask)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			break
 		}
-		subtasks = append(subtasks, subtask)
 	}
 	// Deals with the metadata read failure
 	if err != nil {
@@ -1609,13 +1859,14 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 	}
 
 	for _, s := range subtasks {
-		_, state := s.Wait()
+		_, _, state := s.WaitFor(3*time.Minute)
+		state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
 		if state != nil {
 			errs = append(errs, state.Error())
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf(strings.Join(errs, "\n"))
+		return fail.Wrapf(strings.Join(errs, "\n"))
 	}
 	return nil
 }
@@ -1638,14 +1889,17 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 	clientSSH := clientInstance.SSH
 
 	selectedMasterID, err := b.Cluster().FindAvailableMaster(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return fmt.Errorf("failed to join workers to Docker Swarm: %v", err)
+		return fail.Wrapf("failed to join workers to Docker Swarm: %v", err)
 	}
 	selectedMaster, err := clientHost.Inspect(selectedMasterID, client.DefaultExecutionTimeout)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return fmt.Errorf("failed to get metadata of host: %s", err.Error())
+		return fail.Wrapf("failed to get metadata of host: %s", err.Error())
 	}
 	joinCmd, err := b.getSwarmJoinCommand(task, selectedMaster, true)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1653,7 +1907,12 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
+		if task != nil && task.Aborted() {
+			return fail.AbortedError("aborted by parent task", nil)
+		}
+
 		pbHost, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1661,20 +1920,23 @@ func (b *foreman) joinNodesFromList(task concurrency.Task, hosts []string) error
 		retcode, _, stderr, err := clientSSH.Run(
 			pbHost.Id, joinCmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
+			return fail.Wrapf("failed to join host '%s' to swarm as worker: %s", pbHost.Name, stderr)
 		}
 		nodeLabel := "docker node update " + pbHost.Name + " --label-add safescale.host.role=node"
 		retcode, _, stderr, err = clientSSH.Run(
 			selectedMaster.Id, nodeLabel, outputs.COLLECT, client.DefaultConnectionTimeout,
 			client.DefaultExecutionTimeout,
 		)
+		err = errcontrol.Crasher(err)
 		if err != nil || retcode != 0 {
-			return fmt.Errorf("failed to add label to docker Swarm worker '%s': %s", pbHost.Name, stderr)
+			return fail.Wrapf("failed to add label to docker Swarm worker '%s': %s", pbHost.Name, stderr)
 		}
 
 		if b.makers.JoinMasterToCluster != nil {
 			err = b.makers.JoinNodeToCluster(task, b, pbHost)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
@@ -1696,11 +1958,17 @@ func (b *foreman) leaveMastersFromList(task concurrency.Task, public bool, hosts
 	// Joins to cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
+		if task != nil && task.Aborted() {
+			return fail.AbortedError("aborted by parent task", nil)
+		}
+
 		pbHost, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		err = b.makers.LeaveMasterFromCluster(task, b, pbHost)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1714,6 +1982,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 	logrus.Debugf("Instructing nodes to leave cluster...")
 
 	selectedMaster, err := b.Cluster().FindAvailableMaster(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1723,7 +1992,12 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 	// Unjoins from cluster are done sequentially, experience shows too many join at the same time
 	// may fail (depending of the cluster Flavor)
 	for _, hostID := range hosts {
+		if task != nil && task.Aborted() {
+			return fail.AbortedError("aborted by parent task", nil)
+		}
+
 		pbHost, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			// If host seems deleted, consider leaving as a success
 			if _, ok := err.(fail.ErrNotFound); ok {
@@ -1734,6 +2008,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 
 		if b.makers.LeaveNodeFromCluster != nil {
 			err = b.makers.LeaveNodeFromCluster(task, b, pbHost, selectedMasterID)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
@@ -1743,6 +2018,7 @@ func (b *foreman) leaveNodesFromList(task concurrency.Task, hosts []string, sele
 			// Docker Swarm is always installed, even if the cluster type is not SWARM (for now, may evolve in the future)
 			// So removing a Node implies removing also from Swarm
 			err = b.leaveNodeFromSwarm(task, pbHost, selectedMaster)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
@@ -1756,6 +2032,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	if selectedMaster == "" {
 		var err error
 		selectedMaster, err = b.Cluster().FindAvailableMaster(task)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1770,6 +2047,7 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	retcode, _, _, err := clientSSH.Run(
 		selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1782,11 +2060,12 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	retcode, _, stderr, err := clientSSH.Run(
 		pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("failed to make node '%s' leave swarm: %s", pbHost.Name, stderr)
+		return fail.Wrapf("failed to make node '%s' leave swarm: %s", pbHost.Name, stderr)
 	}
 
 	// 2nd: wait the Swarm worker to appear as down from Swarm master
@@ -1796,11 +2075,12 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 			retcode, _, _, err := clientSSH.Run(
 				selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return err
 			}
 			if retcode != 0 {
-				return fmt.Errorf("'%s' not in Down state", pbHost.Name)
+				return fail.Wrapf("'%s' not in Down state", pbHost.Name)
 			}
 			return nil
 		},
@@ -1809,9 +2089,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case retry.ErrTimeout:
-			return fmt.Errorf("worker '%s' didn't reach 'Down' state after %v", pbHost.Name, temporal.GetHostTimeout())
+			return fail.Wrapf("worker '%s' didn't reach 'Down' state after %v", pbHost.Name, temporal.GetHostTimeout())
 		default:
-			return fmt.Errorf("worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
+			return fail.Wrapf("worker '%s' didn't reach 'Down' state: %v", pbHost.Name, retryErr)
 		}
 	}
 
@@ -1820,11 +2100,12 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 	retcode, _, stderr, err = clientSSH.Run(
 		selectedMaster, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, client.DefaultExecutionTimeout,
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf(
+		return fail.Wrapf(
 			"failed to remove worker '%s' from Swarm on master '%s': %s", pbHost.Name, selectedMaster, stderr,
 		)
 	}
@@ -1832,7 +2113,9 @@ func (b *foreman) leaveNodeFromSwarm(task concurrency.Task, pbHost *pb.Host, sel
 }
 
 // installNodeRequirements ...
-func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string) (err error) {
+func (b *foreman) installNodeRequirements(
+	task concurrency.Task, nodeType nodetype.Enum, pbHost *pb.Host, hostLabel string,
+) (err error) {
 	if b.makers.GetTemplateBox == nil {
 		return fail.InvalidParameterError("b.makers.GetTemplateBox", "cannot be nil")
 	}
@@ -1842,6 +2125,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	netCfg, err := b.cluster.GetNetworkConfig(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1853,6 +2137,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 	}
 
 	box, err := b.makers.GetTemplateBox()
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
@@ -1860,6 +2145,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 	globalSystemRequirements := ""
 	if b.makers.GetGlobalSystemRequirements != nil {
 		result, err := b.makers.GetGlobalSystemRequirements(task, b)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1875,6 +2161,7 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 			},
 		}
 		jsoned, err := json.MarshalIndent(content, "", "    ")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
@@ -1895,22 +2182,25 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 		if binaryDir != "" {
 			path = binaryDir + "/safescale"
 			_, err := os.Stat(path)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				path = ""
 			}
 		}
 		if path == "" {
 			path, err = exec.LookPath("safescale")
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				msg := "failed to find local binary 'safescale', make sure its path is in environment variable PATH"
 				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fail.Wrapf(msg)
 			}
 		}
 		err = install.UploadFile(path, pbHost, utils.BinFolder+"/safescale", "root", "root", "0755")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			logrus.Errorf("failed to upload 'safescale' binary")
-			return fmt.Errorf("failed to upload 'safescale' binary': %s", err.Error())
+			return fail.Wrapf("failed to upload 'safescale' binary': %s", err.Error())
 		}
 
 		// Uploads safescaled binary
@@ -1918,9 +2208,11 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 		if binaryDir != "" {
 			path = binaryDir + "/safescaled"
 			_, err := os.Stat(path)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				path = binaryDir + "../safescaled/safescaled"
 				_, err := os.Stat(path)
+				err = errcontrol.Crasher(err)
 				if err != nil {
 					path = ""
 				}
@@ -1928,32 +2220,35 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 		}
 		if path == "" {
 			path, err = exec.LookPath("safescaled")
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				msg := "failed to find local binary 'safescaled', make sure its path is in environment variable PATH"
 				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fail.Wrapf(msg)
 			}
 		}
 		err = install.UploadFile(path, pbHost, "/opt/safescale/bin/safescaled", "root", "root", "0755")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			logrus.Errorf("failed to upload 'safescaled' binary")
-			return fmt.Errorf("failed to upload 'safescaled' binary': %s", err.Error())
+			return fail.Wrapf("failed to upload 'safescaled' binary': %s", err.Error())
 		}
 
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
 		if suffix != "" {
-			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
-			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
+			cmdTmpl := "sudo bash -c 'echo SAFESCALE_METADATA_SUFFIX=%s >> /etc/environment'"
+			cmd := fmt.Sprintf(cmdTmpl, suffix)
 			retcode, stdout, stderr, err := client.New().SSH.Run(
-				pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, 2*temporal.GetLongOperationTimeout(),
+				pbHost.Id, cmd, outputs.COLLECT, client.DefaultConnectionTimeout, 2*time.Minute,
 			)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				msg := fmt.Sprintf(
 					"failed to submit content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, err.Error(),
 				)
 				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fail.Wrapf(msg)
 			}
 			if retcode != 0 {
 				output := stdout
@@ -1963,16 +2258,17 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 					output = stderr
 				}
 				msg := fmt.Sprintf(
-					"failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': %s", pbHost.Name, output,
+					"failed to copy content of SAFESCALE_METADATA_SUFFIX to host '%s': rc='%d', output='%s'", pbHost.Name, retcode, output,
 				)
 				logrus.Errorf(utils.Capitalize(msg))
-				return fmt.Errorf(msg)
+				return fail.Wrapf(msg)
 			}
 		}
 	}
 
 	var dnsServers []string
 	cfg, err := b.cluster.GetService(task).GetConfigurationOptions()
+	err = errcontrol.Crasher(err)
 	if err == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
@@ -1993,12 +2289,13 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 	if netCfg.SecondaryGatewayIP != "" {
 		params["SecondaryGatewayIP"] = netCfg.SecondaryGatewayIP
 	}
-	retcode, _, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
+	retcode, outscr, _, err := b.ExecuteScript(box, funcMap, script, params, pbHost.Id)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
 	if retcode != 0 {
-		return fmt.Errorf("[%s] system requirements installation failed: retcode=%d", hostLabel, retcode)
+		return fail.Wrapf("[%s] system requirements installation failed: retcode=%d, output=%s", hostLabel, retcode, outscr)
 	}
 
 	logrus.Debugf("[%s] system requirements installation successful.", hostLabel)
@@ -2006,7 +2303,9 @@ func (b *foreman) installNodeRequirements(task concurrency.Task, nodeType nodety
 }
 
 // getNodeInstallationScript ...
-func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType nodetype.Enum) (string, map[string]interface{}) {
+func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType nodetype.Enum) (
+	string, map[string]interface{},
+) {
 	if b.makers.GetNodeInstallationScript != nil {
 		return b.makers.GetNodeInstallationScript(task, b, nodeType)
 	}
@@ -2015,22 +2314,37 @@ func (b *foreman) getNodeInstallationScript(task concurrency.Task, nodeType node
 
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	if t == nil {
-		t, err = concurrency.VoidTask()
+func (b *foreman) taskInstallGateway(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
+	begins := time.Now()
+	unfinished := install.StepResult{
+		Iscompleted: false,
+		Success:     false,
+		Err:         fmt.Errorf("unfinished step taskInstallGateway"),
+	}
+
+	defer func() {
+		logrus.Debugf("Exiting gateway install with: result %v and error %v after %s", result, err, time.Since(begins))
+	}()
+
+	if task == nil {
+		logrus.Warnf("replacing task")
+		task, err = concurrency.VoidTask()
 		if err != nil {
-			return nil, err
+			unfinished.Err = err
+			return unfinished, err
 		}
 	}
 	pbGateway, ok := params.(*pb.Host)
 	if !ok {
-		return result, fail.InvalidParameterError("params", "must contain a *pb.Host")
+		return unfinished, fail.InvalidParameterError("params", "must contain a *pb.Host")
 	}
 	if pbGateway == nil {
-		return result, fail.InvalidParameterError("params", "cannot be nil")
+		return unfinished, fail.InvalidParameterError("params", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(t, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, "("+pbGateway.Name+")", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2038,39 +2352,60 @@ func (b *foreman) taskInstallGateway(t concurrency.Task, params concurrency.Task
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
 	sshCfg, err := client.New().Host.SSHConfig(pbGateway.Id)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return nil, err
+		unfinished.Err = err
+		return unfinished, err
 	}
+
+	logrus.Debugf("[%s] waiting for SSH...", hostLabel)
 	_, err = sshCfg.WaitServerReady("ready", temporal.GetHostTimeout())
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return nil, err
+		unfinished.Err = err
+		return unfinished, err
 	}
 
 	// Installs docker and docker-compose on gateway
-	err = b.installDocker(t, pbGateway, hostLabel)
+	logrus.Debugf("[%s] installing docker...", hostLabel)
+	err = b.installDocker(task, pbGateway, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return nil, err
+		unfinished.Err = err
+		return unfinished, err
 	}
 
 	// Installs proxycache server on gateway (if not disabled)
-	err = b.installProxyCacheServer(t, pbGateway, hostLabel)
+	logrus.Debugf("[%s] installing proxy cache server...", hostLabel)
+	err = b.installProxyCacheServer(task, pbGateway, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return nil, err
+		unfinished.Err = err
+		return unfinished, err
 	}
 
 	// Installs requirements as defined by cluster Flavor (if it exists)
-	err = b.installNodeRequirements(t, nodetype.Gateway, pbGateway, hostLabel)
+	logrus.Debugf("[%s] installing node requirements...", hostLabel)
+	err = b.installNodeRequirements(task, nodetype.Gateway, pbGateway, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
-		return nil, err
+		unfinished.Err = err
+		return unfinished, err
 	}
 
 	logrus.Debugf("[%s] preparation successful", hostLabel)
-	return nil, nil
+	return install.StepResult{
+		Iscompleted: true,
+		Success:     true,
+		Err:         nil,
+	}, nil
 }
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureGateway(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	gw, ok := params.(*pb.Host)
 	if !ok {
@@ -2080,18 +2415,17 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 		return result, fail.InvalidParameterError("params", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(t, "("+gw.Name+")", false).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, "("+gw.Name+")", false).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	logrus.Debugf("[%s] starting configuration...", gw.Name)
 
-	// First install ntp client
-
 	if b.makers.ConfigureGateway != nil {
-		err := b.makers.ConfigureGateway(t, b)
+		err := b.makers.ConfigureGateway(task, b)
+		err = errcontrol.Crasher(err) // validated
 		if err != nil {
-			return nil, err
+			return nil, fail.Wrapf("[%s] error configuring the gateway: %w", gw.Name, err)
 		}
 	}
 
@@ -2101,7 +2435,9 @@ func (b *foreman) taskConfigureGateway(t concurrency.Task, params concurrency.Ta
 
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateMasters(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	count := p["count"].(int)
@@ -2109,14 +2445,23 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 	nokeep := p["nokeep"].(bool)
 
 	tracer := debug.NewTracer(
-		t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true,
+		task, fmt.Sprintf("(%d, <*pb.HostDefinition>, %v)", count, nokeep), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	def.KeepOnFailure = !nokeep
 
-	clusterName := b.cluster.GetIdentity(t).Name
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	theCtx := task.GetContext()
+	if theCtx == nil {
+		return nil, fail.InvalidParameterError("task", "cannot have a nil context")
+	}
+
+	clusterName := b.cluster.GetIdentity(task).Name
 
 	if count <= 0 {
 		logrus.Debugf("[cluster %s] no masters to create.", clusterName)
@@ -2125,10 +2470,15 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 
 	logrus.Debugf("[cluster %s] creating %d master%s...\n", clusterName, count, utils.Plural(count))
 
+	if task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	var subtasks []concurrency.Task
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	for i := 0; i < count; i++ {
-		subtask, err := t.New()
+		subtask, err := task.NewWithContext(theCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
@@ -2140,30 +2490,48 @@ func (b *foreman) taskCreateMasters(t concurrency.Task, params concurrency.TaskP
 				"nokeep":    nokeep,
 			},
 		)
+		subtasks = append(subtasks, subtask)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
-		subtasks = append(subtasks, subtask)
-	}
-	var errs []string
-	for _, s := range subtasks {
-		_, state := s.Wait()
-		if state != nil {
-			errs = append(errs, state.Error())
-		}
-	}
-	if len(errs) > 0 {
-		msg := strings.Join(errs, "\n")
-		return nil, fmt.Errorf("[cluster %s] failed to create master(s): %s", clusterName, msg)
 	}
 
-	logrus.Debugf("[cluster %s] masters creation successful.", clusterName)
-	return nil, nil
+	var errs []string
+
+	stch := make(chan bool)
+
+	go func() {
+		for _, s := range subtasks {
+			_, _, state := s.WaitFor(15*time.Minute) // FIXME: OPP No more waits
+			state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
+			if state != nil {
+				errs = append(errs, state.Error())
+			}
+		}
+
+		stch <- true
+		return
+	}()
+
+	select {
+	case <-stch:
+		if len(errs) > 0 {
+			msg := strings.Join(errs, "\n")
+			return nil, fail.Wrapf("[cluster %s] failed to create master(s): %s", clusterName, msg)
+		}
+		logrus.Debugf("[cluster %s] masters creation successful.", clusterName)
+		return nil, nil
+	case <-task.GetContext().Done():
+		return nil, fail.AbortedError("Already aborted by parent", task.GetContext().Err())
+	}
 }
 
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateMaster(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
@@ -2172,44 +2540,72 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	nokeep := p["nokeep"].(bool)
 
 	tracer := debug.NewTracer(
-		t, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true,
+		task, fmt.Sprintf("(%d, <*pb.HostDefinition>, %s, %v)", index, temporal.FormatDuration(timeout), nokeep), true,
 	).GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
 
 	def.KeepOnFailure = !nokeep
 
 	hostLabel := fmt.Sprintf("master #%d", index)
 	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
 
-	netCfg, err := b.cluster.GetNetworkConfig(t)
+	netCfg, err := b.cluster.GetNetworkConfig(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
 	}
 
-	// hostDef := srvutils.ClonePBHostDefinition(def)
 	hostDef := def.Clone()
-	hostDef.Name, err = b.buildHostname(t, "master", nodetype.Master)
+	hostDef.Name, err = b.buildHostname(task, "master", nodetype.Master)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	// Checks if a host named like the one we want to create already exists on provider side
 	_, err = b.cluster.service.InspectHost(hostDef.Name)
+	err = errcontrol.Crasher(err)
 	if err == nil {
 		return nil, fail.DuplicateError(fmt.Sprintf("there is already a host named '%s'", hostDef.Name))
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	hostDef.Network = netCfg.NetworkID
 	hostDef.Public = false
 	clientHost := client.New().Host
-	pbHost, err := clientHost.Create(hostDef, timeout)
+
+	cancellableCtx := task.GetContext()
+	pbHost, err := clientHost.CreateWithCancel(cancellableCtx, hostDef, timeout)
+	defer func() {
+		if err != nil && nokeep {
+			if pbHost != nil {
+				derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
+				derr = errcontrol.Crasher(derr)
+				if derr != nil {
+					err = fail.AddConsequence(err, derr)
+				}
+			}
+		}
+	}()
+
 	if pbHost != nil {
 		// Updates cluster metadata to keep track of created host, before testing if an error occurred during the creation
 		mErr := b.cluster.UpdateMetadata(
-			t, func() error {
+			task, func() error {
 				// Locks for write the NodesV1 extension...
-				return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+				return b.cluster.GetProperties(task).LockForWrite(property.NodesV1).ThenUse(
 					func(clonable data.Clonable) error {
 						nodesV1 := clonable.(*clusterpropsv1.Nodes)
 						// Update swarmCluster definition in Object Storage
@@ -2226,13 +2622,10 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 			},
 		)
 		if mErr != nil && nokeep {
-			derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
-			if derr != nil {
-				mErr = fail.AddConsequence(mErr, derr)
-			}
 			return nil, mErr
 		}
 	}
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, client.DecorateError(
 			err, fmt.Sprintf("[%s] host resource creation failed: %s", hostLabel, err.Error()), false,
@@ -2241,15 +2634,29 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 	hostLabel = fmt.Sprintf("%s (%s)", hostLabel, pbHost.Name)
 	logrus.Debugf("[%s] host resource creation successful", hostLabel)
 
-	err = b.installProxyCacheClient(t, pbHost, hostLabel)
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
+	err = b.installProxyCacheClient(task, pbHost, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
 	}
 
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	// Installs cluster-level system requirements...
-	err = b.installNodeRequirements(t, nodetype.Master, pbHost, hostLabel)
+	err = b.installNodeRequirements(task, nodetype.Master, pbHost, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
@@ -2258,12 +2665,18 @@ func (b *foreman) taskCreateMaster(t concurrency.Task, params concurrency.TaskPa
 
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
-	tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
+func (b *foreman) taskConfigureMasters(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
+	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	list := b.cluster.ListMasterIDs(t)
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	list := b.cluster.ListMasterIDs(task)
 	if len(list) == 0 {
 		return nil, nil
 	}
@@ -2271,15 +2684,23 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 	logrus.Debugf("[cluster %s] Configuring masters...", b.cluster.Name)
 	started := time.Now()
 
+	theCtx := task.GetContext()
+
 	clientHost := client.New().Host
 	var subtasks []concurrency.Task
-	for i, hostID := range b.cluster.ListMasterIDs(t) {
+	for i, hostID := range b.cluster.ListMasterIDs(task) {
+		if task != nil && task.Aborted() {
+			return nil, fail.AbortedError("aborted by parent task", nil)
+		}
+
 		host, err := clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			logrus.Warnf("failed to get metadata of host: %s", err.Error())
 			continue
 		}
-		subtask, err := t.New()
+		subtask, err := task.NewWithContext(theCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
@@ -2289,21 +2710,23 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 				"host":  host,
 			},
 		)
+		subtasks = append(subtasks, subtask)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
-		subtasks = append(subtasks, subtask)
 	}
 
 	var errs []string
 	for _, s := range subtasks {
 		_, state := s.Wait()
+		state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
 		if state != nil {
 			errs = append(errs, state.Error())
 		}
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(errs, "\n"))
+		return nil, fail.Wrapf(strings.Join(errs, "\n"))
 	}
 
 	logrus.Debugf(
@@ -2315,12 +2738,14 @@ func (b *foreman) taskConfigureMasters(t concurrency.Task, params concurrency.Ta
 
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureMaster(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	if b == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if params == nil {
 		return nil, fail.InvalidParameterError("params", "cannot be nil")
@@ -2332,9 +2757,13 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	pbHost := p["host"].(*pb.Host)
 	// FIXME: validate parameters
 
-	tracer := debug.NewTracer(t, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%d, '%s')", index, pbHost.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
 
 	started := time.Now()
 
@@ -2342,14 +2771,24 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 	logrus.Debugf("[%s] starting configuration...\n", hostLabel)
 
 	// install docker and docker-compose feature
-	err = b.installDocker(t, pbHost, hostLabel)
+	err = b.installDocker(task, pbHost, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
 	}
 
-	err = b.configureMaster(t, index, pbHost)
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
+	err = b.configureMaster(task, index, pbHost)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	logrus.Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
@@ -2358,12 +2797,14 @@ func (b *foreman) taskConfigureMaster(t concurrency.Task, params concurrency.Tas
 
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateNodes(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	if b == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if params == nil {
 		return nil, fail.InvalidParameterError("params", "cannot be nil")
@@ -2393,13 +2834,19 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 		return nil, fail.InvalidParameterError("params[nokeep]", "is missing or not a bool")
 	}
 
-	tracer := debug.NewTracer(t, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%d, %v)", count, public), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	def.KeepOnFailure = !nokeep
 
-	clusterName := b.cluster.GetIdentity(t).Name
+	clusterName := b.cluster.GetIdentity(task).Name
+
+	theCtx := task.GetContext()
 
 	if count <= 0 {
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -2407,10 +2854,19 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 	}
 	logrus.Debugf("[cluster %s] creating %d node%s...", clusterName, count, utils.Plural(count))
 
+	if task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	timeout := timeoutCtxHost + time.Duration(count)*time.Minute
 	var subtasks []concurrency.Task
 	for i := 1; i <= count; i++ {
-		subtask, err := t.New()
+		if task.Aborted() {
+			return nil, fail.AbortedError("aborted by parent task", nil)
+		}
+
+		subtask, err := task.NewWithContext(theCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
@@ -2423,35 +2879,66 @@ func (b *foreman) taskCreateNodes(t concurrency.Task, params concurrency.TaskPar
 				"nokeep":  nokeep,
 			},
 		)
+		subtasks = append(subtasks, subtask)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
-		subtasks = append(subtasks, subtask)
+	}
+
+	defer func() {
+		if err != nil {
+			for _, s := range subtasks {
+				if !s.Aborted() {
+					abortedErr := s.Abort()
+					if abortedErr != nil {
+						logrus.Warnf("error aborting subtask: %v", abortedErr)
+					}
+				}
+			}
+		}
+	}()
+
+	if task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	var errs []string
-	for _, s := range subtasks {
-		_, state := s.Wait()
-		if state != nil {
-			errs = append(errs, state.Error())
+	stch := make(chan bool)
+	go func() {
+		for _, s := range subtasks { // FIXME: OPP This blocks badly
+			_, state := s.Wait()
+			state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
+			if state != nil {
+				errs = append(errs, state.Error())
+			}
 		}
-	}
-	if len(errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(errs, "\n"))
-	}
+		stch <- true
+		return
+	}()
 
-	logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(count))
-	return nil, nil
+	select {
+	case <-stch:
+		if len(errs) != 0 {
+			return nil, fail.Wrapf(strings.Join(errs, "\n"))
+		}
+		logrus.Debugf("[cluster %s] %d node%s creation successful.", clusterName, count, utils.Plural(count))
+		return nil, nil
+	case <-task.GetContext().Done():
+		return nil, fail.AbortedError("aborted by parent task.", task.GetContext().Err())
+	}
 }
 
 // taskCreateNode creates a Node in the Cluster
 // This function is intended to be call as a goroutine
-func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskCreateNode(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	if b == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if params == nil {
 		return nil, fail.InvalidParameterError("params", "cannot be nil")
@@ -2481,7 +2968,7 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 		return nil, fail.InvalidParameterError("params[nokeep]", "is missing or not a bool")
 	}
 
-	tracer := debug.NewTracer(t, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%d)", index), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
@@ -2490,7 +2977,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	hostLabel := fmt.Sprintf("node #%d", index)
 	logrus.Debugf("[%s] starting host resource creation...", hostLabel)
 
-	netCfg, err := b.cluster.GetNetworkConfig(t)
+	netCfg, err := b.cluster.GetNetworkConfig(task)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
 	}
@@ -2498,7 +2986,8 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	// Create the host
 	// hostDef := srvutils.ClonePBHostDefinition(def)
 	hostDef := def.Clone()
-	hostDef.Name, err = b.buildHostname(t, "node", nodetype.Node)
+	hostDef.Name, err = b.buildHostname(task, "node", nodetype.Node)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
 	}
@@ -2509,26 +2998,32 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 
 	// Checks if a host named like the one we want to create already exists on provider side
 	_, err = b.cluster.service.InspectHost(hostDef.Name)
+	err = errcontrol.Crasher(err)
 	if err == nil {
 		return nil, fail.DuplicateError(fmt.Sprintf("there is already a host named '%s'", hostDef.Name))
 	}
 
 	clientHost := client.New().Host
 	var node *clusterpropsv1.Node
-	pbHost, err := clientHost.Create(hostDef, timeout)
-	if pbHost != nil {
-		defer func() {
-			if err != nil {
+
+	cancellableCtx := task.GetContext()
+	pbHost, err := clientHost.CreateWithCancel(cancellableCtx, hostDef, timeout)
+	defer func() {
+		if err != nil && nokeep {
+			if pbHost != nil {
 				derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
+				derr = errcontrol.Crasher(derr)
 				if derr != nil {
 					err = fail.AddConsequence(err, derr)
 				}
 			}
-		}()
+		}
+	}()
+	if pbHost != nil {
 		mErr := b.cluster.UpdateMetadata(
-			t, func() error {
+			task, func() error {
 				// Locks for write the NodesV1 extension...
-				return b.cluster.GetProperties(t).LockForWrite(property.NodesV1).ThenUse(
+				return b.cluster.GetProperties(task).LockForWrite(property.NodesV1).ThenUse(
 					func(clonable data.Clonable) error {
 						nodesV1 := clonable.(*clusterpropsv1.Nodes)
 						// Registers the new Agent in the swarmCluster struct
@@ -2545,10 +3040,6 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 			},
 		)
 		if mErr != nil && nokeep {
-			derr := clientHost.Delete([]string{pbHost.Id}, temporal.GetLongOperationTimeout())
-			if derr != nil {
-				mErr = fail.AddConsequence(mErr, derr)
-			}
 			return nil, mErr
 		}
 		if mErr != nil {
@@ -2561,13 +3052,23 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 	hostLabel = fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	logrus.Debugf("[%s] host resource creation successful.", hostLabel)
 
-	err = b.installProxyCacheClient(t, pbHost, hostLabel)
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
+	err = b.installProxyCacheClient(task, pbHost, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		logrus.Debugf("[%s] failure installing proxy cache client", hostLabel)
 		return nil, err
 	}
 
-	err = b.installNodeRequirements(t, nodetype.Node, pbHost, hostLabel)
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
+	err = b.installNodeRequirements(task, nodetype.Node, pbHost, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		logrus.Debugf("[%s] failure installing node requirements", hostLabel)
 		return nil, err
@@ -2579,36 +3080,58 @@ func (b *foreman) taskCreateNode(t concurrency.Task, params concurrency.TaskPara
 
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.TaskParameters) (task concurrency.TaskResult, err error) {
-	clusterName := b.cluster.GetIdentity(t).Name
+func (b *foreman) taskConfigureNodes(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (_ concurrency.TaskResult, err error) {
+	clusterName := b.cluster.GetIdentity(task).Name
 
-	tracer := debug.NewTracer(t, "", true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, "", true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	list := b.cluster.ListNodeIDs(t)
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
+	list := b.cluster.ListNodeIDs(task)
 	if len(list) == 0 {
 		logrus.Debugf("[cluster %s] no nodes to configure.", clusterName)
 		return nil, nil
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	logrus.Debugf("[cluster %s] configuring nodes...", clusterName)
 
 	var (
 		pbHost *pb.Host
-		i      int
 		hostID string
 		errs   []string
 	)
 
+	theCtx := task.GetContext()
+
 	var subtasks []concurrency.Task
 	clientHost := client.New().Host
-	for i, hostID = range list {
-		pbHost, err = clientHost.Inspect(hostID, temporal.GetExecutionTimeout())
+	for i, aHost := range list {
+		if task != nil && task.Aborted() {
+			return nil, fail.AbortedError("aborted by parent task", nil)
+		}
+
+		hostID = aHost
+		pbHost, err = clientHost.Inspect(aHost, temporal.GetExecutionTimeout())
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			break
 		}
-		subtask, err := t.New()
+		subtask, err := task.NewWithContext(theCtx)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
@@ -2618,24 +3141,35 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 				"host":  pbHost,
 			},
 		)
+		subtasks = append(subtasks, subtask)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
-		subtasks = append(subtasks, subtask)
 	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	// Deals with the metadata read failure
 	if err != nil {
 		errs = append(errs, "failed to get metadata of host '%s': %s", hostID, err.Error())
 	}
 
 	for _, s := range subtasks {
+		if task != nil && task.Aborted() {
+			return nil, fail.AbortedError("aborted by parent task", nil)
+		}
+
 		_, err := s.Wait()
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf(strings.Join(errs, "\n"))
+		return nil, fail.Wrapf(strings.Join(errs, "\n"))
 	}
 
 	logrus.Debugf("[cluster %s] nodes configuration successful.", clusterName)
@@ -2644,29 +3178,45 @@ func (b *foreman) taskConfigureNodes(t concurrency.Task, params concurrency.Task
 
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
-func (b *foreman) taskConfigureNode(t concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, err error) {
+func (b *foreman) taskConfigureNode(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, err error) {
 	// Convert parameters
 	p := params.(data.Map)
 	index := p["index"].(int)
 	pbHost := p["host"].(*pb.Host)
 
-	tracer := debug.NewTracer(t, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
+	tracer := debug.NewTracer(task, fmt.Sprintf("(%d, %s)", index, pbHost.Name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", index, pbHost.Name)
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	// Docker and docker-compose installation is mandatory on all nodes
-	err = b.installDocker(t, pbHost, hostLabel)
+	err = b.installDocker(task, pbHost, hostLabel)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
 	}
 
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
+	}
+
 	// Now configures node specifically for cluster flavor
-	err = b.configureNode(t, index, pbHost)
+	err = b.configureNode(task, index, pbHost)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, err
+	}
+
+	if task != nil && task.Aborted() {
+		return nil, fail.AbortedError("aborted by parent task", nil)
 	}
 
 	logrus.Debugf("[%s] configuration successful.", hostLabel)
@@ -2682,22 +3232,44 @@ func (b *foreman) installTimeServer(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	logrus.Debugf("[cluster %s] adding feature 'ntpserver'", clusterName)
 	feat, err := install.NewEmbeddedFeature(task, "ntpserver")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	target, err := install.NewClusterTarget(task, b.cluster)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+		return fail.Wrapf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 	}
 	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
@@ -2712,24 +3284,46 @@ func (b *foreman) installTimeClient(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	logrus.Debugf("[cluster %s] adding feature 'ntpclient'", clusterName)
 	feat, err := install.NewEmbeddedFeature(task, "ntpclient")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	target, err := install.NewClusterTarget(task, b.cluster)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	var peers []string
 	copy(b.Cluster().ListMasterIPs(task), peers)
 	results, err := feat.Add(target, install.Variables{"Peers": peers}, install.Settings{})
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+		return fail.Wrapf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 	}
 	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
@@ -2744,22 +3338,44 @@ func (b *foreman) installReverseProxy(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	logrus.Debugf("[cluster %s] adding feature 'edgeproxy4network'", clusterName)
 	feat, err := install.NewEmbeddedFeature(task, "edgeproxy4network")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	target, err := install.NewClusterTarget(task, b.cluster)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+		return fail.Wrapf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 	}
 	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
@@ -2778,27 +3394,44 @@ func (b *foreman) installRemoteDesktop(task concurrency.Task) (err error) {
 
 	adminPassword := identity.AdminPassword
 	target, err := install.NewClusterTarget(task, b.cluster)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	// Adds remotedesktop feature on master
 	feat, err := install.NewEmbeddedFeature(task, "remotedesktop")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	results, err := feat.Add(
 		target, install.Variables{
 			"Username": "cladm",
 			"Password": adminPassword,
 		}, install.Settings{},
 	)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+		return fail.Wrapf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 	}
 	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
@@ -2813,25 +3446,46 @@ func (b *foreman) installAnsible(task concurrency.Task) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	logrus.Debugf("[cluster %s] adding feature 'ansible'", clusterName)
 
 	target, err := install.NewClusterTarget(task, b.cluster)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
+	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
 	}
 
 	// Adds ansible
 	feat, err := install.NewEmbeddedFeature(task, "ansible")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
-		return fmt.Errorf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
+		return fail.Wrapf("[cluster %s] failed to add '%s' failed: %s", clusterName, feat.DisplayName(), msg)
 	}
 	logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.DisplayName())
 	return nil
@@ -2843,6 +3497,10 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	disabled := false
 	b.cluster.RLock(task)
 	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(
@@ -2851,26 +3509,35 @@ func (b *foreman) installProxyCacheClient(task concurrency.Task, pbHost *pb.Host
 			return nil
 		},
 	)
+	err = errcontrol.Crasher(err)
 	b.cluster.RUnlock(task)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !disabled {
 		feature, err := install.NewFeature(task, "proxycache-client")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		target, err := install.NewHostTarget(pbHost)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		results, err := feature.Add(target, install.Variables{}, install.Settings{})
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
+			return fail.Wrapf("[%s] failed to install feature 'proxycache-client': %s", hostLabel, msg)
 		}
 	}
 	return nil
@@ -2882,6 +3549,10 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	disabled := false
 	b.cluster.RLock(task)
 	err = b.cluster.GetProperties(task).LockForRead(property.FeaturesV1).ThenUse(
@@ -2890,26 +3561,35 @@ func (b *foreman) installProxyCacheServer(task concurrency.Task, pbHost *pb.Host
 			return nil
 		},
 	)
+	err = errcontrol.Crasher(err)
 	b.cluster.RUnlock(task)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !disabled {
 		feat, err := install.NewEmbeddedFeature(task, "proxycache-server")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		target, err := install.NewHostTarget(pbHost)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		results, err := feat.Add(target, install.Variables{}, install.Settings{})
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return err
 		}
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fmt.Errorf("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
+			return fail.Wrapf("[%s] failed to install feature 'proxycache-server': %s", hostLabel, msg)
 		}
 	}
 	return nil
@@ -2921,22 +3601,44 @@ func (b *foreman) installDocker(task concurrency.Task, pbHost *pb.Host, hostLabe
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	feat, err := install.NewFeature(task, "docker")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	target, err := install.NewHostTarget(pbHost)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	results, err := feat.Add(target, install.Variables{}, install.Settings{})
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return err
 	}
+
+	if task != nil && task.Aborted() {
+		return fail.AbortedError("aborted by parent task", nil)
+	}
+
 	if !results.Successful() {
 		msg := results.AllErrorMessages()
 		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return fmt.Errorf("failed to add feature 'docker' on host '%s': %s", pbHost.Name, msg)
+		return fail.Wrapf("failed to add feature 'docker' on host '%s': %s", pbHost.Name, msg)
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil
