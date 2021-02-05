@@ -415,9 +415,16 @@ func (sc *SSHConfig) CreateTunneling() (*sshtunnel.SSHTunnel, *SSHConfig, error)
 	if err != nil {
 		return nil, nil, err
 	}
-	tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, sshtunnel.TunnelOptionWithLogger(log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)), sshtunnel.TunnelOptionWithDefaultKeepAlive(0))
-	if err != nil {
-		return nil, nil, err
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, sshtunnel.TunnelOptionWithLogger(log.New(os.Stdout, "", log.Ldate|log.Lmicroseconds)), sshtunnel.TunnelOptionWithDefaultKeepAlive(0))
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		tu, err = sshtunnel.NewSSHTunnelFromCfg(*gateway, *server, *local, sshtunnel.TunnelOptionWithDefaultKeepAlive(0))
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	var tsErr error
