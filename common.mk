@@ -16,7 +16,7 @@ endif
 
 MAKEFLAGS += -s
 
-BRANCH_NAME?="develop"
+BRANCH_NAME?="release/v20.06"
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
 UPSTREAM := $(shell git rev-parse origin/$(BRANCH_NAME))
