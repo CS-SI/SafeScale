@@ -465,7 +465,7 @@ func LoadHost(svc iaas.Service, ref string) (mh *Host, err error) {
 			}
 			return nil
 		},
-		2*temporal.GetDefaultDelay(),
+		2*temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {

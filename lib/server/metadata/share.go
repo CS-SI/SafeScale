@@ -498,7 +498,7 @@ func LoadShare(svc iaas.Service, ref string) (share string, err error) {
 
 			return nil
 		},
-		2*temporal.GetDefaultDelay(),
+		2*temporal.GetContextTimeout(),
 	)
 	// If retry timed out, log it and return error ErrNotFound
 	if retryErr != nil {

@@ -427,7 +427,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 			}
 			return nil
 		},
-		2*temporal.GetDefaultDelay(),
+		2*temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch err := retryErr.(type) {

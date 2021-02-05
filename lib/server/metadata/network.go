@@ -599,7 +599,7 @@ func LoadNetwork(svc iaas.Service, ref string) (mn *Network, err error) {
 
 			return nil
 		},
-		2*temporal.GetDefaultDelay(),
+		2*temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
@@ -854,7 +854,7 @@ func LoadGateway(svc iaas.Service, networkID string) (mg *Gateway, err error) {
 			}
 			return nil
 		},
-		2*temporal.GetDefaultDelay(),
+		2*temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) {
