@@ -62,6 +62,10 @@ message TenantCleanupRequest {
 	bool force = 2;
 }
 
+message TenantScan {
+	string name = 1;
+}
+
 message TenantInspectRequest {
 	string name = 1;
 	string user_id = 2;
@@ -127,7 +131,7 @@ service TenantService{
 	rpc Get (google.protobuf.Empty) returns (TenantName){}
 	rpc Inspect (TenantName) returns (TenantInspectResponse){}
 	rpc List (google.protobuf.Empty) returns (TenantList){}
-	rpc Scan (google.protobuf.Empty) returns (google.protobuf.Empty){}
+	rpc Scan (TenantName) returns (google.protobuf.Empty){}
 	rpc Set (TenantName) returns (google.protobuf.Empty){}
 }
 
