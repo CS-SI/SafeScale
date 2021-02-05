@@ -789,7 +789,7 @@ func (handler *HostHandler) Create(
 		}
 
 		task, _ := concurrency.NewTaskWithContext(ctx)
-		_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
+		_, err = sshCfg.WaitServerReady(task, "phase1", temporal.GetHostCreationTimeout())
 		if err != nil {
 			derr := err
 			if client.IsTimeoutError(derr) {
@@ -937,7 +937,7 @@ func (handler *HostHandler) Create(
 		}
 
 		// Wait like 2 min for the machine to reboot
-		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			if client.IsTimeoutError(err) {
 				comm <- result{nil, err}
@@ -958,7 +958,7 @@ func (handler *HostHandler) Create(
 		return
 	}()
 
-	select { // FIXME: OPP Cut previous code ASAP
+	select {
 	case <-ctx.Done():
 		err = fail.Errorf("host creation cancelled by safescale", ctx.Err())
 		// remove metadata first
@@ -968,7 +968,7 @@ func (handler *HostHandler) Create(
 					return
 				}
 			}
-			// FIXME: OPP Remove metadata too if there...
+
 			retryErr := retryOnCommunicationFailure(
 				func() error {
 					if hostID != "" {
@@ -1009,7 +1009,7 @@ func (handler *HostHandler) Create(
 					return
 				}
 			}
-			// FIXME: OPP Remove metadata too if there...
+
 			retryErr := retryOnCommunicationFailure(
 				func() error {
 					if hostID != "" {
@@ -1062,7 +1062,7 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 	return warnings, errs
 }
 
-// FIXME: OPP Why we accept ctx if it's not used ?
+// FIXME: Why we accept ctx if it's not used ?
 func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *abstract.Host) {
 	if sshHandler == nil || host == nil {
 		return

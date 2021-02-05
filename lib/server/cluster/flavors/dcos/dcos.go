@@ -367,7 +367,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (clusterstate.Enum
 		return clusterstate.Error, err
 
 	}
-	_, err = sshCfg.WaitServerReady("ready", temporal.GetContextTimeout())
+	_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetContextTimeout())
 	if err != nil {
 		return clusterstate.Error, err
 	}

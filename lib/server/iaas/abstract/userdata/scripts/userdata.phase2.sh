@@ -577,6 +577,14 @@ function install_route_if_needed() {
     return 0
 }
 
+function allow_custom_env_ssh_vars() {
+    cat >>/etc/ssh/sshd_config <<-EOF
+AcceptEnv SAFESCALESSHUSER
+AcceptEnv SAFESCALESSHPASS
+EOF
+    systemctl reload sshd
+}
+
 function configure_network() {
     case $LINUX_KIND in
     debian | ubuntu)
@@ -620,6 +628,7 @@ function configure_network() {
     {{- end }}
 
     update_fqdn
+    allow_custom_env_ssh_vars
 
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"

@@ -762,7 +762,7 @@ func (b *foreman) construct(task concurrency.Task, req Request) (err error) {
 	// waits the masters creation
 	logrus.Debugf("Waiting for masters to be created...")
 	_, mastersErr = mastersTask.Wait()
-	mastersErr = errcontrol.Crasher(mastersErr) // FIXME: OPP Test for wait error
+	mastersErr = errcontrol.Crasher(mastersErr) // FIXME: Test for wait error
 	if mastersErr != nil {
 		return fail.Wrapf("error waiting for masters task: %w", mastersErr)
 	}
@@ -989,7 +989,7 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 		}
 		for _, s := range subtasks {
 			_, _, subErr := s.WaitFor(3*time.Minute)
-			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
+			subErr = errcontrol.Crasher(subErr) // FIXME: Test for wait error
 			if subErr != nil {
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
@@ -1025,7 +1025,7 @@ func (b *foreman) wipe(task concurrency.Task) (err error) {
 		}
 		for _, s := range subtasks {
 			_, _, subErr := s.WaitFor(3*time.Minute)
-			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
+			subErr = errcontrol.Crasher(subErr) // FIXME: Test for wait error
 			if subErr != nil {
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
@@ -1187,7 +1187,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		}
 		for _, s := range subtasks {
 			_, _, subErr := s.WaitFor(3*time.Minute)
-			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
+			subErr = errcontrol.Crasher(subErr) // FIXME: Test for wait error
 			if subErr != nil {
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
@@ -1215,7 +1215,7 @@ func (b *foreman) destruct(task concurrency.Task) (err error) {
 		}
 		for _, s := range subtasks {
 			_, _, subErr := s.WaitFor(3*time.Minute)
-			subErr = errcontrol.Crasher(subErr) // FIXME: OPP Test for wait error
+			subErr = errcontrol.Crasher(subErr) // FIXME: Test for wait error
 			if subErr != nil {
 				cleaningErrors = append(cleaningErrors, subErr)
 			}
@@ -1860,7 +1860,7 @@ func (b *foreman) configureNodesFromList(task concurrency.Task, hosts []string) 
 
 	for _, s := range subtasks {
 		_, _, state := s.WaitFor(3*time.Minute)
-		state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
+		state = errcontrol.Crasher(state) // FIXME: Test for wait error
 		if state != nil {
 			errs = append(errs, state.Error())
 		}
@@ -2359,7 +2359,7 @@ func (b *foreman) taskInstallGateway(
 	}
 
 	logrus.Debugf("[%s] waiting for SSH...", hostLabel)
-	_, err = sshCfg.WaitServerReady("ready", temporal.GetHostTimeout())
+	_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetHostTimeout())
 	err = errcontrol.Crasher(err)
 	if err != nil {
 		unfinished.Err = err
@@ -2503,8 +2503,8 @@ func (b *foreman) taskCreateMasters(
 
 	go func() {
 		for _, s := range subtasks {
-			_, _, state := s.WaitFor(15*time.Minute) // FIXME: OPP No more waits
-			state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
+			_, _, state := s.WaitFor(15*time.Minute)
+			state = errcontrol.Crasher(state) // FIXME: Test for wait error
 			if state != nil {
 				errs = append(errs, state.Error())
 			}
@@ -2720,7 +2720,7 @@ func (b *foreman) taskConfigureMasters(
 	var errs []string
 	for _, s := range subtasks {
 		_, state := s.Wait()
-		state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
+		state = errcontrol.Crasher(state) // FIXME: Test for wait error
 		if state != nil {
 			errs = append(errs, state.Error())
 		}
@@ -2873,7 +2873,6 @@ func (b *foreman) taskCreateNodes(
 		subtask, err = subtask.Start(
 			b.taskCreateNode, data.Map{
 				"index": i,
-				// "type":    nodetype.Node,
 				"nodeDef": def,
 				"timeout": timeout,
 				"nokeep":  nokeep,
@@ -2906,9 +2905,9 @@ func (b *foreman) taskCreateNodes(
 	var errs []string
 	stch := make(chan bool)
 	go func() {
-		for _, s := range subtasks { // FIXME: OPP This blocks badly
-			_, state := s.Wait()
-			state = errcontrol.Crasher(state) // FIXME: OPP Test for wait error
+		for _, s := range subtasks {
+			_, state := s.Wait() // FIXME: Block risk
+			state = errcontrol.Crasher(state) // FIXME: Test for wait error
 			if state != nil {
 				errs = append(errs, state.Error())
 			}

@@ -84,6 +84,9 @@ func (s *ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout
 				if _, ok := breakErr.(*fail.ErrTimeout); ok {
 					return breakErr
 				}
+
+				log.Debugf("problem running with timeout: %v", breakErr)
+
 				retcode = -1
 				return nil
 			}
@@ -156,7 +159,13 @@ func extractPath(in string) (string, error) {
 }
 
 // Copy ...
-func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, error) {
+func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, err error) {
+	defer func() {
+		if err != nil {
+			log.Warnf("The copy failed with: %v", err)
+		}
+	}()
+
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -229,15 +238,13 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 			retcode, stdout, stderr, err = sshCfg.Copy(remotePath, localPath, upload)
 			// If an error occurred, stop the loop and propagates this error
 			if err != nil {
-				retcode = -1
-				return nil
-			}
-			// If retcode == 255, ssh connection failed, retry
-			if retcode == 255 {
-				err = fmt.Errorf("failed to connect")
 				return err
 			}
-			return nil
+			if retcode == 0 {
+				return nil
+			} else {
+				return fmt.Errorf("copy error: %d", retcode)
+			}
 		},
 		temporal.GetMinDelay(),
 		connectionTimeout,
@@ -245,7 +252,7 @@ func (s *ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dur
 	if retryErr != nil {
 		switch retryErr.(type) { // nolint
 		case retry.ErrTimeout:
-			return -1, "", "", fmt.Errorf("failed to copy after %v: %s", connectionTimeout, err.Error())
+			return -1, "", "", fmt.Errorf("failed to copy after %v: %s", connectionTimeout, retryErr.Error())
 		}
 	}
 	return retcode, stdout, stderr, err
@@ -276,9 +283,13 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 	if err != nil {
 		return err
 	}
-	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
+	connectErr := retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
-			return sshCfg.Enter(username, shell)
+			captured := sshCfg.Enter(username, shell)
+			if captured != nil {
+				log.Warnf("ssh connection error: %v", captured)
+			}
+			return captured
 		},
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
@@ -287,13 +298,14 @@ func (s *ssh) Connect(hostname, username, shell string, timeout time.Duration) e
 			}
 		},
 	)
+
+	return connectErr
 }
 
 func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout time.Duration) error {
-	log.Warnf("Getting ssh config of machine %s", name)
 	sshCfg, err := s.getSSHConfigFromName(name, timeout)
 	if err != nil {
-		return err
+		return fail.Wrap(err, fmt.Sprintf("failure getting ssh configuration of machine %s", name))
 	}
 
 	if sshCfg.GatewayConfig == nil {
@@ -312,15 +324,13 @@ func (s *ssh) CreateTunnel(name string, localPort int, remotePort int, timeout t
 
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
-
-			tunnels, _, err := sshCfg.CreateTunneling()
+			tu, _, err := sshCfg.CreateTunneling()
 			if err != nil {
-				for _, t := range tunnels {
-					nerr := t.Close()
-					if nerr != nil {
-						log.Errorf("error closing ssh tunnel: %v", nerr)
+				defer func() {
+					if tu != nil {
+						tu.Close()
 					}
-				}
+				}()
 				return fmt.Errorf("unable to create command : %s", err.Error())
 			}
 
@@ -387,6 +397,6 @@ func (s *ssh) WaitReady(hostName string, timeout time.Duration) error {
 		return err
 	}
 
-	_, err = sshCfg.WaitServerReady("ready", timeout)
+	_, err = sshCfg.WaitServerReady(nil, "ready", timeout)
 	return err
 }

@@ -591,7 +591,6 @@ func buildGcpMachine(bucketName string, service *compute.Service, projectID stri
 		return nil, err
 	}
 
-	// FIXME: OPP If it's a public ip, then add staticip-
 	if isPublic {
 		if inst != nil {
 			if len(inst.NetworkInterfaces) > 0 && len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {

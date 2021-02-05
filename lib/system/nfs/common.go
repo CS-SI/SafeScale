@@ -133,7 +133,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	)
 
 	// cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; if [[ rc -eq 0 ]]; then rm -f %s; fi; exit $rc", filename, filename, filename)
-	cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; exit $rc", filename, filename)
+	cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s", filename, filename)
 
 	retryErr = retry.Action(
 		func() error {
@@ -141,7 +141,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(cmd, false)
+			sshCmd, err := sshconfig.SudoCommand(cmd)
 			if err != nil {
 				return err
 			}

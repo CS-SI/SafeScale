@@ -457,7 +457,7 @@ func analyzeTenant(group *sync.WaitGroup, theTenant string) (err error) {
 				)
 				return err
 			}
-			_, nerr := ssh.WaitServerReady("ready", time.Duration(6+concurrency-1)*time.Minute)
+			_, nerr := ssh.WaitServerReady(nil, "ready", time.Duration(6+concurrency-1)*time.Minute)
 			if nerr != nil {
 				logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.Name, nerr)
 				return nerr

@@ -549,7 +549,7 @@ func (c *Controller) FindAvailableMaster(task concurrency.Task) (result string, 
 			log.Errorf("failed to get ssh config for master '%s': %s", masterID, err.Error())
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			lastError = err
 			if _, ok := err.(retry.ErrTimeout); ok {
@@ -591,7 +591,7 @@ func (c *Controller) FindAvailableNode(task concurrency.Task) (id string, err er
 			lastError = err
 			continue
 		}
-		_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
 		if err != nil {
 			lastError = err
 			if _, ok := err.(retry.ErrTimeout); ok {
@@ -881,13 +881,17 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 		// FIXME: Improvements: don't wait blocking with for, use channels and use abort when a Wait fails
 		// VPL: I need to be convinced this improvement is worth the risk the possible code complexity growth...
 		for _, s := range subtasks {
-			result, err := s.Wait()
+			_, result, err := s.WaitFor(15*time.Minute)
 			if err != nil {
 				errors = append(errors, err.Error())
 			} else {
-				hostId := result.(string)
-				if hostId != "" {
-					hosts = append(hosts, hostId)
+				if result != nil {
+					hostId, ok := result.(string)
+					if ok {
+						if hostId != "" {
+							hosts = append(hosts, hostId)
+						}
+					}
 				}
 			}
 		}
@@ -913,7 +917,7 @@ func (c *Controller) AddNodes(task concurrency.Task, count int, req *pb.HostDefi
 			}
 
 			for _, s := range subtasks {
-				_, state := s.Wait()
+				_, _, state := s.WaitFor(3*time.Minute)
 				if state != nil {
 					err = fail.AddConsequence(err, state)
 				}

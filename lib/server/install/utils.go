@@ -27,6 +27,9 @@ import (
 	"text/template"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
@@ -54,10 +57,12 @@ trap print_error ERR
 
 set +x
 rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
-exec 1<&-
-exec 2<&-
-exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
-exec 2>&1
+
+# Redirects outputs to /opt/safescale/var/log/user_data.final.log
+LOGFILE=%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 {{ .reserved_BashLibrary }}
@@ -74,6 +79,15 @@ var featureScriptTemplate atomic.Value
 
 // UploadFile uploads a file to remote host
 func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
+	logrus.Debugf("UploadFile %s to %s starting...", remotepath, host.Name)
+	defer func() {
+		if err != nil {
+			logrus.Debugf("UploadFile %s to %s failed with: %v", remotepath, host.Name, err)
+		} else {
+			logrus.Debugf("UploadFile %s to %s OK", remotepath, host.Name)
+		}
+	}()
+
 	if localpath == "" {
 		return fail.InvalidParameterError("localpath", "cannot be empty string")
 	}
@@ -92,51 +106,33 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	sshClt := client.New().SSH
-	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := sshClt.Copy(localpath, to, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
+			logrus.Debug("Getting the SSH Client")
+			sshClt := client.New().SSH
+			logrus.Debug("Running the SSH copy client")
+			retcode, _, _, err := sshClt.Copy(localpath, to, temporal.GetDefaultDelay(), 90*time.Second)
+			logrus.Debug("Returning from SSH copy client")
 			if err != nil {
+				logrus.Warnf("Upload problem: %v", err)
 				return err
 			}
-			if retcode != 0 {
-				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
-				if retcode == 1 {
-					// File may exist on target, try to remote it
-					_, _, _, err = sshClt.Run(
-						host.Name, fmt.Sprintf("sudo rm -f %s", remotepath), outputs.COLLECT, temporal.GetBigDelay(),
-						temporal.GetExecutionTimeout(),
-					)
-					if err == nil {
-						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
-					}
-					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
-					logrus.Tracef(
-						fmt.Sprintf(
-							"this error occured, considered as an unrecoverable network error: %v", err,
-						),
-					)
-					networkError = true
-					return nil
-				}
-				if system.IsSCPRetryable(retcode) {
-					err = fmt.Errorf(
-						"failed to copy file '%s' to '%s' (retcode: %d=%s)", localpath, to, retcode,
-						system.SCPErrorString(retcode),
-					)
+			if retcode == 0 {
+				// it seems copy was ok, but make sure of it
+				retcode, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("test -s %s", remotepath), outputs.COLLECT, temporal.GetDefaultDelay(), 90 * time.Second)
+				if err != nil {
 					return err
+				}
+				if retcode != 0 {
+					return fmt.Errorf("problem checking file %s on host %s: %d", remotepath, host.Name, retcode)
 				}
 				return nil
 			}
-			return nil
+			return fmt.Errorf("problem copying file %s on host %s: %d", remotepath, host.Name, retcode)
 		},
 		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
-	if networkError {
-		return fmt.Errorf("an unrecoverable network error has occurred")
-	}
 	if retryErr != nil {
 		switch retryErr.(type) { // nolint
 		case retry.ErrTimeout:
@@ -162,36 +158,46 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		cmd += "sudo chmod " + rights + " " + remotepath
 	}
 
-	retryErr = retry.WhileUnsuccessful(
-		func() error {
-			var retcode int
-			retcode, _, _, err = sshClt.Run(
-				host.Name, cmd, outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout(),
-			)
-			if err != nil {
-				return err
-			}
-			if retcode != 0 {
-				err = fmt.Errorf("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+	if len(cmd) > 0 {
+		retryErr = retry.WhileUnsuccessful(
+			func() error {
+				var retcode int
+				sshClt := client.New().SSH
+				retcode, _, _, err = sshClt.Run(
+					host.Name, cmd, outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout(),
+				)
+				if err != nil {
+					if sta, ok := status.FromError(err); ok {
+						if sta.Code() == codes.NotFound {
+							return fail.AbortedError("not found", err)
+						}
+					}
+					return err
+				}
+				if retcode != 0 {
+					err = fmt.Errorf("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+					logrus.Warnf("hidden failure: %v", err)
+					return nil
+				}
 				return nil
+			},
+			temporal.GetMinDelay(),
+			temporal.GetLongOperationTimeout(),
+		)
+		if retryErr != nil {
+			switch retryErr.(type) {
+			case retry.ErrTimeout:
+				return fmt.Errorf(
+					"timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error(),
+				)
+			default:
+				return fmt.Errorf(
+					"failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error(),
+				)
 			}
-			return nil
-		},
-		temporal.GetMinDelay(),
-		temporal.GetLongOperationTimeout(),
-	)
-	if retryErr != nil {
-		switch retryErr.(type) {
-		case retry.ErrTimeout:
-			return fmt.Errorf(
-				"timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error(),
-			)
-		default:
-			return fmt.Errorf(
-				"failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error(),
-			)
 		}
 	}
+
 	return nil
 }
 

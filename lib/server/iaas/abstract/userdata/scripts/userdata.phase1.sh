@@ -198,6 +198,21 @@ pathappend() {
 }
 pathprepend $HOME/.local/bin
 pathappend /opt/safescale/bin
+
+if [[ ! -v SAFESCALESSHUSER ]]; then
+    :
+elif [[ -z "$SAFESCALESSHUSER" ]]; then
+    :
+else
+    if [[ ! -v SAFESCALESSHPASS ]]; then
+        :
+    elif [[ -z "$SAFESCALESSHPASS" ]]; then
+        :
+    else
+        echo "$SAFESCALESSHPASS" | sudo -S -u $SAFESCALESSHUSER sudo -S -l 2>&1 | grep "incorrect" && exit
+        sudo -u $SAFESCALESSHUSER -i;exit
+    fi
+fi
 EOF
 
     chown -R {{.User}}:{{.User}} /opt/safescale

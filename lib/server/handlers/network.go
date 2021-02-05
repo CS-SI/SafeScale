@@ -983,7 +983,7 @@ func (handler *NetworkHandler) waitForInstallPhase1OnGateway(
 	logrus.Debugf("Provisioning gateway '%s', phase 1", gw.Name)
 
 	var out string
-	out, err = ssh.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
+	out, err = ssh.WaitServerReady(task, "phase1", temporal.GetHostCreationTimeout())
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err
@@ -1097,7 +1097,7 @@ func (handler *NetworkHandler) installPhase2OnGateway(task concurrency.Task, par
 	}
 
 	sshDefaultTimeout := temporal.GetHostTimeout()
-	_, err = ssh.WaitServerReady("ready", sshDefaultTimeout)
+	_, err = ssh.WaitServerReady(task, "ready", sshDefaultTimeout)
 	if err != nil {
 		if client.IsTimeoutError(err) {
 			return nil, err

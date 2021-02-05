@@ -146,7 +146,6 @@ func (s *BucketListener) Prune(ctx context.Context, in *pb.Bucket) (empty *googl
 
 // Verify
 func (s *BucketListener) Verify(ctx context.Context, in *pb.Bucket) (bl *pb.BucketErrorList, err error) {
-	// FIXME: OPP Test verify
 	bucketName := in.GetName()
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()

@@ -27,7 +27,6 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
-	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -150,7 +149,7 @@ var sshCopy = cli.Command{
 		if retcode != 0 {
 			return clitools.FailureResponse(
 				clitools.ExitOnErrorWithMessage(
-					exitcode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode)),
+					exitcode.Run, fmt.Sprintf("copy failed: retcode=%d", retcode),
 				),
 			)
 		}

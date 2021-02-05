@@ -195,6 +195,21 @@ func (ud *Content) Prepare(
 	// ud.ConfIF = !autoHostNetworkInterfaces
 	ud.IsGateway = request.DefaultRouteIP == "" && len(request.Networks) != 0 && request.Networks[0].Name != abstract.SingleHostNetworkName && !useLayer3Networking
 	ud.AddGateway = !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
+
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+		if ud.IsGateway {
+			logrus.Debugf("marking that %s IS A GATEWAY because of %d, %s, %t", request.ResourceName, len(request.Networks), request.Networks[0].Name, !useLayer3Networking)
+		} else {
+			logrus.Debugf("marking that %s IS NOT A GATEWAY because of %d, %s, %t", request.ResourceName, len(request.Networks), request.Networks[0].Name, !useLayer3Networking)
+		}
+
+		if ud.AddGateway {
+			logrus.Debugf("decided that %s REQUIRES GATEWAY cfg because of %t, %t, %s, %t", request.ResourceName, !request.PublicIP, !useLayer3Networking, ip, !useNATService)
+		} else {
+			logrus.Debugf("decided that %s NOT REQUIRES GATEWAY cfg because of %t, %t, %s, %t", request.ResourceName, !request.PublicIP, !useLayer3Networking, ip, !useNATService)
+		}
+	}
+
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr
 	ud.DefaultRouteIP = ip

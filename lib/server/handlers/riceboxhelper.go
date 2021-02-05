@@ -72,7 +72,7 @@ func exec(ctx context.Context, script string, data interface{}, hostid string, s
 		return err
 	}
 
-	cmd, err := ssh.SudoCommand(scriptCmd, false)
+	cmd, err := ssh.SudoCommand(scriptCmd)
 	if err != nil {
 		return err
 	}

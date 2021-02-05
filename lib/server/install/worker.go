@@ -451,13 +451,25 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 		}
 
 		var result *StepResults
-		tr, err := subtask.Wait()
-		if tr != nil {
-			result = tr.(*StepResults)
-			results[k] = *result
-		}
+		_, tr, err := subtask.WaitFor(10*time.Minute)
 		if err != nil {
+			if tr != nil {
+				result, ok = tr.(*StepResults)
+				if ok {
+					results[k] = *result
+				} else {
+					logrus.Error("problem casting to StepResults")
+				}
+			}
 			return results, err
+		}
+		if tr != nil {
+			result, ok = tr.(*StepResults)
+			if ok {
+				results[k] = *result
+			} else {
+				logrus.Error("problem casting to StepResults")
+			}
 		}
 	}
 	return results, nil

@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
@@ -184,7 +185,8 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 		return err
 	}
 
-	_, waitErr := ssh.WaitServerReady("ready", timeout)
+	task, _ := concurrency.NewTaskWithContext(ctx)
+	_, waitErr := ssh.WaitServerReady(task, "ready", timeout)
 	return waitErr
 }
 

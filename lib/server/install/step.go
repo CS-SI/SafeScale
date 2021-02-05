@@ -302,8 +302,12 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			if err != nil {
 				return nil, err
 			}
-			result, _ := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
-			
+
+			result, err := subtask.Run(is.taskRunOnHost, data.Map{"host": h, "variables": cloneV})
+			if err != nil {
+				log.Warnf("Unexpected problem running step: %v", err)
+			}
+
 			if _, ok := result.(StepResult); !ok {
 				return nil, fmt.Errorf("result of step %s was not of type StepResult: %v", cloneV["StepID"], result)
 			}
@@ -370,7 +374,7 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 			subtasks[h.Name] = subtask
 		}
 		for k, s := range subtasks {
-			result, err := s.Wait()
+			_, result, err := s.WaitFor(10*time.Minute)
 			if err != nil {
 				log.Warn(
 					tracer.TraceMessage(
@@ -380,6 +384,10 @@ func (is *step) Run(hosts []*pb.Host, v Variables, s Settings) (results StepResu
 					),
 				)
 				continue
+			}
+			if result == nil {
+				log.Errorf("Invalid result, that shouldn't happen")
+				return results, fmt.Errorf("Invalid result, that shouldn't happen")
 			}
 
 			if _, ok := result.(StepResult); !ok {
@@ -477,7 +485,7 @@ func (is *step) taskRunOnHost(t concurrency.Task, params concurrency.TaskParamet
 	}
 
 	// command = fmt.Sprintf("sudo bash %s; rc=$?; if [[ rc -eq 0 ]]; then sudo rm -f %s %s/options.json; fi; exit $rc", filename, filename, srvutils.TempFolder)
-	command = fmt.Sprintf("sudo bash %s; rc=$?; exit $rc", filename)
+	command = fmt.Sprintf("sudo bash %s", filename)
 
 	// Executes the script on the remote host
 	retcode, _, _, err := client.New().SSH.Run(
