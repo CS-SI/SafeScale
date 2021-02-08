@@ -1829,10 +1829,6 @@ func (rh host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, xerr fa
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-// FIXME: verify that system.SSHConfig carries data about secondary getGateway
-func (rh host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2795,6 +2791,10 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 	}
 	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	var (
