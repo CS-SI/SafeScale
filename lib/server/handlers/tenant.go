@@ -32,12 +32,17 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
+	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -203,33 +208,85 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	task := handler.job.GetTask()
 
 	// Prepare network if needed
-	//netName := "net-safescale" // FIXME: Hardcoded string
-	//network, xerr := networkfactory.Load(task, svc, netName)
-	//if xerr != nil {
-	//	if _, ok := xerr.(*fail.ErrNotFound); !ok {
-	//		return xerr
-	//	}
-	//	network, xerr := networkfactory.New(svc)
-	//	if xerr != nil {
-	//		return xerr
-	//	}
-	//	req := abstract.NetworkRequest{
-	//		Name:      netName,
-	//		IPVersion: ipversion.IPv4,
-	//		CIDR:      "192.168.0.0/24",
-	//	}
-	//	if xerr = network.Create(task, req, "", nil); xerr != nil {
-	//		return xerr
-	//	}
-	//
-	//	defer func() {
-	//		derr := network.Delete(task)
-	//		if derr != nil {
-	//			logrus.Warnf("Error deleting network '%s'", network.GetID())
-	//		}
-	//		_ = xerr.AddConsequence(derr)
-	//	}()
-	//}
+	netName := "net-safescale-scan" // FIXME: Hardcoded string
+	network, xerr := networkfactory.Load(task, svc, netName)
+	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+			return xerr
+		}
+		network, xerr := networkfactory.New(svc)
+		if xerr != nil {
+			return xerr
+		}
+		req := abstract.NetworkRequest{
+			Name: netName,
+			//IPVersion: ipversion.IPv4,
+			CIDR: "192.168.20.0/24",
+		}
+		if xerr = network.Create(task, req); xerr != nil {
+			return xerr
+		}
+
+		defer func() {
+			derr := network.Delete(task)
+			if derr != nil {
+				logrus.Warnf("Error deleting network '%s'", network.GetID())
+			}
+			_ = xerr.AddConsequence(derr)
+		}()
+	}
+
+	// Prepare sub-network if needed
+	logrus.Debug("Creating subnet.1..")
+	subNetName := "subnet-safescale-scan" // FIXME: Hardcoded string
+	subNetwork, xerr := subnetfactory.Load(task, svc, netName, subNetName)
+	logrus.Debug("Loaded subnet...")
+	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+			return xerr
+		}
+		logrus.Debug("Creating subnet.2..")
+		subnet, xerr := subnetfactory.New(svc)
+		if xerr != nil {
+			return xerr
+		}
+		req := abstract.SubnetRequest{
+			Name:      subNetName,
+			NetworkID: network.GetID(),
+			IPVersion: ipversion.IPv4,
+			CIDR:      "192.168.20.0/24",
+		}
+
+		subnethq := abstract.HostSizingRequirements{
+			MinGPU: -1,
+		}
+		logrus.Debug("Creating subnet.3..")
+		if xerr = subnet.Create(task, req, "", &subnethq); xerr != nil {
+			return xerr
+		}
+
+		defer func() {
+			logrus.Debug("Deleting subnet...")
+			derr := subnet.Delete(task)
+			if derr != nil {
+				logrus.Warnf("Error deleting subnetwork '%s'", subnet.GetID())
+			}
+			_ = xerr.AddConsequence(derr)
+		}()
+	}
+
+	var as *abstract.Subnet
+	logrus.Debug("Getting subnet...")
+	xerr = subNetwork.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		logrus.Debug("Loading data...")
+		as = clonable.(*abstract.Subnet)
+		logrus.Debug("Loaded data...")
+		return nil
+	})
+
+	if xerr != nil {
+		return xerr
+	}
 
 	// already done by dump functions above
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
@@ -238,7 +295,8 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 
 	var wg sync.WaitGroup
 
-	concurrency := math.Min(4, float64(len(templates)/2))
+	//concurrency := math.Min(4, float64(len(templates)/2)) // Why /2 ?
+	concurrency := math.Min(4.0, float64(len(templates)))
 	sem := make(chan bool, int(concurrency))
 
 	hostAnalysis := func(template abstract.HostTemplate) fail.Error {
@@ -266,18 +324,18 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 
 		logrus.Infof("Checking template %s", template.Name)
 
-		//var an *abstract.Network
-		//xerr = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		//	var ok bool
-		//	an, ok = clonable.(*abstract.Network)
-		//	if !ok {
-		//		return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		//	}
-		//	return nil
-		//})
-		//if xerr != nil {
-		//	return xerr
-		//}
+		// var an *abstract.Network
+		// xerr = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		// 	var ok bool
+		// 	an, ok = clonable.(*abstract.Network)
+		// 	if !ok {
+		// 		return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// 	}
+		// 	return nil
+		// })
+		// if xerr != nil {
+		// 	return xerr
+		// }
 		hostName := "scanhost-" + template.Name
 		host, xerr := hostfactory.New(svc)
 		if xerr != nil {
@@ -286,9 +344,9 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 
 		req := abstract.HostRequest{
 			ResourceName: hostName,
-			//Subnets:      []*abstract.Network{an},
-			PublicIP:   false,
-			TemplateID: template.ID,
+			Subnets:      []*abstract.Subnet{as},
+			PublicIP:     false,
+			TemplateID:   template.ID,
 		}
 		def := abstract.HostSizingRequirements{
 			Image: "Ubuntu 18.04",
