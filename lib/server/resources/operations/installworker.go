@@ -144,11 +144,13 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 		w.host = t.(resources.Host)
 	}
 
-	w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
-	if !f.(*feature).Specs().IsSet(w.rootKey) {
-		msg := `syntax error in feature '%s' specification file (%s):
+	if m != installmethod.None {
+		w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
+		if !f.(*feature).Specs().IsSet(w.rootKey) {
+			msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
+			return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
+		}
 	}
 
 	return &w, nil
@@ -347,7 +349,6 @@ func (w *worker) identifyAllNodes() ([]resources.Host, fail.Error) {
 
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
-// For now, only one gateway is allowed, but in the future we may have 2 for High Availability
 func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 	if w.availableGateway != nil {
 		return w.availableGateway, nil
@@ -377,15 +378,25 @@ func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 
 		w.availableGateway = gw
 	} else {
-		// FIXME: secondary gateway not tried if the primary doesn't respond in time
 		// In cluster context
 		netCfg, xerr := w.cluster.GetNetworkConfig(w.feature.task)
-		if xerr == nil {
-			w.availableGateway, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.GatewayID)
-		}
 		if xerr != nil {
 			return nil, xerr
 		}
+		var gw resources.Host
+		if gw, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.GatewayID); xerr == nil {
+			_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		}
+		if xerr != nil {
+			if gw, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.SecondaryGatewayID); xerr == nil {
+				_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+			}
+		}
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to find an available gateway")
+		}
+
+		w.availableGateway = gw
 	}
 	return w.availableGateway, nil
 }
@@ -471,18 +482,26 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	outcomes = &results{}
 
 	// 'pace' tells the order of execution
-	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
-	if pace == "" {
-		return nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
-	}
+	var (
+		pace     string
+		stepsKey string
+		steps    map[string]interface{}
+		order    []string
+	)
+	if w.method != installmethod.None {
+		pace = w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
+		if pace == "" {
+			return nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
+		}
 
-	// 'steps' describes the steps of the action
-	stepsKey := w.rootKey + "." + yamlStepsKeyword
-	steps := w.feature.specs.GetStringMap(stepsKey)
-	if len(steps) == 0 {
-		return nil, fail.InvalidRequestError("nothing to do")
+		// 'steps' describes the steps of the action
+		stepsKey = w.rootKey + "." + yamlStepsKeyword
+		steps = w.feature.specs.GetStringMap(stepsKey)
+		if len(steps) == 0 {
+			return nil, fail.InvalidRequestError("nothing to do")
+		}
+		order = strings.Split(pace, ",")
 	}
-	order := strings.Split(pace, ",")
 
 	// Applies reverseproxy rules and security to make Feature functional (Feature may need it during the install)
 	switch w.action {
@@ -784,7 +803,7 @@ func (w *worker) validateContextForCluster() fail.Error {
 		return xerr
 	}
 
-	yamlKey := "feature.suitableFor.cluster"
+	const yamlKey = "feature.suitableFor.cluster"
 	if w.feature.specs.IsSet(yamlKey) {
 		yamlFlavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range yamlFlavors {
@@ -806,7 +825,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 	}
 
 	ok := false
-	yamlKey := "feature.suitableFor.host"
+	const yamlKey = "feature.suitableFor.host"
 	if w.feature.specs.IsSet(yamlKey) {
 		value := strings.ToLower(w.feature.specs.GetString(yamlKey))
 		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
@@ -876,7 +895,9 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, f
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy() (xerr fail.Error) {
-	rules, ok := w.feature.specs.Get("feature.proxy.rules").(map[string]map[string]interface{})
+	const yamlKey = "feature.proxy.rules"
+	// rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[string]interface{})
+	rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[interface{}]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
@@ -890,10 +911,12 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	}
 
 	svc := w.cluster.GetService()
+
 	netprops, xerr := w.cluster.GetNetworkConfig(w.feature.task)
 	if xerr != nil {
 		return xerr
 	}
+
 	subnet, xerr := LoadSubnet(w.feature.task, svc, "", netprops.SubnetID)
 	if xerr != nil {
 		return xerr
@@ -903,6 +926,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 	}
+
 	var secondaryKongController *KongController
 	if subnet.HasVirtualIP(w.feature.task) {
 		if secondaryKongController, xerr = NewKongController(svc, subnet, false); xerr != nil {
@@ -1034,24 +1058,12 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 type taskApplyProxyRuleParameters struct {
 	controller *KongController
-	rule       map[string]interface{}
+	rule       map[interface{}]interface{}
 	variables  *data.Map
 }
 
 func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
 	p := params.(taskApplyProxyRuleParameters)
-	// ctrl, ok := params.(data.Map)["ctrl"].(*KongController)
-	// if !ok {
-	// 	return nil, fail.InvalidParameterError("ctrl", "is not a *KongController")
-	// }
-	// rule, ok := params.(data.Map)["rule"].(map[interface{}]interface{})
-	// if !ok {
-	// 	return nil, fail.InvalidParameterError("rule", "is not a map")
-	// }
-	// vars, ok := params.(data.Map)["vars"].(*data.Map)
-	// if !ok {
-	// 	return nil, fail.InvalidParameterError("vars", "is not a '*data.Map'")
-	// }
 	hostName, ok := (*p.variables)["Hostname"].(string)
 	if !ok {
 		return nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")
@@ -1193,22 +1205,26 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 // setSecurity applies the security rules defined in specification file (if there are some)
 func (w *worker) setSecurity() (xerr fail.Error) {
-	if xerr = w.setSubnetSecurity(); xerr != nil {
+	if xerr = w.setNetworkingSecurity(); xerr != nil {
 		return xerr
 	}
 	return nil
 }
 
-// setSubnetSecurity applies the network security rules defined in specification file (if there are some)
-func (w *worker) setSubnetSecurity() (xerr fail.Error) {
-	const yamlKey = "feature.security.subnet"
-	rules, ok := w.feature.specs.Get(yamlKey).([]map[string]interface{})
+// setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
+func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
+	const yamlKey = "feature.security.networking"
+	if ok := w.feature.specs.IsSet(yamlKey); !ok {
+		return nil
+	}
+
+	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
 
-	if w.feature.task.IsNull() {
-		return fail.InvalidParameterError("w.feature.task", "cannot be null value of 'concurrency.Task'")
+	if w.feature.task == nil {
+		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
 	}
 
 	task := w.feature.task
@@ -1216,7 +1232,7 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 		svc iaas.Service
 		rs  resources.Subnet
 	)
-	if !w.cluster.IsNull() {
+	if w.cluster != nil {
 		svc = w.cluster.GetService()
 		netprops, xerr := w.cluster.GetNetworkConfig(task)
 		if xerr != nil {
@@ -1225,20 +1241,24 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 		if rs, xerr = LoadSubnet(task, svc, netprops.NetworkID, netprops.SubnetID); xerr != nil {
 			return xerr
 		}
-		defer rs.Dispose() // will not used the instance outside of the function
-	} else if !w.host.IsNull() {
+	} else if w.host != nil {
 		if rs, xerr = w.host.GetDefaultSubnet(task); xerr != nil {
 			return xerr
 		}
-		defer rs.Dispose() // will not used the instance outside of the function
 	}
+	defer rs.Dispose() // will not used the instance outside of the function
 
-	gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
-	if xerr != nil {
-		return xerr
-	}
+	// gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
-	for k, r := range rules {
+	for k, rule := range rules {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
+		r := rule.(map[interface{}]interface{})
 		targets := w.interpretRuleTargets(r)
 
 		// If security rules concerns gateways, update subnet Security Group for gateways
@@ -1246,13 +1266,12 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 
 			description, ok := r["name"].(string)
 			if !ok {
-				return fail.SyntaxError("missing field 'name' of rule #%d in 'feature.security.network'", k+1)
+				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)
 			}
-			description += " for feature '" + w.feature.GetName() + "'"
 
-			gwSG, innerXErr := rs.InspectGatewaySecurityGroup(task)
-			if innerXErr != nil {
-				return innerXErr
+			gwSG, xerr := rs.InspectGatewaySecurityGroup(task)
+			if xerr != nil {
+				return xerr
 			}
 			defer gwSG.Dispose()
 
@@ -1260,56 +1279,62 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
 			sgRule.EtherType = ipversion.IPv4
 			sgRule.Protocol, _ = r["protocol"].(string)
-			sgRule.Targets = gatewayPublicIPs
+			sgRule.Sources = []string{"0.0.0.0/0"}
+			// sgRule.Targets = []string{gwSG.GetID()}
 
 			var commaSplitted []string
-			ports, ok := r["ports"].(string)
-			if ok {
+			if ports, ok := r["ports"].(int); ok {
+				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports)
+				sgRule.PortFrom = int32(ports)
+			} else if ports, ok := r["ports"].(string); ok {
 				commaSplitted = strings.Split(ports, ",")
-			}
-			if len(commaSplitted) > 0 {
-				var (
-					portFrom, portTo int
-					err              error
-				)
-				for _, v := range commaSplitted {
-					sgRule.Description = description
-					dashSplitted := strings.Split(v, "-")
-					if dashCount := len(dashSplitted); dashCount > 0 {
-						if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
-							return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
-						}
-						if len(dashSplitted) == 2 {
-							if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
+				if len(commaSplitted) > 0 {
+					var (
+						portFrom, portTo int
+						err              error
+					)
+					for _, v := range commaSplitted {
+						sgRule.Description = description
+						dashSplitted := strings.Split(v, "-")
+						if dashCount := len(dashSplitted); dashCount > 0 {
+							if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
 								return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
 							}
+							if len(dashSplitted) == 2 {
+								if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
+									return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+								}
+							}
+							sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
+
+							sgRule.PortFrom = int32(portFrom)
+							sgRule.PortTo = int32(portTo)
 						}
-						sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
 
-						sgRule.PortFrom = int32(portFrom)
-						sgRule.PortTo = int32(portTo)
-					}
-
-					if innerXErr = gwSG.AddRule(w.feature.task, sgRule); innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrDuplicate:
-							// This rule already exists, consider as a success and continue
-						default:
-							return innerXErr
+						if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
+							switch xerr.(type) {
+							case *fail.ErrDuplicate:
+								// This rule already exists, consider as a success and continue
+							default:
+								return xerr
+							}
 						}
 					}
 				}
 			} else {
-				sgRule.Description = description
-				if innerXErr = gwSG.AddRule(w.feature.task, sgRule); innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrDuplicate:
-						// This rule already exists, consider as a success and continue
-					default:
-						return innerXErr
-					}
+				return fail.SyntaxError("invalid value for ports in rule '%s'")
+			}
+
+			sgRule.Description += " for feature '" + w.feature.GetName() + "'"
+			if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrDuplicate:
+					// This rule already exists, consider as a success and continue
+				default:
+					return xerr
 				}
 			}
+
 		}
 	}
 
@@ -1408,7 +1433,7 @@ func (w *worker) setSubnetSecurity() (xerr fail.Error) {
 }
 
 // interpretRuleTargets interprets the targets of a rule
-func (w worker) interpretRuleTargets(rule map[string]interface{}) stepTargets {
+func (w worker) interpretRuleTargets(rule map[interface{}]interface{}) stepTargets {
 	targets := stepTargets{}
 
 	anon, ok := rule["targets"].(map[interface{}]interface{})

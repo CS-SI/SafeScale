@@ -108,6 +108,8 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		}
 		index++
 		c.installMethods[index] = installmethod.Bash
+		index++
+		c.installMethods[index] = installmethod.None
 	}
 	return c.installMethods
 }
@@ -394,6 +396,8 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 
 // ExecuteScript executes the script template with the parameters on target IPAddress
 func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
@@ -470,9 +474,9 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 
 // installNodeRequirements ...
 func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
@@ -614,9 +618,9 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	}
 	clusterName := identity.Name
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -665,9 +669,9 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 	}
 	clusterName := identity.Name
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -715,6 +719,8 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 
 // install proxycache-client feature if not disabled
 func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if host.IsNull() {
 		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
@@ -722,10 +728,9 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
 	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -762,6 +767,8 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 
 // install proxycache-server feature if not disabled
 func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if host.IsNull() {
 		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
 	}
@@ -769,10 +776,9 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
 	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -817,9 +823,9 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
 	feat, xerr := NewFeature(task, "docker")

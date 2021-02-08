@@ -632,7 +632,6 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		shieldedMapped = map[string]interface{}{}
 		propsMapped    = map[string]string{}
 	)
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
@@ -686,8 +685,6 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 	// 		xerr = fail.Wrap(xerr, "failed to deserialize %s resource", c.kind)
 	// 	}
 	// }()
-
-	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)

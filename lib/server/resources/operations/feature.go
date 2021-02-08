@@ -182,6 +182,7 @@ func NewFeature(task concurrency.Task, name string) (_ resources.Feature, xerr f
 		}
 		xerr = nil
 	}
+
 	return casted, xerr
 }
 
@@ -282,6 +283,8 @@ func (f feature) installerOfMethod(m installmethod.Enum) Installer {
 		installer = NewYumInstaller()
 	case installmethod.Dnf:
 		installer = NewDnfInstaller()
+	case installmethod.None:
+		installer = newNoneInstaller()
 	}
 	return installer
 }
@@ -333,18 +336,22 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 	// 	return anon.(Results), nil
 	// }
 
-	methods := target.InstallMethods(f.task)
-	var installer Installer
-	for _, meth := range methods {
-		if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
-			installer = f.installerOfMethod(meth)
-			if installer != nil {
-				break
-			}
-		}
-	}
-	if installer == nil {
-		return nil, fail.NewError("failed to find a way to check '%s'", featureName)
+	// methods := target.InstallMethods(f.task)
+	// var installer Installer
+	// for _, meth := range methods {
+	// 	if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
+	// 		installer = f.installerOfMethod(meth)
+	// 		if installer != nil {
+	// 			break
+	// 		}
+	// 	}
+	// }
+	// if installer == nil {
+	// 	return nil, fail.NewError("failed to find a way to check '%s'", featureName)
+	// }
+	installer, xerr := f.findInstallerForTarget(f.task, target, "check")
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	logrus.Debugf("Checking if feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
@@ -369,6 +376,24 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 	r, xerr := installer.Check(&f, target, myV, s)
 	// _ = checkCache.ForceSet(cacheKey, results)
 	return r, xerr
+}
+
+// findInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
+func (f feature) findInstallerForTarget(task concurrency.Task, target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
+	methods := target.InstallMethods(f.task)
+	w := f.specs.GetStringMap("feature.install")
+	for i := uint8(1); i <= uint8(len(methods)); i++ {
+		meth := methods[i]
+		if _, ok := w[strings.ToLower(meth.String())]; ok {
+			if installer = f.installerOfMethod(meth); installer != nil {
+				break
+			}
+		}
+	}
+	if installer == nil {
+		return nil, fail.NotAvailableError("failed to find a way to %s '%s'", action, f.GetName())
+	}
+	return installer, nil
 }
 
 // Check if required parameters defined in specification file have been set in 'v'
@@ -412,23 +437,22 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),
 	)()
 
-	// FIXME: change code to make sure this block is called once during all the life of the feature
-	methods := target.InstallMethods(f.task)
-	var (
-		installer Installer
-		i         uint8
-	)
-	for i = 1; i <= uint8(len(methods)); i++ {
-		meth := methods[i]
-		if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
-			installer = f.installerOfMethod(meth)
-			if installer != nil {
-				break
-			}
-		}
-	}
-	if installer == nil {
-		return nil, fail.NotAvailableError("failed to find a way to install '%s'", featureName)
+	// methods := target.InstallMethods(f.task)
+	// w := f.specs.GetStringMap("feature.install")
+	// for i = 1; i <= uint8(len(methods)); i++ {
+	// 	meth := methods[i]
+	// 	if _, ok := w[strings.ToLower(meth.String())]; ok {
+	// 		if installer = f.installerOfMethod(meth); installer != nil {
+	// 			break
+	// 		}
+	// 	}
+	// }
+	// if installer == nil {
+	// 	return nil, fail.NotAvailableError("failed to find a way to install '%s'", featureName)
+	// }
+	installer, xerr := f.findInstallerForTarget(f.task, target, "check")
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// 'v' may be updated by concurrent tasks, so use copy of it
@@ -488,20 +512,24 @@ func (f feature) Remove(target resources.Targetable, v data.Map, s resources.Fea
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	var (
-		results   resources.Results
-		installer Installer
+		results resources.Results
+		// installer Installer
 	)
-	methods := target.InstallMethods(f.task)
-	for _, meth := range methods {
-		if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
-			installer = f.installerOfMethod(meth)
-			if installer != nil {
-				break
-			}
-		}
-	}
-	if installer == nil {
-		return nil, fail.NotAvailableError("failed to find a way to uninstall '%s'", featureName)
+	// methods := target.InstallMethods(f.task)
+	// for _, meth := range methods {
+	// 	if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
+	// 		installer = f.installerOfMethod(meth)
+	// 		if installer != nil {
+	// 			break
+	// 		}
+	// 	}
+	// }
+	// if installer == nil {
+	// 	return nil, fail.NotAvailableError("failed to find a way to uninstall '%s'", featureName)
+	// }
+	installer, xerr := f.findInstallerForTarget(f.task, target, "check")
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
