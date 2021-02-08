@@ -516,6 +516,10 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 
 			defer func() {
 				if xerr != nil {
+					// Disable abort signal during the clean up
+					task.IgnoreAbortSignal(true)
+					defer task.IgnoreAbortSignal(false)
+
 					if derr := server.UnmountBlockDevice(task, volumeUUID); derr != nil {
 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(xerr), volumeName, targetName))
 					}
@@ -558,6 +562,10 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during the clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			if derr := server.UnmountBlockDevice(task, volumeUUID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(xerr), volumeName, targetName))
 			}

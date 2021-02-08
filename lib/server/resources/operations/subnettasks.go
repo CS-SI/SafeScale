@@ -86,6 +86,10 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
+			// Disable abort signal during clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
 			derr := rgw.Delete(task)
 			if derr != nil {
@@ -126,6 +130,8 @@ type taskFinalizeGatewayConfigurationParameters struct {
 }
 
 func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	objgw := params.(taskFinalizeGatewayConfigurationParameters).host
 	if objgw.IsNull() {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
@@ -141,7 +147,6 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 		fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname),
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
-	defer fail.OnPanic(&xerr)
 
 	if xerr = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
 		return nil, xerr

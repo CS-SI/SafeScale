@@ -137,6 +137,8 @@ func (rn *network) IsNull() bool {
 
 // Create creates a network
 func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -151,7 +153,6 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := rn.GetService()
@@ -195,7 +196,9 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 }
 
 // Browse walks through all the metadata objects in subnet
-func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error {
+func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -218,6 +221,8 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 
 // Delete deletes subnet
 func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -228,7 +233,6 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	rn.SafeLock(task)
 	defer rn.SafeUnlock(task)
@@ -328,6 +332,8 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 
 // GetCIDR returns the CIDR of the subnet
 func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -356,6 +362,8 @@ func (rn network) CIDR(task concurrency.Task) string {
 
 // ToProtocol converts resources.Network to protocol.Network
 func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -399,7 +407,9 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (rn network) InspectSubnet(task concurrency.Task, ref string) (resources.Subnet, fail.Error) {
+func (rn network) InspectSubnet(task concurrency.Task, ref string) (_ resources.Subnet, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}

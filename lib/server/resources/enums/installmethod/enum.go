@@ -40,9 +40,11 @@ const (
 	// Ansible is supported by target
 	Ansible
 	// DCOS packager is supported by cluster target
-	DCOS
+	DCOS_deprecated
 	// Helm is supported by cluster target
 	Helm
+	// Nonedoes nothing; check always fail, add and remove always succeed
+	None
 
 	// NextEnum marks the next value (or the max, depending the use)
 	NextEnum
@@ -50,23 +52,25 @@ const (
 
 var (
 	stringMap = map[string]Enum{
-		"apt":     Apt,
-		"yum":     Yum,
-		"dnf":     Dnf,
-		"bash":    Bash,
-		"ansible": Ansible,
-		"dcos":    DCOS,
-		"helm":    Helm,
+		"apt":             Apt,
+		"yum":             Yum,
+		"dnf":             Dnf,
+		"bash":            Bash,
+		"ansible":         Ansible,
+		"dcos_deprecated": DCOS_deprecated,
+		"helm":            Helm,
+		"none":            None,
 	}
 
 	enumMap = map[Enum]string{
-		Apt:     "Apt",
-		Yum:     "Yum",
-		Dnf:     "Dnf",
-		Bash:    "Bash",
-		Ansible: "Ansible",
-		DCOS:    "DCOS",
-		Helm:    "Helm",
+		Apt:             "Apt",
+		Yum:             "Yum",
+		Dnf:             "Dnf",
+		Bash:            "Bash",
+		Ansible:         "Ansible",
+		DCOS_deprecated: "DCOS (deprecated)",
+		Helm:            "Helm",
+		None:            "None",
 	}
 )
 
