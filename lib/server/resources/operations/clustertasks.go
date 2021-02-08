@@ -39,7 +39,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -51,7 +53,9 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	return nil, c.service.StartHost(params.(string))
 }
 
-func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -70,6 +74,8 @@ type taskInstallGatewayParameters struct {
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
 func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -79,7 +85,7 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	p, ok := params.(taskInstallGatewayParameters)
 	if !ok {
@@ -122,6 +128,8 @@ type taskConfigureGatewayParameters struct {
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
 func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -140,7 +148,7 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	logrus.Debugf("[%s] starting configuration...", p.Host.GetName())
 
@@ -163,6 +171,8 @@ type taskCreateMastersParameters struct {
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
 func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -172,7 +182,7 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMastersParameters)
@@ -233,6 +243,8 @@ type taskCreateMasterParameters struct {
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -242,8 +254,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMasterParameters)
@@ -290,6 +301,10 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -349,6 +364,10 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			if derr := rh.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
@@ -515,6 +534,8 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -524,7 +545,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	logrus.Debugf("[cluster %s] Configuring masters...", c.GetName())
 	started := time.Now()
@@ -579,6 +600,8 @@ type taskConfigureMasterParameters struct {
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -588,7 +611,7 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate params
 	p, ok := params.(taskConfigureMasterParameters)
@@ -637,6 +660,8 @@ type taskCreateNodesParameters struct {
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -656,7 +681,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	clusterName := c.GetName()
 
@@ -707,14 +732,14 @@ type taskCreateNodeParameters struct {
 // taskCreateNode creates a node in the Cluster
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task.IsNull() {
 		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-
-	defer fail.OnPanic(&xerr)
 
 	// Convert then validate parameters
 	p, ok := params.(taskCreateNodeParameters)
@@ -728,7 +753,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	hostLabel := fmt.Sprintf("node #%d", p.index)
 	logrus.Debugf("[%s] starting Host creation...", hostLabel)
@@ -765,6 +790,10 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -824,6 +853,10 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			if derr := rh.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), rh.GetName()))
 			}
@@ -911,6 +944,8 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -922,7 +957,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	list, err := c.ListNodeIDs(task)
 	if err != nil {
@@ -982,6 +1017,8 @@ type taskConfigureNodeParameters struct {
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1003,7 +1040,7 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Host.GetName())
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
@@ -1030,7 +1067,9 @@ type taskDeleteHostOnFailureParameters struct {
 }
 
 // taskDeleteHostOnFailure deletes a host
-func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1062,7 +1101,7 @@ type taskDeleteNodeParameters struct {
 }
 
 func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnExitLogError(&xerr)
+	// defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
 	if c.IsNull() {
@@ -1109,6 +1148,8 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 }
 
 func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}

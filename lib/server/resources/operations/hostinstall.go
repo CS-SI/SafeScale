@@ -240,6 +240,8 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 			})
 			index++
 			rh.installMethods[index] = installmethod.Bash
+			index++
+			rh.installMethods[index] = installmethod.None
 			return nil
 		})
 	}
