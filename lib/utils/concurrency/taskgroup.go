@@ -82,6 +82,10 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail
 			t, err = NewTaskWithContext(ctx, nil)
 		}
 	} else {
+		if parentTask.Aborted() {
+			return nil, fail.AbortedError(nil, "aborted")
+		}
+
 		switch parentTask := parentTask.(type) {
 		case *task:
 			p := parentTask

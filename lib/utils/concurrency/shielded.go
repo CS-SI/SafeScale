@@ -59,6 +59,10 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	if xerr = d.lock.RLock(task); xerr != nil {
 		return xerr
 	}
@@ -94,6 +98,10 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xer
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	xerr = d.lock.Lock(task)
 	if xerr != nil {
 		return xerr
@@ -109,10 +117,10 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xer
 	}()
 
 	clone := d.witness.Clone()
-	xerr = alterer(clone)
-	if xerr != nil {
+	if xerr = alterer(clone); xerr != nil {
 		return xerr
 	}
+
 	_ = d.witness.Replace(clone)
 	return nil
 }
