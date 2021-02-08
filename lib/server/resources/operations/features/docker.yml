@@ -202,9 +202,15 @@ feature:
                             sfService start dbus
                             # then firewalld  itself
                             sfService restart firewalld
-                            sfFirewallAdd --zone=trusted --add-interface=docker0 --add-interface=docker_gwbridge
-                            sfFirewallAdd --zone=trusted --add-masquerade
-                            sfFirewallReload || sfFail 206 "Firewall problem"
+
+                            # If a zone named 'docker' is created and activated, we do not need to add interfaces to trusted zone
+                            # FIXME: it should be better to create a configuration identical to the one created by docker 20.10+...
+                            sfFirewall --info-zone=docker 2>&1 >/dev/null || {
+                                sfFirewallAdd --zone=trusted --add-interface=docker0
+                                sfFirewallAdd --zone=trusted --add-masquerade
+                                sfFirewallReload || sfFail 206 "Firewall problem"
+                            }
+                            sfExit
 
                     ready:
                         targets:
