@@ -42,9 +42,7 @@ type consequencer interface {
 type causer interface {
 	CauseFormatter(func(Error) string) // defines a function used to format a causer output to string
 	Cause() error                      // returns the first immediate cause of an error
-	//CauseError() string                // returns the cause of an error as an error
-	RootCause() error // returns the root cause of an error
-	//RootCauseError() string            // returns the root cause of an error as string
+	RootCause() error                  // returns the root cause of an error
 }
 
 // Error defines the interface of a SafeScale error
@@ -55,19 +53,10 @@ type Error interface {
 	consequencer
 	error
 
-	// Cause() error     // returns the first immediate cause of an error
-	// RootCause() error // returns the root cause of an error
-
-	// // ConsequenceFormatter(func(Error) string)
-	// AddConsequence(err error) Error
-	// Consequences() []error
-
 	AnnotationFormatter(func(data.Annotations) string)
 
 	ForceSetCause(error) Error // set the cause of the error
 	TrySetCause(error) bool    // set the cause of the error if not already set
-
-	// Error() string   // VPL: comes from error...
 
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
@@ -83,8 +72,7 @@ type errorCore struct {
 	annotations         data.Annotations
 	annotationFormatter func(data.Annotations) string
 	consequences        []error
-	// consequenceFormatter func(Error) string
-	grpcCode codes.Code
+	grpcCode            codes.Code
 }
 
 // NewError creates a new failure report
@@ -115,7 +103,6 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		grpcCode:            codes.Unknown,
 		causeFormatter:      defaultCauseFormatter,
 		annotationFormatter: defaultAnnotationFormatter,
-		// consequenceFormatter: defaultConsequenceFormatter,
 	}
 	return &r
 }
@@ -151,7 +138,7 @@ func defaultCauseFormatter(e Error) string {
 	if lenConseq > 0 {
 		msgFinal += fmt.Sprintf("\nwith consequence%s:\n", strprocess.Plural(lenConseq))
 		for ind, con := range errCore.consequences {
-			msgFinal += "- "+con.Error()
+			msgFinal += "- " + con.Error()
 			if uint(ind+1) < lenConseq {
 				msgFinal += "\n"
 			}
@@ -164,8 +151,7 @@ func defaultCauseFormatter(e Error) string {
 // ForceSetCause sets the cause error even if already set
 func (e *errorCore) ForceSetCause(err error) Error {
 	// e.IsNull() not used here, it's not a mistake
-	//if e == nil {
-	if e.IsNull() {
+	if e == nil {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from nil", 0))
 		return ToError(err)
 	}
@@ -180,8 +166,7 @@ func (e *errorCore) ForceSetCause(err error) Error {
 // Returns true if cause has been successfully set, false if cause was already set
 func (e *errorCore) TrySetCause(err error) bool {
 	// e.IsNull() not used here, it's not a mistake
-	//if e == nil {
-	if e.IsNull() {
+	if e == nil {
 		return false
 	}
 	if err == nil {
@@ -197,8 +182,7 @@ func (e *errorCore) TrySetCause(err error) bool {
 // CauseFormatter defines the func uses to format cause to string
 func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	// e.IsNull() not used here, it's not a mistake
-	//if e == nil {
-	if e.IsNull() {
+	if e == nil {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from nil", 0))
 		return
 	}
@@ -218,17 +202,6 @@ func (e errorCore) Cause() error {
 	return e.cause
 }
 
-//// CauseError returns the string of the error cause
-//// VPL: is it really necessary ? e.Cause().Error() does the job...
-//func (e errorCore) CauseError() string {
-//	if !e.IsNull() {
-//		if e.cause != nil {
-//			return e.cause.Error()
-//		}
-//	}
-//	return ""
-//}
-
 // RootCause returns the initial error's cause
 func (e errorCore) RootCause() error {
 	if e.IsNull() {
@@ -237,18 +210,6 @@ func (e errorCore) RootCause() error {
 	}
 	return RootCause(e)
 }
-
-//// RootCauseError returns the string corresponding to the root cause
-//// VPL: is it really necessary ? e.RootCause().Error() does the job...
-//func (e errorCore) RootCauseError() string {
-//	if !e.IsNull() {
-//		err := e.RootCause()
-//		if err != nil {
-//			return err.Error()
-//		}
-//	}
-//	return ""
-//}
 
 // defaultAnnotationFormatter ...
 func defaultAnnotationFormatter(a data.Annotations) string {
@@ -379,6 +340,7 @@ func (e *errorCore) prependToMessage(msg string) {
 
 // ErrTimeout defines a ErrTimeout error
 type ErrTimeout struct {
+	data.NullValue
 	*errorCore
 	dur time.Duration
 }

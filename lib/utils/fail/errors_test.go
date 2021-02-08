@@ -23,10 +23,174 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
+
+func generateErrTimeout() *ErrTimeout {
+	return TimeoutError(nil, 2*time.Minute, "Ouch!!")
+}
+
+func generateErrNilTimeout() *ErrTimeout {
+	return nil
+}
+
+func generateNilNewError() *errorCore {
+	return nil
+}
+
+func TestInternalUsage(t *testing.T) {
+	e := newError(nil, nil, "nothing to see")
+	e.CauseFormatter(
+		func(e Error) string {
+			return "toto"
+		})
+	origin := fmt.Errorf("whatever")
+	done := e.TrySetCause(origin)
+	if e.Cause() != origin {
+		t.Fail()
+	}
+	if !done {
+		t.Fail()
+	}
+}
+
+func TestInternalUsageWithNilCheck(t *testing.T) {
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fail()
+		}
+	}()
+	e := generateNilNewError()
+	e.CauseFormatter(
+		func(e Error) string {
+			return "toto"
+		})
+	done := e.TrySetCause(fmt.Errorf("whatever")) // it's a nil, cannot be done
+	if done {
+		t.Fail()
+	}
+}
+
+func TestInternalUsageWithoutNilCheck(t *testing.T) {
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fail()
+		}
+	}()
+	e := generateNilNewError()
+	e.CauseFormatter(
+		func(e Error) string {
+			return "toto"
+		})
+	e.TrySetCause(fmt.Errorf("whatever"))
+	forced := e.ForceSetCause(fmt.Errorf("it takes"))
+	if forced == nil {
+		t.Fail()
+	}
+}
+
+func TestNormalUsage(t *testing.T) {
+	av := TimeoutError(nil, 2*time.Minute, "Ouch!!")
+	if av != nil {
+		av.CauseFormatter(
+			func(e Error) string {
+				return "toto"
+			})
+	}
+}
+
+func TestAWellBuiltErrorIsNotNil(t *testing.T) {
+	ha := newError(nil, nil, nil)
+	if ha.IsNull() {
+		t.Fail()
+	}
+}
+
+func TestAManuallyCreatedInternalErrorMightBeNil(t *testing.T) {
+	ha := errorCore{
+		message:             "",
+		cause:               nil,
+		causeFormatter:      nil,
+		annotations:         nil,
+		annotationFormatter: nil,
+		consequences:        nil,
+		grpcCode:            33,
+	}
+
+	if !ha.IsNull() {
+		t.Fail()
+	}
+}
+
+func TestCanonical(t *testing.T) {
+	e := TimeoutError(fmt.Errorf("Ouch !!"), 1)
+	e.CauseFormatter(
+		func(e Error) string {
+			return "toto"
+		})
+}
+
+func TestNilNormalUsage(t *testing.T) {
+	av := generateErrNilTimeout()
+	if av != nil {
+		av.CauseFormatter(
+			func(e Error) string {
+				return "toto"
+			})
+	}
+}
+
+// this test breaks no matter what, the first line of CauseFormatter being 'if e.IsNull()' of 'if e == nil' makes no difference
+func TestNilNormalUsageSkippingNilCheck(t *testing.T) {
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fail()
+		}
+	}()
+
+	av := generateErrNilTimeout()
+	av.CauseFormatter(
+		func(e Error) string {
+			return "toto"
+		})
+}
+
+// this test breaks no matter what, the first line of CauseFormatter being 'if e.IsNull()' of 'if e == nil' makes no difference
+func TestNilInternalUsageSkippingNilCheck(t *testing.T) {
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fail()
+		}
+	}()
+
+	av := generateNilNewError()
+	av.CauseFormatter(
+		func(e Error) string {
+			return "toto"
+		})
+}
+
+func TestFromPointerUsage(t *testing.T) {
+	av := generateErrTimeout()
+	if av != nil {
+		av.CauseFormatter(
+			func(e Error) string {
+				return "toto"
+			})
+	}
+}
+
+func TestForceSetCause(t *testing.T) {
+	av := generateErrTimeout()
+	_ = av.ForceSetCause(fmt.Errorf("the cause"))
+	_ = av.ForceSetCause(fmt.Errorf("the strange cause"))
+	if !strings.Contains(av.Cause().Error(), "strange") {
+		t.Fail()
+	}
+}
 
 func TestInterfaceMatching(t *testing.T) {
 	var ok bool
@@ -396,21 +560,3 @@ func TestNotUncategorizedError(t *testing.T) {
 		t.Fail()
 	}
 }
-
-//func sender() error {
-//	return NewError("what", NewError("something else", nil))
-//}
-//
-//func specialSender() error {
-//	return InvalidInstanceError()
-//}
-//
-//func TestRecognizeErrCore(t *testing.T) {
-//	err := sender()
-//	if eb, ok := err.(causer); ok {
-//		require.True(t, strings.Contains(err.Error(), "caused by"))
-//		require.False(t, strings.Contains(eb.Cause().Error(), "caused by"))
-//	} else {
-//		t.Fail()
-//	}
-//}

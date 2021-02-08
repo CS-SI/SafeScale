@@ -287,6 +287,10 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	if t.status == ABORTED {
+		return t.status, fail.AbortedError(nil, "aborted")
+	}
+
 	return t.status, nil
 }
 
@@ -298,6 +302,10 @@ func (t *task) GetContext() (context.Context, fail.Error) {
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.status == ABORTED {
+		return t.ctx, fail.AbortedError(nil, "aborted")
+	}
 
 	return t.ctx, nil
 }
@@ -314,8 +322,13 @@ func (t *task) SetID(id string) fail.Error {
 	if id == "0" {
 		return fail.InvalidParameterError("id", "cannot be '0', reserved for root task")
 	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.status == ABORTED {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	t.id = id
 	return nil
@@ -346,7 +359,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	defer t.mu.Unlock()
 
 	if t.status != READY {
-		return nil, fail.NewError("can't start task '%s': not ready", tid)
+		return nil, fail.NewError("cannot start task '%s': not ready", tid)
 	}
 	if action == nil {
 		t.status = DONE
@@ -368,9 +381,9 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	st, err := NewTaskWithParent(t)
-	if err != nil {
-		return nil, err
+	st, xerr := NewTaskWithParent(t)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	t.mu.Lock()
@@ -532,9 +545,9 @@ func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResul
 		return nil, fail.InvalidParameterError("action", "cannot be nil")
 	}
 
-	st, err := NewTaskWithParent(t)
-	if err != nil {
-		return nil, err
+	st, xerr := NewTaskWithParent(t)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return st.Run(action, params)
@@ -720,7 +733,13 @@ func (t *task) Aborted() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	// If abort signal is disengaged, return false
+	if t.abortDisengaged {
+		return false
+	}
+
 	return t.status == ABORTED
+
 }
 
 // Abortable tells if task can be aborted
@@ -736,6 +755,8 @@ func (t *task) Abortable() (bool, fail.Error) {
 }
 
 // IgnoreAbortSignal can be use to disable the effect of Abort()
+// Typically,it is advised to call this inside a defer statementuised to cleanup things (cleanup has to terminate; if abort signal is not disengaged, any
+// callwith task as parameter may abort before the end.
 func (t *task) IgnoreAbortSignal(ignore bool) fail.Error {
 	if t.IsNull() {
 		return fail.InvalidInstanceError()
