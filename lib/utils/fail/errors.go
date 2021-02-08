@@ -194,6 +194,10 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	e.causeFormatter = formatter
 }
 
+func (e errorCore) Unwrap() error {
+	return e.cause
+}
+
 // Cause returns an error's cause
 func (e errorCore) Cause() error {
 	return e.cause
