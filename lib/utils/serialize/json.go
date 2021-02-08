@@ -131,6 +131,10 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 		return fail.InvalidParameterError("inspector", "cannot be nil")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	var (
 		item  *jsonProperty
 		found bool
@@ -148,9 +152,7 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 	clone := item.Clone()
 	x.RUnlock()
 
-	err := clone.(*jsonProperty).Shielded.Inspect(task, inspector)
-	return err
-	// return inspector(clone)
+	return clone.(*jsonProperty).Shielded.Inspect(task, inspector)
 }
 
 // Alter is used to lock an extension for write
@@ -179,12 +181,17 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 		return fail.InvalidParameterError("alterer", "cannot be nil")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	x.Lock()
+	defer x.Unlock()
+
 	var (
 		item  *jsonProperty
 		found bool
 	)
-	x.Lock()
-	defer x.Unlock()
 
 	if item, found = x.Properties[key].(*jsonProperty); !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
@@ -195,11 +202,9 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 		}
 		x.Properties[key] = item
 	}
-	clone := item.Clone()
 
-	xerr := clone.(*jsonProperty).Alter(task, alterer)
-	// err := alterer(clone)
-	if xerr != nil {
+	clone := item.Clone()
+	if xerr := clone.(*jsonProperty).Alter(task, alterer); xerr != nil {
 		return xerr
 	}
 

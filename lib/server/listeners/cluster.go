@@ -452,7 +452,6 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 
 	removedNodes, xerr := instance.Shrink(task, count)
 
-
 	out := &protocol.ClusterNodeListResponse{}
 	out.Nodes = fromClusterNodes(removedNodes)
 	return out, nil
