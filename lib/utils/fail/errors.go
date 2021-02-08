@@ -58,8 +58,6 @@ type Error interface {
 	ForceSetCause(error) Error // set the cause of the error
 	TrySetCause(error) bool    // set the cause of the error if not already set
 
-	// Error() string   // VPL: comes from error...
-
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
 
@@ -74,8 +72,7 @@ type errorCore struct {
 	annotations         data.Annotations
 	annotationFormatter func(data.Annotations) string
 	consequences        []error
-	// consequenceFormatter func(Error) string
-	grpcCode codes.Code
+	grpcCode            codes.Code
 }
 
 // NewError creates a new failure report
@@ -106,7 +103,6 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		grpcCode:            codes.Unknown,
 		causeFormatter:      defaultCauseFormatter,
 		annotationFormatter: defaultAnnotationFormatter,
-		// consequenceFormatter: defaultConsequenceFormatter,
 	}
 	return &r
 }
@@ -320,6 +316,7 @@ func (e *errorCore) prependToMessage(msg string) {
 
 // ErrTimeout defines a ErrTimeout error
 type ErrTimeout struct {
+	data.NullValue
 	*errorCore
 	dur time.Duration
 }

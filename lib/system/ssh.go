@@ -318,12 +318,12 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 
 // SSHCommand defines a SSH command
 type SSHCommand struct {
-	hostname string
-	runCmdString  string
+	hostname     string
+	runCmdString string
 	// pingCmdString string
-	cmd           *exec.Cmd
-	tunnels       []*SSHTunnel
-	keyFile       *os.File
+	cmd     *exec.Cmd
+	tunnels []*SSHTunnel
+	keyFile *os.File
 }
 
 func (scmd *SSHCommand) closeTunnels() (xerr fail.Error) {
@@ -531,7 +531,7 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 		return -1, "", "", xerr
 	}
 
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{/*stdout: stdoutPipe, stderr: stderrPipe, */ collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
+	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{ /*stdout: stdoutPipe, stderr: stderrPipe, */ collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
 		return -1, "", "", xerr
 	}
 
@@ -838,9 +838,17 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 		return nil, fail.InvalidParameterError("runCmdString", "cannot be empty string")
 	}
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	tunnels, sshConfig, err := sconf.CreateTunneling()
 	if err != nil {
 		return nil, fail.Wrap(err, "unable to create command")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	sshCmdString, keyFile, err := createSSHCommand(sshConfig, cmdString, "", "", withTty, withSudo)
@@ -850,10 +858,10 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 
 	// cmd := exec.NewCommandWithContext(ctx, "bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
-		hostname: sconf.Hostname,
-		runCmdString:  sshCmdString,
-		tunnels: tunnels,
-		keyFile: keyFile,
+		hostname:     sconf.Hostname,
+		runCmdString: sshCmdString,
+		tunnels:      tunnels,
+		keyFile:      keyFile,
 	}
 	return &sshCommand, nil
 }
@@ -889,10 +897,6 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			taskStatus, _ := task.GetStatus()
-			if taskStatus == concurrency.ABORTED {
-				return retry.StopRetryError(nil, "operation aborted")
-			}
 
 			sshCmd, innerErr := sconf.NewCommand(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
 			if innerErr != nil {
@@ -936,7 +940,6 @@ func (sconf *SSHConfig) CopyWithTimeout(
 
 	return sconf.copy(task, remotePath, localPath, isUpload, timeout)
 }
-
 
 // copy copies a file/directory from/to local to/from remote, and fails after 'timeout' (if timeout > 0)
 func (sconf *SSHConfig) copy(
@@ -990,10 +993,10 @@ func (sconf *SSHConfig) copy(
 
 	// cmd := exec.NewCommand("bash", "-c", sshCmdString)
 	sshCommand := SSHCommand{
-		hostname:      sconf.Hostname,
-		runCmdString:  sshCmdString,
-		tunnels:       tunnels,
-		keyFile:       identityfile,
+		hostname:     sconf.Hostname,
+		runCmdString: sshCmdString,
+		tunnels:      tunnels,
+		keyFile:      identityfile,
 	}
 
 	return sshCommand.RunWithTimeout(task, outputs.COLLECT, timeout)
