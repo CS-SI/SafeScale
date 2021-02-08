@@ -334,6 +334,10 @@ func (objs *share) Create(
 	// Starting from here, remove share from host if exiting with error
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			derr := nfsServer.RemoveShare(task, sharePath)
 			if derr != nil {
 				logrus.Errorf("After failure, cleanup failed to remove share '%s' on host", sharePath)
@@ -374,6 +378,10 @@ func (objs *share) Create(
 	// Starting from here, delete share reference in server if exiting with error
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			derr := server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -603,6 +611,10 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 	// Starting from here, remove share mount from server share when exiting with error
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			derr := objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -659,6 +671,10 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 	// Starting from here, removes share mount from target if exiting with error
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during clean up
+			task.IgnoreAbortSignal(true)
+			defer task.IgnoreAbortSignal(false)
+
 			derr := target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 					targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -840,11 +856,16 @@ func (objs *share) Delete(task concurrency.Task) fail.Error {
 				return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
 			}
 
-			sshConfig := objserver.(*host).getSSHConfig(task)
+			sshConfig, xerr := objserver.(*host).GetSSHConfig(task)
+			if xerr != nil {
+				return xerr
+			}
+
 			nfsServer, xerr := nfs.NewServer(sshConfig)
 			if xerr != nil {
 				return xerr
 			}
+
 			if xerr = nfsServer.RemoveShare(task, hostShare.Path); xerr != nil {
 				return xerr
 			}
