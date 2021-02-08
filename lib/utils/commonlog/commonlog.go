@@ -92,8 +92,6 @@ func init() {
 		if max > pidMaxLength {
 			pidMaxLength = max
 		}
-	case "windows":
-		panic("pid max value for Windows systems not managed currently, please fix the code in lib/utils/commonlog/commonlog.go")
 	default:
 		pidMaxLength = 5
 	}
