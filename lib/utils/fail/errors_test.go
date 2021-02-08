@@ -396,21 +396,3 @@ func TestNotUncategorizedError(t *testing.T) {
 		t.Fail()
 	}
 }
-
-//func sender() error {
-//	return NewError("what", NewError("something else", nil))
-//}
-//
-//func specialSender() error {
-//	return InvalidInstanceError()
-//}
-//
-//func TestRecognizeErrCore(t *testing.T) {
-//	err := sender()
-//	if eb, ok := err.(causer); ok {
-//		require.True(t, strings.Contains(err.Error(), "caused by"))
-//		require.False(t, strings.Contains(eb.Cause().Error(), "caused by"))
-//	} else {
-//		t.Fail()
-//	}
-//}
