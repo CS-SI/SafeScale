@@ -73,7 +73,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	if cancel == nil {
 		return nil, fail.InvalidParameterError("cancel", "cannot be nil")
 	}
-	if svc.IsNull() {
+	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 

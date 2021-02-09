@@ -29,8 +29,8 @@ type Server struct {
 
 // NewServer instantiates a new nfs.getServer struct
 func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
-	if sshconfig.IsNull() {
-		return nil, fail.InvalidParameterError("sshconfig", "cannot be null value")
+	if sshconfig == nil {
+		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}
 
 	server := Server{
