@@ -90,8 +90,8 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
-	if task.IsNull() {
-		logrus.Errorf(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
+	if task == nil {
+		logrus.Errorf(fail.InvalidParameterError("task", "cannot be nil").Error())
 		return nil
 	}
 
@@ -127,8 +127,8 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	complexity, xerr := c.GetComplexity(task)
@@ -235,10 +235,10 @@ func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature,
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if feat.IsNull() {
+	if feat == nil {
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 

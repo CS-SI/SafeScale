@@ -121,8 +121,8 @@ func (e *errorCore) IsNull() bool {
 
 // defaultCauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
 func defaultCauseFormatter(e Error) string {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter()", "from null instance", 0))
+	if e == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter()", "from nil", 0))
 		return ""
 	}
 
@@ -151,7 +151,7 @@ func defaultCauseFormatter(e Error) string {
 // ForceSetCause sets the cause error even if already set
 func (e *errorCore) ForceSetCause(err error) Error {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from null value", 0))
 		return ToError(err)
 	}
 	if e.cause != nil {
@@ -180,7 +180,7 @@ func (e *errorCore) TrySetCause(err error) bool {
 // CauseFormatter defines the func uses to format cause to string
 func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from null value", 0))
 		return
 	}
 	if formatter == nil {

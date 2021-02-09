@@ -121,7 +121,7 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 	if x.module == "" {
 		return fail.InvalidInstanceContentError("x.module", "can't be empty string")
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if key == "" {
@@ -171,7 +171,7 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 	if x.module == "" {
 		return fail.InvalidInstanceContentError("x.module", "cannot be empty string")
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if key == "" {
@@ -239,7 +239,7 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 	if x.Properties == nil {
 		return nil, fail.InvalidParameterError("x.properties", "can't be nil")
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -268,7 +268,7 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fa
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 

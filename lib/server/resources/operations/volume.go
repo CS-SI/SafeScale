@@ -63,7 +63,7 @@ func nullVolume() *volume {
 
 // NewVolume creates an instance of Volume
 func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
-	if svc.IsNull() {
+	if svc == nil {
 		return nullVolume(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
 	}
 
@@ -76,10 +76,10 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 
 // LoadVolume loads the metadata of a subnet
 func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
-	if task.IsNull() {
+	if task == nil {
 		return nullVolume(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if svc.IsNull() {
+	if svc == nil {
 		return nullVolume(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
 	}
 	if ref == "" {
@@ -114,8 +114,8 @@ func (rv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) 
 	if rv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var speed volumespeed.Enum
@@ -145,8 +145,8 @@ func (rv volume) GetSize(task concurrency.Task) (int, fail.Error) {
 	if rv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var size int
@@ -176,8 +176,8 @@ func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAtta
 	if rv.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var vaV1 *propertiesv1.VolumeAttachments
@@ -202,8 +202,8 @@ func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) f
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -224,8 +224,8 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	return rv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -273,8 +273,8 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if req.Name == "" {
 		return fail.InvalidParameterError("req.GetName", "cannot be empty string")
@@ -307,11 +307,11 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return fail.InvalidParameterError("host", "cannot be nil")
 	}
 	if path == "" {
 		return fail.InvalidParameterError("path", "cannot be empty string")
