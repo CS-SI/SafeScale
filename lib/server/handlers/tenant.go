@@ -208,13 +208,13 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	task := handler.job.GetTask()
 
 	// Prepare network if needed
-	netName := "net-safescale-scan" // FIXME: Hardcoded string
+	netName := "sf-scan" // FIXME: Hardcoded string
 	network, xerr := networkfactory.Load(task, svc, netName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
-		network, xerr := networkfactory.New(svc)
+		network, xerr = networkfactory.New(svc)
 		if xerr != nil {
 			return xerr
 		}
@@ -237,16 +237,13 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	}
 
 	// Prepare sub-network if needed
-	logrus.Debug("Creating subnet.1..")
-	subNetName := "subnet-safescale-scan" // FIXME: Hardcoded string
+	subNetName := "sf-scan" // FIXME: Hardcoded string
 	subNetwork, xerr := subnetfactory.Load(task, svc, netName, subNetName)
-	logrus.Debug("Loaded subnet...")
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
-		logrus.Debug("Creating subnet.2..")
-		subnet, xerr := subnetfactory.New(svc)
+		subNetwork, xerr = subnetfactory.New(svc)
 		if xerr != nil {
 			return xerr
 		}
@@ -254,33 +251,28 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 			Name:      subNetName,
 			NetworkID: network.GetID(),
 			IPVersion: ipversion.IPv4,
-			CIDR:      "192.168.20.0/24",
+			CIDR:      "192.168.20.0/26",
 		}
 
 		subnethq := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		logrus.Debug("Creating subnet.3..")
-		if xerr = subnet.Create(task, req, "", &subnethq); xerr != nil {
+		if xerr = subNetwork.Create(task, req, "", &subnethq); xerr != nil {
 			return xerr
 		}
 
 		defer func() {
-			logrus.Debug("Deleting subnet...")
-			derr := subnet.Delete(task)
+			derr := subNetwork.Delete(task)
 			if derr != nil {
-				logrus.Warnf("Error deleting subnetwork '%s'", subnet.GetID())
+				logrus.Warnf("Error deleting subnetwork '%s'", subNetwork.GetID())
 			}
 			_ = xerr.AddConsequence(derr)
 		}()
 	}
 
 	var as *abstract.Subnet
-	logrus.Debug("Getting subnet...")
 	xerr = subNetwork.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		logrus.Debug("Loading data...")
 		as = clonable.(*abstract.Subnet)
-		logrus.Debug("Loaded data...")
 		return nil
 	})
 
