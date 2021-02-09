@@ -84,8 +84,8 @@ func nullCluster() *cluster {
 func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return nullCluster(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if svc == nil {
 		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
@@ -107,11 +107,11 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return nullCluster(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return nullCluster(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nullCluster(), fail.InvalidParameterError("name", "cannot be empty string")
@@ -2944,8 +2944,8 @@ func (c *cluster) deleteMaster(task concurrency.Task, host resources.Host) fail.
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if host.IsNull() {
-		return fail.InvalidParameterError("hostID", "cannot be null value of 'resources.Host' string")
+	if host == nil {
+		return fail.InvalidParameterError("hostID", "cannot be nil")
 	}
 
 	var master *propertiesv3.ClusterNode

@@ -311,15 +311,11 @@ feature:
                             sfExit
 
     security:
-        subnet:
-            - name: allow_https
+        networking:
+            - name: https
               targets:
+                  host: yes
                   gateways: all
-                  #masters: all|one|no|none
-                  #nodes: all|one|no|none
-                  #host: yes|no
               protocol: tcp
               ports: 443
-              # ports: a|a-b|a,b,c
-              # direction: ingress|egress; ignored for targets gateways, implicit INGRESS
 ...

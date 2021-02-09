@@ -895,6 +895,11 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, f
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy() (xerr fail.Error) {
+	if w.feature.task == nil {
+		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
+	}
+	task := w.feature.task
+
 	const yamlKey = "feature.proxy.rules"
 	// rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[string]interface{})
 	rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[interface{}]interface{})
@@ -902,22 +907,19 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 		return nil
 	}
 
+	// FIXME: there are valid scenarii for reverse proxy settings when feature applied to Host...
 	if w.cluster == nil {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
-	if w.feature.task.IsNull() {
-		return fail.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
-	}
-
 	svc := w.cluster.GetService()
 
-	netprops, xerr := w.cluster.GetNetworkConfig(w.feature.task)
+	netprops, xerr := w.cluster.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
 
-	subnet, xerr := LoadSubnet(w.feature.task, svc, "", netprops.SubnetID)
+	subnet, xerr := LoadSubnet(task, svc, "", netprops.SubnetID)
 	if xerr != nil {
 		return xerr
 	}
@@ -928,7 +930,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	}
 
 	var secondaryKongController *KongController
-	if subnet.HasVirtualIP(w.feature.task) {
+	if subnet.HasVirtualIP(task) {
 		if secondaryKongController, xerr = NewKongController(svc, subnet, false); xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 		}
@@ -975,13 +977,13 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 		}
 
 		for _, h := range hosts {
-			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task); xerr != nil {
 				return xerr
 			}
 			primaryGatewayVariables["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+			xerr = h.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -999,7 +1001,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-			tP, xerr := w.feature.task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+			tP, xerr := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
 				controller: primaryKongController,
 				rule:       r,
 				variables:  &primaryGatewayVariables,
@@ -1010,13 +1012,13 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 			var errS fail.Error
 			if secondaryKongController != nil {
-				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task); xerr != nil {
 					return xerr
 				}
 				secondaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain = ""
-				xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				xerr = h.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1033,7 +1035,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				}
 				secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-				tS, errOp := w.feature.task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+				tS, errOp := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
 					controller: secondaryKongController,
 					rule:       r,
 					variables:  &secondaryGatewayVariables,
@@ -1213,6 +1215,11 @@ func (w *worker) setSecurity() (xerr fail.Error) {
 
 // setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
 func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
+	if w.feature.task == nil {
+		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
+	}
+	task := w.feature.task
+
 	const yamlKey = "feature.security.networking"
 	if ok := w.feature.specs.IsSet(yamlKey); !ok {
 		return nil
@@ -1223,11 +1230,6 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 		return nil
 	}
 
-	if w.feature.task == nil {
-		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
-	}
-
-	task := w.feature.task
 	var (
 		svc iaas.Service
 		rs  resources.Subnet
@@ -1252,6 +1254,8 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 	// if xerr != nil {
 	// 	return xerr
 	// }
+
+	forFeature := " for feature '" + w.feature.GetName() + "'"
 
 	for k, rule := range rules {
 		if task.Aborted() {
@@ -1280,12 +1284,21 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 			sgRule.EtherType = ipversion.IPv4
 			sgRule.Protocol, _ = r["protocol"].(string)
 			sgRule.Sources = []string{"0.0.0.0/0"}
-			// sgRule.Targets = []string{gwSG.GetID()}
+			sgRule.Targets = []string{gwSG.GetID()}
 
 			var commaSplitted []string
 			if ports, ok := r["ports"].(int); ok {
-				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports)
+				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports) + forFeature
 				sgRule.PortFrom = int32(ports)
+
+				if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrDuplicate:
+						// This rule already exists, consider as a success and continue
+					default:
+						return xerr
+					}
+				}
 			} else if ports, ok := r["ports"].(string); ok {
 				commaSplitted = strings.Split(ports, ",")
 				if len(commaSplitted) > 0 {
@@ -1311,6 +1324,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 							sgRule.PortTo = int32(portTo)
 						}
 
+						sgRule.Description += forFeature
 						if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
 							switch xerr.(type) {
 							case *fail.ErrDuplicate:
@@ -1323,16 +1337,6 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 				}
 			} else {
 				return fail.SyntaxError("invalid value for ports in rule '%s'")
-			}
-
-			sgRule.Description += " for feature '" + w.feature.GetName() + "'"
-			if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrDuplicate:
-					// This rule already exists, consider as a success and continue
-				default:
-					return xerr
-				}
 			}
 
 		}

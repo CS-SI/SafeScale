@@ -19,6 +19,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -37,15 +38,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
-// AddFeature handles 'safescale host add-feature <host name or id> <feature name>'
+// AddFeature handles 'safescale host feature add <host name or id> <feature name>'
 func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -88,15 +89,15 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 	return outcomes, nil
 }
 
-// IsFeatureInstalled ...
+// CheckFeature ...
 func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -130,8 +131,8 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	if rh.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -171,7 +172,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
-				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
+				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
 			}
 
 			delete(hostFeaturesV1.Installed, name)
@@ -197,8 +198,8 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
 	}
-	if task.IsNull() {
-		logrus.Error(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
+	if task == nil {
+		logrus.Error(fail.InvalidParameterError("task", "cannot be nil").Error())
 		return map[uint8]installmethod.Enum{}
 	}
 
@@ -255,11 +256,11 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if feat.IsNull() {
-		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
+	if feat == nil {
+		return fail.InvalidParameterError("feat", "cannot be nil")
 	}
 
 	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -409,4 +410,29 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 	}
 
 	return nil
+}
+
+// IsFeatureInstalled ...
+func (rh *host) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
+	found = false
+	defer fail.OnPanic(&xerr)
+
+	if rh.IsNull() {
+		return false, fail.InvalidInstanceError()
+	}
+	if name = strings.TrimSpace(name); name == "" {
+		return false, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	return found, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+			if !ok {
+				return fail.InconsistentError("``ropertoesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			_, found = featuresV1.Installed[name]
+			return nil
+		})
+	})
 }

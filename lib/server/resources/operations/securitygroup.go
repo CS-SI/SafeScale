@@ -76,11 +76,11 @@ func nullSecurityGroup() *securityGroup {
 
 // lookupSecurityGroup returns true if security group exists, false otherwise
 func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (bool, fail.Error) {
-	if task.IsNull() {
-		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return false, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return false, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return false, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
@@ -108,11 +108,11 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 	//defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
@@ -148,8 +148,8 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -171,8 +171,8 @@ func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	// Read data from metadata storage
@@ -208,8 +208,8 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
