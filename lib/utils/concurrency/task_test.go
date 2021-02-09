@@ -626,6 +626,17 @@ func TestOneShot(t *testing.T) {
 	}
 }
 
+func TestPanickingIgnoringAbortSignal(t *testing.T) {
+	defer func() {
+		err := recover()
+		require.NotNil(t, err)
+	}()
+
+	var single Task
+	single.IgnoreAbortSignal(true)
+	require.Fail(t, "did not panic")
+}
+
 func TestOneShotIgnoringAbort(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -635,8 +646,7 @@ func TestOneShotIgnoringAbort(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	xerr = single.IgnoreAbortSignal(true)
-	require.Nil(t, xerr)
+	single.IgnoreAbortSignal(true)
 
 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		for {
@@ -655,8 +665,7 @@ func TestOneShotIgnoringAbort(t *testing.T) {
 	xerr = single.Abort()
 	require.NotNil(t, xerr)
 
-	xerr = single.IgnoreAbortSignal(false)
-	require.Nil(t, xerr)
+	single.IgnoreAbortSignal(false)
 
 	xerr = single.Abort()
 	require.Nil(t, xerr)

@@ -81,7 +81,7 @@ type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	IgnoreAbortSignal(bool) fail.Error
+	IgnoreAbortSignal(bool)
 	SetID(string) fail.Error
 	GetID() (string, fail.Error)
 	GetSignature() string
@@ -768,15 +768,15 @@ func (t *task) Abortable() (bool, fail.Error) {
 
 // IgnoreAbortSignal can be use to disable the effect of Abort()
 // Typically,it is advised to call this inside a defer statementuised to cleanup things (cleanup has to terminate; if abort signal is not disengaged, any
-// callwith task as parameter may abort before the end.
-func (t *task) IgnoreAbortSignal(ignore bool) fail.Error {
+// call with task as parameter may abort before the end.
+// By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
+func (t *task) IgnoreAbortSignal(ignore bool) {
 	if t.IsNull() {
-		return fail.InvalidInstanceError()
+		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	t.abortDisengaged = ignore
-	return nil
 }
