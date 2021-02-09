@@ -81,11 +81,11 @@ func nullSubnet() *subnet {
 func ListSubnets(task concurrency.Task, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	if all {
@@ -116,8 +116,8 @@ func ListSubnets(task concurrency.Task, svc iaas.Service, networkID string, all 
 func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if svc.IsNull() {
-		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be null value")
+	if svc == nil {
+		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	coreInstance, xerr := newCore(svc, "subnet", subnetsFolderName, &abstract.Subnet{})
@@ -134,16 +134,6 @@ func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 
 // lookupSubnet tells if a Subnet exists
 func lookupSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (_ bool, xerr fail.Error) {
-	// if task.IsNull() {
-	// 	return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	// }
-	// if svc.IsNull() {
-	// 	return false, fail.InvalidParameterError("svc", "cannot be null value")
-	// }
-	// if subnetRef == "" {
-	// 	return false, fail.InvalidParameterError("subnetRef", "cannot be empty string")
-	// }
-
 	var subnetID string
 	if networkRef != "" {
 		// If networkRef is not empty, make sure the subnetRef is inside the network
@@ -205,11 +195,11 @@ func lookupSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef
 func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return nullSubnet(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullSubnet(), fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be null value")
+	if svc == nil {
+		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
 		return nullSubnet(), fail.InvalidParameterError("subnetRef", "cannot be empty string")
@@ -232,7 +222,7 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 				return nil, xerr
 			}
 		}
-		if !rn.IsNull() {
+		if rn != nil {
 			// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
 			xerr = rn.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -319,8 +309,8 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),

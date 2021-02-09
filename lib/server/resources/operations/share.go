@@ -125,11 +125,11 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
 func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, fail.Error) {
-	if task.IsNull() {
-		return nullShare(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullShare(), fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return nullShare(), fail.InvalidParameterError("svc", "cannot be null value")
+	if svc == nil {
+		return nullShare(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return nullShare(), fail.InvalidParameterError("ref", "cannot be empty string")
@@ -164,8 +164,8 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 	if objs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -252,7 +252,7 @@ func (objs *share) Create(
 	if objs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if shareName == "" {

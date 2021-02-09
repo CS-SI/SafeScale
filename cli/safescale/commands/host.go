@@ -957,7 +957,7 @@ func hostFeatureRemoveAction(c *cli.Context) error {
 	err = clientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
-		msg := fmt.Sprintf("error removing feature '%s' on host '%s': %s", featureName, hostName, err.Error())
+		msg := fmt.Sprintf("failed to remove Feature '%s' on Host '%s': %s", featureName, hostName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 	return clitools.SuccessResponse(nil)

@@ -78,8 +78,8 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 	if tm == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil!")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
@@ -132,8 +132,8 @@ func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
 	if tm == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tid, err := task.GetID()
@@ -182,7 +182,7 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
 	defer traceR.exiting()
 
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -231,8 +231,8 @@ func (tm *taskedLock) Unlock(task Task) fail.Error {
 	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
 	defer traceR.exiting()
 
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil!")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tid, err := task.GetID()
@@ -279,7 +279,7 @@ func (tm *taskedLock) IsRLocked(task Task) (bool, fail.Error) {
 	if tm == nil {
 		return false, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return false, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -298,7 +298,7 @@ func (tm *taskedLock) IsLocked(task Task) (bool, fail.Error) {
 	if tm == nil {
 		return false, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return false, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -317,7 +317,7 @@ func (tm *taskedLock) GetReadLockCount(task Task) (uint64, fail.Error) {
 	if tm == nil {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -339,7 +339,7 @@ func (tm *taskedLock) GetWriteLockCount(task Task) (uint64, fail.Error) {
 	if tm == nil {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 

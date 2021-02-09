@@ -115,8 +115,8 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	if pbc.bridges == nil {
 		return fail.InvalidInstanceContentError("pbc.bridges", "cannot be nil")
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	pipeCount := uint(len(pbc.bridges))

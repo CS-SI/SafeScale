@@ -496,7 +496,7 @@ func (scmd *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, stri
 	if scmd == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 
@@ -518,8 +518,8 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 	if scmd == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
@@ -561,7 +561,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -831,7 +831,7 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if cmdString = strings.TrimSpace(cmdString); cmdString == "" {
@@ -871,7 +871,7 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 	if sconf == nil {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if phase == "" {

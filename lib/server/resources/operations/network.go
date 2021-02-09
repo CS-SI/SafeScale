@@ -54,8 +54,8 @@ func nullNetwork() resources.Network {
 
 // NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
-	if svc.IsNull() {
-		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
+	if svc == nil {
+		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
 	coreInstance, xerr := newCore(svc, "network", networksFolderName, &abstract.Network{})
@@ -68,10 +68,10 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 
 // LoadNetwork loads the metadata of a subnet
 func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-	if task.IsNull() {
+	if task == nil {
 		return nullNetwork(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
-	if svc.IsNull() {
+	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
 	if ref == "" {
@@ -142,8 +142,8 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(
@@ -202,11 +202,11 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "can't be nil")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "can't be nil")
+		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
 
 	return rn.core.BrowseFolder(task, func(buf []byte) fail.Error {
@@ -226,8 +226,8 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
@@ -337,8 +337,8 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 	if rn.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	cidr = ""
