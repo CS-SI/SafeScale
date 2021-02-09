@@ -150,8 +150,7 @@ func defaultCauseFormatter(e Error) string {
 
 // ForceSetCause sets the cause error even if already set
 func (e *errorCore) ForceSetCause(err error) Error {
-	// e.IsNull() not used here, it's not a mistake
-	if e == nil {
+	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from nil", 0))
 		return ToError(err)
 	}
@@ -165,8 +164,7 @@ func (e *errorCore) ForceSetCause(err error) Error {
 // TrySetCause sets the cause error if not already set
 // Returns true if cause has been successfully set, false if cause was already set
 func (e *errorCore) TrySetCause(err error) bool {
-	// e.IsNull() not used here, it's not a mistake
-	if e == nil {
+	if e.IsNull() {
 		return false
 	}
 	if err == nil {
@@ -181,8 +179,7 @@ func (e *errorCore) TrySetCause(err error) bool {
 
 // CauseFormatter defines the func uses to format cause to string
 func (e *errorCore) CauseFormatter(formatter func(Error) string) {
-	// e.IsNull() not used here, it's not a mistake
-	if e == nil {
+	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from nil", 0))
 		return
 	}
@@ -193,21 +190,17 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	e.causeFormatter = formatter
 }
 
+func (e errorCore) Unwrap() error {
+	return e.cause
+}
+
 // Cause returns an error's cause
 func (e errorCore) Cause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.Cause()", "from null instance", 0))
-		return nil
-	}
 	return e.cause
 }
 
 // RootCause returns the initial error's cause
 func (e errorCore) RootCause() error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.RootCause()", "from null instance", 0))
-		return nil
-	}
 	return RootCause(e)
 }
 
@@ -283,21 +276,12 @@ func (e *errorCore) AddConsequence(err error) Error {
 
 // Consequences returns the consequences of current error (detected teardown problems)
 func (e errorCore) Consequences() []error {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.Consequences() from null instance")
-		return []error{}
-	}
 	return e.consequences
 }
 
 // Error returns a human-friendly error explanation
 // satisfies interface error
 func (e errorCore) Error() string {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.Error() from null instance")
-		return ""
-	}
-
 	msgFinal := e.message
 
 	if e.causeFormatter != nil {
@@ -314,19 +298,11 @@ func (e errorCore) Error() string {
 
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e errorCore) GRPCCode() codes.Code {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.GRPCCode() from null instance")
-		return codes.Unknown
-	}
 	return e.grpcCode
 }
 
 // ToGRPCStatus returns a grpcstatus struct from error
 func (e errorCore) ToGRPCStatus() error {
-	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.ToGRPCStatus() from null instance")
-		return nil
-	}
 	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
 }
 
