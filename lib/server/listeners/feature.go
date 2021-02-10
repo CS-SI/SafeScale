@@ -152,7 +152,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		}
 	}()
 
-	feat, xerr := featurefactory.New(task, featureName)
+	feat, xerr := featurefactory.New(task, svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -245,7 +245,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(task, featureName)
+	feat, xerr := featurefactory.New(task, svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -323,7 +323,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(task, featureName)
+	feat, xerr := featurefactory.New(task, svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}

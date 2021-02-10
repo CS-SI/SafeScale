@@ -17,6 +17,7 @@
 package feature
 
 import (
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -66,15 +67,18 @@ import (
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(task concurrency.Task, name string) (resources.Feature, fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+func New(task concurrency.Task, svc iaas.Service, name string) (resources.Feature, fail.Error) {
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "can't be empty string!")
 	}
 
-	feat, xerr := operations.NewFeature(task, name)
+	feat, xerr := operations.NewFeature(task, svc, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -93,13 +97,16 @@ func New(task concurrency.Task, name string) (resources.Feature, fail.Error) {
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(task concurrency.Task, name string) (resources.Feature, error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+func NewEmbedded(task concurrency.Task, svc iaas.Service, name string) (resources.Feature, error) {
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "canno't be empty string!")
 	}
 
-	return operations.NewEmbeddedFeature(task, name)
+	return operations.NewEmbeddedFeature(task, svc, name)
 }

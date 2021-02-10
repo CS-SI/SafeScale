@@ -55,7 +55,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, rh.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -106,7 +106,7 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, rh.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -141,7 +141,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	tracer := debug.NewTracer(task, false /*Trace.IPAddress, */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, rh.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -250,17 +250,17 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
+func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if feat == nil {
-		return fail.InvalidParameterError("feat", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
 	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -278,6 +278,7 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 				}
 				item = propertiesv1.NewHostInstalledFeature()
 				item.Requires = requirements
+				item.HostContext = !clusterContext
 				featuresV1.Installed[feat.GetName()] = item
 			}
 			if rf, ok := requiredBy.(*feature); ok && !rf.IsNull() {

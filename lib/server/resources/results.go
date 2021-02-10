@@ -31,6 +31,8 @@ type UnitResults interface {
 	Uncompleted() []string
 	ErrorMessages() string
 	Successful() bool
+	Keys() []string
+	ResultOfKey(key string) UnitResult
 }
 
 // Results ...

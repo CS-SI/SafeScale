@@ -229,14 +229,14 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature) (xerr fail.Error) {
+func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if feat == nil {
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
@@ -326,7 +326,7 @@ func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Featu
 
 	out := make([]resources.Feature, 0, len(list))
 	for k := range list {
-		item, xerr := NewFeature(task, k)
+		item, xerr := NewFeature(task, c.GetService(), k)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -340,14 +340,14 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, c.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -359,14 +359,14 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, c.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -379,14 +379,14 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, c.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -639,7 +639,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 
 	if !disabled {
 		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
-		feat, xerr := NewEmbeddedFeature(task, "edgeproxy4subnet")
+		feat, xerr := NewFeature(task, c.GetService(), "edgeproxy4subnet")
 		if xerr != nil {
 			return xerr
 		}
@@ -693,7 +693,7 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 
 		adminPassword := identity.AdminPassword
 
-		feat, xerr := NewEmbeddedFeature(task, "remotedesktop")
+		feat, xerr := NewFeature(task, c.GetService(), "remotedesktop")
 		if xerr != nil {
 			return xerr
 		}
@@ -747,7 +747,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		return xerr
 	}
 	if !disabled {
-		feat, xerr := NewEmbeddedFeature(task, "proxycache-client")
+		feat, xerr := NewFeature(task, c.GetService(), "proxycache-client")
 		if xerr != nil {
 			return xerr
 		}
@@ -796,7 +796,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 	}
 
 	if !disabled {
-		feat, xerr := NewEmbeddedFeature(task, "proxycache-server")
+		feat, xerr := NewFeature(task, c.GetService(), "proxycache-server")
 		if xerr != nil {
 			return xerr
 		}
@@ -816,19 +816,19 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 
 // intallDocker installs docker and docker-compose
 func (c *cluster) installDocker(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
-	}
-	if hostLabel == "" {
-		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
-	}
+	// if host == nil {
+	// 	return fail.InvalidParameterCannotBeNilError("host")
+	// }
+	// if hostLabel == "" {
+	// 	return fail.InvalidParameterError("hostLabel", "cannot be empty string")
+	// }
 
 	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	// defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
-	feat, xerr := NewFeature(task, "docker")
+	feat, xerr := NewFeature(task, c.GetService(), "docker")
 	if xerr != nil {
 		return xerr
 	}

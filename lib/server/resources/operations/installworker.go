@@ -507,20 +507,13 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	switch w.action {
 	case installaction.Add:
 		if !s.SkipProxy {
-			rgw, xerr := w.identifyAvailableGateway()
-			if xerr == nil {
-				var found bool
-				if found, xerr = rgw.IsFeatureInstalled(w.feature.task, "edgeproxy4subnet"); xerr == nil && found {
-					xerr = w.setReverseProxy()
-				}
-			}
-			if xerr != nil {
+			if xerr = w.setReverseProxy(); xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
 			}
 		}
 
 		if xerr := w.setSecurity(); xerr != nil {
-			return nil, xerr
+			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
 		}
 	case installaction.Remove:
 		// if !s.SkipProxy {
@@ -576,6 +569,7 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 			_ = outcomes.Add(k, *outcome)
 		}
 	}
+
 	return outcomes, nil
 }
 
@@ -910,6 +904,21 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	// FIXME: there are valid scenarii for reverse proxy settings when feature applied to Host...
 	if w.cluster == nil {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
+	}
+
+	rgw, xerr := w.identifyAvailableGateway()
+	if xerr != nil {
+		return xerr
+	}
+
+	found, xerr := rgw.IsFeatureInstalled(w.feature.task, "edgeproxy4subnet")
+	if xerr != nil {
+		return xerr
+	}
+	if found {
+		if xerr = w.setReverseProxy(); xerr != nil {
+			return xerr
+		}
 	}
 
 	svc := w.cluster.GetService()

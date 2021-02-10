@@ -73,10 +73,12 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 	if xerr != nil {
 		return nil, xerr
 	}
-	rp, xerr := NewEmbeddedFeature(voidtask, "edgeproxy4subnet")
+
+	rp, xerr := NewFeature(voidtask, svc, "edgeproxy4subnet")
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	addressedGateway, xerr := subnet.InspectGateway(voidtask, addressPrimaryGateway)
 	if xerr != nil {
 		return nil, xerr
