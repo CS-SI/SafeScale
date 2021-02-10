@@ -407,8 +407,7 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, def
 	}
 }
 
-// IsNull tells if the instance represents a null value of cluster
-// Satisfies interface data.NullValue
+// IsNull tells if the instance should be considered as a null value
 func (c *cluster) IsNull() bool {
 	return c == nil || c.core.IsNull()
 }
@@ -438,8 +437,8 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -615,8 +614,8 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
 		return fail.InvalidParameterError("req.Name", "cannot be empty string")
@@ -1175,7 +1174,7 @@ func (c *cluster) createHostResources(
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
 		return primaryGatewayStatus
 	}
-	if haveSecondaryGateway && !secondaryGatewayTask.IsNull() {
+	if haveSecondaryGateway && secondaryGatewayTask != nil {
 		if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
 			return secondaryGatewayStatus
 		}
@@ -1233,7 +1232,7 @@ func (c *cluster) createHostResources(
 		}
 	}
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
-		if haveSecondaryGateway && !secondaryGatewayTask.IsNull() {
+		if haveSecondaryGateway && secondaryGatewayTask != nil {
 			if secondaryGatewayErr := secondaryGatewayTask.Abort(); secondaryGatewayErr != nil {
 				_ = primaryGatewayStatus.AddConsequence(secondaryGatewayErr)
 			}
@@ -1241,7 +1240,7 @@ func (c *cluster) createHostResources(
 		return primaryGatewayStatus
 	}
 
-	if haveSecondaryGateway && !secondaryGatewayTask.IsNull() {
+	if haveSecondaryGateway && secondaryGatewayTask != nil {
 		if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
 			return secondaryGatewayStatus
 		}
@@ -1353,8 +1352,8 @@ func (c *cluster) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 	if c.IsNull() {
 		return []byte{}, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	c.SafeRLock(task)
@@ -1371,8 +1370,8 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
@@ -1392,8 +1391,8 @@ func (c *cluster) Bootstrap(task concurrency.Task, flavor clusterflavor.Enum) (x
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	c.SafeLock(task)
@@ -1420,11 +1419,11 @@ func (c cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterId
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	return c.core.BrowseFolder(task, func(buf []byte) fail.Error {
@@ -1448,8 +1447,8 @@ func (c cluster) GetIdentity(task concurrency.Task) (clusterIdentity abstract.Cl
 	if c.IsNull() {
 		return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return abstract.ClusterIdentity{}, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return abstract.ClusterIdentity{}, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = c.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -1470,8 +1469,8 @@ func (c cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, xe
 	if c.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return 0, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1492,8 +1491,8 @@ func (c cluster) GetComplexity(task concurrency.Task) (_ clustercomplexity.Enum,
 	if c.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return 0, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1515,8 +1514,8 @@ func (c cluster) GetAdminPassword(task concurrency.Task) (adminPassword string, 
 	if c.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1538,8 +1537,8 @@ func (c cluster) GetKeyPair(task concurrency.Task) (keyPair abstract.KeyPair, xe
 	if c.IsNull() {
 		return nullAKP, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nullAKP, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullAKP, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	aci, xerr := c.GetIdentity(task)
@@ -1557,8 +1556,8 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv3.
 	if c.IsNull() {
 		return config, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return config, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return config, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1585,8 +1584,8 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1774,8 +1773,8 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -1961,8 +1960,8 @@ func (c *cluster) GetState(task concurrency.Task) (state clusterstate.Enum, xerr
 	if c.IsNull() {
 		return state, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return state, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return state, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -2015,8 +2014,8 @@ func (c *cluster) AddNode(task concurrency.Task, def abstract.HostSizingRequirem
 	if c.IsNull() {
 		return nullHost(), fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nullHost(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -2038,8 +2037,8 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if count == 0 {
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
@@ -2226,8 +2225,8 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv3.Clus
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -2289,8 +2288,8 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if hostID = strings.TrimSpace(hostID); hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
@@ -2334,8 +2333,8 @@ func (c cluster) ListMasters(task concurrency.Task) (list resources.IndexedListO
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2381,8 +2380,8 @@ func (c cluster) ListMasterNames(task concurrency.Task) (list data.IndexedListOf
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2427,8 +2426,8 @@ func (c cluster) ListMasterIDs(task concurrency.Task) (list data.IndexedListOfSt
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2473,8 +2472,8 @@ func (c *cluster) ListMasterIPs(task concurrency.Task) (list data.IndexedListOfS
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2519,8 +2518,8 @@ func (c cluster) FindAvailableMaster(task concurrency.Task) (master resources.Ho
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -2571,8 +2570,8 @@ func (c cluster) ListNodes(task concurrency.Task) (list resources.IndexedListOfC
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	if task.Aborted() {
@@ -2629,8 +2628,8 @@ func (c cluster) ListNodeNames(task concurrency.Task) (list data.IndexedListOfSt
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2676,8 +2675,8 @@ func (c cluster) ListNodeIDs(task concurrency.Task) (list data.IndexedListOfStri
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2723,8 +2722,8 @@ func (c cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedListOfStri
 	if c.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptyList, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var state clusterstate.Enum
@@ -2767,8 +2766,8 @@ func (c cluster) FindAvailableNode(task concurrency.Task) (node resources.Host, 
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -2820,8 +2819,8 @@ func (c cluster) LookupNode(task concurrency.Task, ref string) (found bool, xerr
 	if c.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return false, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if ref == "" {
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
@@ -2861,8 +2860,8 @@ func (c cluster) CountNodes(task concurrency.Task) (count uint, xerr fail.Error)
 	if c.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return 0, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return 0, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// defer fail.OnExitLogError(&xerr, debug.NewTracer(task, tracing.ShouldTrace("cluster")).TraceMessage())
@@ -2900,8 +2899,8 @@ func (c cluster) GetNodeByID(task concurrency.Task, hostID string) (host resourc
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if hostID == "" {
 		return nil, fail.InvalidParameterError("hostID", "cannot be empty string")
@@ -2945,7 +2944,7 @@ func (c *cluster) deleteMaster(task concurrency.Task, host resources.Host) fail.
 		return fail.InvalidInstanceError()
 	}
 	if host == nil {
-		return fail.InvalidParameterError("hostID", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("hostID")
 	}
 
 	var master *propertiesv3.ClusterNode
@@ -3024,21 +3023,18 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
-	// if master.IsNull() {
-	// 	return fail.InvalidParameterError("master", "cannot be null value of 'resources.Host'")
-	// }
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	// Identify the node to delete and remove it preventively from metadata
+	// Identify the node to delete and remove it preventive from metadata
 	var node *propertiesv3.ClusterNode
 	xerr = c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3131,8 +3127,8 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var cleaningErrors []error
@@ -3302,7 +3298,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if !rs.IsNull() {
+	if rs != nil {
 		subnetName := rs.GetName()
 		logrus.Debugf("Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
@@ -3344,7 +3340,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 
 	// If we have to delete network and Network instance is null value, networkID is the same as
-	if !rn.IsNull() && deleteNetwork {
+	if rn != nil && deleteNetwork {
 		networkName := rn.GetName()
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
@@ -3404,7 +3400,7 @@ func (c cluster) extractNetworkingInfo(task concurrency.Task) (network resources
 
 			if networkV3.NetworkID != "" {
 				network, innerXErr = LoadNetwork(task, c.GetService(), networkV3.NetworkID)
-			} else if !subnet.IsNull() {
+			} else if subnet != nil {
 				network, innerXErr = subnet.InspectNetwork(task)
 			}
 			if innerXErr != nil {
@@ -3777,8 +3773,8 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 	if c.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptySlice, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if count == 0 {
 		return emptySlice, fail.InvalidParameterError("count", "cannot be 0")

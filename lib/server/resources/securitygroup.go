@@ -46,7 +46,6 @@ const (
 // SecurityGroup links Object Storage folder and SecurityGroup
 type SecurityGroup interface {
 	Metadata
-	data.NullValue
 	data.Identifiable
 
 	AddRule(concurrency.Task, abstract.SecurityGroupRule) fail.Error                                                  // returns true if the host is member of a cluster

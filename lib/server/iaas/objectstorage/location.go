@@ -32,7 +32,6 @@ import (
 	_ "gomodules.xyz/stow/swift"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -64,8 +63,6 @@ type Config struct {
 
 // Location ...
 type Location interface {
-	data.NullValue
-
 	// ObjectStorageProtocol returns the name of the Object Storage protocol corresponding used by the location
 	ObjectStorageProtocol() string
 
@@ -135,8 +132,7 @@ func NewLocation(conf Config) (*location, fail.Error) {
 	return l, nil
 }
 
-// IsNull tells if the instance is a null value
-// satisfies interface data.NullValue
+// IsNull tells if the instance should be considered as a null value
 func (l *location) IsNull() bool {
 	return l == nil || l.stowLocation == nil
 }

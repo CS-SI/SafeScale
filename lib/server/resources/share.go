@@ -28,7 +28,6 @@ import (
 type Share interface {
 	Metadata
 	data.Identifiable
-	data.NullValue
 
 	Browse(task concurrency.Task, callback func(hostName string, shareID string) fail.Error) fail.Error
 	Create(task concurrency.Task, shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host

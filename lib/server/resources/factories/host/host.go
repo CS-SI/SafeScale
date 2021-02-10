@@ -31,8 +31,8 @@ import (
 // List returns a list of available hosts
 func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
 	var nullList abstract.HostList
-	if svc.IsNull() {
-		return nullList, fail.InvalidParameterError("svc", "cannot be nil")
+	if svc == nil {
+		return nullList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	if all {
@@ -54,7 +54,7 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 
 // New creates an instance of resources.Host
 func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
-	if svc.IsNull() {
+	if svc == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -67,14 +67,14 @@ func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 
 // Load loads the metadata of host and returns an instance of resources.Host
 func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
 	// FIXME: tracer...

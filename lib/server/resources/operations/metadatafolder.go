@@ -73,10 +73,9 @@ func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
 	return f, nil
 }
 
-// IsNull ...
-// satisfies interface data.NullValue
+// IsNull tells if the folder instance should be considered as a null value
 func (f *folder) IsNull() bool {
-	return f == nil || f.service.IsNull()
+	return f == nil || f.service == nil
 }
 
 // GetService returns the service used by the folder

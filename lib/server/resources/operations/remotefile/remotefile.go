@@ -43,11 +43,11 @@ type Item struct {
 func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
 	if rfc.Local == "" {
 		return fail.InvalidInstanceContentError("rfc.Local", "cannot be empty string")
@@ -108,8 +108,8 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	f, xerr := system.CreateTempFileFromString(content, 0600)

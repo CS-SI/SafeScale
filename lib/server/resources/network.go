@@ -29,7 +29,6 @@ import (
 type Network interface {
 	Metadata
 	data.Identifiable
-	data.NullValue
 
 	Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error // ...
 	Create(task concurrency.Task, req abstract.NetworkRequest) fail.Error                 // creates a network

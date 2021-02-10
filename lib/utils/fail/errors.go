@@ -47,7 +47,6 @@ type causer interface {
 
 // Error defines the interface of a SafeScale error
 type Error interface {
-	data.NullValue
 	data.Annotatable
 	causer
 	consequencer
@@ -316,7 +315,6 @@ func (e *errorCore) prependToMessage(msg string) {
 
 // ErrTimeout defines a ErrTimeout error
 type ErrTimeout struct {
-	data.NullValue
 	*errorCore
 	dur time.Duration
 }

@@ -40,6 +40,11 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
+// IsNull returns true if the instance is considered as a null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
+}
+
 func (p *provider) InspectImage(id string) (*abstract.Image, fail.Error) {
 	panic("implement me")
 }
