@@ -62,10 +62,10 @@ type KongController struct {
 // NewKongController ...
 func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
-	if subnet.IsNull() {
-		return nil, fail.InvalidParameterError("subnet", "cannot be null value of 'resources.Subnet'")
+	if subnet == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
 	// Check if 'edgeproxy4subnet' feature is installed on host

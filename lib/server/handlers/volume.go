@@ -105,7 +105,7 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if ref == "" {
-		return fail.InvalidParameterError("ref", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
 	task := handler.job.GetTask()
@@ -270,16 +270,16 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if volumeRef == "" {
-		return fail.InvalidParameterError("volumeRef", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("volumeRef")
 	}
 	if hostRef == "" {
-		return fail.InvalidParameterError("hostRef", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 	if path == "" {
-		return fail.InvalidParameterError("path", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
 	if format == "" {
-		return fail.InvalidParameterError("format", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("format")
 	}
 
 	task := handler.job.GetTask()
@@ -554,10 +554,10 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if volumeRef == "" {
-		return fail.InvalidParameterError("volumeRef", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("volumeRef")
 	}
 	if hostRef == "" {
-		return fail.InvalidParameterError("hostRef", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
 	task := handler.job.GetTask()

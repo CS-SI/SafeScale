@@ -93,7 +93,7 @@ func (s Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
-		return nil, fail.InvalidParameterError("request.Name", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
@@ -190,7 +190,7 @@ func (s Stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 		return nullAV, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
@@ -274,7 +274,7 @@ func (s Stack) DeleteVolume(id string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
@@ -310,7 +310,7 @@ func (s Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 		return "", fail.InvalidInstanceError()
 	}
 	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
-		return "", fail.InvalidParameterError("request.Name", "cannot be empty string")
+		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
@@ -339,10 +339,10 @@ func (s Stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 		return nullAVA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nullAVA, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 	if id = strings.TrimSpace(id); id == "" {
-		return nullAVA, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
@@ -373,7 +373,7 @@ func (s Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return emptySlice, fail.InvalidParameterError("serverID", "cannot be empty string")
+		return emptySlice, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
@@ -413,10 +413,10 @@ func (s Stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return fail.InvalidParameterError("serverID", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 	if vaID = strings.TrimSpace(vaID); vaID == "" {
-		return fail.InvalidParameterError("vaID", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()

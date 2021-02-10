@@ -62,7 +62,7 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
-		return nullCore(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullCore(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if kind == "" {
 		return nullCore(), fail.InvalidParameterError("kind", "cannot be empty string")
@@ -134,10 +134,10 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 	if c.properties == nil {
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
@@ -163,10 +163,10 @@ func (c *core) Review(task concurrency.Task, callback resources.Callback) (xerr 
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 	if c.properties == nil {
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
@@ -185,10 +185,10 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	c.SafeLock(task)
@@ -239,10 +239,10 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if clonable == nil {
-		return fail.InvalidParameterError("clonable", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
 	c.SafeLock(task)
@@ -292,7 +292,7 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")

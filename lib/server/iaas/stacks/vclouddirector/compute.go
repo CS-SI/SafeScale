@@ -265,7 +265,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 		return nullAhf, nil, fail.InvalidInstanceError()
 	}
 	if request.KeyPair == nil {
-		return nullAhf, nil, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+		return nullAhf, nil, fail.InvalidParameterCannotBeNilError("request.KeyPair")
 	}
 
 	// TODO: use concurrency.Tracer

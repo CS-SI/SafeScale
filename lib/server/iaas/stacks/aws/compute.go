@@ -68,7 +68,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
-		return fail.InvalidParameterError("keypair", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("keypair")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).
@@ -487,7 +487,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 	// if request.KeyPair == nil {
-	// 	return nullAHF, nullUDC, fail.InvalidParameterError("request.KeyPair", "cannot be nil")
+	// 	return nullAHF, nullUDC, fail.InvalidParameterCannotBeNilError("request.KeyPair")
 	// }
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
@@ -580,8 +580,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// import keypair on provider side
 	keypair := abstract.KeyPair{
-		Name: keyPairName,
-		PublicKey: userData.FirstPublicKey,
+		Name:       keyPairName,
+		PublicKey:  userData.FirstPublicKey,
 		PrivateKey: userData.FirstPrivateKey,
 	}
 	if xerr = s.ImportKeyPair(&keypair); xerr != nil {

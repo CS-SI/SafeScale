@@ -29,7 +29,7 @@ import (
 func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if id == "" {
-		return nullServer, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	var server *servers.Server
@@ -49,7 +49,7 @@ func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
-		return nullServer, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...

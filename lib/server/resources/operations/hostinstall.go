@@ -46,7 +46,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -97,7 +97,7 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -132,7 +132,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -199,7 +199,7 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		return map[uint8]installmethod.Enum{}
 	}
 	if task == nil {
-		logrus.Error(fail.InvalidParameterError("task", "cannot be nil").Error())
+		logrus.Error(fail.InvalidParameterCannotBeNilError("task").Error())
 		return map[uint8]installmethod.Enum{}
 	}
 
@@ -319,7 +319,6 @@ func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail
 }
 
 // InstalledFeatures returns a list of installed features
-//
 // satisfies interface install.Targetable
 func (rh host) InstalledFeatures(task concurrency.Task) []string {
 	var list []string

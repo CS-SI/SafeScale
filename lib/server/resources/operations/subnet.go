@@ -82,10 +82,10 @@ func ListSubnets(task concurrency.Task, svc iaas.Service, networkID string, all 
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	if all {
@@ -117,7 +117,7 @@ func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
-		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := newCore(svc, "subnet", subnetsFolderName, &abstract.Subnet{})
@@ -196,10 +196,10 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
-		return nullSubnet(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullSubnet(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nullSubnet(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
 		return nullSubnet(), fail.InvalidParameterError("subnetRef", "cannot be empty string")
@@ -310,7 +310,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),

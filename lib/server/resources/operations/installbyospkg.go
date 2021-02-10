@@ -45,10 +45,10 @@ func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v d
 	defer fail.OnPanic(xerr)
 
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	yamlKey := "feature.install." + g.keyword + ".check"
@@ -79,10 +79,10 @@ func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v dat
 	defer fail.OnPanic(&xerr)
 
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	yamlKey := "feature.install." + g.keyword + ".add"
@@ -114,10 +114,10 @@ func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v 
 	defer fail.OnPanic(&xerr)
 
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	yamlKey := "feature.install." + g.keyword + ".remove"

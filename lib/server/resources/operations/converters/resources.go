@@ -50,11 +50,11 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 
 // func VolumeFromResourceToProtocol(task concurrency.Task, in resources.Volume) (*protocol.VolumeInspectResponse, error) {
 // 	empty := &protocol.VolumeIspectResponse{}
-// 	if in.IsNull() {
-// 		return empty, fail.InvalidParameterError("in", "cannot be null value")
+// 	if task == nil {
+// 		return empty, fail.InvalidParameterError("task", "cannot be nil")
 // 	}
-// 	if task.IsNull() {
-// 		return empty, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+// 	if in == nil {
+// 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 // 	}
 
 // 	va, err := in.GetAttachments(task)

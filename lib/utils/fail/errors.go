@@ -874,13 +874,22 @@ type ErrInvalidParameter struct {
 	*errorCore
 }
 
-// InvalidParameterError creates a ErrInvalidParameter error
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 0))
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 2))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())
 	return &ErrInvalidParameter{r}
+}
+
+// InvalidParameterCannotBeNilError is a specialized *ErrInvalidParameter with message "cannot be nil"
+func InvalidParameterCannotBeNilError(what string) *ErrInvalidParameter {
+	return InvalidParameterError(what, "cannot be nil")
+}
+
+// InvalidParameterCannotBeEmptyStringError is a specialized *ErrInvalidParameter with message "cannot be empty string"
+func InvalidParameterCannotBeEmptyStringError(what string) *ErrInvalidParameter {
+	return InvalidParameterError(what, "cannot be empty string")
 }
 
 // IsNull tells if the instance is null

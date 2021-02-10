@@ -286,10 +286,10 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return -1, "", "", fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if hostRef == "" {
-		return -1, "", "", fail.InvalidParameterError("hostRef", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 	if cmd == "" {
-		return -1, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("cmd")
 	}
 
 	task := handler.job.GetTask()
@@ -384,10 +384,10 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return -1, "", "", fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if from == "" {
-		return -1, "", "", fail.InvalidParameterError("from", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
 	}
 	if to == "" {
-		return -1, "", "", fail.InvalidParameterError("to", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
 	task := handler.job.GetTask()

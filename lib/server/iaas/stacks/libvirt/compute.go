@@ -680,10 +680,10 @@ func (s stack) getHostAndDomainFromRef(ref string) (*abstract.HostCore, *libvirt
 
 func (s stack) complementHost(hostCore *abstract.HostCore, newHost *abstract.HostFull) (xerr fail.Error) {
 	if hostCore == nil {
-		return fail.InvalidParameterError("hostCore", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("hostCore")
 	}
 	if newHost == nil {
-		return fail.InvalidParameterError("newHost", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("newHost")
 	}
 
 	defer fail.OnPanic(&xerr)

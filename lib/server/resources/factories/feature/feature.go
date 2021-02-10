@@ -84,7 +84,7 @@ func New(task concurrency.Task, name string) (resources.Feature, fail.Error) {
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		if feat, xerr = operations.NewEmbeddedFeature(task, name); xerr != nil {
+		if feat, xerr = operations.NewEmbeddedFeature(task, svc, name); xerr != nil {
 			return nil, xerr
 		}
 	}

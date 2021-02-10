@@ -62,7 +62,7 @@ type bucket struct {
 // NewBucket intanciates bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := newCore(svc, "bucket", bucketsFolderName, &abstract.ObjectStorageBucket{})
@@ -80,10 +80,10 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 // LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
 func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -176,7 +176,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")

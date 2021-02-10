@@ -55,7 +55,7 @@ func List(task concurrency.Task, svc iaas.Service) ([]*abstract.Network, fail.Er
 // New creates an instance of resources.Network
 func New(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	return operations.NewNetwork(svc)

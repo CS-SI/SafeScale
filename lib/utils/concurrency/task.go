@@ -173,7 +173,7 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
 // NewTaskWithContext ...
 func NewTaskWithContext(ctx context.Context, parentTask Task) (Task, fail.Error) {
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	return newTask(ctx, parentTask)
@@ -542,7 +542,7 @@ func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResul
 		return nil, fail.InvalidInstanceError()
 	}
 	if action == nil {
-		return nil, fail.InvalidParameterError("action", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("action")
 	}
 
 	st, xerr := NewTaskWithParent(t)

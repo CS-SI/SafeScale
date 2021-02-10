@@ -83,7 +83,7 @@ type bucket struct {
 // newBucket ...
 func newBucket(location stow.Location) (bucket, fail.Error) {
 	if location == nil {
-		return bucket{}, fail.InvalidParameterError("location", "cannot be nil")
+		return bucket{}, fail.InvalidParameterCannotBeNilError("location")
 	}
 	return bucket{stowLocation: location}, nil
 }
@@ -221,7 +221,7 @@ func (b bucket) DeleteObject(objectName string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if objectName == "" {
-		return fail.InvalidParameterError("objectName", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()

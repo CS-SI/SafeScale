@@ -122,13 +122,13 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 		return fail.InvalidInstanceContentError("x.module", "can't be empty string")
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if key == "" {
-		return fail.InvalidParameterError("key", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 	if inspector == nil {
-		return fail.InvalidParameterError("inspector", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
 
 	if task.Aborted() {
@@ -172,13 +172,13 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 		return fail.InvalidInstanceContentError("x.module", "cannot be empty string")
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if key == "" {
-		return fail.InvalidParameterError("key", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 	if alterer == nil {
-		return fail.InvalidParameterError("alterer", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
 
 	if task.Aborted() {
@@ -240,7 +240,7 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 		return nil, fail.InvalidParameterError("x.properties", "can't be nil")
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	x.RLock()
@@ -269,7 +269,7 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fa
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic

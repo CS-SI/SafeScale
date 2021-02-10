@@ -77,7 +77,7 @@ func NewHost(svc iaas.Service) (_ *host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := newCore(svc, "host", hostsFolderName, &abstract.HostCore{})
@@ -98,10 +98,10 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
-		return nullHost(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nullHost(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullHost(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
 		return nullHost(), fail.InvalidParameterError("ref", "cannot be empty string")
@@ -299,13 +299,13 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	return rh.core.BrowseFolder(task, func(buf []byte) (innerXErr fail.Error) {
@@ -327,7 +327,7 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr
 		return state, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return state, fail.InvalidParameterError("task", "cannot be nil")
+		return state, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	if xerr = rh.Reload(task); xerr != nil {
@@ -354,7 +354,7 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Read data from metadata storage
