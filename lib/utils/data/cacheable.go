@@ -20,6 +20,6 @@ package data
 
 // Cacheable is the interface a struct must satisfy to be able to be cached
 type Cacheable interface {
-	Dispose() 	// Tells cache handler the instance is no more used (giving a chance to free this instance is there are no more use
-	Discard()   // tells cache handler the instance has been deleted and MUST be removed from cache
+	Dispose() // Tells cache handler the instance is no more used (giving a chance to free this instance is there are no more use
+	Discard() // tells cache handler the instance has been deleted and MUST be removed from cache
 }
