@@ -47,7 +47,7 @@ all: begin ground getdevdeps sdk generate lib cli err vet
 common: begin ground getdevdeps sdk generate
 
 versioncut:
-	@(($(GO) version | grep go1.15) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.14 ! $(NO_COLOR)\n" && /bin/false);
+	@(($(GO) version | grep go1.15) || ($(GO) version | grep go1.14)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.14 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
@@ -167,7 +167,7 @@ gofmt: begin
 	@if [ -n "$$($(GOFMT) -d $(PKG_FILES))" ]; then \
 		"$$($(GOFMT) -d $(PKG_FILES))" \
 		echo "-- gofmt check failed"; \
-		/bin/false; \
+		false; \
 	fi
 
 err: begin generate
