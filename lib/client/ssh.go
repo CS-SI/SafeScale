@@ -185,10 +185,10 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	//     return -1, "", "", fail.InvalidInstanceError()
 	// }
 	if from == "" {
-		return -1, "", "", fail.InvalidParameterError("from", "cannot be nil")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
 	}
 	if to == "" {
-		return -1, "", "", fail.InvalidParameterError("to", "cannot be nil")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
 	task, xerr := s.session.GetTask()

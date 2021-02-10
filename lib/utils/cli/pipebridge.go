@@ -38,7 +38,7 @@ type StdoutBridge struct {
 // NewStdoutBridge creates an PipeBridge from a bufio.ReadCloser
 func NewStdoutBridge(pipe io.ReadCloser) (*StdoutBridge, fail.Error) {
 	if pipe == nil {
-		return nil, fail.InvalidParameterError("pipe", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("pipe")
 	}
 	sp := StdoutBridge{
 		coreBridge: coreBridge{
@@ -61,7 +61,7 @@ type StderrBridge struct {
 // NewStderrBridge creates a pipe displaying on stderr
 func NewStderrBridge(pipe io.ReadCloser) (*StderrBridge, fail.Error) {
 	if pipe == nil {
-		return nil, fail.InvalidParameterError("pipe", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("pipe")
 	}
 	sp := StderrBridge{
 		coreBridge: coreBridge{
@@ -89,7 +89,7 @@ type PipeBridgeController struct {
 // NewPipeBridgeController creates a new controller of bridges of pipe
 func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail.Error) {
 	if bridges == nil {
-		return nil, fail.InvalidParameterError("pipes", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("pipes")
 	}
 
 	var validatedBridges []PipeBridge
@@ -116,7 +116,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 		return fail.InvalidInstanceContentError("pbc.bridges", "cannot be nil")
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	pipeCount := uint(len(pbc.bridges))
@@ -169,7 +169,7 @@ type taskReadParameters struct {
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
 func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if p == nil {
-		return nil, fail.InvalidParameterError("p", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("p")
 	}
 
 	params, ok := p.(taskReadParameters)
@@ -186,7 +186,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	// 	return nil, fail.InvalidParameterError("params['bridge']", "must be a PipeBridge")
 	// }
 	// if bridge == nil {
-	// 	return nil, fail.InvalidParameterError("params['bridge']", "cannot be nil")
+	// 	return nil, fail.InvalidParameterCannotBeNilError("params['bridge']")
 	// }
 	// if displayCh, ok = params["displayCh"].(chan<- outputItem); !ok {
 	// 	return nil, fail.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")

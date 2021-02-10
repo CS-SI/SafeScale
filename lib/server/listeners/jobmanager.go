@@ -36,7 +36,7 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 	defer fail.OnPanic(&xerr)
 
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	var tenant *Tenant
@@ -75,10 +75,10 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -134,7 +134,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {

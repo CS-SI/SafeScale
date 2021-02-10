@@ -109,7 +109,7 @@ func nullShare() *share {
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {
-		return nullShare(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullShare(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := newCore(svc, "share", sharesFolderName, &ShareIdentity{})
@@ -126,10 +126,10 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If retry times out, return fail.ErrTimeout
 func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, fail.Error) {
 	if task == nil {
-		return nullShare(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullShare(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nullShare(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullShare(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
 		return nullShare(), fail.InvalidParameterError("ref", "cannot be empty string")
@@ -165,10 +165,10 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 	return objs.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		si := &ShareIdentity{}
@@ -253,13 +253,13 @@ func (objs *share) Create(
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if shareName == "" {
 		return fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
 	if server == nil {
-		return fail.InvalidParameterError("server", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("server")
 	}
 
 	// Check if a share already exists with the same name

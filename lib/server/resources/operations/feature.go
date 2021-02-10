@@ -320,7 +320,7 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
-		return nil, fail.InvalidParameterError("target", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 
 	featureName := f.GetName()
@@ -422,7 +422,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
-		return nil, fail.InvalidParameterError("target", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 
 	featureName := f.GetName()

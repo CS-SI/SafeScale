@@ -34,7 +34,7 @@ import (
 // asking "waitor" to wait between each try, with a duration limit of 'timeout'.
 func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
 	if waitor == nil {
-		return fail.InvalidParameterError("waitor", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("waitor")
 	}
 
 	// xerr := retry.WhileUnsuccessful(
@@ -119,9 +119,9 @@ func normalizeError(in error) (err error) {
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
-			case "not found":   // stow may return that error message if it does not find something
+			case "not found": // stow may return that error message if it does not find something
 				return fail.NotFoundError("not found")
-			default:    // stow may return an error containing "dial tcp:" for some HTTP errors
+			default: // stow may return an error containing "dial tcp:" for some HTTP errors
 				if strings.Contains(str, "dial tcp:") {
 					return fail.NotAvailableError(str)
 				}

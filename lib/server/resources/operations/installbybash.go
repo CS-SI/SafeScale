@@ -35,10 +35,10 @@ func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 	defer fail.OnPanic(&xerr)
 
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	yamlKey := "feature.install.bash.check"
@@ -71,10 +71,10 @@ func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 	defer fail.OnPanic(&xerr)
 
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	// Determining if install script is defined in specification file
@@ -113,10 +113,10 @@ func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	defer fail.OnPanic(&xerr)
 
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be null value of 'resources.Feature'")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	if !f.(*feature).Specs().IsSet("feature.install.bash.remove") {

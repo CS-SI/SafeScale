@@ -314,7 +314,7 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterError("id", "cannot be nil")
+		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()

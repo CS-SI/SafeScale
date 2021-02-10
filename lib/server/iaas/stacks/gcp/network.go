@@ -215,7 +215,7 @@ func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v)", vip).WithStopwatch().Entering()
@@ -230,7 +230,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
@@ -248,7 +248,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
@@ -266,7 +266,7 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v)", vip).WithStopwatch().Entering()

@@ -945,7 +945,7 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID = strings.TrimSpace(hostID); hostID == "" {
 		return fail.InvalidParameterError("host", "cannot be empty string")
@@ -995,7 +995,7 @@ func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID = strings.TrimSpace(hostID); hostID == "" {
 		return fail.InvalidParameterError("host", "cannot be empty string")
@@ -1046,7 +1046,7 @@ func (s Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
 	for _, v := range vip.Hosts {

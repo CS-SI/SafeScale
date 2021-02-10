@@ -430,7 +430,7 @@ var networkSecurityGroupInspect = &cli.Command{
 
 func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (map[string]interface{}, error) {
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	jsoned, err := json.Marshal(in)

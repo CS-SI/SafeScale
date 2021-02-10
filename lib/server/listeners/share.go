@@ -54,10 +54,10 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -133,10 +133,10 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -177,7 +177,7 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -222,10 +222,10 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -267,10 +267,10 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 		return empty, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -310,10 +310,10 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)

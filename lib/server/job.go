@@ -68,13 +68,13 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	defer fail.OnPanic(&xerr)
 
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if cancel == nil {
-		return nil, fail.InvalidParameterError("cancel", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("cancel")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	var (
@@ -235,7 +235,7 @@ func register(job Job) fail.Error {
 // deregister ...
 func deregister(job Job) fail.Error {
 	if job == nil {
-		return fail.InvalidParameterError("job", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("job")
 	}
 
 	if uuid := job.GetID(); uuid != "" {
@@ -257,7 +257,7 @@ func AbortJobByID(id string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	if job, ok := jobMap[id]; ok {

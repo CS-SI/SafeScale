@@ -50,10 +50,10 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if inspector == nil {
-		return fail.InvalidParameterError("inspector", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
 	if d.witness == nil {
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
@@ -89,10 +89,10 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xer
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if alterer == nil {
-		return fail.InvalidParameterError("alterer", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
 	if d.witness == nil {
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
@@ -132,7 +132,7 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var jsoned []byte
@@ -158,7 +158,7 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")

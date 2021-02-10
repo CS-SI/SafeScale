@@ -611,10 +611,10 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterError("param.stepKey", "cannot be empty string")
 	}
 	if p.stepMap == nil {
-		return nil, fail.InvalidParameterError("params.stepMap", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("params.stepMap")
 	}
 	if p.variables == nil {
-		return nil, fail.InvalidParameterError("params[variables]", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("params[variables]")
 	}
 
 	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
@@ -943,34 +943,8 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 		secondaryGatewayVariables = w.variables.Clone()
 	}
 	for _, r := range rules {
-		// targets := stepTargets{}
-		// rule, ok := r.(map[string]interface{})
-		// if !ok {
-		// 	return fail.InvalidParameterError("r", "is not a rule (map)")
-		// }
 
 		targets := w.interpretRuleTargets(r)
-		// anon, ok := rule["targets"].(map[interface{}]interface{})
-		// if !ok {
-		// 	// If no 'targets' key found, applies on host only
-		// 	if w.cluster != nil {
-		// 		continue
-		// 	}
-		// 	targets[targetHosts] = "yes"
-		// } else {
-		// 	for i, j := range anon {
-		// 		switch j := j.(type) {
-		// 		case bool:
-		// 			if j {
-		// 				targets[i.(string)] = "yes"
-		// 			} else {
-		// 				targets[i.(string)] = "no"
-		// 			}
-		// 		case string:
-		// 			targets[i.(string)] = j
-		// 		}
-		// 	}
-		// }
 		hosts, xerr := w.identifyHosts(targets)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply proxy rules: %s")

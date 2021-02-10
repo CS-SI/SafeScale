@@ -54,7 +54,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 		return nullASG, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullASG, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullASG, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()

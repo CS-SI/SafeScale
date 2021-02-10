@@ -397,10 +397,10 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterError("host", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("host")
 	}
 
 	return nil
@@ -412,10 +412,10 @@ func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterError("host", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("host")
 	}
 
 	return nil

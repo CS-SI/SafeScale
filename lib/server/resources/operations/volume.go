@@ -64,7 +64,7 @@ func nullVolume() *volume {
 // NewVolume creates an instance of Volume
 func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 	if svc == nil {
-		return nullVolume(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, err := newCore(svc, "volume", volumesFolderName, &abstract.Volume{})
@@ -77,10 +77,10 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 // LoadVolume loads the metadata of a subnet
 func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
 	if task == nil {
-		return nullVolume(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+		return nullVolume(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nullVolume(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
 		return nullVolume(), fail.InvalidParameterError("ref", "cannot be empty string")

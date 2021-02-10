@@ -85,10 +85,10 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
-		return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullCluster(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	c, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
@@ -108,10 +108,10 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
-		return nullCluster(), fail.InvalidParameterError("task", "cannot be nil")
+		return nullCluster(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nullCluster(), fail.InvalidParameterError("svc", "cannot be nil")
+		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nullCluster(), fail.InvalidParameterError("name", "cannot be empty string")

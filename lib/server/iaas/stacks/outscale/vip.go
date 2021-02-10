@@ -109,7 +109,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("host", "cannot be empty string")
@@ -156,7 +156,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr f
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("host", "cannot be empty string")
@@ -194,7 +194,7 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()

@@ -19,7 +19,6 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"math"
 	"os"
 	"regexp"
@@ -52,8 +51,6 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
-	data.NullValue
-
 	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
@@ -172,7 +169,7 @@ func (svc *service) ChangeProvider(provider providers.Provider) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if provider == nil {
-		return fail.InvalidParameterError("provider", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("provider")
 	}
 	svc.Provider = provider
 	return nil
@@ -186,7 +183,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 		return fail.InvalidInstanceError()
 	}
 	if hostID == "" {
-		return fail.InvalidParameterError("hostID", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("hostID")
 	}
 
 	timer := time.After(timeout)
@@ -219,7 +216,7 @@ func (svc service) WaitVolumeState(volumeID string, state volumestate.Enum, time
 		return nil, fail.InvalidInstanceError()
 	}
 	if volumeID == "" {
-		return nil, fail.InvalidParameterError("volumeID", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("volumeID")
 	}
 
 	cout := make(chan int)

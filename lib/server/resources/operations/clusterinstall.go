@@ -91,7 +91,7 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		return nil
 	}
 	if task == nil {
-		logrus.Errorf(fail.InvalidParameterError("task", "cannot be nil").Error())
+		logrus.Errorf(fail.InvalidParameterCannotBeNilError("task").Error())
 		return nil
 	}
 
@@ -128,7 +128,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	complexity, xerr := c.GetComplexity(task)

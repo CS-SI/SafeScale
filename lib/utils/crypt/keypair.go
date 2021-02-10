@@ -30,7 +30,7 @@ import (
 // GenerateRSAKeyPair creates a key pair
 func GenerateRSAKeyPair(name string) (privKey string, pubKey string, xerr fail.Error) {
 	if name == "" {
-		return "", "", fail.InvalidParameterError("name", "cannot be empty string")
+		return "", "", fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)

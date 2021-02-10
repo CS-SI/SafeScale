@@ -38,7 +38,7 @@ func (i *noneInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 		return nil, fail.InvalidParameterError("f", "cannot be null value of 'resources.Feature'")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	// Forge a completed but unsuccessful results
@@ -63,7 +63,7 @@ func (i *noneInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 		return nil, fail.InvalidParameterError("f", "cannot be null value of 'resources.Feature'")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	w, xerr := newWorker(f, t, installmethod.None, installaction.Add, nil)

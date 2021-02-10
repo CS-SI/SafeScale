@@ -197,7 +197,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (abstract.SecurityGroupRule, fail.Error) {
 	var out abstract.SecurityGroupRule
 	if in == nil {
-		return out, fail.InvalidParameterError("in", "cannot be nil")
+		return out, fail.InvalidParameterCannotBeNilError("in")
 	}
 	out.IDs = in.Ids
 	out.Description = in.Description
@@ -226,7 +226,7 @@ func SecurityGroupRulesFromProtocolToAbstract(in []*protocol.SecurityGroupRule) 
 // SecurityGroupFromProtocolToAbstract ...
 func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (abstract.SecurityGroup, fail.Error) {
 	if in == nil {
-		return abstract.SecurityGroup{}, fail.InvalidParameterError("in", "cannot be nil")
+		return abstract.SecurityGroup{}, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	rules, xerr := SecurityGroupRulesFromProtocolToAbstract(in.Rules)
