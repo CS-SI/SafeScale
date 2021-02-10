@@ -27,11 +27,11 @@ import (
 
 // List returns a list of available security groups
 func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	if all {
@@ -52,8 +52,8 @@ func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.Securi
 
 // New creates an instance of resources.SecurityGroup
 func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	rsg, xerr := operations.NewSecurityGroup(svc)
@@ -65,11 +65,11 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
 func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")

@@ -74,6 +74,11 @@ func New() providers.Provider {
 	return &provider{}
 }
 
+// IsNull returns true if the instance is considered as a null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
+}
+
 // Build initializes a new FlexibleEngine instance from parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {

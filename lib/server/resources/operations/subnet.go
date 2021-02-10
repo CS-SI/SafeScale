@@ -1213,7 +1213,7 @@ func (rs subnet) Browse(task concurrency.Task, callback func(*abstract.Subnet) f
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "can't be nil")
 	}
 	if callback == nil {
@@ -1236,11 +1236,11 @@ func (rs *subnet) BindHost(task concurrency.Task, host resources.Host) (xerr fai
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if host == nil {
-		return fail.InvalidParameterError("host", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	tracer := debug.NewTracer(nil, true, "("+host.GetName()+")").Entering()
@@ -1270,8 +1270,8 @@ func (rs *subnet) UnbindHost(task concurrency.Task, hostID string) (xerr fail.Er
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
@@ -1304,8 +1304,8 @@ func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail
 	if rs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	defer debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering().Exiting()
@@ -1339,8 +1339,8 @@ func (rs *subnet) InspectGateway(task concurrency.Task, primary bool) (_ resourc
 	if rs.IsNull() {
 		return nullHost(), fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nullHost(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	primaryStr := "primary"
@@ -1400,8 +1400,8 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 	if rs.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var ip string
@@ -1451,8 +1451,8 @@ func (rs subnet) GetGatewayPublicIPs(task concurrency.Task) (_ []string, xerr fa
 	if rs.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptySlice, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var gatewayIPs []string
@@ -1493,8 +1493,8 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("operations.subnet")*/).WithStopwatch().Entering()
@@ -1670,8 +1670,8 @@ func (rs *subnet) InspectNetwork(task concurrency.Task) (rn resources.Network, x
 	if rs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	rs.cacheLock.Lock()
@@ -1775,8 +1775,8 @@ func (rs subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.
 	if rs.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	ip = ""
@@ -1821,8 +1821,8 @@ func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Erro
 	if rs.IsNull() {
 		return ip, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return ip, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return ip, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -1852,8 +1852,8 @@ func (rs subnet) HasVirtualIP(task concurrency.Task) bool {
 		logrus.Errorf(fail.InvalidInstanceError().Error())
 		return false
 	}
-	if task.IsNull() {
-		logrus.Errorf(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
+	if task == nil {
+		logrus.Errorf(fail.InvalidParameterCannotBeNilError("task").Error())
 		return false
 	}
 
@@ -1876,8 +1876,8 @@ func (rs subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, x
 	if rs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1905,8 +1905,8 @@ func (rs subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
 	if rs.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	cidr = ""
@@ -1935,8 +1935,8 @@ func (rs subnet) GetState(task concurrency.Task) (state subnetstate.Enum, xerr f
 	if rs.IsNull() {
 		return subnetstate.UNKNOWN, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return subnetstate.UNKNOWN, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return subnetstate.UNKNOWN, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -1964,8 +1964,8 @@ func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fai
 	if rs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "").Entering()
@@ -2029,11 +2029,11 @@ func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Security
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if sg.IsNull() {
-		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
+	if sg == nil {
+		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2070,11 +2070,11 @@ func (rs *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.Securi
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if sg.IsNull() {
-		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
+	if sg == nil {
+		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2120,7 +2120,7 @@ func (rs *subnet) ListSecurityGroups(task concurrency.Task, state securitygroups
 	if rs.IsNull() {
 		return nullList, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nullList, fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
 	}
 
@@ -2143,11 +2143,11 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if sg.IsNull() {
-		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
+	if sg == nil {
+		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
 	svc := rs.GetService()
@@ -2211,11 +2211,11 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 	if rs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if sg.IsNull() {
-		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
+	if sg == nil {
+		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
 	svc := rs.GetService()
@@ -2274,8 +2274,8 @@ func (rs subnet) InspectGatewaySecurityGroup(task concurrency.Task) (sg resource
 	if rs.IsNull() {
 		return sg, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return sg, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return sg, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
@@ -2298,8 +2298,8 @@ func (rs subnet) InspectInternalSecurityGroup(task concurrency.Task) (sg resourc
 	if rs.IsNull() {
 		return sg, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return sg, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return sg, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
@@ -2322,8 +2322,8 @@ func (rs subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resourc
 	if rs.IsNull() {
 		return sg, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return sg, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return sg, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {

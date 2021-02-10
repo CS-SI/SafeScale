@@ -39,9 +39,9 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
-// IsNull ...
+// IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
-	return p == nil || p.Stack.IsNull()
+	return p == nil || p.Stack == nil
 }
 
 // Build build a new Client from configuration parameter

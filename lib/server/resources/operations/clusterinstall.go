@@ -275,8 +275,8 @@ func (c *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fa
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
@@ -304,8 +304,8 @@ func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Featu
 	if c.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return emptySlice, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var list map[string]*propertiesv1.ClusterInstalledFeature
@@ -401,14 +401,14 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 	if c.IsNull() {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
 	}
-	if host.IsNull() {
-		return -1, "", "", fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -721,8 +721,8 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
@@ -769,8 +769,8 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")

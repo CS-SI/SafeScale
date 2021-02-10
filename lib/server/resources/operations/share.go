@@ -153,8 +153,7 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (resources.S
 	return rs, nil
 }
 
-// IsNull ...
-// satisfies interface data.NullValue
+// IsNull tells if the instance should be considered as a null value
 func (objs *share) IsNull() bool {
 	return objs == nil || objs.core.IsNull()
 }
@@ -415,8 +414,8 @@ func (objs share) GetServer(task concurrency.Task) (resources.Host, fail.Error) 
 	if objs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be il")
 	}
 
 	var hostID, hostName string
@@ -455,11 +454,11 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 	if objs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if target.IsNull() {
-		return nil, fail.InvalidParameterError("target", "cannot be null value")
+	if target == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 	if path == "" {
 		return nil, fail.InvalidParameterError("path", "cannot be empty string")
@@ -702,11 +701,11 @@ func (objs share) Unmount(task concurrency.Task, target resources.Host) fail.Err
 	if objs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if target == nil {
-		return fail.InvalidParameterError("target", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("target")
 	}
 
 	var (
@@ -808,8 +807,8 @@ func (objs *share) Delete(task concurrency.Task) fail.Error {
 	if objs.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	var (
@@ -895,8 +894,8 @@ func (objs share) ToProtocol(task concurrency.Task) (*protocol.ShareMountList, f
 	if objs.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	shareID := objs.GetID()

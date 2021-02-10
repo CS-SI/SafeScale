@@ -47,6 +47,7 @@ func New() providers.Provider {
 	return &provider{}
 }
 
+// IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }

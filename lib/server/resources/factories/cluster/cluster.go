@@ -29,11 +29,11 @@ import (
 func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
 	nullList := []abstract.ClusterIdentity{}
 
-	if task.IsNull() {
-		return nullList, fail.InvalidParameterError("task", "cannot be null value")
+	if task == nil {
+		return nullList, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
-		return nullList, fail.InvalidParameterError("svc", "cannot be null value")
+	if svc == nil {
+		return nullList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	objc, xerr := New(task, svc)
@@ -51,18 +51,18 @@ func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdent
 // New creates a new instance of resources.Cluster
 func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	return operations.NewCluster(task, svc)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
 func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	return operations.LoadCluster(task, svc, name)

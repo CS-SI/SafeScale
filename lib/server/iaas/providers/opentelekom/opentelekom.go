@@ -50,7 +50,7 @@ func New() providers.Provider {
 	return &provider{}
 }
 
-// IsNull tells if the instance represents an null value
+// IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }

@@ -311,8 +311,8 @@ func (sg *securityGroup) ForceDelete(task concurrency.Task) (xerr fail.Error) {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	return sg.delete(task, true)
@@ -325,7 +325,7 @@ func (sg *securityGroup) Delete(task concurrency.Task) (xerr fail.Error) {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -567,7 +567,7 @@ func (sg *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -588,7 +588,7 @@ func (sg *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
 	}
 
@@ -718,7 +718,7 @@ func (sg securityGroup) GetBoundHosts(task concurrency.Task) (_ []*propertiesv1.
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -746,7 +746,7 @@ func (sg securityGroup) GetBoundSubnets(task concurrency.Task) (list []*properti
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -802,8 +802,8 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rh.IsNull() {
-		return fail.InvalidParameterError("rh", "cannot be null value of 'resources.Host'")
+	if rh == nil {
+		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
 
 	return sg.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -874,8 +874,8 @@ func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rh.IsNull() {
-		return fail.InvalidParameterError("rh", "cannot be null value of 'resources.Host'")
+	if rh == nil {
+		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
 
 	return sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -960,8 +960,8 @@ func (sg *securityGroup) BindToSubnet(task concurrency.Task, rs resources.Subnet
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rs.IsNull() {
-		return fail.InvalidParameterError("rh", "cannot be null value of 'resources.Network'")
+	if rs == nil {
+		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
 
 	switch enable {
@@ -1067,8 +1067,8 @@ func (sg *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Su
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rs.IsNull() {
-		return fail.InvalidParameterError("rs", "cannot be null value of 'resources.Subnet'")
+	if rs == nil {
+		return fail.InvalidParameterError("rs", "cannot be nil")
 	}
 
 	return sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

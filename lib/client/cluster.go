@@ -346,8 +346,8 @@ func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration ti
 
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureListRequest{
-		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef: &protocol.Reference{Name: clusterName},
+		TargetType:    protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:     &protocol.Reference{Name: clusterName},
 		InstalledOnly: !all,
 	}
 	list, err := service.List(ctx, request)

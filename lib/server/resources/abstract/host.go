@@ -231,8 +231,7 @@ func NewHostCore() *HostCore {
 	return &HostCore{SshPort: 22}
 }
 
-// IsNull tells if the instance is a null value
-// satisfies interface data.NullValue
+// IsNull tells if the instance should be considered as a null value
 func (hc *HostCore) IsNull() bool {
 	return hc == nil || (hc.ID == "" && hc.Name == "")
 }
@@ -385,8 +384,7 @@ func NewHostFull() *HostFull {
 	}
 }
 
-// IsNull tells of the instance is a null value
-// satisfies interface data.NullValue
+// IsNull tells if the instance should be considered as a null value
 func (hf *HostFull) IsNull() bool {
 	return hf == nil || hf.Core.IsNull()
 }

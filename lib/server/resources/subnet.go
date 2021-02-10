@@ -32,7 +32,6 @@ import (
 type Subnet interface {
 	Metadata
 	data.Identifiable
-	data.NullValue
 
 	BindHost(concurrency.Task, Host) fail.Error                                                                                    // links Host to the Subnet
 	BindSecurityGroup(concurrency.Task, SecurityGroup, SecurityGroupActivation) fail.Error                                         // binds a Security Group to the Subnet

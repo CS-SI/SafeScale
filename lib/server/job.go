@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"sync"
 	"time"
 
@@ -34,8 +33,6 @@ import (
 
 // Job is the interface of a daemon job
 type Job interface {
-	data.NullValue
-
 	GetID() string
 	GetName() string
 	GetTask() concurrency.Task

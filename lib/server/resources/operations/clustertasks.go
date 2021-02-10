@@ -45,8 +45,8 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// FIXME: validate params
@@ -59,8 +59,8 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// FIXME: validate params
@@ -79,8 +79,8 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
@@ -91,8 +91,8 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	if !ok {
 		return result, fail.InvalidParameterError("params", "must be a 'taskInstallGatewayParameters'")
 	}
-	if p.Host.IsNull() {
-		return result, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return result, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	hostLabel := p.Host.GetName()
@@ -133,8 +133,8 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// validate and convert parameters
@@ -142,8 +142,8 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 	if !ok {
 		return result, fail.InvalidParameterError("params", "must be a 'taskConfigureGatewayParameters'")
 	}
-	if p.Host.IsNull() {
-		return result, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return result, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
@@ -176,8 +176,8 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
@@ -248,8 +248,8 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
@@ -539,8 +539,8 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
@@ -605,8 +605,8 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
@@ -622,8 +622,8 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	if p.Index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
-	if p.Host.IsNull() {
-		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	started := time.Now()
@@ -665,8 +665,8 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert then validate params
@@ -737,8 +737,8 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert then validate parameters
@@ -949,8 +949,8 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	clusterName := c.GetName()
@@ -1022,8 +1022,8 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -1034,8 +1034,8 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	if p.Index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
-	if p.Host.IsNull() {
-		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
@@ -1073,8 +1073,8 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -1107,8 +1107,8 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -1153,8 +1153,8 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params

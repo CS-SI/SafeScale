@@ -26,7 +26,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -76,8 +75,6 @@ type TaskGuard interface {
 
 // TaskCore is the interface of core methods to control task and taskgroup
 type TaskCore interface {
-	data.NullValue
-
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool

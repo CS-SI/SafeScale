@@ -34,7 +34,6 @@ type IndexedListOfClusterNodes map[uint]Host
 type Cluster interface {
 	Metadata
 	Targetable
-	data.NullValue
 
 	AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)    // adds feature on cluster
 	AddNode(task concurrency.Task, def abstract.HostSizingRequirements) (Host, fail.Error)                           // adds a node

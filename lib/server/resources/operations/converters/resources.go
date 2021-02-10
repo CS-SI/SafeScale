@@ -25,10 +25,10 @@ import (
 
 // BucketMountPointFromResourceToProtocol converts a bucket mount point from resource to protocol
 func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.Bucket) (*protocol.BucketMountingPoint, fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if in.IsNull() {
+	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 

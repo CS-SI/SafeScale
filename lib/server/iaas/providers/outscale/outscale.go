@@ -83,7 +83,7 @@ func volumeSpeed(s string) volumespeed.Enum {
 	return volumespeed.HDD
 }
 
-// IsNull tells if the instance represents a null value
+// IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }

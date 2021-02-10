@@ -295,8 +295,8 @@ func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
@@ -333,11 +333,11 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if v == nil {
-		return fail.InvalidParameterError("v", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("v")
 	}
 
 	v["ShortHostname"] = rh.GetName()
