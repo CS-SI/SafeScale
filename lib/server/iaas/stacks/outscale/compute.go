@@ -840,7 +840,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	// }
 	// Using udc.FirstPublicKey in creation keypair
 	creationKeyPair := &abstract.KeyPair{
-		Name: request.ResourceName+"_install",
+		Name:      request.ResourceName + "_install",
 		PublicKey: udc.FirstPublicKey,
 	}
 	if xerr = s.ImportKeyPair(creationKeyPair); xerr != nil {

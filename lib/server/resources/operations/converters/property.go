@@ -82,11 +82,11 @@ func HostSizingRequirementsFromPropertyToProtocol(in propertiesv1.HostSizingRequ
 	return &protocol.HostSizing{
 		MinCpuCount: int32(in.MinCores),
 		MaxCpuCount: int32(in.MaxCores),
-		MinRamSize: in.MinRAMSize,
-		MaxRamSize: in.MaxRAMSize,
+		MinRamSize:  in.MinRAMSize,
+		MaxRamSize:  in.MaxRAMSize,
 		MinDiskSize: int32(in.MinDiskSize),
-		GpuCount: int32(in.MinGPU),
-		MinCpuFreq: in.MinCPUFreq,
+		GpuCount:    int32(in.MinGPU),
+		MinCpuFreq:  in.MinCPUFreq,
 	}
 }
 
@@ -111,26 +111,26 @@ func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *p
 func ClusterDefaultsFromPropertyToProtocol(in propertiesv2.ClusterDefaults) *protocol.ClusterDefaults {
 	return &protocol.ClusterDefaults{
 		GatewaySizing: HostSizingRequirementsFromPropertyToProtocol(in.GatewaySizing),
-		MasterSizing: HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
-		NodeSizing: HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
-		Image: in.Image,
+		MasterSizing:  HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
+		NodeSizing:    HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
+		Image:         in.Image,
 	}
 }
 
 // ClusterNetworkFromPropertyToProtocol does what the name says
 func ClusterNetworkFromPropertyToProtocol(in propertiesv3.ClusterNetwork) *protocol.ClusterNetwork {
 	return &protocol.ClusterNetwork{
-		NetworkId: in.NetworkID,
-		Cidr: in.CIDR,
-		Domain: in.Domain,
-		GatewayId: in.GatewayID,
-		GatewayIp: in.GatewayIP,
+		NetworkId:          in.NetworkID,
+		Cidr:               in.CIDR,
+		Domain:             in.Domain,
+		GatewayId:          in.GatewayID,
+		GatewayIp:          in.GatewayIP,
 		SecondaryGatewayId: in.SecondaryGatewayID,
 		SecondaryGatewayIp: in.SecondaryGatewayIP,
-		DefaultRouteIp: in.DefaultRouteIP,
-		PrimaryPublicIp: in.PrimaryPublicIP,
-		SecondaryPublicIp: in.SecondaryPublicIP,
-		EndpointIp: in.EndpointIP,
+		DefaultRouteIp:     in.DefaultRouteIP,
+		PrimaryPublicIp:    in.PrimaryPublicIP,
+		SecondaryPublicIp:  in.SecondaryPublicIP,
+		EndpointIp:         in.EndpointIP,
 	}
 }
 
