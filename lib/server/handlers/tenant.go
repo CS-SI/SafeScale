@@ -102,6 +102,7 @@ const cmdCPUModelName string = "lscpu | grep 'Model name' | cut -d: -f2 | sed -e
 const cmdTotalRAM string = "cat /proc/meminfo | grep MemTotal | cut -d: -f2 | sed -e 's/^[[:space:]]*//' | cut -d' ' -f1"
 const cmdRAMFreq string = "sudo dmidecode -t memory | grep Speed | head -1 | cut -d' ' -f2"
 
+// FIXME: some disks are vda (instead of sda)
 const cmdGPU string = "lspci | egrep -i 'VGA|3D' | grep -i nvidia | cut -d: -f3 | sed 's/.*controller://g' | tr '\n' '%'"
 const cmdDiskSize string = "lsblk -b --output SIZE -n -d /dev/sda"
 const cmdEphemeralDiskSize string = "lsblk -o name,type,mountpoint | grep disk | awk {'print $1'} | grep -v sda | xargs -i'{}' lsblk -b --output SIZE -n -d /dev/'{}'"
@@ -332,6 +333,11 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		host, xerr := hostfactory.New(svc)
 		if xerr != nil {
 			return xerr
+		}
+
+		// Fix harcoded flexible engine host name regex
+		if svc.GetName() == "flexibleengine" {
+			hostName = strings.ReplaceAll(hostName, ".", "_")
 		}
 
 		req := abstract.HostRequest{
