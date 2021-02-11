@@ -162,7 +162,7 @@ var volumeCreate = &cli.Command{
 		}
 
 		speed := c.String("speed")
-		volSpeed, ok := protocol.VolumeSpeed_value[speed]
+		volSpeed, ok := protocol.VolumeSpeed_value["VS_"+speed]
 		if !ok {
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
 		}
