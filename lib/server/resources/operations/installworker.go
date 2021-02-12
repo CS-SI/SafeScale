@@ -915,10 +915,8 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	if found {
-		if xerr = w.setReverseProxy(); xerr != nil {
-			return xerr
-		}
+	if !found {
+		return nil
 	}
 
 	svc := w.cluster.GetService()
