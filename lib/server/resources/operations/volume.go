@@ -221,6 +221,8 @@ func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) f
 
 // Delete deletes Volume and its metadata
 func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -228,9 +230,12 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
-	return rv.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	rv.SafeLock(task)
+	defer rv.SafeUnlock(task)
+
+	xerr = rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
-		innerXErr := props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' received", reflect.TypeOf(clonable).String())
@@ -249,23 +254,31 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 			}
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
-		}
+	})
+	if xerr != nil {
+		return xerr
+	}
 
-		// delete volume
-		if innerXErr = rv.GetService().DeleteVolume(rv.GetID()); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
-			default:
-				return fail.Wrap(innerXErr, "cannot delete volume")
+	// delete volume
+	if xerr = rv.GetService().DeleteVolume(rv.GetID()); xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			if xerr.Cause() != nil {
+				xerr = fail.ToError(xerr.Cause())
 			}
 		}
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Debugf("Unable to find the volume on provider side, cleaning up metadata")
+		default:
+			return xerr
+		}
+	}
 
-		// remove metadata
-		return rv.core.Delete(task)
-	})
+	// remove metadata
+	return rv.core.Delete(task)
 }
 
 // Create a volume

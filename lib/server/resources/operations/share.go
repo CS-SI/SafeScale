@@ -816,6 +816,9 @@ func (objs *share) Delete(task concurrency.Task) fail.Error {
 		hostShare          *propertiesv1.HostShare
 	)
 
+	objs.SafeLock(task)
+	defer objs.SafeUnlock(task)
+
 	// -- Retrieve info about the share --
 	xerr := objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
@@ -834,6 +837,7 @@ func (objs *share) Delete(task concurrency.Task) fail.Error {
 	if xerr != nil {
 		return xerr
 	}
+
 	xerr = objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			serverSharesV1, ok := clonable.(*propertiesv1.HostShares)

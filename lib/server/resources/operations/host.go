@@ -1498,7 +1498,7 @@ func (rh *host) Delete(task concurrency.Task) (xerr fail.Error) {
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
 
-	xerr = rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Don't remove a host that is a gateway
 		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
