@@ -269,7 +269,9 @@ func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s Stack) DeleteVolume(id string) fail.Error {
+func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -279,11 +281,8 @@ func (s Stack) DeleteVolume(id string) fail.Error {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var (
-		timeout = temporal.GetBigDelay()
-	)
-
-	return retry.WhileUnsuccessfulDelay5Seconds(
+	var timeout = temporal.GetBigDelay()
+	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -294,11 +293,22 @@ func (s Stack) DeleteVolume(id string) fail.Error {
 			switch innerXErr.(type) {
 			case *fail.ErrInvalidRequest:
 				return fail.NotAvailableError("volume not in state 'available'")
+			case *fail.ErrNotFound:
+				return retry.StopRetryError(innerXErr)
 			}
 			return innerXErr
 		},
 		timeout,
 	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			if xerr.Cause() != nil {
+				xerr = fail.ToError(xerr.Cause())
+			}
+		}
+	}
+	return xerr
 }
 
 // CreateVolumeAttachment attaches a volume to an host

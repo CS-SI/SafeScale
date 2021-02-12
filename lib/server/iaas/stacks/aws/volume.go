@@ -44,7 +44,6 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		return nil, xerr
 	}
 
-	// FIXME: Defer volume destruction
 	defer func() {
 		if xerr != nil {
 			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
