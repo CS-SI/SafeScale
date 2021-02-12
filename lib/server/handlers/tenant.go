@@ -294,7 +294,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 
 	hostAnalysis := func(template abstract.HostTemplate) fail.Error {
 		defer wg.Done()
-		//if network != nil {
+
 		// Limit scanner tests for integration test purposes
 		testSubset := ""
 
@@ -317,18 +317,6 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 
 		logrus.Infof("Checking template %s", template.Name)
 
-		// var an *abstract.Network
-		// xerr = network.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		// 	var ok bool
-		// 	an, ok = clonable.(*abstract.Network)
-		// 	if !ok {
-		// 		return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 	}
-		// 	return nil
-		// })
-		// if xerr != nil {
-		// 	return xerr
-		// }
 		hostName := "scanhost-" + template.Name
 		host, xerr := hostfactory.New(svc)
 		if xerr != nil {
@@ -336,7 +324,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		}
 
 		// Fix harcoded flexible engine host name regex
-		if svc.GetName() == "flexibleengine" {
+		if tenantName == "flexibleengine" {
 			hostName = strings.ReplaceAll(hostName, ".", "_")
 		}
 
@@ -411,9 +399,6 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 			return fail.ToError(nerr)
 		}
 		logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
-		//} else {
-		//	return fail.NewError("no gateway network")
-		//}
 
 		return nil
 	}
