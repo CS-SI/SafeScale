@@ -654,9 +654,8 @@ func registerOnSuccessfulHostsInCluster(task concurrency.Task, svc iaas.Service,
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				s := r.ResultOfKey(l)
-				if s.Successful() {
-					successfulHosts[k] = struct{}{}
+				if s := r.ResultOfKey(l); s.Successful() {
+					successfulHosts[l] = struct{}{}
 				}
 			}
 		}
@@ -680,9 +679,8 @@ func unregisterOnSuccessfulHostsInCluster(task concurrency.Task, svc iaas.Servic
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				s := r.ResultOfKey(l)
-				if s.Successful() {
-					successfulHosts[k] = struct{}{}
+				if s := r.ResultOfKey(l); s.Successful() {
+					successfulHosts[l] = struct{}{}
 				}
 			}
 		}
