@@ -47,7 +47,11 @@ type dumper interface {
 func OnPanic(err *error) func() {
 	return func() {
 		if x := recover(); x != nil {
-			*err = fmt.Errorf("runtime panic occurred: %w", x)
+			if anError, ok := x.(error); ok {
+				*err = fmt.Errorf("runtime panic occurred: %w", anError)
+			} else {
+				*err = fmt.Errorf("runtime panic occurred: %v", x)
+			}
 		}
 	}
 }
@@ -70,7 +74,8 @@ type SSHTunnel struct {
 	dialTimeout       time.Duration
 	timeTunnelRunning time.Duration
 
-	withKeepAlive      bool
+	withKeepAlive bool
+
 	timeKeepAliveRead  time.Duration
 	timeKeepAliveWrite time.Duration
 
@@ -187,7 +192,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	if err != nil {
 		err = convertErrorToTunnelError(err)
 		tunnel.ready <- false
-		tunnel.isReady = false
+		close(tunnel.ready)
 		return fmt.Errorf("error starting the ssh tunnel: %w", err)
 	}
 
@@ -225,9 +230,11 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		}()
 
 		tunnel.logf("listening for new ssh connections...")
-		if !tunnel.isReady {
+		select {
+		case <-tunnel.ready:
+		default:
 			tunnel.ready <- true
-			tunnel.isReady = true
+			close(tunnel.ready)
 		}
 
 		select {
