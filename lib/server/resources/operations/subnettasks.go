@@ -87,8 +87,7 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
 			// Disable abort signal during clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
 			derr := rgw.Delete(task)

@@ -302,8 +302,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -365,8 +364,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			if derr := rh.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
@@ -791,8 +789,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -854,8 +851,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			if derr := rh.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), rh.GetName()))

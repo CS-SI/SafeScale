@@ -626,75 +626,77 @@ func TestOneShot(t *testing.T) {
 	}
 }
 
-func TestPanickingIgnoringAbortSignal(t *testing.T) {
-	defer func() {
-		err := recover()
-		require.NotNil(t, err)
-	}()
+// VPL:IgnoreAbortSignal() replaced by DisarmAbortSignal() - probably to remove
+// func TestPanickingIgnoringAbortSignal(t *testing.T) {
+// 	defer func() {
+// 		err := recover()
+// 		require.NotNil(t, err)
+// 	}()
+//
+// 	var single Task
+// 	single.IgnoreAbortSignal(true)
+// 	require.Fail(t, "did not panic")
+// }
 
-	var single Task
-	single.IgnoreAbortSignal(true)
-	require.Fail(t, "did not panic")
-}
-
-func TestOneShotIgnoringAbort(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	single, xerr := NewTask()
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
-
-	single.IgnoreAbortSignal(true)
-
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, _ := t.GetStatus()
-			if status == ABORTED || status == TIMEOUT {
-				break
-			}
-			fmt.Println("Forever young...")
-		}
-		return "I want to be forever young", nil
-	}, nil, time.Duration(400)*time.Millisecond)
-	require.Nil(t, xerr)
-
-	time.Sleep(time.Duration(100) * time.Millisecond)
-	xerr = single.Abort()
-	require.NotNil(t, xerr)
-
-	single.IgnoreAbortSignal(false)
-
-	xerr = single.Abort()
-	require.Nil(t, xerr)
-
-	fmt.Println("Forcefully aborted ??")
-
-	// Nothing wrong should happen after this point...
-	time.Sleep(time.Duration(100) * time.Millisecond)
-
-	require.Nil(t, xerr)
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-
-	// Here, last 2 lines of the output should be:
-	// Forever young...
-	// Forcefully aborted ??
-
-	outString := string(out)
-	nah := strings.Split(outString, "\n")
-
-	if !strings.Contains(nah[len(nah)-3], "Forever young") {
-		t.Fail()
-	}
-	if !strings.Contains(nah[len(nah)-2], "Forcefully") {
-		t.Fail()
-	}
-}
+// FIXME: IgnoreAbortSignal() replaced by DisarmAbortSignal() - to refactor
+// func TestOneShotIgnoringAbort(t *testing.T) {
+// 	rescueStdout := os.Stdout
+// 	r, w, _ := os.Pipe()
+// 	os.Stdout = w
+//
+// 	single, xerr := NewTask()
+// 	require.NotNil(t, single)
+// 	require.Nil(t, xerr)
+//
+// 	single.IgnoreAbortSignal(true)
+//
+// 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+// 		for {
+// 			time.Sleep(time.Duration(10) * time.Millisecond)
+// 			status, _ := t.GetStatus()
+// 			if status == ABORTED || status == TIMEOUT {
+// 				break
+// 			}
+// 			fmt.Println("Forever young...")
+// 		}
+// 		return "I want to be forever young", nil
+// 	}, nil, time.Duration(400)*time.Millisecond)
+// 	require.Nil(t, xerr)
+//
+// 	time.Sleep(time.Duration(100) * time.Millisecond)
+// 	xerr = single.Abort()
+// 	require.NotNil(t, xerr)
+//
+// 	single.IgnoreAbortSignal(false)
+//
+// 	xerr = single.Abort()
+// 	require.Nil(t, xerr)
+//
+// 	fmt.Println("Forcefully aborted ??")
+//
+// 	// Nothing wrong should happen after this point...
+// 	time.Sleep(time.Duration(100) * time.Millisecond)
+//
+// 	require.Nil(t, xerr)
+//
+// 	_ = w.Close()
+// 	out, _ := ioutil.ReadAll(r)
+// 	os.Stdout = rescueStdout
+//
+// 	// Here, last 2 lines of the output should be:
+// 	// Forever young...
+// 	// Forcefully aborted ??
+//
+// 	outString := string(out)
+// 	nah := strings.Split(outString, "\n")
+//
+// 	if !strings.Contains(nah[len(nah)-3], "Forever young") {
+// 		t.Fail()
+// 	}
+// 	if !strings.Contains(nah[len(nah)-2], "Forcefully") {
+// 		t.Fail()
+// 	}
+// }
 
 func TestTwoRoots(t *testing.T) {
 	a, err := RootTask()
