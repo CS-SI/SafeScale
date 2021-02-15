@@ -300,7 +300,7 @@ func (sc *SSHCommand) NewRunWithTimeout(task concurrency.Task, outs outputs.Enum
 		opTimeout := timeout
 		if timeout != 0 {
 			if 150*time.Second > timeout {
-				opTimeout = 150*time.Second
+				opTimeout = 150 * time.Second
 			}
 		}
 
@@ -312,7 +312,7 @@ func (sc *SSHCommand) NewRunWithTimeout(task concurrency.Task, outs outputs.Enum
 
 			beginIter := time.Now()
 			if err := sshtunnel.RunCommandInSshSessionWithTimeout(session, sc.cmd.String(), opTimeout); err != nil {
-				logrus.Warnf("Running with session timeout here after %s", time.Since(beginIter))
+				logrus.Debugf("Running with session timeout here after %s", time.Since(beginIter))
 				errorCode = -1
 
 				if ee, ok := err.(*ssh.ExitError); ok {
@@ -667,11 +667,24 @@ func (sc *SSHConfig) Copy(remotePath, localPath string, isUpload bool) (int, str
 			return -1, "", "", err
 		}
 
+		var expected int64
 		if fi, err := srcFile.Stat(); err != nil {
 			if fi != nil {
+				expected = fi.Size()
 				if fi.Size() != written {
 					return -1, "", "", fmt.Errorf("file size mismatch")
 				}
+			}
+		}
+
+		// it seems copy was ok, but make sure of it
+		finfo, err := client.Lstat(remotePath)
+		if err != nil {
+			return -1, "", "", err
+		}
+		if expected != 0 {
+			if finfo.Size() == 0 {
+				return -1, "", "", fmt.Errorf("problem checking file %s: empty file", remotePath)
 			}
 		}
 
