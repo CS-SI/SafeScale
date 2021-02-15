@@ -88,6 +88,11 @@ func New() providers.Provider {
 	return &provider{}
 }
 
+// IsNull returns true if the instance is considered as a null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
+}
+
 // Build build a new instance of Ovh using configuration parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
@@ -397,10 +402,10 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterError("host", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("host")
 	}
 
 	return nil
@@ -412,13 +417,39 @@ func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID == "" {
-		return fail.InvalidParameterError("host", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("host")
 	}
 
 	return nil
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			"t1-.*",
+			"g2-.*",
+			"g3-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
 }
 
 func init() {

@@ -28,11 +28,11 @@ import (
 
 // List returns a list of available subnets
 func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	return operations.ListSubnets(task, svc, networkID, all)
@@ -40,8 +40,8 @@ func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) (
 
 // New creates an instance of resources.Subnet
 func New(svc iaas.Service) (resources.Subnet, fail.Error) {
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	return operations.NewSubnet(svc)
@@ -49,14 +49,14 @@ func New(svc iaas.Service) (resources.Subnet, fail.Error) {
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
 func Load(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if subnetRef == "" {
-		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
 	return operations.LoadSubnet(task, svc, networkRef, subnetRef)

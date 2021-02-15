@@ -121,14 +121,18 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 	if x.module == "" {
 		return fail.InvalidInstanceContentError("x.module", "can't be empty string")
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if key == "" {
-		return fail.InvalidParameterError("key", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 	if inspector == nil {
-		return fail.InvalidParameterError("inspector", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("inspector")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	var (
@@ -148,9 +152,7 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 	clone := item.Clone()
 	x.RUnlock()
 
-	err := clone.(*jsonProperty).Shielded.Inspect(task, inspector)
-	return err
-	// return inspector(clone)
+	return clone.(*jsonProperty).Shielded.Inspect(task, inspector)
 }
 
 // Alter is used to lock an extension for write
@@ -169,22 +171,27 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 	if x.module == "" {
 		return fail.InvalidInstanceContentError("x.module", "cannot be empty string")
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if key == "" {
-		return fail.InvalidParameterError("key", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 	if alterer == nil {
-		return fail.InvalidParameterError("alterer", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	x.Lock()
+	defer x.Unlock()
 
 	var (
 		item  *jsonProperty
 		found bool
 	)
-	x.Lock()
-	defer x.Unlock()
 
 	if item, found = x.Properties[key].(*jsonProperty); !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
@@ -195,11 +202,9 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 		}
 		x.Properties[key] = item
 	}
-	clone := item.Clone()
 
-	xerr := clone.(*jsonProperty).Alter(task, alterer)
-	// err := alterer(clone)
-	if xerr != nil {
+	clone := item.Clone()
+	if xerr := clone.(*jsonProperty).Alter(task, alterer); xerr != nil {
 		return xerr
 	}
 
@@ -234,8 +239,8 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 	if x.Properties == nil {
 		return nil, fail.InvalidParameterError("x.properties", "can't be nil")
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	x.RLock()
@@ -263,8 +268,8 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fa
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic

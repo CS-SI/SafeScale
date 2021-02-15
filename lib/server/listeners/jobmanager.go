@@ -32,9 +32,11 @@ import (
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (server.Job, fail.Error) {
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	var tenant *Tenant
@@ -66,16 +68,17 @@ type JobManagerListener struct{}
 func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop job")
+	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
@@ -125,12 +128,13 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list jobs")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {

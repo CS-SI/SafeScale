@@ -187,6 +187,7 @@ var volumeCreate = &cli.Command{
 
 var volumeAttach = &cli.Command{
 	Name:      "attach",
+	Aliases:   []string{"bind"},
 	Usage:     "Attach a volume to an host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
@@ -202,7 +203,7 @@ var volumeAttach = &cli.Command{
 		},
 		&cli.BoolFlag{
 			Name:  "do-not-format",
-			Usage: "Prevent the volume to be formated (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so cannot be attach with this option)",
+			Usage: "Prevent the volume to be formatted (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so would not be mounted with this option)",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -235,6 +236,7 @@ var volumeAttach = &cli.Command{
 
 var volumeDetach = &cli.Command{
 	Name:      "detach",
+	Aliases:   []string{"unbind"},
 	Usage:     "Detach a volume from an host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {

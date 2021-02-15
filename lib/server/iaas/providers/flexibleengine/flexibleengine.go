@@ -74,6 +74,11 @@ func New() providers.Provider {
 	return &provider{}
 }
 
+// IsNull returns true if the instance is considered as a null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
+}
+
 // Build initializes a new FlexibleEngine instance from parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
@@ -320,6 +325,30 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			"g1-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
 }
 
 func init() {

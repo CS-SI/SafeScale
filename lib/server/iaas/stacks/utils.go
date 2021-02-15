@@ -38,7 +38,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
-			return nil, "", fail.InvalidParameterError("hostParam", "cannot be empty string")
+			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("hostParam")
 		}
 		ahf.Core.ID = hostParam
 		hostLabel = hostParam
@@ -74,11 +74,10 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 	return ahf, hostLabel, nil
 }
 
-
 // ProvideCredentialsIfNeeded ...
 func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error) {
 	if request == nil {
-		return fail.InvalidParameterError("request", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("request")
 	}
 
 	// If no key pair is supplied create one

@@ -51,7 +51,7 @@ package operations
 // // GetPhaseWarningsAndErrors ...
 // // FIXME: documentation
 // func GetPhaseWarningsAndErrors(task concurrency.Task, host resources.Host) ([]string, []string) {
-// 	if task.IsNull() || host == nil {
+// 	if task == nil || host == nil {
 // 		return []string{}, []string{}
 // 	}
 //

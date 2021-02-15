@@ -43,6 +43,7 @@ type FeatureListener struct{}
 func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequest) (_ *protocol.FeatureListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list features")
+	defer fail.OnPanic(&err)
 
 	empty := &protocol.FeatureListResponse{}
 	if s == nil {
@@ -75,7 +76,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	}
 	defer job.Close()
 	task := job.GetTask()
-	// svc := job.GetService()
+	svc := job.GetService()
 
 	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.feature")*/, "(%s, %s)", targetType, targetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -84,6 +85,17 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
 	case protocol.FeatureTargetType_FT_CLUSTER:
+		rc, xerr := clusterfactory.Load(task, svc, targetRef)
+		if xerr != nil {
+			return empty, xerr
+		}
+
+		list, xerr := rc.ListInstalledFeatures(task)
+		if xerr != nil {
+			return empty, xerr
+		}
+
+		return converters.FeatureSliceFromResourceToProtocol(task, list), nil
 	}
 
 	// Should not reach this
@@ -140,7 +152,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		}
 	}()
 
-	feat, xerr := featurefactory.New(task, featureName)
+	feat, xerr := featurefactory.New(task, svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -233,7 +245,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(task, featureName)
+	feat, xerr := featurefactory.New(task, svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -311,7 +323,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(task, featureName)
+	feat, xerr := featurefactory.New(task, svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}

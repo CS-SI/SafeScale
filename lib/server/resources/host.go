@@ -17,10 +17,11 @@
 package resources
 
 import (
+	"time"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
-	"time"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -28,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -36,7 +36,6 @@ import (
 type Host interface {
 	Metadata
 	Targetable
-	data.NullValue
 
 	BindSecurityGroup(task concurrency.Task, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                          // Binds a security group to host
 	Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) fail.Error                                                         // ...
@@ -56,6 +55,7 @@ type Host interface {
 	GetState(task concurrency.Task) hoststate.Enum                                                                                                 // returns the current state of the host, with error handling
 	GetVolumes(task concurrency.Task) (*propertiesv1.HostVolumes, fail.Error)                                                                      // returns the volumes attached to the host
 	IsClusterMember(task concurrency.Task) (bool, fail.Error)                                                                                      // returns true if the host is member of a cluster
+	IsFeatureInstalled(task concurrency.Task, f string) (bool, fail.Error)                                                                         // tells if a feature is installed on Host, using only metadata
 	IsGateway(task concurrency.Task) (bool, fail.Error)                                                                                            // tells of  the host acts as a gateway
 	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                       // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(task concurrency.Task, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host

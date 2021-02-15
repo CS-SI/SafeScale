@@ -113,7 +113,7 @@ func (rfc RemoteFileItem) UploadString(clientSession *Session, content string, h
 // RemoveRemote deletes the remote file from host
 func (rfc RemoteFileItem) RemoveRemote(clientSession *Session, hostname string) error {
 	if clientSession == nil {
-		return fail.InvalidParameterError("clientSession", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("clientSession")
 	}
 
 	cmd := "rm -rf " + rfc.Remote
@@ -145,10 +145,10 @@ func (rfh *RemoteFilesHandler) Upload(clientSession *Session, hostname string) e
 		return fail.InvalidInstanceError()
 	}
 	if clientSession == nil {
-		return fail.InvalidParameterError("clientSession", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("clientSession")
 	}
 	if hostname != "" {
-		return fail.InvalidParameterError("hostname", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("hostname")
 	}
 	for _, v := range rfh.items {
 		err := v.Upload(clientSession, hostname)

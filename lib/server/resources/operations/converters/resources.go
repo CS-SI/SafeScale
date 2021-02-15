@@ -25,10 +25,10 @@ import (
 
 // BucketMountPointFromResourceToProtocol converts a bucket mount point from resource to protocol
 func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.Bucket) (*protocol.BucketMountingPoint, fail.Error) {
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if in.IsNull() {
+	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
@@ -50,11 +50,11 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 
 // func VolumeFromResourceToProtocol(task concurrency.Task, in resources.Volume) (*protocol.VolumeInspectResponse, error) {
 // 	empty := &protocol.VolumeIspectResponse{}
-// 	if in.IsNull() {
-// 		return empty, fail.InvalidParameterError("in", "cannot be null value")
+// 	if task == nil {
+// 		return empty, fail.InvalidParameterError("task", "cannot be nil")
 // 	}
-// 	if task.IsNull() {
-// 		return empty, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+// 	if in == nil {
+// 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 // 	}
 
 // 	va, err := in.GetAttachments(task)
@@ -125,4 +125,13 @@ func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in r
 		out.Nodes = append(out.Nodes, item)
 	}
 	return out, nil
+}
+
+func FeatureSliceFromResourceToProtocol(task concurrency.Task, in []resources.Feature) *protocol.FeatureListResponse {
+	out := &protocol.FeatureListResponse{}
+	out.Features = make([]*protocol.FeatureResponse, 0, len(in))
+	for _, v := range in {
+		out.Features = append(out.Features, v.ToProtocol())
+	}
+	return out
 }

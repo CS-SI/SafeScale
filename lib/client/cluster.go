@@ -59,7 +59,7 @@ func (c cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.C
 	// 	return nil, fail.InvalidInstanceError()
 	// }
 	if clusterName == "" {
-		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
 
 	c.session.Connect()
@@ -83,7 +83,7 @@ func (c cluster) GetState(clusteName string, timeout time.Duration) (*protocol.C
 	// 	return nil, fail.InvalidInstanceError()
 	// }
 	if clusteName == "" {
-		return nil, fail.InvalidParameterError("clusteName", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusteName")
 	}
 
 	c.session.Connect()
@@ -153,7 +153,7 @@ func (c cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duratio
 	// 	return nil, fail.InvalidInstanceError()
 	// }
 	if def == nil {
-		return nil, fail.InvalidParameterError("def", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("def")
 	}
 
 	c.session.Connect()
@@ -174,7 +174,7 @@ func (c cluster) Delete(clusterName string, timeout time.Duration) error {
 	// 	return fail.InvalidInstanceError()
 	// }
 	if clusterName == "" {
-		return fail.InvalidParameterError("clusterName", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
 
 	c.session.Connect()
@@ -196,7 +196,7 @@ func (c cluster) Expand(req *protocol.ClusterResizeRequest, duration time.Durati
 	// 	return nil, fail.InvalidInstanceError()
 	// }
 	if req == nil {
-		return nil, fail.InvalidParameterError("req", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("req")
 	}
 
 	c.session.Connect()
@@ -217,7 +217,7 @@ func (c cluster) Shrink(req *protocol.ClusterResizeRequest, duration time.Durati
 	// 	return nil, fail.InvalidInstanceError()
 	// }
 	if req == nil {
-		return nil, fail.InvalidParameterError("req", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("req")
 	}
 
 	c.session.Connect()
@@ -238,10 +238,10 @@ func (c cluster) CheckFeature(clusterName, featureName string, params map[string
 	// 	return fail.InvalidInstanceError()
 	// }
 	if clusterName == "" {
-		return fail.InvalidParameterError("clusterName", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
 	if featureName == "" {
-		return fail.InvalidParameterError("featureName", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
 	c.session.Connect()
@@ -270,10 +270,10 @@ func (c cluster) AddFeature(clusterName, featureName string, params map[string]s
 	// 	return fail.InvalidInstanceError()
 	// }
 	if clusterName == "" {
-		return fail.InvalidParameterError("clusterName", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
 	if featureName == "" {
-		return fail.InvalidParameterError("featureName", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
 	c.session.Connect()
@@ -343,10 +343,18 @@ func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration ti
 	if xerr != nil {
 		return nil, xerr
 	}
-	_ = ctx
 
-	// service := protocol.NewFeatureServiceClient(c.session.connection)
-	return nil, fail.NotImplementedError()
+	service := protocol.NewFeatureServiceClient(c.session.connection)
+	request := &protocol.FeatureListRequest{
+		TargetType:    protocol.FeatureTargetType_FT_CLUSTER,
+		TargetRef:     &protocol.Reference{Name: clusterName},
+		InstalledOnly: !all,
+	}
+	list, err := service.List(ctx, request)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+	return list, nil
 }
 
 // FindAvailableMaster ...

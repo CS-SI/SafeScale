@@ -114,7 +114,7 @@ func NullStack() *stack {
 // New creates a new stack
 func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) {
 	if options == nil {
-		return nil, fail.InvalidParameterError("options", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()

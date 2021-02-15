@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"sync"
 	"time"
 
@@ -34,8 +33,6 @@ import (
 
 // Job is the interface of a daemon job
 type Job interface {
-	data.NullValue
-
 	GetID() string
 	GetName() string
 	GetTask() concurrency.Task
@@ -58,16 +55,23 @@ type job struct {
 	startTime   time.Time
 }
 
+var (
+	jobMap          = map[string]Job{}
+	mutexJobManager sync.Mutex
+)
+
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (Job, fail.Error) {
+func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if cancel == nil {
-		return nil, fail.InvalidParameterError("cancel", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("cancel")
 	}
-	if svc.IsNull() {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	var (
@@ -91,7 +95,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		}
 
 		if id = u[0]; id == "" {
-			return nil, fail.InvalidParameterError("ctx", "does not contain a valid grpc uuid")
+			return nil, fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid")
 		}
 	}
 
@@ -99,8 +103,8 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = task.SetID("job-task:" + id)
-	if xerr != nil {
+
+	if xerr = task.SetID("job-task:" + id); xerr != nil {
 		return nil, xerr
 	}
 
@@ -113,10 +117,10 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		tenant:      svc.GetName(),
 		startTime:   time.Now(),
 	}
-	xerr = register(&nj)
-	if xerr != nil {
+	if xerr = register(&nj); xerr != nil {
 		return nil, xerr
 	}
+
 	return &nj, nil
 }
 
@@ -126,52 +130,82 @@ func (j *job) IsNull() bool {
 }
 
 // GetID returns the id of the job (ie the uuid of gRPC message)
-func (j *job) GetID() string {
+func (j job) GetID() string {
+	if j.IsNull() {
+		return ""
+	}
+
 	return j.uuid
 }
 
 // GetName returns the name (== id) of the job
-func (j *job) GetName() string {
+func (j job) GetName() string {
+	if j.IsNull() {
+		return ""
+	}
+
 	return j.uuid
 }
 
 // GetTask returns the task instance
-func (j *job) GetTask() concurrency.Task {
+func (j job) GetTask() concurrency.Task {
+	if j.IsNull() {
+		return nil
+	}
+
 	return j.task
 }
 
 // GetService returns the service instance
-func (j *job) GetService() iaas.Service {
+func (j job) GetService() iaas.Service {
+	if j.IsNull() {
+		return iaas.NullService()
+	}
+
 	return j.service
 }
 
 // GetDuration returns the duration of the job
-func (j *job) GetDuration() time.Duration {
+func (j job) GetDuration() time.Duration {
+	if j.IsNull() {
+		return 0
+	}
+
 	return time.Since(j.startTime)
 }
 
 // Abort tells the job it has to abort operations
-func (j *job) Abort() fail.Error {
-	if j == nil {
+func (j *job) Abort() (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if j.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if j.cancel == nil {
 		return fail.InvalidInstanceContentError("j.cancel", "cannot be nil")
 	}
+
 	j.cancel()
 	j.cancel = nil
 	return nil
 }
 
 // Aborted tells if the job has been aborted
-func (j *job) Aborted() bool {
-	status, _ := j.task.GetStatus()
+func (j job) Aborted() bool {
+	if j.IsNull() {
+		return false
+	}
 
+	status, _ := j.task.GetStatus()
 	return status == concurrency.ABORTED
 }
 
 // Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
 func (j *job) Close() {
+	if j.IsNull() {
+		return
+	}
+
 	_ = deregister(j)
 	if j.cancel != nil {
 		j.cancel()
@@ -179,14 +213,12 @@ func (j *job) Close() {
 }
 
 // String returns a string representation of job information
-func (j *job) String() string {
+func (j job) String() string {
+	if j.IsNull() {
+		return ""
+	}
 	return fmt.Sprintf("Job: %s (started at %s)", j.description, j.startTime.String())
 }
-
-var (
-	jobMap          = map[string]Job{}
-	mutexJobManager sync.Mutex
-)
 
 // register ...
 func register(job Job) fail.Error {
@@ -200,34 +232,34 @@ func register(job Job) fail.Error {
 // deregister ...
 func deregister(job Job) fail.Error {
 	if job == nil {
-		return fail.InvalidParameterError("job", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("job")
 	}
-	return deregisterUUID(job.GetID())
-}
 
-func deregisterUUID(uuid string) fail.Error {
-	if uuid == "" {
-		return fail.InvalidParameterError("uuid", "cannot be empty string")
-	}
-	mutexJobManager.Lock()
-	defer mutexJobManager.Unlock()
+	if uuid := job.GetID(); uuid != "" {
+		mutexJobManager.Lock()
+		defer mutexJobManager.Unlock()
 
-	if _, ok := jobMap[uuid]; !ok {
-		return fail.NotFoundError("no job identified by '%s' found", uuid)
+		if _, ok := jobMap[uuid]; !ok {
+			return fail.NotFoundError("failed to find a job identified by id '%s'", uuid)
+		}
+		delete(jobMap, uuid)
+		return nil
 	}
-	delete(jobMap, uuid)
-	return nil
+
+	return fail.InvalidParameterError("job", "job id cannot be empty string")
 }
 
 // AbortJobByID asks the job identified by 'id' to abort
-func AbortJobByID(id string) fail.Error {
+func AbortJobByID(id string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
+
 	if job, ok := jobMap[id]; ok {
-		err := job.Abort()
-		if err != nil {
-			return fail.Wrap(err, fmt.Sprintf("failed to stop job '%s'", id))
+		if xerr := job.Abort(); xerr != nil {
+			return fail.Wrap(xerr, "failed to stop job '%s'", id)
 		}
 		return nil
 	}

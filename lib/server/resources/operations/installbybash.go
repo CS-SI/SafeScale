@@ -29,18 +29,16 @@ import (
 // bashInstaller is an installer using script to add and remove a feature
 type bashInstaller struct{}
 
-// GetName ...
-func (i *bashInstaller) GetName() string {
-	return "script"
-}
-
 // Check checks if the feature is installed, using the check script in Specs
-func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
-	if f.IsNull() {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+	r = nil
+	defer fail.OnPanic(&xerr)
+
+	if f == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	yamlKey := "feature.install.bash.check"
@@ -58,17 +56,25 @@ func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
-	return w.Proceed(v, s)
+
+	if r, xerr = w.Proceed(v, s); xerr != nil {
+		xerr = fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+	}
+
+	return r, xerr
 }
 
 // Add installs the feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
-	if f.IsNull() {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+	r = nil
+	defer fail.OnPanic(&xerr)
+
+	if f == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	// Determining if install script is defined in specification file
@@ -82,25 +88,35 @@ func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
+
 	if !w.ConcernsCluster() {
 		if _, ok := v["Username"]; !ok {
 			v["Username"] = "safescale"
 		}
 	}
-	return w.Proceed(v, s)
+
+	if r, xerr = w.Proceed(v, s); xerr != nil {
+		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+	}
+
+	return r, xerr
 }
 
 // Remove uninstalls the feature
-func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (resources.Results, fail.Error) {
+func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+	r = nil
+	defer fail.OnPanic(&xerr)
+
 	if f == nil {
-		return nil, fail.InvalidParameterError("f", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
 	if t == nil {
-		return nil, fail.InvalidParameterError("t", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
 	if !f.(*feature).Specs().IsSet("feature.install.bash.remove") {
@@ -113,17 +129,17 @@ func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 
-	// if t.GetTargetType() != featuretargettype.CLUSTER {
-	// 	if _, ok := v["Username"]; !ok {
-	// 		v["Username"] = "safescale"
-	// 	}
-	// }
-	return w.Proceed(v, s)
+	if r, xerr = w.Proceed(v, s); xerr != nil {
+		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+	}
+
+	return r, xerr
 }
 
 // newBashInstaller creates a new instance of Installer using script

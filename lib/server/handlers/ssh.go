@@ -176,7 +176,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// gets primary gateway information
-			gw, xerr := rs.GetGateway(task, true)
+			gw, xerr := rs.InspectGateway(task, true)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -209,7 +209,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			}
 
 			// gets secondary gateway information
-			gw, xerr = rs.GetGateway(task, false)
+			gw, xerr = rs.InspectGateway(task, false)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -286,10 +286,10 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return -1, "", "", fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if hostRef == "" {
-		return -1, "", "", fail.InvalidParameterError("hostRef", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 	if cmd == "" {
-		return -1, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("cmd")
 	}
 
 	task := handler.job.GetTask()
@@ -384,10 +384,10 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return -1, "", "", fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if from == "" {
-		return -1, "", "", fail.InvalidParameterError("from", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
 	}
 	if to == "" {
-		return -1, "", "", fail.InvalidParameterError("to", "cannot be empty string")
+		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
 	task := handler.job.GetTask()

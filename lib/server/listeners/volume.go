@@ -57,10 +57,10 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -110,10 +110,10 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -154,10 +154,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -215,10 +215,10 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
@@ -264,10 +264,10 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -306,10 +306,10 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {

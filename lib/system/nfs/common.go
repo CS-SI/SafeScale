@@ -132,8 +132,15 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		// return 255, "", "", fail.Wrap(err, "failed to create temporary file")
 		return "", xerr
 	}
+
+	defer func() {
+		if derr := utils.LazyRemove(f.Name()); derr != nil {
+			logrus.Warnf("Error deleting file: %v", derr)
+		}
+	}()
+
 	filename := utils.TempFolder + "/" + name
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			retcode, stdout, stderr, innerXErr := sshconfig.Copy(task, filename, f.Name(), true)
 			if innerXErr != nil {
@@ -148,77 +155,75 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		},
 		temporal.GetHostTimeout(),
 	)
-	if retryErr != nil {
-		if _, ok := retryErr.(*fail.ErrExecution); ok {
-			xerr = retryErr
-		} else {
-			xerr = fail.ExecutionError(retryErr, "failed to copy script to remote host")
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrExecution:
+		default:
+			xerr = fail.ExecutionError(xerr, "failed to copy script to remote host")
 			xerr.Annotate("retcode", 255)
 		}
 		// return 255, "", "", fail.Wrap(err, "failed to copy script to remote host")
 		return "", xerr
 	}
 
-	k, uperr := sshconfig.NewSudoCommand(task, "which scp")
-	if uperr != nil && k != nil {
-		var uptext string
-		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
-			func() error {
-				var innerXErr fail.Error
-				_, uptext, _, innerXErr = k.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
-				if innerXErr != nil {
-					return fail.Wrap(innerXErr, "ssh operation failed")
-				}
-				return nil
-			},
-			temporal.GetHostTimeout(),
-		)
-		if retryErr == nil {
-			if connected := strings.Contains(uptext, "/scp"); !connected {
-				logrus.Warn("SUDO problem ?")
+	sshcmd, xerr := sshconfig.NewSudoCommand(task, "which scp")
+	if xerr != nil {
+		return "", xerr
+	}
+	// if k != nil {
+	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+		func() error {
+			var innerXErr fail.Error
+			_, _, _, innerXErr = sshcmd.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
+			if innerXErr != nil {
+				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
-		}
+			return nil
+		},
+		temporal.GetHostTimeout(),
+	)
+	if xerr != nil {
+		return "", xerr
 	}
-
-	if xerr = utils.LazyRemove(f.Name()); xerr != nil {
-		logrus.Warnf("Error deleting file: %v", xerr)
-	}
+	// VPL: Whaaaaat ?
+	// if xerr == nil {
+	// 	if connected := strings.Contains(uptext, "/scp"); !connected {
+	// 		logrus.Warn("SUDO problem ?")
+	// 	}
+	// }
+	// }
 
 	// Execute script on remote host with retries if needed
-	var (
-		cmd, stdout string
-		// retcode     int
-	)
+	var cmd, stdout string
 
 	if !hidesOutput {
 		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; exit ${PIPESTATUS}", filename, filename)
 	} else {
-//		cmd = fmt.Sprintf("chmod u+rwx %s; export BASH_XTRACEFD=7; bash -c %s 7> /tmp/captured 2>&1;retcode=${PIPESTATUS};cat /tmp/captured; rm /tmp/captured;exit ${retcode}", filename, filename)
+		// cmd = fmt.Sprintf("chmod u+rwx %s; export BASH_XTRACEFD=7; bash -c %s 7> /tmp/captured 2>&1;retcode=${PIPESTATUS};cat /tmp/captured; rm /tmp/captured;exit ${retcode}", filename, filename)
 		cmd = fmt.Sprintf("chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; bash -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
 	}
 
-	retryErr = retry.Action(
-		func() error {
-			stdout = ""
-			// retcode = 0
+	sshCmd, xerr := sshconfig.NewSudoCommand(task, cmd)
+	if xerr != nil {
+		return "", fail.ExecutionError(xerr)
+	}
 
-			sshCmd, err := sshconfig.NewSudoCommand(task, cmd)
-			if err != nil {
-				return fail.ExecutionError(err)
+	xerr = retry.Action(
+		func() error {
+			var innerXErr fail.Error
+
+			if _, stdout, _, innerXErr = sshCmd.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
+				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
-			cmdResult, err := sshCmd.Output()
-			stdout = string(cmdResult)
-			if err != nil {
-				return fail.ExecutionError(err)
-			}
+
 			return nil
 		},
 		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(temporal.GetContextTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil, nil,
 	)
-	if retryErr != nil {
-		switch cErr := retryErr.(type) {
+	if xerr != nil {
+		switch cErr := xerr.(type) {
 		case *fail.ErrTimeout:
 			logrus.Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
@@ -228,25 +233,12 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		case *fail.ErrExecution:
 			return stdout, cErr
 		default:
-			xerr = fail.ExecutionError(retryErr)
+			xerr = fail.ExecutionError(xerr)
 			xerr.Annotate("retcode", 255).Annotate("stderr", "")
 			// return 255, stdout, stderr, retryErr
 			return stdout, xerr
 		}
 	}
 
-	/*
-		k, uperr = sshconfig.NewSudoCommand("ping -c4 google.com")
-		if uperr != nil {
-			logrus.Warn("Network problem...")
-		} else {
-			_, uptext, _, kerr := k.Run()
-			if kerr == nil {
-				logrus.Warnf("Network working !!: %s", uptext)
-			}
-		}
-	*/
-
-	// return retcode, stdout, stderr, err
 	return stdout, nil
 }

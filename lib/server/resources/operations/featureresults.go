@@ -111,6 +111,23 @@ func (urs unitResults) Completed() bool {
 	return true
 }
 
+// Keys returns a slice of keys for the results
+func (urs unitResults) Keys() []string {
+	keys := make([]string, 0, len(urs))
+	for k := range urs {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// ResultFromKey returns the result corresponding to the unit passed as parameter
+func (urs unitResults) ResultOfKey(key string) resources.UnitResult {
+	if r, ok := urs[key]; ok {
+		return r
+	}
+	return &stepResult{}
+}
+
 // results ...
 type results map[string]resources.UnitResults
 
@@ -120,7 +137,7 @@ func (r *results) Add(key string, urs resources.UnitResults) error {
 		*r = results{}
 	}
 	if urs == nil {
-		return fail.InvalidParameterError("urs", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("urs")
 	}
 
 	(*r)[key] = urs
@@ -133,7 +150,7 @@ func (r *results) AddOne(key, unitName string, ur resources.UnitResult) error {
 		*r = results{}
 	}
 	if ur == nil {
-		return fail.InvalidParameterError("ur", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("ur")
 	}
 	if _, ok := (*r)[key]; !ok {
 		(*r)[key] = &unitResults{}

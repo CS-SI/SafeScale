@@ -62,22 +62,24 @@ type KongController struct {
 // NewKongController ...
 func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
 	if svc == nil {
-		return nil, fail.InvalidParameterError("svc", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
-	if subnet.IsNull() {
-		return nil, fail.InvalidParameterError("subnet", "cannot be null value of 'resources.Subnet'")
+	if subnet == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-	// Check if 'edgeproxy4network' feature is installed on host
+	// Check if 'edgeproxy4subnet' feature is installed on host
 	voidtask, xerr := concurrency.NewTask()
 	if xerr != nil {
 		return nil, xerr
 	}
-	rp, xerr := NewEmbeddedFeature(voidtask, "edgeproxy4network")
+
+	rp, xerr := NewFeature(voidtask, svc, "edgeproxy4subnet")
 	if xerr != nil {
 		return nil, xerr
 	}
-	addressedGateway, xerr := subnet.GetGateway(voidtask, addressPrimaryGateway)
+
+	addressedGateway, xerr := subnet.InspectGateway(voidtask, addressPrimaryGateway)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -89,10 +91,10 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		setErr := kongProxyCheckedCache.SetBy(subnet.GetName(), func() (interface{}, fail.Error) {
 			results, xerr := rp.Check(addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if xerr != nil {
-				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4network' is installed on gateway '%s'", addressedGateway.GetName())
+				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
 			}
 			if !results.Successful() {
-				return false, fail.NotFoundError("feature 'edgeproxy4network' is not installed on gateway '%s'", addressedGateway.GetName())
+				return false, fail.NotFoundError("feature 'edgeproxy4subnet' is not installed on gateway '%s'", addressedGateway.GetName())
 			}
 
 			return true, nil
@@ -103,7 +105,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		present = true
 	}
 	if !present {
-		return nil, fail.NotFoundError("'edgeproxy4network' feature is not installed on gateway '%s'", addressedGateway.GetName())
+		return nil, fail.NotFoundError("'edgeproxy4subnet' feature is not installed on gateway '%s'", addressedGateway.GetName())
 	}
 
 	ctrl := &KongController{
@@ -133,6 +135,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	if xerr != nil {
 		return rule["name"].(string), xerr
 	}
+
 	content, xerr := k.realizeRuleData(strings.Trim(rule["content"].(string), "\n"), *values)
 	if xerr != nil {
 		return ruleName, xerr
@@ -169,7 +172,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	(*values)["PublicIP"] = (*values)["EndpointIP"]
 	(*values)["GatewayIP"] = (*values)["DefaultRouteIP"]
 
-	// Analyzes the rule...
+	// Analyze the rule...
 	switch ruleType {
 	case "service":
 		unjsoned := map[string]interface{}{}

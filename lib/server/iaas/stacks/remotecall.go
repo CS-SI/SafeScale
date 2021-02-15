@@ -13,7 +13,7 @@ import (
 // Remote API is done inside 'callback' parameter and returns remote error if necessary that 'convertError' function convert to SafeScale error
 func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) fail.Error {
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	var normalizeError func(err error) fail.Error

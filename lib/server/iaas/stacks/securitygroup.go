@@ -37,7 +37,7 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {
-			return asg, "", fail.InvalidParameterError("sgaram", "cannot be empty string")
+			return asg, "", fail.InvalidParameterCannotBeEmptyStringError("sgaram")
 		}
 		asg.ID = sgParam
 		sgLabel = asg.ID

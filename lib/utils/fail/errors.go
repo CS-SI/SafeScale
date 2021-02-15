@@ -47,7 +47,6 @@ type causer interface {
 
 // Error defines the interface of a SafeScale error
 type Error interface {
-	data.NullValue
 	data.Annotatable
 	causer
 	consequencer
@@ -57,8 +56,6 @@ type Error interface {
 
 	ForceSetCause(error) Error // set the cause of the error
 	TrySetCause(error) bool    // set the cause of the error if not already set
-
-	// Error() string   // VPL: comes from error...
 
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
@@ -74,8 +71,7 @@ type errorCore struct {
 	annotations         data.Annotations
 	annotationFormatter func(data.Annotations) string
 	consequences        []error
-	// consequenceFormatter func(Error) string
-	grpcCode codes.Code
+	grpcCode            codes.Code
 }
 
 // NewError creates a new failure report
@@ -106,7 +102,6 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		grpcCode:            codes.Unknown,
 		causeFormatter:      defaultCauseFormatter,
 		annotationFormatter: defaultAnnotationFormatter,
-		// consequenceFormatter: defaultConsequenceFormatter,
 	}
 	return &r
 }
@@ -125,8 +120,8 @@ func (e *errorCore) IsNull() bool {
 
 // defaultCauseFormatter generates a string containing information about the causing error and the derived errors while trying to clean up
 func defaultCauseFormatter(e Error) string {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter()", "from null instance", 0))
+	if e == nil {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter()", "from nil", 0))
 		return ""
 	}
 
@@ -155,7 +150,7 @@ func defaultCauseFormatter(e Error) string {
 // ForceSetCause sets the cause error even if already set
 func (e *errorCore) ForceSetCause(err error) Error {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from null value", 0))
 		return ToError(err)
 	}
 	if e.cause != nil {
@@ -184,7 +179,7 @@ func (e *errorCore) TrySetCause(err error) bool {
 // CauseFormatter defines the func uses to format cause to string
 func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from nil", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from null value", 0))
 		return
 	}
 	if formatter == nil {
@@ -757,7 +752,7 @@ type ErrNotImplemented struct {
 
 // NotImplementedError creates a ErrNotImplemented report
 func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
-	r := newError(nil, nil, callstack.DecorateWith("not implemented yet:", strprocess.FormatStrings(msg...), "", 0))
+	r := newError(nil, nil, callstack.DecorateWith("not implemented yet: ", strprocess.FormatStrings(msg...), "", 0))
 	r.grpcCode = codes.Unimplemented
 	return &ErrNotImplemented{r}
 }
@@ -877,13 +872,22 @@ type ErrInvalidParameter struct {
 	*errorCore
 }
 
-// InvalidParameterError creates a ErrInvalidParameter error
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 0))
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 2))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())
 	return &ErrInvalidParameter{r}
+}
+
+// InvalidParameterCannotBeNilError is a specialized *ErrInvalidParameter with message "cannot be nil"
+func InvalidParameterCannotBeNilError(what string) *ErrInvalidParameter {
+	return InvalidParameterError(what, "cannot be nil")
+}
+
+// InvalidParameterCannotBeEmptyStringError is a specialized *ErrInvalidParameter with message "cannot be empty string"
+func InvalidParameterCannotBeEmptyStringError(what string) *ErrInvalidParameter {
+	return InvalidParameterError(what, "cannot be empty string")
 }
 
 // IsNull tells if the instance is null

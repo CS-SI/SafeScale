@@ -84,14 +84,14 @@ func (c *cluster) TargetType() featuretargettype.Enum {
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-// satisfies feature.Targetable interface
+// satisfies resources.Targetable interface
 func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	if c == nil {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
-	if task.IsNull() {
-		logrus.Errorf(fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'").Error())
+	if task == nil {
+		logrus.Errorf(fail.InvalidParameterCannotBeNilError("task").Error())
 		return nil
 	}
 
@@ -108,6 +108,8 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		}
 		index++
 		c.installMethods[index] = installmethod.Bash
+		index++
+		c.installMethods[index] = installmethod.None
 	}
 	return c.installMethods
 }
@@ -119,13 +121,14 @@ func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
 }
 
 // FIXME: include the cluster part of setImplicitParameters() from feature
-// ComplementFeatureParameters configures parameters that are implicitely defined, based on target
+// ComplementFeatureParameters configures parameters that are implicitly defined, based on target
+// satisfies interface resources.Targetable
 func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	complexity, xerr := c.GetComplexity(task)
@@ -224,43 +227,146 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	return nil
 }
 
+// RegisterFeature registers an installed Feature in metadata of a Cluster
+// satisfies interface resources.Targetable
+func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if feat == nil {
+		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
+	}
+
+	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			var item *propertiesv1.ClusterInstalledFeature
+			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
+				requirements, innerXErr := feat.GetRequirements()
+				if innerXErr != nil {
+					return innerXErr
+				}
+				item = propertiesv1.NewClusterInstalledFeature()
+				item.Requires = requirements
+				featuresV1.Installed[feat.GetName()] = item
+			}
+			if rf, ok := requiredBy.(*feature); ok && !rf.IsNull() {
+				item.RequiredBy[rf.GetName()] = struct{}{}
+			}
+			return nil
+		})
+	})
+}
+
+// UnregisterFeature unregisters a Feature from Cluster metadata
+// satisfies interface resources.Targetable
+func (c *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if feat == "" {
+		return fail.InvalidParameterError("feat", "cannot be empty string")
+	}
+
+	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			delete(featuresV1.Installed, feat)
+			for _, v := range featuresV1.Installed {
+				delete(v.RequiredBy, feat)
+			}
+			return nil
+		})
+	})
+}
+
 // ListInstalledFeatures returns a slice of installed features
-func (c *cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
-	return nil, fail.NotImplementedError("ListInstalledFeatures() is not implemented yet")
+func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
+	var emptySlice []resources.Feature
+	if c.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
+	}
+
+	var list map[string]*propertiesv1.ClusterInstalledFeature
+	xerr := c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			list = featuresV1.Installed
+			return nil
+		})
+	})
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	out := make([]resources.Feature, 0, len(list))
+	for k := range list {
+		item, xerr := NewFeature(task, c.GetService(), k)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 // AddFeature installs a feature on the cluster
 func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c == nil {
+	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, c.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
 	return feat.Add(c, vars, settings)
 }
 
-// CheckFeature tells if a feature is installed on the cluster
+// IsFeatureInstalled tells if a feature is installed on the cluster
 func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c == nil {
+	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, c.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -270,17 +376,17 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 
 // RemoveFeature uninstalls a feature from the cluster
 func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c == nil {
+	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, name)
+	feat, xerr := NewFeature(task, c.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -290,17 +396,19 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 
 // ExecuteScript executes the script template with the parameters on target IPAddress
 func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
 	}
-	if host.IsNull() {
-		return -1, "", "", fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	if host == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -355,10 +463,10 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
+		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
 		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
 	} else {
-//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
+		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
 		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
 	}
 	return host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
@@ -366,9 +474,9 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 
 // installNodeRequirements ...
 func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
@@ -510,9 +618,9 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	}
 	clusterName := identity.Name
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -528,9 +636,10 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
+
 	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4network'", clusterName)
-		feat, xerr := NewEmbeddedFeature(task, "edgeproxy4network")
+		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
+		feat, xerr := NewFeature(task, c.GetService(), "edgeproxy4subnet")
 		if xerr != nil {
 			return xerr
 		}
@@ -543,7 +652,10 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 			return fail.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
 		}
 		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
+		return nil
 	}
+
+	logrus.Infof("[cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
 	return nil
 }
 
@@ -557,9 +669,9 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 	}
 	clusterName := identity.Name
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -581,7 +693,7 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 
 		adminPassword := identity.AdminPassword
 
-		feat, xerr := NewEmbeddedFeature(task, "remotedesktop")
+		feat, xerr := NewFeature(task, c.GetService(), "remotedesktop")
 		if xerr != nil {
 			return xerr
 		}
@@ -607,20 +719,21 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 
 // install proxycache-client feature if not disabled
 func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	defer fail.OnPanic(&xerr)
+
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -634,7 +747,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		return xerr
 	}
 	if !disabled {
-		feat, xerr := NewEmbeddedFeature(task, "proxycache-client")
+		feat, xerr := NewFeature(task, c.GetService(), "proxycache-client")
 		if xerr != nil {
 			return xerr
 		}
@@ -654,20 +767,21 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 
 // install proxycache-server feature if not disabled
 func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
+	defer fail.OnPanic(&xerr)
+
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
 	}
 	if hostLabel == "" {
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -682,7 +796,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 	}
 
 	if !disabled {
-		feat, xerr := NewEmbeddedFeature(task, "proxycache-server")
+		feat, xerr := NewFeature(task, c.GetService(), "proxycache-server")
 		if xerr != nil {
 			return xerr
 		}
@@ -702,19 +816,19 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 
 // intallDocker installs docker and docker-compose
 func (c *cluster) installDocker(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
-	if host.IsNull() {
-		return fail.InvalidParameterError("host", "cannot be null value of 'resources.Host'")
-	}
-	if hostLabel == "" {
-		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
-	}
+	// if host == nil {
+	// 	return fail.InvalidParameterCannotBeNilError("host")
+	// }
+	// if hostLabel == "" {
+	// 	return fail.InvalidParameterError("hostLabel", "cannot be empty string")
+	// }
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
-	feat, xerr := NewFeature(task, "docker")
+	feat, xerr := NewFeature(task, c.GetService(), "docker")
 	if xerr != nil {
 		return xerr
 	}

@@ -432,7 +432,7 @@ type runOnHostParameters struct {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	var ok bool
 	if params == nil {
-		return nil, fail.InvalidParameterError("params", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("params")
 	}
 	p, ok := params.(runOnHostParameters)
 	if !ok {

@@ -274,7 +274,7 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 	operator := t.members[1]
 	value := t.members[2]
 	switch operator {
-	case "~": 		// "~" means "[<value>-<value*2>]"
+	case "~": // "~" means "[<value>-<value*2>]"
 		if keyword == "count" {
 			return "", "", fail.InvalidRequestError("'count' can only use '='")
 		}
