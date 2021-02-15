@@ -1678,28 +1678,15 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 			return fail.Wrap(innerErr, "failed to get list of hosts")
 		}
 
-		if props.Lookup(clusterproperty.NetworkV2) {
-			innerErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				gatewayID = networkV2.GatewayID
-				secondaryGatewayID = networkV2.SecondaryGatewayID
-				return nil
-			})
-		} else {
-			// FIXME: property upgrade must be treated on instance load (LoadCluster()...)
-			// Legacy...
-			innerErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				gatewayID = networkV1.GatewayID
-				return nil
-			})
-		}
+		innerErr = props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			gatewayID = networkV3.GatewayID
+			secondaryGatewayID = networkV3.SecondaryGatewayID
+			return nil
+		})
 		if innerErr != nil {
 			return innerErr
 		}
@@ -1876,28 +1863,15 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 			return fail.Wrap(innerErr, "failed to get list of hosts")
 		}
 
-		if props.Lookup(clusterproperty.NetworkV2) {
-			innerErr = props.Inspect(task, clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				gatewayID = networkV2.GatewayID
-				secondaryGatewayID = networkV2.SecondaryGatewayID
-				return nil
-			})
-		} else {
-			// Legacy ...
-			// FIXME:operty upgrade should take during the instance load (LoadCluster()...)
-			innerErr = props.Inspect(task, clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				gatewayID = networkV1.GatewayID
-				return nil
-			})
-		}
+		innerErr = props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			gatewayID = networkV3.GatewayID
+			secondaryGatewayID = networkV3.SecondaryGatewayID
+			return nil
+		})
 		if innerErr != nil {
 			return innerErr
 		}
