@@ -873,7 +873,7 @@ type ErrInvalidParameter struct {
 }
 
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter: ", what, strprocess.FormatStrings(why...), 2))
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), 4))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())

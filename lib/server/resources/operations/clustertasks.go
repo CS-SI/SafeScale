@@ -49,8 +49,18 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	// FIXME: validate params
-	return nil, c.service.StartHost(params.(string))
+	id, ok := params.(string)
+	if !ok || id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
+	}
+
+	if xerr = c.service.StartHost(id); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrDuplicate: // A host already started is considered as a successful run
+			return nil, nil
+		}
+	}
+	return nil, xerr
 }
 
 func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
@@ -63,8 +73,18 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	// FIXME: validate params
-	return nil, c.service.StopHost(params.(string))
+	id, ok := params.(string)
+	if !ok || id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
+	}
+
+	if xerr = c.service.StopHost(id); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
+			return nil, nil
+		}
+	}
+	return nil, xerr
 }
 
 type taskInstallGatewayParameters struct {
@@ -1180,6 +1200,6 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	logrus.Debugf("Successfully deleted master '%s'", p.node.Name)
+	logrus.Debugf("Successfully deleted Master '%s'", p.node.Name)
 	return nil, nil
 }
