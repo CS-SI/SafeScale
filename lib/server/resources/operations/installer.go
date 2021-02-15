@@ -26,10 +26,7 @@ import (
 
 // Installer defines the API of an Installer
 type Installer interface {
-	// Check checks if the feature is installed
-	Check(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)
-	// Add executes installation of feature
-	Add(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)
-	// Remove executes deletion of feature
-	Remove(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)
+	Check(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)  // checks if a Feature is installed
+	Add(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)    // executes installation of Feature
+	Remove(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error) // executes deletion of Feature
 }

@@ -73,10 +73,9 @@ func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
 	return f, nil
 }
 
-// IsNull ...
-// satisfies interface data.NullValue
+// IsNull tells if the folder instance should be considered as a null value
 func (f *folder) IsNull() bool {
-	return f == nil || f.service.IsNull()
+	return f == nil || f.service == nil
 }
 
 // GetService returns the service used by the folder
@@ -171,7 +170,7 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	// if xerr := f.Lookup(path, name); xerr != nil {
@@ -287,8 +286,8 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
 		retry.Constant(1*time.Second),
-	nil,
-	nil,
+		nil,
+		nil,
 		func(t retry.Try, v verdict.Enum) {
 			switch v {
 			case verdict.Retry:

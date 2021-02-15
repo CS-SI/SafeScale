@@ -26,7 +26,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -76,12 +75,11 @@ type TaskGuard interface {
 
 // TaskCore is the interface of core methods to control task and taskgroup
 type TaskCore interface {
-	data.NullValue
-
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	IgnoreAbortSignal(bool) fail.Error
+	// IgnoreAbortSignal(bool)
+	DisarmAbortSignal() func()
 	SetID(string) fail.Error
 	GetID() (string, fail.Error)
 	GetSignature() string
@@ -173,7 +171,7 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
 // NewTaskWithContext ...
 func NewTaskWithContext(ctx context.Context, parentTask Task) (Task, fail.Error) {
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	return newTask(ctx, parentTask)
@@ -287,6 +285,10 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	if t.status == ABORTED {
+		return t.status, fail.AbortedError(nil, "aborted")
+	}
+
 	return t.status, nil
 }
 
@@ -298,6 +300,10 @@ func (t *task) GetContext() (context.Context, fail.Error) {
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.status == ABORTED {
+		return t.ctx, fail.AbortedError(nil, "aborted")
+	}
 
 	return t.ctx, nil
 }
@@ -314,8 +320,13 @@ func (t *task) SetID(id string) fail.Error {
 	if id == "0" {
 		return fail.InvalidParameterError("id", "cannot be '0', reserved for root task")
 	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	if t.status == ABORTED {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	t.id = id
 	return nil
@@ -346,7 +357,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	defer t.mu.Unlock()
 
 	if t.status != READY {
-		return nil, fail.NewError("can't start task '%s': not ready", tid)
+		return nil, fail.NewError("cannot start task '%s': not ready", tid)
 	}
 	if action == nil {
 		t.status = DONE
@@ -368,9 +379,9 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	st, err := NewTaskWithParent(t)
-	if err != nil {
-		return nil, err
+	st, xerr := NewTaskWithParent(t)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	t.mu.Lock()
@@ -529,12 +540,12 @@ func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResul
 		return nil, fail.InvalidInstanceError()
 	}
 	if action == nil {
-		return nil, fail.InvalidParameterError("action", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("action")
 	}
 
-	st, err := NewTaskWithParent(t)
-	if err != nil {
-		return nil, err
+	st, xerr := NewTaskWithParent(t)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return st.Run(action, params)
@@ -732,7 +743,13 @@ func (t *task) Aborted() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	// If abort signal is disengaged, return false
+	if t.abortDisengaged {
+		return false
+	}
+
 	return t.status == ABORTED
+
 }
 
 // Abortable tells if task can be aborted
@@ -747,15 +764,54 @@ func (t *task) Abortable() (bool, fail.Error) {
 	return !t.abortDisengaged, nil
 }
 
-// IgnoreAbortSignal can be use to disable the effect of Abort()
-func (t *task) IgnoreAbortSignal(ignore bool) fail.Error {
+// // IgnoreAbortSignal can be use to disable the effect of Abort()
+// // Typically,it is advised to call this inside a defer statementuised to cleanup things (cleanup has to terminate; if abort signal is not disengaged, any
+// // call with task as parameter may abort before the end.
+// // By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
+// func (t *task) IgnoreAbortSignal(ignore bool) {
+// 	if t.IsNull() {
+// 		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
+// 	}
+//
+// 	t.mu.Lock()
+// 	defer t.mu.Unlock()
+//
+// 	t.abortDisengaged = ignore
+// }
+
+// DisarmAbortSignal can be use to disable the effect of Abort()
+// Typically, it is advised to call this inside a defer statement when cleanup things (cleanup has to terminate; if abort signal is not disarmed, any
+// call with task as parameter may abort before the end.
+// Returns a function to rearm the signal handling
+// If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
+// If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
+
+func (t *task) DisarmAbortSignal() func() {
 	if t.IsNull() {
-		return fail.InvalidInstanceError()
+		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
+		return func() {}
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.abortDisengaged = ignore
-	return nil
+	if !t.abortDisengaged {
+		// Disengage Abort signal
+		t.abortDisengaged = true
+
+		// Return a func that reengage abort signal
+		return func() {
+			if t.IsNull() {
+				return
+			}
+
+			t.mu.Lock()
+			defer t.mu.Unlock()
+
+			t.abortDisengaged = false
+		}
+	}
+
+	// If abort signal is already disengaged, does nothing and returns a func that does nothing also
+	return func() {}
 }

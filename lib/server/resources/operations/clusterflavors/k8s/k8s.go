@@ -113,6 +113,7 @@ func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
 		return xerr
 	}
 	logrus.Infof("[cluster %s] feature 'kubernetes' addition successful.", clusterName)
+
 	return nil
 }
 

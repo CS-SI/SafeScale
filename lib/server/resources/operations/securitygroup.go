@@ -76,11 +76,11 @@ func nullSecurityGroup() *securityGroup {
 
 // lookupSecurityGroup returns true if security group exists, false otherwise
 func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (bool, fail.Error) {
-	if task.IsNull() {
-		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return false, fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return false, fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return false, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
@@ -108,11 +108,11 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 	//defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
-	if task.IsNull() {
-		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if svc.IsNull() {
-		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be null value of 'iaas.Service'")
+	if svc == nil {
+		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
@@ -143,11 +143,13 @@ func (sg *securityGroup) IsNull() bool {
 
 // Browse walks through securityGroup folder and executes a callback for each entries
 func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -163,17 +165,19 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 }
 
 // Reload reloads securityGroup from metadata and current securityGroup state on provider state
-func (sg *securityGroup) Reload(task concurrency.Task) fail.Error {
+func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	// Read data from metadata storage
 	securityGroupID := sg.GetID()
-	xerr := retry.WhileUnsuccessfulDelay1Second(
+	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			return sg.Read(task, securityGroupID)
 		},
@@ -199,11 +203,13 @@ func (sg *securityGroup) Reload(task concurrency.Task) fail.Error {
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a securityGroup, returns fail.ErrNotAvailable
 func (sg *securityGroup) Create(task concurrency.Task, networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
@@ -219,7 +225,6 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	defer tracer.Exiting()
 	// Log or propagate errors: here we propagate
 	//defer fail.OnExitLogError(&xerr, "failed to create securityGroup")
-	defer fail.OnPanic(&xerr)
 
 	svc := sg.GetService()
 
@@ -230,7 +235,7 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 		// case *fail.ErrNotFound:
 		// 	// not found, good, continue
 		// default:
-			return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
 		// }
 	}
 	if found {
@@ -262,8 +267,11 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during clean up
+			defer task.DisarmAbortSignal()()
+
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s'", name))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), name))
 			}
 		}
 	}()
@@ -275,8 +283,11 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during clean up
+			defer task.DisarmAbortSignal()()
+
 			if derr := sg.core.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up after failure, failed to delete Security Group '%s' metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -292,23 +303,27 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 }
 
 // ForceDelete deletes a Security Group unconditionally
-func (sg *securityGroup) ForceDelete(task concurrency.Task) fail.Error {
+func (sg *securityGroup) ForceDelete(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	return sg.delete(task, true)
 }
 
 // Delete deletes a Security Group
-func (sg *securityGroup) Delete(task concurrency.Task) fail.Error {
+func (sg *securityGroup) Delete(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -335,7 +350,11 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 				// Do not remove a securityGroup used on hosts
 				hostCount := len(hostsV1.ByName)
 				if hostCount > 0 {
-					return fail.NotAvailableError("security group '%s' is currently bound to %d host%s", sg.GetName(), hostCount, strprocess.Plural(uint(hostCount)))
+					keys := make([]string, 0, hostCount)
+					for k := range hostsV1.ByName {
+						keys = append(keys, k)
+					}
+					return fail.NotAvailableError("security group '%s' is currently bound to %d host%s: %s", sg.GetName(), hostCount, strprocess.Plural(uint(hostCount)), strings.Join(keys, ","))
 				}
 
 				// Do not remove a Security Group marked as default for a host
@@ -366,7 +385,11 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 				// Do not remove a securityGroup used on subnet(s)
 				subnetCount := len(subnetsV1.ByID)
 				if subnetCount > 0 {
-					return fail.NotAvailableError("security group is currently bound to %d subnet%s", subnetCount, strprocess.Plural(uint(subnetCount)))
+					keys := make([]string, subnetCount)
+					for k := range subnetsV1.ByName {
+						keys = append(keys, k)
+					}
+					return fail.NotAvailableError("security group is currently bound to %d subnet%s: %s", subnetCount, strprocess.Plural(uint(subnetCount)), strings.Join(keys, ","))
 				}
 
 				// Do not remove a Security Group marked as default for a subnet
@@ -515,8 +538,7 @@ func (sg *securityGroup) unbindFromSubnets(task concurrency.Task, in *properties
 			break
 		}
 	}
-	_, xerr = tg.Wait()
-	if xerr != nil {
+	if _, xerr = tg.Wait(); xerr != nil {
 		return xerr
 	}
 
@@ -538,10 +560,12 @@ func (sg *securityGroup) unbindFromSubnets(task concurrency.Task, in *properties
 
 // Clear removes all rules from a security group
 func (sg *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -557,10 +581,12 @@ func (sg *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
 
 // Reset clears a security group and re-adds associated rules as stored in metadata
 func (sg *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
 	}
 
@@ -568,8 +594,7 @@ func (sg *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
 	defer sg.SafeUnlock(task)
 
 	// Refresh content of the instance from metadata
-	xerr = sg.Reload(task)
-	if xerr != nil {
+	if xerr = sg.Reload(task); xerr != nil {
 		return xerr
 	}
 
@@ -587,15 +612,13 @@ func (sg *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
 	}
 
 	// Removes all rules...
-	xerr = sg.Clear(task)
-	if xerr != nil {
+	if xerr = sg.Clear(task); xerr != nil {
 		return xerr
 	}
 
 	// ... then re-adds rules from metadata
 	for _, v := range rules {
-		xerr = sg.AddRule(task, v)
-		if xerr != nil {
+		if xerr = sg.AddRule(task, v); xerr != nil {
 			return xerr
 		}
 	}
@@ -603,7 +626,9 @@ func (sg *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
 }
 
 // AddRule adds a rule to a security group
-func (sg securityGroup) AddRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error {
+func (sg securityGroup) AddRule(task concurrency.Task, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -626,7 +651,9 @@ func (sg securityGroup) AddRule(task concurrency.Task, rule abstract.SecurityGro
 }
 
 // AddRules adds rules to a Security Group
-func (sg securityGroup) AddRules(task concurrency.Task, rules abstract.SecurityGroupRules) fail.Error {
+func (sg securityGroup) AddRules(task concurrency.Task, rules abstract.SecurityGroupRules) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -657,7 +684,9 @@ func (sg securityGroup) AddRules(task concurrency.Task, rules abstract.SecurityG
 
 // DeleteRule deletes a rule identified by its ID from a security group
 // If rule is not in the security group, returns *fail.ErrNotFound
-func (sg securityGroup) DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) fail.Error {
+func (sg securityGroup) DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -681,16 +710,18 @@ func (sg securityGroup) DeleteRule(task concurrency.Task, rule abstract.Security
 }
 
 // GetBoundHosts returns the list of ID of hosts bound to the security group
-func (sg securityGroup) GetBoundHosts(task concurrency.Task) ([]*propertiesv1.SecurityGroupBond, fail.Error) {
+func (sg securityGroup) GetBoundHosts(task concurrency.Task) (_ []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
 	var list []*propertiesv1.SecurityGroupBond
-	xerr := sg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = sg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -708,10 +739,12 @@ func (sg securityGroup) GetBoundHosts(task concurrency.Task) ([]*propertiesv1.Se
 
 // GetBoundSubnets returns the subnet bound to the security group
 func (sg securityGroup) GetBoundSubnets(task concurrency.Task) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
+	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 
@@ -737,7 +770,9 @@ func (sg securityGroup) CheckConsistency(task concurrency.Task) fail.Error {
 }
 
 // ToProtocol converts a Security Group to protobuf message
-func (sg securityGroup) ToProtocol(task concurrency.Task) (*protocol.SecurityGroupResponse, fail.Error) {
+func (sg securityGroup) ToProtocol(task concurrency.Task) (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -759,12 +794,14 @@ func (sg securityGroup) ToProtocol(task concurrency.Task) (*protocol.SecurityGro
 
 // BindToHost binds the security group to a IPAddress.
 // If 'ip' is not empty, applies the Security Group only on the interface hosting this IP address.
-func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*ip string,*/, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) fail.Error {
+func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*ip string,*/, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rh.IsNull() {
-		return fail.InvalidParameterError("rh", "cannot be null value of 'resources.Host'")
+	if rh == nil {
+		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
 
 	return sg.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -829,12 +866,14 @@ func (sg *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*i
 }
 
 // UnbindFromHost unbinds the security group from an host
-func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host) fail.Error {
+func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rh.IsNull() {
-		return fail.InvalidParameterError("rh", "cannot be null value of 'resources.Host'")
+	if rh == nil {
+		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
 
 	return sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -864,7 +903,9 @@ func (sg *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host
 }
 
 // UnbindFromHostByReference unbinds the security group from an host identified by reference (id or name)
-func (sg *securityGroup) UnbindFromHostByReference(task concurrency.Task, hostRef string) fail.Error {
+func (sg *securityGroup) UnbindFromHostByReference(task concurrency.Task, hostRef string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -912,11 +953,13 @@ func (sg *securityGroup) UnbindFromHostByReference(task concurrency.Task, hostRe
 
 // BindToSubnet binds the security group to a host
 func (sg *securityGroup) BindToSubnet(task concurrency.Task, rs resources.Subnet, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rs.IsNull() {
-		return fail.InvalidParameterError("rh", "cannot be null value of 'resources.Network'")
+	if rs == nil {
+		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
 
 	switch enable {
@@ -1016,12 +1059,14 @@ func (sg *securityGroup) disableOnHostsAttachedToSubnet(task concurrency.Task, r
 }
 
 // UnbindFromSubnet unbinds the security group from a subnet
-func (sg *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Subnet) fail.Error {
+func (sg *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Subnet) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if rs.IsNull() {
-		return fail.InvalidParameterError("rs", "cannot be null value of 'resources.Subnet'")
+	if rs == nil {
+		return fail.InvalidParameterError("rs", "cannot be nil")
 	}
 
 	return sg.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1049,7 +1094,9 @@ func (sg *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Su
 }
 
 // UnbindFromSubnetByReference unbinds the security group from a subnet
-func (sg *securityGroup) UnbindFromSubnetByReference(task concurrency.Task, subnetRef string) fail.Error {
+func (sg *securityGroup) UnbindFromSubnetByReference(task concurrency.Task, subnetRef string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg.IsNull() {
 		return fail.InvalidInstanceError()
 	}

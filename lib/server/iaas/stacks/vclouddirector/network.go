@@ -757,7 +757,7 @@ func (s *stack) DeleteNetwork(ref string) fail.Error {
 //	}
 //
 //	if req.Networking == nil {
-//		return nil, nil, fail.InvalidParameterError("req.Networking", "cannot be nil")
+//		return nil, nil, fail.InvalidParameterCannotBeNilError("req.Networking")
 //	}
 //	gwname := strings.Split(req.Name, ".")[0]   // req.Name may contain a FQDN...
 //	if gwname == "" {

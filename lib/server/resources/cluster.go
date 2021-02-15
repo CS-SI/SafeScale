@@ -34,39 +34,39 @@ type IndexedListOfClusterNodes map[uint]Host
 type Cluster interface {
 	Metadata
 	Targetable
-	data.NullValue
 
-	Browse(task concurrency.Task, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error // ...
-	Create(task concurrency.Task, req abstract.ClusterRequest) fail.Error                         // Create creates a new cluster and save its metadata
-	GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, fail.Error)
-	GetFlavor(task concurrency.Task) (clusterflavor.Enum, fail.Error)                                                // Flavor returns the flavor of the cluster
-	GetComplexity(task concurrency.Task) (clustercomplexity.Enum, fail.Error)                                        // Complexity returns the complexity of the cluster
-	GetAdminPassword(task concurrency.Task) (string, fail.Error)                                                     // AdminPassword returns the password of the cluster admin account
-	GetKeyPair(task concurrency.Task) (abstract.KeyPair, fail.Error)                                                 // KeyPair returns the key pair used in the cluster
-	GetNetworkConfig(task concurrency.Task) (*propertiesv3.ClusterNetwork, fail.Error)                               // NetworkConfig returns network configuration of the cluster
-	GetState(task concurrency.Task) (clusterstate.Enum, fail.Error)                                                  // returns the current state of the cluster
-	Start(task concurrency.Task) fail.Error                                                                          // starts the cluster
-	Stop(task concurrency.Task) fail.Error                                                                           // stops the cluster
+	AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)    // adds feature on cluster
 	AddNode(task concurrency.Task, def abstract.HostSizingRequirements) (Host, fail.Error)                           // adds a node
 	AddNodes(task concurrency.Task, count uint, def abstract.HostSizingRequirements) ([]Host, fail.Error)            // adds several nodes
+	Browse(task concurrency.Task, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error                    // browse in metadata clusters and execute a callback on each entry
+	CheckFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)  // checks feature on cluster
+	CountNodes(task concurrency.Task) (uint, fail.Error)                                                             // counts the nodes of the cluster
+	Create(task concurrency.Task, req abstract.ClusterRequest) fail.Error                                            // creates a new cluster and save its metadata
 	DeleteLastNode(task concurrency.Task) (*propertiesv3.ClusterNode, fail.Error)                                    // deletes the last added node and returns its name
 	DeleteSpecificNode(task concurrency.Task, hostID string, selectedMasterID string) fail.Error                     // deletes a node identified by its ID
+	FindAvailableMaster(task concurrency.Task) (Host, fail.Error)                                                    // returns ID of the first master available to execute order
+	FindAvailableNode(task concurrency.Task) (Host, fail.Error)                                                      // returns node instance of the first node available to execute order
+	GetIdentity(task concurrency.Task) (abstract.ClusterIdentity, fail.Error)                                        // returns Cluster Identity
+	GetFlavor(task concurrency.Task) (clusterflavor.Enum, fail.Error)                                                // returns the flavor of the cluster
+	GetComplexity(task concurrency.Task) (clustercomplexity.Enum, fail.Error)                                        // returns the complexity of the cluster
+	GetAdminPassword(task concurrency.Task) (string, fail.Error)                                                     // returns the password of the cluster admin account
+	GetKeyPair(task concurrency.Task) (abstract.KeyPair, fail.Error)                                                 // returns the key pair used in the cluster
+	GetNetworkConfig(task concurrency.Task) (*propertiesv3.ClusterNetwork, fail.Error)                               // returns network configuration of the cluster
+	GetState(task concurrency.Task) (clusterstate.Enum, fail.Error)                                                  // returns the current state of the cluster
+	IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error)                             // tells if a feature is installed in Cluster using only metadata
+	ListInstalledFeatures(task concurrency.Task) ([]Feature, fail.Error)                                             // returns the list of installed features
 	ListMasters(task concurrency.Task) (IndexedListOfClusterNodes, fail.Error)                                       // lists the node instances corresponding to masters (if there is such masters in the flavor...)
-	ListMasterNames(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                   // lists the names of the master nodes in the Cluster
 	ListMasterIDs(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                     // lists the IDs of masters (if there is such masters in the flavor...)
 	ListMasterIPs(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                     // lists the IPs of masters (if there is such masters in the flavor...)
-	FindAvailableMaster(task concurrency.Task) (Host, fail.Error)                                                    // returns ID of the first master available to execute order
+	ListMasterNames(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                   // lists the names of the master nodes in the Cluster
 	ListNodes(task concurrency.Task) (IndexedListOfClusterNodes, fail.Error)                                         // lists node instances corresponding to the nodes in the cluster
-	ListNodeNames(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                     // lists the names of the nodes in the Cluster
 	ListNodeIDs(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                       // lists the IDs of the nodes in the cluster
 	ListNodeIPs(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                       // lists the IPs of the nodes in the cluster
-	FindAvailableNode(task concurrency.Task) (Host, fail.Error)                                                      // returns node instance of the first node available to execute order
+	ListNodeNames(task concurrency.Task) (data.IndexedListOfStrings, fail.Error)                                     // lists the names of the nodes in the Cluster
 	LookupNode(task concurrency.Task, ref string) (bool, fail.Error)                                                 // tells if the ID of the host passed as parameter is a node
-	CountNodes(task concurrency.Task) (uint, fail.Error)                                                             // counts the nodes of the cluster
-	CheckFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)  // checks feature on cluster
-	AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)    // adds feature on cluster
 	RemoveFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error) // removes feature from cluster
 	Shrink(task concurrency.Task, count uint) ([]*propertiesv3.ClusterNode, fail.Error)                              // reduce the size of the cluster of 'count' nodes (the last created)
-	ListInstalledFeatures(task concurrency.Task) ([]Feature, fail.Error)                                             // returns the list of installed features
+	Start(task concurrency.Task) fail.Error                                                                          // starts the cluster
+	Stop(task concurrency.Task) fail.Error                                                                           // stops the cluster
 	ToProtocol(concurrency.Task) (*protocol.ClusterResponse, fail.Error)
 }

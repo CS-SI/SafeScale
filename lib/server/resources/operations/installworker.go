@@ -29,6 +29,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
@@ -37,6 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -141,11 +144,13 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 		w.host = t.(resources.Host)
 	}
 
-	w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
-	if !f.(*feature).Specs().IsSet(w.rootKey) {
-		msg := `syntax error in feature '%s' specification file (%s):
+	if m != installmethod.None {
+		w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
+		if !f.(*feature).Specs().IsSet(w.rootKey) {
+			msg := `syntax error in feature '%s' specification file (%s):
 				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
+			return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), w.rootKey)
+		}
 	}
 
 	return &w, nil
@@ -344,7 +349,6 @@ func (w *worker) identifyAllNodes() ([]resources.Host, fail.Error) {
 
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
-// For now, only one gateway is allowed, but in the future we may have 2 for High Availability
 func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 	if w.availableGateway != nil {
 		return w.availableGateway, nil
@@ -357,13 +361,13 @@ func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 			return nil, xerr
 		}
 
-		gw, xerr := subnet.GetGateway(w.feature.task, true)
+		gw, xerr := subnet.InspectGateway(w.feature.task, true)
 		if xerr == nil {
 			_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
 		}
 
 		if xerr != nil {
-			if gw, xerr = subnet.GetGateway(w.feature.task, false); xerr == nil {
+			if gw, xerr = subnet.InspectGateway(w.feature.task, false); xerr == nil {
 				_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
 			}
 		}
@@ -374,15 +378,25 @@ func (w *worker) identifyAvailableGateway() (resources.Host, fail.Error) {
 
 		w.availableGateway = gw
 	} else {
-		// FIXME: secondary gateway not tried if the primary doesn't respond in time
 		// In cluster context
 		netCfg, xerr := w.cluster.GetNetworkConfig(w.feature.task)
-		if xerr == nil {
-			w.availableGateway, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.GatewayID)
-		}
 		if xerr != nil {
 			return nil, xerr
 		}
+		var gw resources.Host
+		if gw, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.GatewayID); xerr == nil {
+			_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+		}
+		if xerr != nil {
+			if gw, xerr = LoadHost(w.feature.task, w.cluster.GetService(), netCfg.SecondaryGatewayID); xerr == nil {
+				_, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout())
+			}
+		}
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to find an available gateway")
+		}
+
+		w.availableGateway = gw
 	}
 	return w.availableGateway, nil
 }
@@ -442,13 +456,13 @@ func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 		}
 	}
 
-	gw, xerr := rs.GetGateway(w.feature.task, true)
+	gw, xerr := rs.InspectGateway(w.feature.task, true)
 	if xerr == nil {
 		if _, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
-	if gw, xerr = rs.GetGateway(w.feature.task, false); xerr == nil {
+	if gw, xerr = rs.InspectGateway(w.feature.task, false); xerr == nil {
 		if _, xerr = gw.WaitSSHReady(w.feature.task, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
@@ -468,26 +482,56 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 	outcomes = &results{}
 
 	// 'pace' tells the order of execution
-	pace := w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
-	if pace == "" {
-		return nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
+	var (
+		pace     string
+		stepsKey string
+		steps    map[string]interface{}
+		order    []string
+	)
+	if w.method != installmethod.None {
+		pace = w.feature.specs.GetString(w.rootKey + "." + yamlPaceKeyword)
+		if pace == "" {
+			return nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)
+		}
+
+		// 'steps' describes the steps of the action
+		stepsKey = w.rootKey + "." + yamlStepsKeyword
+		steps = w.feature.specs.GetStringMap(stepsKey)
+		if len(steps) == 0 {
+			return nil, fail.InvalidRequestError("nothing to do")
+		}
+		order = strings.Split(pace, ",")
 	}
 
-	// 'steps' describes the steps of the action
-	stepsKey := w.rootKey + "." + yamlStepsKeyword
-	steps := w.feature.specs.GetStringMap(stepsKey)
-	if len(steps) == 0 {
-		return nil, fail.InvalidRequestError("nothing to do")
-	}
-	order := strings.Split(pace, ",")
-
-	// Applies reverseproxy rules to make it functional (feature may need it during the install)
-	if w.action == installaction.Add && !s.SkipProxy {
-		if w.cluster != nil {
-			if xerr := w.setReverseProxy(); xerr != nil {
-				return nil, xerr
+	// Applies reverseproxy rules and security to make Feature functional (Feature may need it during the install)
+	switch w.action {
+	case installaction.Add:
+		if !s.SkipProxy {
+			if xerr = w.setReverseProxy(); xerr != nil {
+				return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
 			}
 		}
+
+		if xerr := w.setSecurity(); xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
+		}
+	case installaction.Remove:
+		// if !s.SkipProxy {
+		// 	rgw, xerr := w.identifyAvailableGateway()
+		// 	if xerr == nil {
+		// 		var found bool
+		// 		if found, xerr = rgw.IsFeatureInstalled(w.feature.task, "edgeproxy4subnet"); xerr == nil && found {
+		// 			xerr = w.unsetReverseProxy()
+		// 		}
+		// 	}
+		// 	if xerr != nil {
+		// 		return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
+		// 	}
+		// }
+		//
+		// if xerr := w.unsetSecurity(); xerr != nil {
+		// 	return nil, xerr
+		// }
 	}
 
 	// Now enumerate steps and execute each of them
@@ -498,14 +542,19 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
-		params := data.Map{
-			"stepName":  k,
-			"stepKey":   stepKey,
-			"stepMap":   stepMap,
-			"variables": v,
-		}
+		// params := data.Map{
+		// 	"stepName":  k,
+		// 	"stepKey":   stepKey,
+		// 	"stepMap":   stepMap,
+		// 	"variables": v,
+		// }
 
-		subtask, xerr := w.feature.task.StartInSubtask(w.taskLaunchStep, params)
+		subtask, xerr := w.feature.task.StartInSubtask(w.taskLaunchStep, taskLaunchStepParameters{
+			stepName:  k,
+			stepKey:   stepKey,
+			stepMap:   stepMap,
+			variables: v,
+		})
 		if xerr != nil {
 			return outcomes, xerr
 		}
@@ -514,12 +563,21 @@ func (w *worker) Proceed(v data.Map, s resources.FeatureSettings) (outcomes reso
 		if xerr != nil {
 			return outcomes, xerr
 		}
+
 		if tr != nil {
 			outcome := tr.(*resources.UnitResults)
 			_ = outcomes.Add(k, *outcome)
 		}
 	}
+
 	return outcomes, nil
+}
+
+type taskLaunchStepParameters struct {
+	stepName  string
+	stepKey   string
+	stepMap   map[string]interface{}
+	variables data.Map
 }
 
 // taskLaunchStep starts the step
@@ -535,52 +593,28 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	var (
-		anon              interface{}
-		stepName, stepKey string
-		stepMap           map[string]interface{}
-		vars              data.Map
-		ok                bool
+		anon interface{}
+		ok   bool
 	)
-	p := params.(data.Map)
+	p := params.(taskLaunchStepParameters)
 
-	if anon, ok = p["stepName"]; !ok {
-		return nil, fail.InvalidParameterError("params[stepName]", "is missing")
+	if p.stepName == "" {
+		return nil, fail.InvalidParameterError("param.stepName", "cannot be empty string")
 	}
-	if stepName, ok = anon.(string); !ok {
-		return nil, fail.InvalidParameterError("param[stepName]", "must be a string")
+	if p.stepKey == "" {
+		return nil, fail.InvalidParameterError("param.stepKey", "cannot be empty string")
 	}
-	if stepName == "" {
-		return nil, fail.InvalidParameterError("param[stepName]", "cannot be an empty string")
+	if p.stepMap == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.stepMap")
 	}
-	if anon, ok = p["stepKey"]; !ok {
-		return nil, fail.InvalidParameterError("params[stepKey]", "is missing")
-	}
-	if stepKey, ok = anon.(string); !ok {
-		return nil, fail.InvalidParameterError("param[stepKey]", "must be a string")
-	}
-	if stepKey == "" {
-		return nil, fail.InvalidParameterError("param[stepKey]", "cannot be an empty string")
-	}
-	if anon, ok = p["stepMap"]; !ok {
-		return nil, fail.InvalidParameterError("params[stepMap]", "is missing")
-	}
-	if stepMap, ok = anon.(map[string]interface{}); !ok {
-		return nil, fail.InvalidParameterError("params[stepMap]", "must be a map[string]interface{}")
-	}
-	if anon, ok = p["variables"]; !ok {
-		return nil, fail.InvalidParameterError("params[variables]", "is missing")
-	}
-	if vars, ok = anon.(data.Map); !ok {
-		return nil, fail.InvalidParameterError("params[variables]", "must be a data.Map")
-	}
-	if vars == nil {
-		return nil, fail.InvalidParameterError("params[variables]", "cannot be nil")
+	if p.variables == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params[variables]")
 	}
 
-	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), stepName))
+	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
-		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), stepName),
-		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), stepName),
+		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName),
+		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), p.stepName),
 		logrus.DebugLevel,
 	)
 
@@ -595,7 +629,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if w.target.TargetType() == featuretargettype.HOST {
 		hostsList, xerr = w.identifyHosts(map[string]string{"hosts": "1"})
 	} else {
-		anon, ok = stepMap[yamlTargetsKeyword]
+		anon, ok = p.stepMap[yamlTargetsKeyword]
 		if ok {
 			for i, j := range anon.(map[string]interface{}) {
 				switch j := j.(type) {
@@ -611,7 +645,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		} else {
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlTargetsKeyword)
+			return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlTargetsKeyword)
 		}
 
 		hostsList, xerr = w.identifyHosts(stepT)
@@ -633,28 +667,25 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	case installmethod.Dnf:
 		keyword = yamlPackageKeyword
 	}
-	anon, ok = stepMap[keyword]
+	runContent, ok = p.stepMap[keyword].(string)
 	if ok {
-		runContent = anon.(string)
 		// If 'run' content has to be altered, do it
 		if w.commandCB != nil {
 			runContent = w.commandCB(runContent)
 		}
 	} else {
 		msg := `syntax error in feature '%s' specification file (%s): no key '%s.%s' found`
-		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlRunKeyword)
+		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
 	}
 
 	// If there is an options file (for now specific to DCOS), upload it to the remote host
 	optionsFileContent := ""
-	anon, ok = stepMap[yamlOptionsKeyword]
-	if ok {
+	if anon, ok = p.stepMap[yamlOptionsKeyword]; ok {
 		for i, j := range anon.(map[string]interface{}) {
 			options[i] = j.(string)
 		}
 		var (
 			avails  = map[string]interface{}{}
-			ok      bool
 			content interface{}
 		)
 		complexity, xerr := w.cluster.GetComplexity(w.feature.task)
@@ -677,15 +708,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 		if ok {
 			optionsFileContent = content.(string)
-			vars["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
+			p.variables["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
 		}
 	} else {
-		vars["options"] = ""
+		p.variables["options"] = ""
 	}
 
 	wallTime := temporal.GetLongOperationTimeout()
-	anon, ok = stepMap[yamlTimeoutKeyword]
-	if ok {
+	if anon, ok = p.stepMap[yamlTimeoutKeyword]; ok {
 		if _, ok := anon.(int); ok {
 			wallTime = time.Duration(anon.(int)) * time.Minute
 		} else {
@@ -702,7 +732,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
-		"reserved_Step":    stepName,
+		"reserved_Step":    p.stepName,
 	})
 	if xerr != nil {
 		return nil, xerr
@@ -710,7 +740,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	// Checks if step can be performed in parallel on selected hosts
 	serial := false
-	anon, ok = stepMap[yamlSerialKeyword]
+	anon, ok = p.stepMap[yamlSerialKeyword]
 	if ok {
 		value, ok := anon.(string)
 		if ok {
@@ -722,16 +752,16 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	stepInstance := step{
 		Worker: w,
-		Name:   stepName,
+		Name:   p.stepName,
 		Action: w.action,
 		// Targets:            stepT,
 		Script:             templateCommand,
 		WallTime:           wallTime,
 		OptionsFileContent: optionsFileContent,
-		YamlKey:            stepKey,
+		YamlKey:            p.stepKey,
 		Serial:             serial,
 	}
-	r, xerr := stepInstance.Run(hostsList, vars, w.settings)
+	r, xerr := stepInstance.Run(hostsList, p.variables, w.settings)
 	// If an error occurred, don't do the remaining steps, fail immediately
 	if xerr != nil {
 		return nil, xerr
@@ -740,7 +770,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if !r.Successful() {
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
-			msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.Uncompleted())
+			msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), p.stepName, r.Uncompleted())
 			logrus.Errorf(strprocess.Capitalize(msg))
 			return &r, fail.NewError(msg)
 		}
@@ -750,7 +780,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 
 		// For any other situations, raise error and break
-		msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), stepName, r.ErrorMessages())
+		msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), p.stepName, r.ErrorMessages())
 		logrus.Errorf(strprocess.Capitalize(msg))
 		return &r, fail.NewError(msg)
 	}
@@ -767,7 +797,7 @@ func (w *worker) validateContextForCluster() fail.Error {
 		return xerr
 	}
 
-	yamlKey := "feature.suitableFor.cluster"
+	const yamlKey = "feature.suitableFor.cluster"
 	if w.feature.specs.IsSet(yamlKey) {
 		yamlFlavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range yamlFlavors {
@@ -789,7 +819,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 	}
 
 	ok := false
-	yamlKey := "feature.suitableFor.host"
+	const yamlKey = "feature.suitableFor.host"
 	if w.feature.specs.IsSet(yamlKey) {
 		value := strings.ToLower(w.feature.specs.GetString(yamlKey))
 		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
@@ -859,25 +889,44 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, f
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy() (xerr fail.Error) {
-	rules, ok := w.feature.specs.Get("feature.proxy.rules").([]interface{})
+	if w.feature.task == nil {
+		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
+	}
+	task := w.feature.task
+
+	const yamlKey = "feature.proxy.rules"
+	// rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[string]interface{})
+	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
 
+	// FIXME: there are valid scenarii for reverse proxy settings when feature applied to Host...
 	if w.cluster == nil {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
 
-	if w.feature.task.IsNull() {
-		return fail.InvalidParameterError("w.feature.task", "nil task in setReverseProxy, cannot be nil")
-	}
-
-	svc := w.cluster.GetService()
-	netprops, xerr := w.cluster.GetNetworkConfig(w.feature.task)
+	rgw, xerr := w.identifyAvailableGateway()
 	if xerr != nil {
 		return xerr
 	}
-	subnet, xerr := LoadSubnet(w.feature.task, svc, "", netprops.SubnetID)
+
+	found, xerr := rgw.IsFeatureInstalled(w.feature.task, "edgeproxy4subnet")
+	if xerr != nil {
+		return xerr
+	}
+	if !found {
+		return nil
+	}
+
+	svc := w.cluster.GetService()
+
+	netprops, xerr := w.cluster.GetNetworkConfig(task)
+	if xerr != nil {
+		return xerr
+	}
+
+	subnet, xerr := LoadSubnet(task, svc, "", netprops.SubnetID)
 	if xerr != nil {
 		return xerr
 	}
@@ -886,8 +935,9 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 	}
+
 	var secondaryKongController *KongController
-	if subnet.HasVirtualIP(w.feature.task) {
+	if subnet.HasVirtualIP(task) {
 		if secondaryKongController, xerr = NewKongController(svc, subnet, false); xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 		}
@@ -900,45 +950,22 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 		secondaryGatewayVariables = w.variables.Clone()
 	}
 	for _, r := range rules {
-		targets := stepTargets{}
-		rule, ok := r.(map[interface{}]interface{})
-		if !ok {
-			return fail.InvalidParameterError("r", "is not a rule (map)")
-		}
-		anon, ok := rule["targets"].(map[interface{}]interface{})
-		if !ok {
-			// If no 'targets' key found, applies on host only
-			if w.cluster != nil {
-				continue
-			}
-			targets[targetHosts] = "yes"
-		} else {
-			for i, j := range anon {
-				switch j := j.(type) {
-				case bool:
-					if j {
-						targets[i.(string)] = "yes"
-					} else {
-						targets[i.(string)] = "no"
-					}
-				case string:
-					targets[i.(string)] = j
-				}
-			}
-		}
+
+		rule := r.(map[interface{}]interface{})
+		targets := w.interpretRuleTargets(rule)
 		hosts, xerr := w.identifyHosts(targets)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply proxy rules: %s")
 		}
 
 		for _, h := range hosts {
-			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task); xerr != nil {
 				return xerr
 			}
 			primaryGatewayVariables["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+			xerr = h.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -956,10 +983,10 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-			tP, xerr := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
-				"ctrl": primaryKongController,
-				"rule": rule,
-				"vars": &primaryGatewayVariables,
+			tP, xerr := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+				controller: primaryKongController,
+				rule:       r.(map[interface{}]interface{}),
+				variables:  &primaryGatewayVariables,
 			})
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to apply proxy rules")
@@ -967,13 +994,13 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 			var errS fail.Error
 			if secondaryKongController != nil {
-				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(task); xerr != nil {
 					return xerr
 				}
 				secondaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain = ""
-				xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				xerr = h.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -990,10 +1017,10 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				}
 				secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-				tS, errOp := w.feature.task.StartInSubtask(asyncApplyProxyRule, data.Map{
-					"ctrl": secondaryKongController,
-					"rule": rule,
-					"vars": &secondaryGatewayVariables,
+				tS, errOp := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+					controller: secondaryKongController,
+					rule:       rule,
+					variables:  &secondaryGatewayVariables,
 				})
 				if errOp == nil {
 					_, errOp = tS.Wait()
@@ -1013,25 +1040,20 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	return nil
 }
 
-func asyncApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
-	ctrl, ok := params.(data.Map)["ctrl"].(*KongController)
+type taskApplyProxyRuleParameters struct {
+	controller *KongController
+	rule       map[interface{}]interface{}
+	variables  *data.Map
+}
+
+func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
+	p := params.(taskApplyProxyRuleParameters)
+	hostName, ok := (*p.variables)["Hostname"].(string)
 	if !ok {
-		return nil, fail.InvalidParameterError("ctrl", "is not a *KongController")
-	}
-	rule, ok := params.(data.Map)["rule"].(map[interface{}]interface{})
-	if !ok {
-		return nil, fail.InvalidParameterError("rule", "is not a map")
-	}
-	vars, ok := params.(data.Map)["vars"].(*data.Map)
-	if !ok {
-		return nil, fail.InvalidParameterError("vars", "is not a '*data.Map'")
-	}
-	hostName, ok := (*vars)["Hostname"].(string)
-	if !ok {
-		return nil, fail.InvalidParameterError("Hostname", "is not a string")
+		return nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")
 	}
 
-	ruleName, xerr := ctrl.Apply(rule, vars)
+	ruleName, xerr := p.controller.Apply(p.rule, p.variables)
 	if xerr != nil {
 		msg := "failed to apply proxy rule"
 		if ruleName != "" {
@@ -1163,4 +1185,264 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 	}
 
 	return dataBuffer.String(), nil
+}
+
+// setSecurity applies the security rules defined in specification file (if there are some)
+func (w *worker) setSecurity() (xerr fail.Error) {
+	if xerr = w.setNetworkingSecurity(); xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+// setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
+func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
+	if w.feature.task == nil {
+		return fail.InvalidInstanceContentError("w.feature.task", "cannot be nil")
+	}
+	task := w.feature.task
+
+	const yamlKey = "feature.security.networking"
+	if ok := w.feature.specs.IsSet(yamlKey); !ok {
+		return nil
+	}
+
+	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
+	if !ok || len(rules) == 0 {
+		return nil
+	}
+
+	var (
+		svc iaas.Service
+		rs  resources.Subnet
+	)
+	if w.cluster != nil {
+		svc = w.cluster.GetService()
+		netprops, xerr := w.cluster.GetNetworkConfig(task)
+		if xerr != nil {
+			return xerr
+		}
+		if rs, xerr = LoadSubnet(task, svc, netprops.NetworkID, netprops.SubnetID); xerr != nil {
+			return xerr
+		}
+	} else if w.host != nil {
+		if rs, xerr = w.host.GetDefaultSubnet(task); xerr != nil {
+			return xerr
+		}
+	}
+	defer rs.Dispose() // will not used the instance outside of the function
+
+	// gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+
+	forFeature := " for feature '" + w.feature.GetName() + "'"
+
+	for k, rule := range rules {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
+		r := rule.(map[interface{}]interface{})
+		targets := w.interpretRuleTargets(r)
+
+		// If security rules concerns gateways, update subnet Security Group for gateways
+		if _, ok := targets["gateways"]; ok {
+
+			description, ok := r["name"].(string)
+			if !ok {
+				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)
+			}
+
+			gwSG, xerr := rs.InspectGatewaySecurityGroup(task)
+			if xerr != nil {
+				return xerr
+			}
+			defer gwSG.Dispose()
+
+			sgRule := abstract.NewSecurityGroupRule()
+			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
+			sgRule.EtherType = ipversion.IPv4
+			sgRule.Protocol, _ = r["protocol"].(string)
+			sgRule.Sources = []string{"0.0.0.0/0"}
+			sgRule.Targets = []string{gwSG.GetID()}
+
+			var commaSplitted []string
+			if ports, ok := r["ports"].(int); ok {
+				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports) + forFeature
+				sgRule.PortFrom = int32(ports)
+
+				if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrDuplicate:
+						// This rule already exists, consider as a success and continue
+					default:
+						return xerr
+					}
+				}
+			} else if ports, ok := r["ports"].(string); ok {
+				commaSplitted = strings.Split(ports, ",")
+				if len(commaSplitted) > 0 {
+					var (
+						portFrom, portTo int
+						err              error
+					)
+					for _, v := range commaSplitted {
+						sgRule.Description = description
+						dashSplitted := strings.Split(v, "-")
+						if dashCount := len(dashSplitted); dashCount > 0 {
+							if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
+								return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+							}
+							if len(dashSplitted) == 2 {
+								if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
+									return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+								}
+							}
+							sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
+
+							sgRule.PortFrom = int32(portFrom)
+							sgRule.PortTo = int32(portTo)
+						}
+
+						sgRule.Description += forFeature
+						if xerr = gwSG.AddRule(w.feature.task, sgRule); xerr != nil {
+							switch xerr.(type) {
+							case *fail.ErrDuplicate:
+								// This rule already exists, consider as a success and continue
+							default:
+								return xerr
+							}
+						}
+					}
+				}
+			} else {
+				return fail.SyntaxError("invalid value for ports in rule '%s'")
+			}
+
+		}
+	}
+
+	// VPL: for the future ? For now, targets == gateways only supported...
+	// hosts, xerr := w.identifyHosts(targets)
+	// if xerr != nil {
+	// 	return fail.Wrap(xerr, "failed to apply proxy rules: %s")
+	// }
+	//
+	// 	if _, ok = targets["masters"]; ok {
+	// 	}
+	//
+	// 	if _, ok = targets["nodes"]; ok {
+	// 	}
+	//
+	// 	for _, h := range hosts {
+	// 		if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+	// 			return xerr
+	// 		}
+	// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
+	// 		domain := ""
+	// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 				hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	// 				if !ok {
+	// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 				}
+	// 				domain = hostDescriptionV1.Domain
+	// 				if domain != "" {
+	// 					domain = "." + domain
+	// 				}
+	// 				return nil
+	// 			})
+	// 		})
+	// 		if xerr != nil {
+	// 			return xerr
+	// 		}
+	//
+	// 		primaryGatewayVariables["Hostname"] = h.GetName() + domain
+	//
+	// 		tP, xerr := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
+	// 			"ctrl": primaryKongController,
+	// 			"rule": rule,
+	// 			"vars": &primaryGatewayVariables,
+	// 		})
+	// 		if xerr != nil {
+	// 			return fail.Wrap(xerr, "failed to apply proxy rules")
+	// 		}
+	//
+	// 		var errS fail.Error
+	// 		if secondaryKongController != nil {
+	// 			if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
+	// 				return xerr
+	// 			}
+	// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
+	// 			domain = ""
+	// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	// 					if !ok {
+	// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 					}
+	// 					domain = hostDescriptionV1.Domain
+	// 					if domain != "" {
+	// 						domain = "." + domain
+	// 					}
+	// 					return nil
+	// 				})
+	// 			})
+	// 			if xerr != nil {
+	// 				return xerr
+	// 			}
+	// 			secondaryGatewayVariables["Hostname"] = h.GetName() + domain
+	//
+	// 			tS, errOp := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
+	// 				"ctrl": secondaryKongController,
+	// 				"rule": rule,
+	// 				"vars": &secondaryGatewayVariables,
+	// 			})
+	// 			if errOp == nil {
+	// 				_, errOp = tS.Wait()
+	// 			}
+	// 			errS = errOp
+	// 		}
+	//
+	// 		_, errP := tP.Wait()
+	// 		if errP != nil {
+	// 			return errP
+	// 		}
+	// 		if errS != nil {
+	// 			return errS
+	// 		}
+	// 	}
+	// }
+	return nil
+}
+
+// interpretRuleTargets interprets the targets of a rule
+func (w worker) interpretRuleTargets(rule map[interface{}]interface{}) stepTargets {
+	targets := stepTargets{}
+
+	anon, ok := rule["targets"].(map[interface{}]interface{})
+	if !ok {
+		// If no 'targets' key found, applies on host only
+		if w.cluster != nil {
+			return nil
+		}
+		targets[targetHosts] = "yes"
+	} else {
+		for i, j := range anon {
+			switch j := j.(type) {
+			case bool:
+				if j {
+					targets[i.(string)] = "yes"
+				} else {
+					targets[i.(string)] = "no"
+				}
+			case string:
+				targets[i.(string)] = j
+			}
+		}
+	}
+
+	return targets
 }

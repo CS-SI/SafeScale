@@ -54,8 +54,8 @@ func nullNetwork() resources.Network {
 
 // NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
-	if svc.IsNull() {
-		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
+	if svc == nil {
+		return nullNetwork(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	coreInstance, xerr := newCore(svc, "network", networksFolderName, &abstract.Network{})
@@ -68,10 +68,10 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 
 // LoadNetwork loads the metadata of a subnet
 func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-	if task.IsNull() {
-		return nullNetwork(), fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nullNetwork(), fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc.IsNull() {
+	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
 	if ref == "" {
@@ -137,11 +137,13 @@ func (rn *network) IsNull() bool {
 
 // Create creates a network
 func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(
@@ -151,7 +153,6 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := rn.GetService()
@@ -195,15 +196,17 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 }
 
 // Browse walks through all the metadata objects in subnet
-func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error {
+func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "can't be nil")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "can't be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	return rn.core.BrowseFolder(task, func(buf []byte) fail.Error {
@@ -218,17 +221,18 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 
 // Delete deletes subnet
 func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	rn.SafeLock(task)
 	defer rn.SafeUnlock(task)
@@ -328,11 +332,13 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 
 // GetCIDR returns the CIDR of the subnet
 func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	cidr = ""
@@ -356,11 +362,13 @@ func (rn network) CIDR(task concurrency.Task) string {
 
 // ToProtocol converts resources.Network to protocol.Network
 func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, true, "").Entering()
@@ -399,12 +407,14 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (rn network) InspectSubnet(task concurrency.Task, ref string) (resources.Subnet, fail.Error) {
+func (rn network) InspectSubnet(task concurrency.Task, ref string) (_ resources.Subnet, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rn.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	return LoadSubnet(task, rn.GetService(), rn.GetID(), ref)

@@ -945,7 +945,7 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID = strings.TrimSpace(hostID); hostID == "" {
 		return fail.InvalidParameterError("host", "cannot be empty string")
@@ -962,7 +962,7 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 	if xerr != nil {
 		return xerr
 	}
-	hostPorts, xerr := s.listPorts(ports.ListOpts{
+	hostPorts, xerr := s.rpcListPorts(ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
@@ -995,7 +995,7 @@ func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 	if hostID = strings.TrimSpace(hostID); hostID == "" {
 		return fail.InvalidParameterError("host", "cannot be empty string")
@@ -1012,7 +1012,7 @@ func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 	if xerr != nil {
 		return xerr
 	}
-	hostPorts, xerr := s.listPorts(ports.ListOpts{
+	hostPorts, xerr := s.rpcListPorts(ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
@@ -1046,7 +1046,7 @@ func (s Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
-		return fail.InvalidParameterError("vip", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
 	for _, v := range vip.Hosts {
@@ -1061,93 +1061,4 @@ func (s Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 		},
 		NormalizeError,
 	)
-}
-
-// createPort creates a port
-func (s Stack) createPort(req ports.CreateOpts) (port *ports.Port, xerr fail.Error) {
-	if s.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
-			return innerErr
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return port, nil
-}
-
-func (s Stack) deletePort(id string) fail.Error {
-	if s.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if id = strings.TrimSpace(id); id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
-	}
-
-	if _, xerr := s.inspectPort(id); xerr != nil {
-		return fail.NotFoundError("failed to query port %s", id)
-	}
-
-	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			return ports.Delete(s.NetworkClient, id).ExtractErr()
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
-}
-
-// listPorts lists all ports available
-func (s Stack) listPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
-	var allPages pagination.Page
-	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
-			return innerErr
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-	r, err := ports.ExtractPorts(allPages)
-	return r, NormalizeError(err)
-}
-
-// // updatePort updates the settings of a port
-// func (s Stack) updatePort(id string, options ports.UpdateOpts) fail.Error {
-// 	return stacks.RetryableRemoteCall(
-// 		func() error {
-// 			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
-// 			_ = resp
-// 			return NormalizeError(innerErr)
-// 		},
-// 		NormalizeError,
-// 	)
-// }
-
-// inspectPort returns port from its ID
-func (s Stack) inspectPort(id string) (port *ports.Port, xerr fail.Error) {
-	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
-			return innerErr
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-	return port, nil
 }

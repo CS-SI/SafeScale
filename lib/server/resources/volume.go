@@ -30,7 +30,6 @@ import (
 type Volume interface {
 	Metadata
 	data.Identifiable
-	data.NullValue
 
 	Attach(task concurrency.Task, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
 	Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network

@@ -14,40 +14,21 @@
  * limitations under the License.
  */
 
-package propertiesv1
+package operations
 
 import (
-	"reflect"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func TestFeatures_Clone(t *testing.T) {
-	ct := newClusterFeatures()
-
-	ct.Installed["fair"] = &ClusterInstalledFeature{
-		Requires: map[string]struct{}{
-			"something": struct{}{},
-		},
-	}
-	ct.Disabled["kind"] = struct{}{}
-
-	clonedCt, ok := ct.Clone().(*ClusterFeatures)
-	if !ok {
-		t.Fail()
+func actionFromError(err error) string {
+	if err == nil {
+		return ""
 	}
 
-	assert.Equal(t, ct, clonedCt)
-	clonedCt.Installed["fair"] = &ClusterInstalledFeature{
-		Requires: map[string]struct{}{
-			"commitment": struct{}{},
-		},
-	}
-
-	areEqual := reflect.DeepEqual(ct, clonedCt)
-	if areEqual {
-		t.Error("It's a shallow clone !")
-		t.Fail()
+	switch err.(type) {
+	case *fail.ErrAborted:
+		return "abort"
+	default:
+		return "failure"
 	}
 }

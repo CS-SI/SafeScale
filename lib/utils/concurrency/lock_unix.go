@@ -3,9 +3,9 @@
 package concurrency
 
 import (
-    "golang.org/x/sys/unix"
+	"golang.org/x/sys/unix"
 )
 
 func goid() int { // nolint
-    return unix.Gettid()
+	return unix.Gettid()
 }

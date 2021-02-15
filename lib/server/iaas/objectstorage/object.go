@@ -226,7 +226,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 	if source == nil {
-		return fail.InvalidParameterError("source", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("source")
 	}
 	if o.bucket == nil {
 		return fail.InvalidInstanceContentError("o.bucket", "cannot be nil")

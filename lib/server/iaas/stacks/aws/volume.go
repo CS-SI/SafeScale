@@ -44,7 +44,6 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		return nil, xerr
 	}
 
-	// FIXME: Defer volume destruction
 	defer func() {
 		if xerr != nil {
 			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
@@ -65,7 +64,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 
 func (s stack) rpcDeleteVolume(id *string) fail.Error {
 	if id == nil {
-		return fail.InvalidParameterError("id", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("id")
 	}
 	if *id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty AWS String")
@@ -84,7 +83,7 @@ func (s stack) rpcDeleteVolume(id *string) fail.Error {
 }
 func (s stack) rpcCreateVolume(name *string, size int64, speed string) (*ec2.Volume, fail.Error) {
 	if name == nil {
-		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be nil")
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
 	}
 	if aws.StringValue(name) == "" {
 		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
@@ -191,7 +190,7 @@ func (s stack) rpcDescribeVolumes(ids []*string) ([]*ec2.Volume, fail.Error) {
 
 func (s stack) rpcDescribeVolumeByID(id *string) (*ec2.Volume, fail.Error) {
 	if id == nil {
-		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be nil")
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("id")
 	}
 	if aws.StringValue(id) == "" {
 		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be empty AWS String")

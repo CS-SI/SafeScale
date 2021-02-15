@@ -18,9 +18,12 @@ package openstack
 
 import (
 	"encoding/json"
+	"strings"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	"strings"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -29,7 +32,7 @@ import (
 func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if id == "" {
-		return nullServer, fail.InvalidParameterError("id", "cannot be empty string")
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
 	var server *servers.Server
@@ -49,7 +52,7 @@ func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
-		return nullServer, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
@@ -127,4 +130,149 @@ func (s Stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Erro
 	}
 
 	return out, nil
+}
+
+// rpcCreateServer calls openstack to create a server
+func (s Stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, userdata []byte, az string) (*servers.Server, fail.Error) {
+	nullServer := &servers.Server{}
+	if name = strings.TrimSpace(name); name == "" {
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+	if templateID = strings.TrimSpace(templateID); templateID == "" {
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("templateID")
+	}
+	if imageID = strings.TrimSpace(imageID); imageID == "" {
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("imageID")
+	}
+	if az == "" {
+		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("az")
+	}
+
+	srvOpts := servers.CreateOpts{
+		Name:             name,
+		Networks:         networks,
+		FlavorRef:        templateID,
+		ImageRef:         imageID,
+		UserData:         userdata,
+		AvailabilityZone: az,
+	}
+
+	var server *servers.Server
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			server, innerErr = servers.Create(s.ComputeClient, srvOpts).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return &servers.Server{}, xerr
+	}
+	return server, nil
+}
+
+// rpcDeleteServer calls openstack to delete a server
+func (s Stack) rpcDeleteServer(id string) fail.Error {
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	return stacks.RetryableRemoteCall(
+		func() error {
+			return servers.Delete(s.ComputeClient, id).ExtractErr()
+		},
+		NormalizeError,
+	)
+}
+
+// rpcCreatePort creates a port
+func (s Stack) rpcCreatePort(req ports.CreateOpts) (port *ports.Port, xerr fail.Error) {
+	xerr = stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return port, nil
+}
+
+// rpcDeletePort deletes a port
+func (s Stack) rpcDeletePort(id string) fail.Error {
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	return stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			return ports.Delete(s.NetworkClient, id).ExtractErr()
+		},
+		NormalizeError,
+	)
+}
+
+// rpcListPorts lists all ports available
+func (s Stack) rpcListPorts(options ports.ListOpts) ([]ports.Port, fail.Error) {
+	var (
+		emptyList []ports.Port
+		allPages  pagination.Page
+	)
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			allPages, innerErr = ports.List(s.NetworkClient, options).AllPages()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return emptyList, xerr
+	}
+
+	r, err := ports.ExtractPorts(allPages)
+	if err != nil {
+		return emptyList, NormalizeError(err)
+	}
+	return r, nil
+}
+
+// rpcUpdatePort updates the settings of a port
+func (s Stack) rpcUpdatePort(id string, options ports.UpdateOpts) fail.Error {
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	return stacks.RetryableRemoteCall(
+		func() error {
+			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
+			_ = resp
+			return innerErr
+		},
+		NormalizeError,
+	)
+}
+
+// rpcGetPort returns port information from its ID
+func (s Stack) rpcGetPort(id string) (port *ports.Port, xerr fail.Error) {
+	nullPort := &ports.Port{}
+
+	if id == "" {
+		return nullPort, fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	xerr = stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nullPort, xerr
+	}
+
+	return port, nil
 }

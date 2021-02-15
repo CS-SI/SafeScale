@@ -40,6 +40,11 @@ type provider struct {
 	tenantParameters map[string]interface{}
 }
 
+// IsNull returns true if the instance is considered as a null value
+func (p *provider) IsNull() bool {
+	return p == nil || p.Stack == nil
+}
+
 func (p *provider) InspectImage(id string) (*abstract.Image, fail.Error) {
 	panic("implement me")
 }
@@ -247,6 +252,31 @@ func (p provider) GetName() string {
 // AddRuleToSecurityGroup adds a rule to a security group
 func (p *provider) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGroupRule) fail.Error {
 	return fail.NotImplementedError()
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			// "g.*-.*",
+			// "t.*-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
 }
 
 func init() {

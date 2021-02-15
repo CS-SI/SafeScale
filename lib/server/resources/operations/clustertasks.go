@@ -39,24 +39,28 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// FIXME: validate params
 	return nil, c.service.StartHost(params.(string))
 }
 
-func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// FIXME: validate params
@@ -70,23 +74,25 @@ type taskInstallGatewayParameters struct {
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
 func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	p, ok := params.(taskInstallGatewayParameters)
 	if !ok {
 		return result, fail.InvalidParameterError("params", "must be a 'taskInstallGatewayParameters'")
 	}
-	if p.Host.IsNull() {
-		return result, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return result, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	hostLabel := p.Host.GetName()
@@ -122,11 +128,13 @@ type taskConfigureGatewayParameters struct {
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
 func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// validate and convert parameters
@@ -134,13 +142,13 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 	if !ok {
 		return result, fail.InvalidParameterError("params", "must be a 'taskConfigureGatewayParameters'")
 	}
-	if p.Host.IsNull() {
-		return result, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return result, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	logrus.Debugf("[%s] starting configuration...", p.Host.GetName())
 
@@ -163,16 +171,18 @@ type taskCreateMastersParameters struct {
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
 func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMastersParameters)
@@ -233,17 +243,18 @@ type taskCreateMasterParameters struct {
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMasterParameters)
@@ -290,6 +301,9 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			defer task.DisarmAbortSignal()()
+
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -302,7 +316,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove master from Cluster metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -349,6 +363,9 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			defer task.DisarmAbortSignal()()
+
 			if derr := rh.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
@@ -515,16 +532,18 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	logrus.Debugf("[cluster %s] Configuring masters...", c.GetName())
 	started := time.Now()
@@ -579,16 +598,18 @@ type taskConfigureMasterParameters struct {
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate params
 	p, ok := params.(taskConfigureMasterParameters)
@@ -599,8 +620,8 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	if p.Index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
-	if p.Host.IsNull() {
-		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	started := time.Now()
@@ -637,11 +658,13 @@ type taskCreateNodesParameters struct {
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert then validate params
@@ -656,7 +679,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	clusterName := c.GetName()
 
@@ -707,14 +730,14 @@ type taskCreateNodeParameters struct {
 // taskCreateNode creates a node in the Cluster
 // This function is intended to be call as a goroutine
 func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
-	defer fail.OnPanic(&xerr)
 
 	// Convert then validate parameters
 	p, ok := params.(taskCreateNodeParameters)
@@ -728,7 +751,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	hostLabel := fmt.Sprintf("node #%d", p.index)
 	logrus.Debugf("[%s] starting Host creation...", hostLabel)
@@ -765,6 +788,9 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			defer task.DisarmAbortSignal()()
+
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -777,7 +803,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove master from Cluster metadata"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", actionFromError(xerr)))
 			}
 		}
 	}()
@@ -824,8 +850,11 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
+			// Disable abort signal during the clean up
+			defer task.DisarmAbortSignal()()
+
 			if derr := rh.Delete(task); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", rh.GetName()))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), rh.GetName()))
 			}
 		}
 	}()
@@ -911,18 +940,20 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	clusterName := c.GetName()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	list, err := c.ListNodeIDs(task)
 	if err != nil {
@@ -982,11 +1013,13 @@ type taskConfigureNodeParameters struct {
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
 func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -997,13 +1030,13 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	if p.Index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
-	if p.Host.IsNull() {
-		return nil, fail.InvalidParameterError("params.Host", "cannot be null value of 'resources.Host'")
+	if p.Host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Host.GetName())
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
@@ -1030,12 +1063,14 @@ type taskDeleteHostOnFailureParameters struct {
 }
 
 // taskDeleteHostOnFailure deletes a host
-func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -1057,16 +1092,19 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 }
 
 type taskDeleteNodeParameters struct {
-	node *propertiesv3.ClusterNode
+	node   *propertiesv3.ClusterNode
 	master *host
 }
 
 func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	// defer fail.OnExitLogError(&xerr)
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -1077,9 +1115,12 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	if p.node == nil {
 		return nil, fail.InvalidParameterError("params.node", "cannot be nil")
 	}
-	// if p.master.IsNull() {
-	// 	return nil, fail.InvalidParameterError("params.master", "cannot be null value of 'resources.Host'")
-	// }
+
+	defer func() {
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
+		}
+	}()
 
 	logrus.Debugf("Deleting Node '%s'", p.node.Name)
 	var host resources.Host
@@ -1090,9 +1131,11 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if xerr := c.deleteNode(task, host, p.master); xerr != nil {
-		logrus.Errorf("Failed to delete Node '%s'", p.node.Name)
 		return nil, xerr
 	}
 
@@ -1101,11 +1144,13 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 }
 
 func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task.IsNull() {
-		return nil, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	// Convert and validate params
@@ -1124,6 +1169,9 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
+	}
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	logrus.Debugf("Deleting Master '%s'", p.node.Name)

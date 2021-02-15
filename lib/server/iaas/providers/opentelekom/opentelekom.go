@@ -50,7 +50,7 @@ func New() providers.Provider {
 	return &provider{}
 }
 
-// IsNull tells if the instance represents an null value
+// IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
@@ -246,6 +246,31 @@ func (p provider) GetCapabilities() providers.Capabilities {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
 	}
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			// "g.*-.*",
+			// "t.*-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
 }
 
 // init registers the opentelekom provider

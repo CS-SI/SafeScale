@@ -27,22 +27,22 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type ClusterInstalledFeature struct {
-	RequiredBy []string `json:"required_by,omitempty"` // tells what feature(s) needs this one
-	Requires   []string `json:"requires,omitempty"`
+	RequiredBy map[string]struct{} `json:"required_by,omitempty"` // tells what feature(s) needs this one
+	Requires   map[string]struct{} `json:"requires,omitempty"`
 }
 
-// newClusterInstalledFeature ...
-func newClusterInstalledFeature() *ClusterInstalledFeature {
+// NewClusterInstalledFeature ...
+func NewClusterInstalledFeature() *ClusterInstalledFeature {
 	return &ClusterInstalledFeature{
-		RequiredBy: []string{},
-		Requires:   []string{},
+		RequiredBy: map[string]struct{}{},
+		Requires:   map[string]struct{}{},
 	}
 }
 
 // Clone ...
 // satisfies interface data.Clonable
 func (cif ClusterInstalledFeature) Clone() data.Clonable {
-	return newClusterInstalledFeature().Replace(&cif)
+	return NewClusterInstalledFeature().Replace(&cif)
 }
 
 // Replace ...
@@ -54,10 +54,14 @@ func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
 	}
 
 	src := p.(*ClusterInstalledFeature)
-	cif.RequiredBy = make([]string, len(src.RequiredBy))
-	copy(cif.RequiredBy, src.RequiredBy)
-	cif.Requires = make([]string, len(src.Requires))
-	copy(cif.Requires, src.Requires)
+	cif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
+	for k := range src.RequiredBy {
+		cif.RequiredBy[k] = struct{}{}
+	}
+	cif.Requires = make(map[string]struct{}, len(src.Requires))
+	for k := range src.Requires {
+		cif.Requires[k] = struct{}{}
+	}
 	return cif
 }
 

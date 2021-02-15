@@ -32,7 +32,7 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Erro
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
@@ -69,7 +69,7 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 		return nullAKP, fail.InvalidInstanceError()
 	}
 	if id == "" {
-		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
+		return nullAKP, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
@@ -121,7 +121,7 @@ func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return fail.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
