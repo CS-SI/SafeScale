@@ -19,6 +19,7 @@
 package local
 
 import (
+	"regexp"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -302,6 +303,11 @@ func (provider *provider) EnableSecurityGroup(*abstract.SecurityGroup) fail.Erro
 
 func (provider *provider) DisableSecurityGroup(*abstract.SecurityGroup) fail.Error {
 	return gReport
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	return nil
 }
 
 func init() {

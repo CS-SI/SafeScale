@@ -248,6 +248,31 @@ func (p provider) GetCapabilities() providers.Capabilities {
 	}
 }
 
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			// "g.*-.*",
+			// "t.*-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
+}
+
 // init registers the opentelekom provider
 func init() {
 	iaas.Register("opentelekom", &provider{})

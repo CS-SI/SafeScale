@@ -273,10 +273,12 @@ func (svc service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 	if err != nil {
 		return nil, err
 	}
+
 	if all {
 		return allTemplates, nil
 	}
-	return svc.reduceTemplates(allTemplates), nil
+
+	return svc.reduceTemplates(allTemplates, svc.whitelistTemplateREs, svc.blacklistTemplateREs), nil
 }
 
 // FindTemplateByName returns the template by its name
@@ -328,13 +330,16 @@ func (svc service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) 
 	return template, nil
 }
 
-func (svc service) reduceTemplates(tpls []abstract.HostTemplate) []abstract.HostTemplate {
+// reduceTemplates filters from template slice the entries satisfyin whitelist and blacklist regexps
+func (svc service) reduceTemplates(tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp) []abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
-	if len(svc.whitelistTemplateREs) > 0 {
-		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.whitelistTemplateREs))
+	if len(whitelistREs) > 0 {
+		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.whitelistTemplateREs))
+		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(whitelistREs))
 	}
-	if len(svc.blacklistTemplateREs) > 0 {
-		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.blacklistTemplateREs))
+	if len(blacklistREs) > 0 {
+		//		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.blacklistTemplateREs))
+		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(blacklistREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
 		} else {
@@ -369,12 +374,11 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 	defer tracer.Exiting()
 
 	allTpls, rerr := svc.ListTemplates(false)
-	scannerTpls := map[string]bool{}
 	if rerr != nil {
 		return nil, rerr
 	}
 
-	// FIXME: Prevent GPUs when user sends a 0
+	scannerTpls := map[string]bool{}
 	askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
 	if askedForSpecificScannerInfo {
 		_ = os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
@@ -396,10 +400,12 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 			if rerr != nil {
 				return nil, rerr
 			}
+
 			region, ok := authOpts.Get("Region")
 			if !ok {
 				return nil, fail.SyntaxError("region value unset")
 			}
+
 			folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
 
 			imageList, err := db.ReadAll(folder)
@@ -458,6 +464,12 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 		}
 	}
 
+	reducedTmpls := svc.reduceTemplates(allTpls, svc.whitelistTemplateREs, svc.blacklistTemplateREs)
+	if sizing.MinGPU < 1 {
+		// Force filtering of known templates with GPU from template list whensizing explicitely wants no GPU
+		reducedTmpls = svc.reduceTemplates(reducedTmpls, nil, svc.GetRegexpsOfTemplatesWithGPU())
+	}
+
 	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
 		logrus.Debugf("Looking for a host template as small as possible")
 	} else {
@@ -492,7 +504,7 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg))
 	}
 
-	for _, t := range allTpls {
+	for _, t := range reducedTmpls {
 		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.GPUNumber, t.DiskSize)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {

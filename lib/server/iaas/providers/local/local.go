@@ -254,6 +254,31 @@ func (p *provider) AddRuleToSecurityGroup(groupRef string, rule abstract.Securit
 	return fail.NotImplementedError()
 }
 
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			// "g.*-.*",
+			// "t.*-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
+}
+
 func init() {
 	// log.Debug("Registering local provider")
 	iaas.Register("local", &provider{})

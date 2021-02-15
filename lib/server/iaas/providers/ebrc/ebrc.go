@@ -20,6 +20,7 @@ package ebrc
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"regexp"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -167,6 +168,31 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			// "g.*-.*",
+			// "t.*-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
 }
 
 func init() {
