@@ -94,6 +94,12 @@ $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PA
 endif
 endif
 
+ifeq (, $(GOOS))
+RACE_CHECK=-race
+else
+RACE_CHECK=
+endif
+
 # Life is better with colors
 COM_COLOR   = \033[0;34m
 OBJ_COLOR   = \033[0;36m
