@@ -96,10 +96,12 @@ func (handler *shareHandler) Create(
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	objh, xerr := hostfactory.Load(task, handler.job.GetService(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return objs, objs.Create(task, shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 

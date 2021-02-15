@@ -723,6 +723,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					if derr := s.rpcDeleteServer(server.ID); derr != nil {
 						logrus.Debugf(derr.Error())
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
+						switch derr.(type) {
+						case *fail.ErrNotAvailable: // If host is not available (ie in error state), stop retries, something is wrong on provider side
+							xerr = retry.StopRetryError(innerXErr)
+						}
 					} else {
 						logrus.Debugf("unresponsive server deleted")
 					}
