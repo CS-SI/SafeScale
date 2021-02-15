@@ -606,8 +606,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), ahf.Core.Name))
@@ -630,8 +629,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			if derr := rh.core.Delete(task); derr != nil {
 				logrus.Errorf("cleaning up on %s, failed to delete host '%s' metadata: %v", actionFromError(xerr), ahf.Core.Name, derr)
@@ -710,8 +708,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 	defer func() {
 		// Disable abort signal during the clean up
-		task.IgnoreAbortSignal(true)
-		defer task.IgnoreAbortSignal(false)
+		defer task.DisarmAbortSignal()()
 
 		rh.undoSetSecurityGroups(task, &xerr, hostReq.KeepOnFailure)
 	}()
@@ -766,8 +763,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 	defer func() {
 		// Disable abort signal during the clean up
-		task.IgnoreAbortSignal(true)
-		defer task.IgnoreAbortSignal(false)
+		defer task.DisarmAbortSignal()()
 
 		rh.undoUpdateSubnets(task, hostReq, &xerr)
 	}()
@@ -823,8 +819,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					// Disable abort signal during the clean up
-					task.IgnoreAbortSignal(true)
-					defer task.IgnoreAbortSignal(false)
+					defer task.DisarmAbortSignal()()
 
 					if derr := gwsg.UnbindFromHost(task, rh); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), gwsg.GetName(), rh.GetName()))
@@ -854,8 +849,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					// Disable abort signal during the clean up
-					task.IgnoreAbortSignal(true)
-					defer task.IgnoreAbortSignal(false)
+					defer task.DisarmAbortSignal()()
 
 					if derr := pubipsg.UnbindFromHost(task, rh); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), pubipsg.GetName(), rh.GetName()))
@@ -878,8 +872,7 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					// Disable abort signal during the clean up
-					task.IgnoreAbortSignal(true)
-					defer task.IgnoreAbortSignal(false)
+					defer task.DisarmAbortSignal()()
 
 					var (
 						sg     resources.SecurityGroup
@@ -1251,8 +1244,7 @@ func (rh *host) updateSubnets(task concurrency.Task, req abstract.HostRequest) f
 func (rh *host) undoUpdateSubnets(task concurrency.Task, req abstract.HostRequest, errorPtr *fail.Error) {
 	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.KeepOnFailure {
 		// Without this,the undo will not be able to complete in case it's called on an abort...
-		task.IgnoreAbortSignal(true)
-		defer task.IgnoreAbortSignal(false)
+		defer task.DisarmAbortSignal()()
 
 		xerr := rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
@@ -1420,8 +1412,7 @@ func getOrCreateDefaultSubnet(task concurrency.Task, svc iaas.Service) (rs resou
 		defer func() {
 			if xerr != nil {
 				// Disable abort signal during the clean up
-				task.IgnoreAbortSignal(true)
-				defer task.IgnoreAbortSignal(false)
+				defer task.DisarmAbortSignal()()
 
 				if derr := rn.Delete(task); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -1466,8 +1457,7 @@ func getOrCreateDefaultSubnet(task concurrency.Task, svc iaas.Service) (rs resou
 		defer func() {
 			if xerr != nil {
 				// Disable abort signal during the clean up
-				task.IgnoreAbortSignal(true)
-				defer task.IgnoreAbortSignal(false)
+				defer task.DisarmAbortSignal()()
 
 				if derr := rs.Delete(task); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet '%s'", actionFromError(xerr), abstract.SingleHostSubnetName))

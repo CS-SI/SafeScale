@@ -463,8 +463,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", actionFromError(xerr), req.Name)
 			if derr := c.core.Delete(task); derr != nil {
@@ -509,8 +508,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
 			if derr := rs.Delete(task); derr != nil {
@@ -540,8 +538,7 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			tg, tgerr := concurrency.NewTaskGroup(task)
 			if tgerr != nil {
@@ -884,8 +881,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 		defer func() {
 			if xerr != nil && !req.KeepOnFailure {
 				// Disable abort signal during the clean up
-				task.IgnoreAbortSignal(true)
-				defer task.IgnoreAbortSignal(false)
+				defer task.DisarmAbortSignal()()
 
 				if derr := rn.Delete(task); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -958,8 +954,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			if derr := rs.Delete(task); derr != nil {
 				_ = xerr.AddConsequence(derr)
@@ -1128,8 +1123,8 @@ func (c *cluster) createHostResources(
 	// defer func() {
 	// 	if xerr != nil {
 	// Disable abort signal during the clean up
-	// task.IgnoreAbortSignal(true)
-	// defer task.IgnoreAbortSignal(false)
+	// defer task.DisarmAbortSignal()()
+	//
 	//
 	// 		if st, _ := mastersTask.GetStatus(); st == concurrency.RUNNING {
 	// 			_ = mastersTask.Abort()
@@ -1156,8 +1151,8 @@ func (c *cluster) createHostResources(
 	// defer func() {
 	// 	if xerr != nil {
 	// // Disable abort signal during the clean up
-	// task.IgnoreAbortSignal(true)
-	// defer task.IgnoreAbortSignal(false)
+	// defer task.DisarmAbortSignal()()
+	//
 	//
 	// 		if st, _ := privateNodesTask.GetStatus(); st == concurrency.RUNNING {
 	// 			_ = privateNodesTask.Abort()
@@ -1184,8 +1179,7 @@ func (c *cluster) createHostResources(
 	defer func() {
 		if xerr != nil && !keepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			list, merr := c.ListMasters(task)
 			if merr != nil {
@@ -1255,8 +1249,7 @@ func (c *cluster) createHostResources(
 	defer func() {
 		if xerr != nil && !keepOnFailure {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			list, merr := c.ListNodes(task)
 			if merr != nil {
@@ -2145,8 +2138,7 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 	defer func() {
 		if xerr != nil && len(newHosts) > 0 {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			logrus.Debugf("Cleaning up on failure, deleting Nodes...")
 			if derr := c.deleteHosts(task, newHosts); derr != nil {
@@ -2984,8 +2976,7 @@ func (c *cluster) deleteMaster(task concurrency.Task, host resources.Host) fail.
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3070,8 +3061,7 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3144,8 +3134,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
@@ -3831,8 +3820,7 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during the clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {

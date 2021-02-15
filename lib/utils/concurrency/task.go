@@ -78,7 +78,8 @@ type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	IgnoreAbortSignal(bool)
+	// IgnoreAbortSignal(bool)
+	DisarmAbortSignal() func()
 	SetID(string) fail.Error
 	GetID() (string, fail.Error)
 	GetSignature() string
@@ -763,17 +764,54 @@ func (t *task) Abortable() (bool, fail.Error) {
 	return !t.abortDisengaged, nil
 }
 
-// IgnoreAbortSignal can be use to disable the effect of Abort()
-// Typically,it is advised to call this inside a defer statementuised to cleanup things (cleanup has to terminate; if abort signal is not disengaged, any
+// // IgnoreAbortSignal can be use to disable the effect of Abort()
+// // Typically,it is advised to call this inside a defer statementuised to cleanup things (cleanup has to terminate; if abort signal is not disengaged, any
+// // call with task as parameter may abort before the end.
+// // By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
+// func (t *task) IgnoreAbortSignal(ignore bool) {
+// 	if t.IsNull() {
+// 		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
+// 	}
+//
+// 	t.mu.Lock()
+// 	defer t.mu.Unlock()
+//
+// 	t.abortDisengaged = ignore
+// }
+
+// DisarmAbortSignal can be use to disable the effect of Abort()
+// Typically, it is advised to call this inside a defer statement when cleanup things (cleanup has to terminate; if abort signal is not disarmed, any
 // call with task as parameter may abort before the end.
-// By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
-func (t *task) IgnoreAbortSignal(ignore bool) {
+// Returns a function to rearm the signal handling
+// If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
+// If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
+
+func (t *task) DisarmAbortSignal() func() {
 	if t.IsNull() {
-		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
+		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
+		return func() {}
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.abortDisengaged = ignore
+	if !t.abortDisengaged {
+		// Disengage Abort signal
+		t.abortDisengaged = true
+
+		// Return a func that reengage abort signal
+		return func() {
+			if t.IsNull() {
+				return
+			}
+
+			t.mu.Lock()
+			defer t.mu.Unlock()
+
+			t.abortDisengaged = false
+		}
+	}
+
+	// If abort signal is already disengaged, does nothing and returns a func that does nothing also
+	return func() {}
 }

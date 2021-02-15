@@ -334,8 +334,7 @@ func (objs *share) Create(
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := nfsServer.RemoveShare(task, sharePath)
 			if derr != nil {
@@ -378,8 +377,7 @@ func (objs *share) Create(
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := server.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -611,8 +609,7 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := objserver.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -671,8 +668,7 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 	defer func() {
 		if xerr != nil {
 			// Disable abort signal during clean up
-			task.IgnoreAbortSignal(true)
-			defer task.IgnoreAbortSignal(false)
+			defer task.DisarmAbortSignal()()
 
 			derr := target.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
