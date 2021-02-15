@@ -448,7 +448,12 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
 	if xerr != nil {
-		return nullAHF, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+		// continue
+		default:
+			return nullAHF, xerr
+		}
 	}
 
 	state := toHostState(server.Status)
@@ -616,22 +621,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
 
-	hostNets, hostPorts, xerr := s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
-	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to construct list of Subnets for the host")
-	}
-
-	// Starting from here, delete created ports if exiting with error
-	defer func() {
-		if xerr != nil && !request.KeepOnFailure {
-			for _, v := range hostPorts {
-				if derr := s.deletePort(v.ID); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", v))
-				}
-			}
-		}
-	}()
-
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
@@ -664,14 +653,30 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to select availability zone")
 	}
 
-	srvOpts := servers.CreateOpts{
-		Name:             request.ResourceName,
-		Networks:         hostNets,
-		FlavorRef:        request.TemplateID,
-		ImageRef:         request.ImageID,
-		UserData:         userDataPhase1,
-		AvailabilityZone: azone,
+	hostNets, hostPorts, createdPorts, xerr := s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
+	if xerr != nil {
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to construct list of Subnets for the Host")
 	}
+
+	// Starting from here, delete created ports if exiting with error
+	defer func() {
+		if xerr != nil && !request.KeepOnFailure {
+			for _, v := range createdPorts {
+				if derr := s.rpcDeletePort(v); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", v))
+				}
+			}
+		}
+	}()
+
+	// srvOpts := servers.CreateOpts{
+	// 	Name:             request.ResourceName,
+	// 	Networks:         hostNets,
+	// 	FlavorRef:        request.TemplateID,
+	// 	ImageRef:         request.ImageID,
+	// 	UserData:         userDataPhase1,
+	// 	AvailabilityZone: azone,
+	// }
 
 	// --- Initializes abstract.HostCore ---
 
@@ -683,19 +688,13 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	logrus.Debugf("Creating host resource '%s' ...", request.ResourceName)
 	// Retry creation until success, for 10 minutes
-	var server *servers.Server
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	var (
+		server *servers.Server
+	)
+	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			server = nil
-			innerXErr := stacks.RetryableRemoteCall(
-				func() (innerErr error) {
-					server, innerErr = servers.Create(s.ComputeClient, keypairs.CreateOptsExt{
-						CreateOptsBuilder: srvOpts,
-					}).Extract()
-					return innerErr
-				},
-				NormalizeError,
-			)
+			var innerXErr fail.Error
+			server, innerXErr = s.rpcCreateServer(request.ResourceName, hostNets, request.TemplateID, request.ImageID, userDataPhase1, azone)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
@@ -706,14 +705,8 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					return retry.StopRetryError(innerXErr)
 				}
 				if server != nil {
-					derr := stacks.RetryableRemoteCall(
-						func() error {
-							return servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-						},
-						NormalizeError,
-					)
-					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
+					if derr := s.rpcDeleteServer(server.ID); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
 					}
 				}
 				logrus.Errorf(innerXErr.Error())
@@ -725,15 +718,13 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 			// Starting from here, delete host if exiting with error
 			defer func() {
-				if xerr != nil {
-					derr := stacks.RetryableRemoteCall(
-						func() error {
-							return servers.Delete(s.ComputeClient, server.ID).ExtractErr()
-						},
-						NormalizeError,
-					)
-					if derr != nil {
-						logrus.Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
+				if innerXErr != nil {
+					logrus.Debugf("deleting unresponsive server...")
+					if derr := s.rpcDeleteServer(server.ID); derr != nil {
+						logrus.Debugf(derr.Error())
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
+					} else {
+						logrus.Debugf("unresponsive server deleted")
 					}
 				}
 			}()
@@ -743,10 +734,8 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				logrus.Tracef("Host successfully created but cannot confirm AZ: %s", innerXErr)
 			} else {
 				logrus.Tracef("Host successfully created in requested AZ '%s'", creationZone)
-				if creationZone != srvOpts.AvailabilityZone {
-					if srvOpts.AvailabilityZone != "" {
-						logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", srvOpts.AvailabilityZone, creationZone)
-					}
+				if creationZone != azone && azone != "" {
+					logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", azone, creationZone)
 				}
 			}
 
@@ -754,21 +743,21 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.STARTED, temporal.GetHostTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.STARTED, 2*temporal.GetHostTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					return fail.NewError("host '%s' is in ERROR state", request.ResourceName)
+					return fail.Wrap(innerXErr, "host '%s' is in ERROR state", request.ResourceName)
 				default:
 					return fail.Wrap(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
 				}
 			}
 			return nil
 		},
-		temporal.GetLongOperationTimeout(),
+		2*temporal.GetLongOperationTimeout(),
 	)
-	if retryErr != nil {
-		return nullAHF, nullUDC, retryErr
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
 	}
 
 	// Starting from here, delete host if exiting with error
@@ -847,8 +836,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			return nullAHF, nullUDC, xerr
 		}
 
-		// FIXME: Apply Security Group for gateway of Subnet to the first NIC of the gateway ?
-
 		if ipversion.IPv4.Is(ip.IP) {
 			newHost.Networking.PublicIPv4 = ip.IP
 		} else if ipversion.IPv6.Is(ip.IP) {
@@ -872,18 +859,17 @@ func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) 
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port /*sgs []string,*/, xerr fail.Error) {
+func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, xerr fail.Error) {
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
+	createdPorts = []string{}
 
 	// cleanup if exiting with error
 	defer func() {
 		if xerr != nil && !request.KeepOnFailure {
-			for _, n := range nets {
-				if n.Port != "" {
-					if derr := s.deletePort(n.Port); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", n.Port))
-					}
+			for _, v := range createdPorts {
+				if derr := s.rpcDeletePort(v); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete port %s", v))
 				}
 			}
 		}
@@ -896,17 +882,16 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
 		adminState := true
 		req := ports.CreateOpts{
-			NetworkID:   s.ProviderNetworkID,
-			Name:        fmt.Sprintf("nic_%s_external", request.ResourceName),
-			Description: fmt.Sprintf("nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork),
-			//	FixedIPs:       []ports.IP{{SubnetID: n.ID}},
-			//SecurityGroups: &sgs,
+			NetworkID:    s.ProviderNetworkID,
+			Name:         fmt.Sprintf("nic_%s_external", request.ResourceName),
+			Description:  fmt.Sprintf("nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork),
 			AdminStateUp: &adminState,
 		}
-		port, xerr := s.createPort(req)
+		port, xerr := s.rpcCreatePort(req)
 		if xerr != nil {
-			return nets, netPorts /*, sgs*/, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
+			return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
 		}
+		createdPorts = append(createdPorts, port.ID)
 
 		nets = append(nets, servers.Network{Port: port.ID})
 		netPorts = append(netPorts, *port)
@@ -922,16 +907,17 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 			FixedIPs:    []ports.IP{{SubnetID: n.ID}},
 			//SecurityGroups: &sgs,
 		}
-		port, xerr := s.createPort(req)
+		port, xerr := s.rpcCreatePort(req)
 		if xerr != nil {
-			return nets, netPorts /*, sgs */, fail.Wrap(xerr, "failed to create port on subnet '%s'", n.Name)
+			return nets, netPorts /*, sgs */, createdPorts, fail.Wrap(xerr, "failed to create port on subnet '%s'", n.Name)
 		}
 
+		createdPorts = append(createdPorts, port.ID)
 		nets = append(nets, servers.Network{Port: port.ID})
 		netPorts = append(netPorts, *port)
 	}
 
-	return nets, netPorts /*, sgs*/, nil
+	return nets, netPorts, createdPorts, nil
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
@@ -1234,7 +1220,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	req := ports.ListOpts{
 		DeviceID: ahf.Core.ID,
 	}
-	portList, xerr := s.listPorts(req)
+	portList, xerr := s.rpcListPorts(req)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1310,7 +1296,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
 		case *fail.ErrNotFound:
-			// if host disappear (listPorts succeeded then host was still there at this moment), consider the error as a successful deletion;
+			// if host disappear (rpcListPorts succeeded then host was still there at this moment), consider the error as a successful deletion;
 			// leave a chance to remove ports
 		default:
 			return outerRetryErr
@@ -1320,7 +1306,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	// Removes ports freed from host
 	var errors []error
 	for _, v := range portList {
-		if derr := s.deletePort(v.ID); derr != nil {
+		if derr := s.rpcDeletePort(v.ID); derr != nil {
 			switch derr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
