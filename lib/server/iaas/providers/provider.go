@@ -17,6 +17,8 @@
 package providers
 
 import (
+	"regexp"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -46,6 +48,8 @@ type Provider interface {
 
 	// GetName returns the provider name
 	GetName() string
+
+	GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp
 
 	// GetCapabilities returns the capabilities of the provider
 	GetCapabilities() Capabilities

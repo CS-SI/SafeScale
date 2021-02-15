@@ -18,6 +18,7 @@ package outscale
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -229,6 +230,31 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 // ListTemplates ...
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
+}
+
+// GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
+func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+	var emptySlice []*regexp.Regexp
+	if p.IsNull() {
+		return emptySlice
+	}
+
+	var (
+		templatesWithGPU = []string{
+			// "g.*-.*",
+			// "t.*-.*",
+		}
+		out []*regexp.Regexp
+	)
+	for _, v := range templatesWithGPU {
+		re, err := regexp.Compile(v)
+		if err != nil {
+			return emptySlice
+		}
+		out = append(out, re)
+	}
+
+	return out
 }
 
 // TODO: init when finished
