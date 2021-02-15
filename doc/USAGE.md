@@ -233,6 +233,7 @@ The following actions are proposed:
 | `safescale tenant list` | List available tenants |
 | `safescale tenant get` | Display the current tenant used for action commands. |
 | `safescale tenant set <tenant_name>` | Set the tenant to use by the next commands |
+| `safescale tenant scan <tenant_name>` | Scan the given tenant's templates. (See [scanner doc.](SCANNER.md)) |
 <br>
 
 ##### safescale tenant list
