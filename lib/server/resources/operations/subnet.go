@@ -537,32 +537,26 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 
 	// --- Create the gateway(s) ---
 
-	var template *abstract.HostTemplate
 	if gwSizing == nil {
 		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
-	tpls, xerr := svc.ListTemplatesBySizing(*gwSizing, false)
+	template, xerr := svc.FindTemplateBySizing(*gwSizing)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find appropriate template")
 	}
-	if len(tpls) > 0 {
-		template = tpls[0]
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-		if template.CPUFreq > 0 {
-			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-		}
-		msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-		if template.GPUNumber > 0 {
-			msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-			if template.GPUType != "" {
-				msg += fmt.Sprintf(" %s", template.GPUType)
-			}
-		}
-		msg += ")"
-		logrus.Infof(msg)
-	} else {
-		return fail.NotFoundError("error creating subnet: no host template matching requirements for gateway")
-	}
+	// msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+	// if template.CPUFreq > 0 {
+	// 	msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+	// }
+	// msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+	// if template.GPUNumber > 0 {
+	// 	msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
+	// 	if template.GPUType != "" {
+	// 		msg += fmt.Sprintf(" %s", template.GPUType)
+	// 	}
+	// }
+	// msg += ")"
+	// logrus.Infof(msg)
 
 	// define image...
 	if gwSizing.Image == "" {

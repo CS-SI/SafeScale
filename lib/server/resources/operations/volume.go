@@ -417,7 +417,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 					}
 
 					if strings.Index(i.Path, mountPoint) == 0 {
-						return fail.InvalidRequestError(fmt.Sprintf("can't attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+						return fail.InvalidRequestError(fmt.Sprintf("cannot attach volume '%s' to '%s:%s': there is already a volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
 					}
 				}
 				for _, i := range hostMountsV1.RemoteMountsByPath {
@@ -856,7 +856,7 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 		}
 
 		// ... update host property propertiesv1.MountsV1 ...
-		innerXErr = props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())

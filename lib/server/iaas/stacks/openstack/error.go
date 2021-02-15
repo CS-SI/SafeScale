@@ -49,9 +49,11 @@ func NormalizeError(err error) fail.Error {
 	case *gophercloud.ErrDefault401: // unauthorized
 		return fail.NotAuthenticatedError(string(e.Body))
 	case gophercloud.ErrDefault403: // forbidden
-		return fail.ForbiddenError(string(e.Body))
+		return reduceOpenstackError("Forbidden", e.Body)
+		// return fail.ForbiddenError(string(e.Body))
 	case *gophercloud.ErrDefault403: // forbidden
-		return fail.ForbiddenError(string(e.Body))
+		return reduceOpenstackError("Forbidden", e.Body)
+		// return fail.ForbiddenError(string(e.Body))
 	case gophercloud.ErrDefault404: // not found
 		return reduceOpenstackError("NotFound", e.Body)
 	case *gophercloud.ErrDefault404: // not found
@@ -141,6 +143,7 @@ var errorFuncMap = map[string]func(string) fail.Error{
 	"NotFound":   func(msg string) fail.Error { return fail.NotFoundError(msg) },
 	"BadRequest": func(msg string) fail.Error { return fail.InvalidRequestError(msg) },
 	"Duplicate":  func(msg string) fail.Error { return fail.DuplicateError(msg) },
+	"Forbidden":  func(msg string) fail.Error { return fail.ForbiddenError(msg) },
 }
 
 // reduceOpenstackError ...

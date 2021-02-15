@@ -98,15 +98,15 @@ func (s Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
-	volume, xerr = s.InspectVolume(request.Name)
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
-			return nullAV, xerr
-		}
-	}
-	if volume != nil {
-		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
-	}
+	// VPL: openstack is old enough to sayby itself when a volume already exist at creation
+	// if volume, xerr = s.InspectVolume(request.Name); xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrTimeout:
+	// 		// continue
+	// 	default:
+	// 		return nullAV, xerr
+	// 	}
+	// }
 
 	az, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
