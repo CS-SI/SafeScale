@@ -104,8 +104,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 
 	defer func() {
 		if err != nil && !in.GetKeepOnFailure() {
-			derr := rn.Delete(task)
-			if derr != nil {
+			if derr := rn.Delete(task); derr != nil {
 				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}

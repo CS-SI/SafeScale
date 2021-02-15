@@ -896,7 +896,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 	const yamlKey = "feature.proxy.rules"
 	// rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[string]interface{})
-	rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[interface{}]interface{})
+	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
@@ -951,7 +951,8 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	}
 	for _, r := range rules {
 
-		targets := w.interpretRuleTargets(r)
+		rule := r.(map[interface{}]interface{})
+		targets := w.interpretRuleTargets(rule)
 		hosts, xerr := w.identifyHosts(targets)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply proxy rules: %s")
@@ -984,7 +985,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 			tP, xerr := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
 				controller: primaryKongController,
-				rule:       r,
+				rule:       r.(map[interface{}]interface{}),
 				variables:  &primaryGatewayVariables,
 			})
 			if xerr != nil {
@@ -1018,7 +1019,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 				tS, errOp := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
 					controller: secondaryKongController,
-					rule:       r,
+					rule:       rule,
 					variables:  &secondaryGatewayVariables,
 				})
 				if errOp == nil {
