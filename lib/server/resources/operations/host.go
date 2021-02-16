@@ -2087,11 +2087,12 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (_ *propertiesv1
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			if hostShare, ok = sharesV1.ByID[shareRef].Clone().(*propertiesv1.HostShare); ok {
+			if item, ok := sharesV1.ByID[shareRef]; ok {
+				hostShare = item.Clone().(*propertiesv1.HostShare)
 				return nil
 			}
-			if _, ok := sharesV1.ByName[shareRef]; ok {
-				hostShare = sharesV1.ByID[sharesV1.ByName[shareRef]].Clone().(*propertiesv1.HostShare)
+			if item, ok := sharesV1.ByName[shareRef]; ok {
+				hostShare = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
 				return nil
 			}
 			return fail.NotFoundError("share '%s' not found in server '%s' metadata", shareRef, rh.GetName())

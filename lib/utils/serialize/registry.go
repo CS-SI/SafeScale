@@ -25,7 +25,7 @@ import (
 // propertyTypeRegistry contains the registry to have mapping between key strings and real struct
 type propertyTypeRegistry map[string]map[string]data.Clonable
 
-// Registry allows to register a new association
+// Register allows to register a new association
 func (r propertyTypeRegistry) Register(module, key string, zeroValue data.Clonable) {
 	if _, found := r[module]; !found {
 		r[module] = map[string]data.Clonable{}

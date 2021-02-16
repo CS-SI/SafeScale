@@ -194,7 +194,10 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	// }
 
 	// Execute script on remote host with retries if needed
-	var cmd, stdout string
+	var (
+		cmd, stdout, stderr string
+		retcode             int
+	)
 
 	if !hidesOutput {
 		cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; exit ${PIPESTATUS}", filename, filename)
@@ -212,7 +215,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		func() error {
 			var innerXErr fail.Error
 
-			if _, stdout, _, innerXErr = sshCmd.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
@@ -238,6 +241,11 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 			// return 255, stdout, stderr, retryErr
 			return stdout, xerr
 		}
+	}
+	if retcode != 0 {
+		xerr = fail.ExecutionError(nil, "command exited with error code '%d'", retcode)
+		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		return stdout, xerr
 	}
 
 	return stdout, nil

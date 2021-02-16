@@ -107,11 +107,6 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := handlers.NewHostHandler(job)
-	// err = handler.Start(ref)
-	// if err != nil {
-	// 	return empty, err
-	// }
 	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
@@ -168,12 +163,6 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		return empty, xerr
 	}
 
-	// handler := handlers.NewHostHandler(job)
-	// err = handler.Stop(ref)
-	// if err != nil {
-	// 	return empty, err
-	// }
-
 	tracer.Trace("Host %s stopped", refLabel)
 	return empty, nil
 }
@@ -211,11 +200,6 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := handlers.NewHostHandler(job)
-	// err = handler.Reboot(ref)
-	// if err != nil {
-	// 	return empty, err
-	// }
 	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
@@ -321,7 +305,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	sizing.Image = in.GetImageId()
 
 	// Determine if the subnets to use exist
-	// Because of legacy, the subnet can be fully qualified by network+subnet, or can be qualified by network+network,
+	// Because of legacy, the subnet can be fully identified by network+subnet, or can be identified by network+network,
 	// because previous release of SafeScale created network AND subnet with the same name
 	var (
 		rs      resources.Subnet
@@ -394,11 +378,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		Subnets:       subnets,
 	}
 
-	// handler := handlers.NewHostHandler(job)
-	// host, err := handler.Create(hostReq, *sizing, in.Force)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	objh, xerr := hostfactory.New(job.GetService())
 	if xerr != nil {
 		return nil, xerr
@@ -443,21 +422,6 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	// handler := handlers.NewHostHandler(job)
-	// host, err := handler.Resize(
-	// 	name,
-	// 	abstract.HostSizingRequirements{
-	// 		MinCores:    int(in.GetCpuCount()),
-	// 		MinRAMSize:  in.GetRam(),
-	// 		MinDiskSize: int(in.GetDisk()),
-	// 		MinGPU:      int(in.GetGpuCount()),
-	// 		MinCPUFreq:  in.GetCpuFreq(),
-	// 	},
-	// )
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	sizing := abstract.HostSizingRequirements{
 		MinCores:    int(in.GetCpuCount()),
@@ -538,11 +502,6 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := handlers.NewHostHandler(job)
-	// host, err := handler.Inspect(ref)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -592,11 +551,6 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := handlers.NewHostHandler(job)
-	// host, err := handler.Inspect(ref)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -647,11 +601,6 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := handlers.NewHostHandler(job)
-	// err = handler.Delete(ref)
-	// if err != nil {
-	// 	return empty, err
-	// }
 	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr

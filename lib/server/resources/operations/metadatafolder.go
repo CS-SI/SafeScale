@@ -247,7 +247,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 				return innerXErr
 			}
 
-			// inner retry does read-after-write; if timeout consider write has failed, and retry write
+			// inner retry does read-after-write; if timeout consider write has failed, then retry write
 			var target bytes.Buffer
 			innerXErr = retry.Action(
 				func() error {

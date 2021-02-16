@@ -49,6 +49,7 @@ type ShareListener struct{}
 func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create share")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -60,25 +61,21 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
-
-	shareName := in.GetName()
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
-	sharePath := in.GetPath()
-	shareType := in.GetType()
 
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "share create")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-
 	task := job.GetTask()
+
+	shareName := in.GetName()
+	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	sharePath := in.GetPath()
+	shareType := in.GetType()
 	tracer := debug.NewTracer(task, true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -92,34 +89,27 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	rs, xerr := sharefactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if err != nil {
-		return nil, err
-	}
+
 	xerr = rs.Create(
 		task,
 		shareName,
 		rh, sharePath,
 		in.OptionsAsString,
-		// in.GetSecurityModes(),
-		// in.GetOptions().GetReadOnly(),
-		// in.GetOptions().GetRootSquash(),
-		// in.GetOptions().GetSecure(),
-		// in.GetOptions().GetAsync(),
-		// in.GetOptions().GetNoHide(),
-		// in.GetOptions().GetCrossMount(),
-		// in.GetOptions().GetSubtreeCheck(),
 	)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	psml, xerr := rs.ToProtocol(task)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return psml.Share, nil
 }
 
@@ -127,6 +117,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete share")
+	defer fail.OnPanic(&err)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -139,32 +130,31 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
 	}
 
-	shareName := in.GetName()
-
-	job, err := PrepareJob(ctx, in.GetTenantId(), "share delete")
-	if err != nil {
-		return nil, err
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "share delete")
+	if xerr != nil {
+		return nil, xerr
 	}
 	defer job.Close()
+	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
+	shareName := in.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := sharefactory.Load(job.GetTask(), job.GetService(), shareName)
+	rs, xerr := sharefactory.Load(task, job.GetService(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.Delete(job.GetTask()); xerr != nil {
+
+	if xerr = rs.Delete(task); xerr != nil {
 		return empty, xerr
 	}
+
 	return empty, nil
 }
 
@@ -172,6 +162,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *protocol.ShareList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot list shares")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -180,11 +171,8 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "share list")
@@ -217,6 +205,7 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot mount share")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -228,11 +217,8 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "share mount")
@@ -273,11 +259,8 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "share unmount")
@@ -305,6 +288,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect share")
+	defer fail.OnPanic(&err)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -316,11 +300,8 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "share inspect")
@@ -328,9 +309,9 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, xerr
 	}
 	defer job.Close()
+	task := job.GetTask()
 
 	shareRef, _ := srvutils.GetReference(in)
-	task := job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.share"), "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -340,6 +321,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if rh == nil {
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
