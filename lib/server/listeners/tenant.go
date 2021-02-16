@@ -209,16 +209,12 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 }
 
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
-func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
+func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot scan tenant")
 
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
@@ -240,8 +236,7 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantName) (emp
 
 	handler := handlers.NewScannerHandler(job)
 
-	xerr = handler.Scan(name)
-	return empty, xerr
+	return handler.Scan(name, in.GetDryRun())
 }
 
 // Inspect returns information about a tenant

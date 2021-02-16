@@ -30,6 +30,7 @@ import (
 	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
@@ -132,7 +133,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // ScannerHandler defines API to manipulate images
 type ScannerHandler interface {
-	Scan(string) fail.Error
+	Scan(string, bool) (_ *protocol.ScanResultList, xerr fail.Error)
 }
 
 // scannerHandler service
@@ -146,15 +147,15 @@ func NewScannerHandler(job server.Job) ScannerHandler {
 }
 
 // Scan scans the tenant and updates the database
-func (handler *scannerHandler) Scan(tenantName string) (xerr fail.Error) {
+func (handler *scannerHandler) Scan(tenantName string, dryRun bool) (_ *protocol.ScanResultList, xerr fail.Error) {
 	if handler == nil {
-		return fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if handler.job == nil {
-		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 	if tenantName == "" {
-		return fail.InvalidParameterError("tenant name", "cannot be empty string")
+		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
@@ -165,26 +166,42 @@ func (handler *scannerHandler) Scan(tenantName string) (xerr fail.Error) {
 
 	params := svc.GetTenantParameters()
 
+	var resultList []*protocol.ScanResult
+
 	compute, ok1 := params["compute"].(map[string]interface{})
 	isScannable, ok2 := compute["Scannable"].(bool)
 	if !(ok1 && ok2) {
-		return fail.InvalidParameterError("scannable", "not set")
+		return nil, fail.InvalidParameterError("scannable", "not set")
 	}
 
 	if !isScannable {
-		return fail.ForbiddenError("tenant is not scannable")
+		return nil, fail.ForbiddenError("tenant is not scannable")
 	}
 
-	if err := handler.analyze(); err != nil {
-		return err
+	if dryRun {
+		templates, xerr := svc.ListTemplates(false)
+		if xerr != nil {
+			return nil, xerr
+		}
+		for _, template := range templates {
+			resultList = append(resultList, &protocol.ScanResult{
+				Template: template.Name,
+				Success:  true,
+			})
+		}
+		return &protocol.ScanResultList{Results: resultList}, xerr
+	}
+
+	if err := handler.analyze(resultList); err != nil {
+		return nil, err
 	}
 	if err := handler.collect(); err != nil {
-		return fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
+		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
 	}
-	return nil
+	return &protocol.ScanResultList{Results: resultList}, nil
 }
 
-func (handler *scannerHandler) analyze() (xerr fail.Error) {
+func (handler *scannerHandler) analyze(resultList []*protocol.ScanResult) (xerr fail.Error) {
 	svc := handler.job.GetService()
 	tenantName := svc.GetName()
 
@@ -414,6 +431,15 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
 				logrus.Warnf("Error running scanner: %+v", lerr)
+				resultList = append(resultList, &protocol.ScanResult{
+					Template: inner.Name,
+					Success:  false,
+				})
+			} else {
+				resultList = append(resultList, &protocol.ScanResult{
+					Template: inner.Name,
+					Success:  true,
+				})
 			}
 		}(localTarget)
 	}
