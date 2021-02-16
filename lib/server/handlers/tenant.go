@@ -192,7 +192,7 @@ func (handler *scannerHandler) Scan(tenantName string, dryRun bool) (_ *protocol
 		return &protocol.ScanResultList{Results: resultList}, xerr
 	}
 
-	if err := handler.analyze(resultList); err != nil {
+	if err := handler.analyze(&resultList); err != nil {
 		return nil, err
 	}
 	if err := handler.collect(); err != nil {
@@ -201,7 +201,7 @@ func (handler *scannerHandler) Scan(tenantName string, dryRun bool) (_ *protocol
 	return &protocol.ScanResultList{Results: resultList}, nil
 }
 
-func (handler *scannerHandler) analyze(resultList []*protocol.ScanResult) (xerr fail.Error) {
+func (handler *scannerHandler) analyze(resultList *[]*protocol.ScanResult) (xerr fail.Error) {
 	svc := handler.job.GetService()
 	tenantName := svc.GetName()
 
@@ -431,15 +431,17 @@ func (handler *scannerHandler) analyze(resultList []*protocol.ScanResult) (xerr 
 			lerr := hostAnalysis(inner)
 			if lerr != nil {
 				logrus.Warnf("Error running scanner: %+v", lerr)
-				resultList = append(resultList, &protocol.ScanResult{
+				res := append(*resultList, &protocol.ScanResult{
 					Template: inner.Name,
 					Success:  false,
 				})
+				resultList = &res
 			} else {
-				resultList = append(resultList, &protocol.ScanResult{
+				res := append(*resultList, &protocol.ScanResult{
 					Template: inner.Name,
 					Success:  true,
 				})
+				resultList = &res
 			}
 		}(localTarget)
 	}
