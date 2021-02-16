@@ -206,6 +206,10 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 	}
 	networkRef = strings.TrimSpace(networkRef)
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	var subnetID string
 	switch networkRef {
 	case "":
@@ -270,6 +274,10 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 			// failed to identify the Network owning the Subnets
 			return nil, fail.NotFoundError("failed to find Network '%s'", networkRef)
 		}
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	if subnetID != "" {
@@ -967,6 +975,10 @@ func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequ
 
 // createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
 func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name, network.Name)
 
@@ -974,6 +986,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
 		return nil, xerr
 	}
+
 	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
 	if xerr = sg.Create(task, network.ID, sgName, description, nil); xerr != nil {
 		return nil, xerr
@@ -1025,21 +1038,6 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 			Sources:     []string{"::/0"},
 			Targets:     []string{sg.GetID()},
 		},
-		// VPL: brought by subnet internal SG
-		// {
-		// 	Description: "[egress][ipv4][all] Allow everything",
-		// 	Direction:   securitygroupruledirection.EGRESS,
-		// 	EtherType:   ipversion.IPv4,
-		// 	Sources:     []string{sg.GetID()},
-		// 	Targets:     []string{"0.0.0.0/0"},
-		// },
-		// {
-		// 	Description: "[egress][ipv6][all] Allow everything",
-		// 	Direction:   securitygroupruledirection.EGRESS,
-		// 	EtherType:   ipversion.IPv6,
-		// 	Sources:     []string{sg.GetID()},
-		// 	Targets:     []string{"0.0.0.0/0"},
-		// },
 	}
 	if xerr = sg.AddRules(task, rules); xerr != nil {
 		return nil, xerr

@@ -86,6 +86,10 @@ func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (b
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	if task.Aborted() {
+		return false, fail.AbortedError(nil, "aborted")
+	}
+
 	rsg, xerr := NewSecurityGroup(svc)
 	if xerr != nil {
 		return false, xerr
@@ -156,10 +160,19 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 	}
 
 	return sg.core.BrowseFolder(task, func(buf []byte) fail.Error {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		asg := abstract.NewSecurityGroup()
 		if xerr = asg.Deserialize(buf); xerr != nil {
 			return xerr
 		}
+
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		return callback(asg)
 	})
 }
@@ -173,6 +186,10 @@ func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Read data from metadata storage
@@ -225,6 +242,10 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	defer tracer.Exiting()
 	// Log or propagate errors: here we propagate
 	//defer fail.OnExitLogError(&xerr, "failed to create securityGroup")
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	svc := sg.GetService()
 
@@ -330,6 +351,7 @@ func (sg *securityGroup) Delete(task concurrency.Task) (xerr fail.Error) {
 	return sg.delete(task, false)
 }
 
+// delete effectively remove a Security Group
 func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 	svc := sg.GetService()
 
@@ -352,6 +374,10 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 				if hostCount > 0 {
 					keys := make([]string, 0, hostCount)
 					for k := range hostsV1.ByName {
+						if task.Aborted() {
+							return fail.AbortedError(nil, "aborted")
+						}
+
 						keys = append(keys, k)
 					}
 					return fail.NotAvailableError("security group '%s' is currently bound to %d host%s: %s", sg.GetName(), hostCount, strprocess.Plural(uint(hostCount)), strings.Join(keys, ","))
@@ -375,6 +401,10 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 				return innerXErr
 			}
 
+			if task.Aborted() {
+				return fail.AbortedError(nil, "aborted")
+			}
+
 			// check bonds to subnets
 			innerXErr = props.Inspect(task, securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 				subnetsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
@@ -387,6 +417,10 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 				if subnetCount > 0 {
 					keys := make([]string, subnetCount)
 					for k := range subnetsV1.ByName {
+						if task.Aborted() {
+							return fail.AbortedError(nil, "aborted")
+						}
+
 						keys = append(keys, k)
 					}
 					return fail.NotAvailableError("security group is currently bound to %d subnet%s: %s", subnetCount, strprocess.Plural(uint(subnetCount)), strings.Join(keys, ","))
@@ -409,30 +443,37 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 			if innerXErr != nil {
 				return innerXErr
 			}
-		} else {
-			// First unbind from subnets (which will unbind from hosts attached to these subnets...)
-			innerXErr := props.Alter(task, securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-				sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return sg.unbindFromSubnets(task, sgnV1)
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
+		}
 
-			// Second, unbind from the hosts if there are remaining ones
-			innerXErr = props.Alter(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-				sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return sg.unbindFromHosts(task, sghV1)
-			})
-			if innerXErr != nil {
-				return innerXErr
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
+		// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
+		defer task.DisarmAbortSignal()()
+
+		// First unbind from subnets (which will unbind from hosts attached to these subnets...)
+		innerXErr := props.Alter(task, securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			return sg.unbindFromSubnets(task, sgnV1)
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Second, unbind from the hosts if there are remaining ones
+		innerXErr = props.Alter(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return sg.unbindFromHosts(task, sghV1)
+		})
+		if innerXErr != nil {
+			return innerXErr
 		}
 
 		// Conditions are met, delete securityGroup
@@ -467,10 +508,16 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 		}
 	}
 
+	// Again, if we arrive here, we want the deletion of metadata not to be interrupted by abort, it's too late
+	defer task.DisarmAbortSignal()()
+
 	// Deletes metadata from Object Storage
 	if xerr = sg.core.Delete(task); xerr != nil {
 		// If entry not found, considered as success
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
 			return xerr
 		}
 	}

@@ -107,6 +107,10 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 
 // upgradeNetworkPropertyIfNeeded upgrades properties to most recent version
 func upgradeNetworkPropertyIfNeeded(task concurrency.Task, rn resources.Network) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	return rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
@@ -160,6 +164,10 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		return fail.DuplicateError("network '%s' already exists", req.Name)
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	// Verify if the subnet already exist and in this case is not managed by SafeScale
 	if _, xerr = svc.InspectNetworkByName(req.Name); xerr != nil {
 		switch xerr.(type) {
@@ -183,11 +191,28 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		}
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	// Create the network
 	logrus.Debugf("Creating network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 	an, xerr := svc.CreateNetwork(req)
 	if xerr != nil {
 		return xerr
+	}
+
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			if derr := svc.DeleteNetwork(an.ID); xerr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete n=Network"))
+			}
+
+		}
+	}()
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Write subnet object metadata
@@ -210,6 +235,10 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 	}
 
 	return rn.core.BrowseFolder(task, func(buf []byte) fail.Error {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		an := abstract.NewNetwork()
 		xerr := an.Deserialize(buf)
 		if xerr != nil {
@@ -265,6 +294,10 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 		case 1:
 			var found bool
 			for k, v := range subnets {
+				if task.Aborted() {
+					return fail.AbortedError(nil, "aborted")
+				}
+
 				if k == rn.GetName() {
 					found = true
 					// the single subnet present is a subnet named like the network, delete it first
@@ -290,6 +323,9 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 		default:
 			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", rn.GetName(), subnetsLen)
 		}
+
+		// Cannot abort starting from here
+		defer task.DisarmAbortSignal()()
 
 		// delete Network, with tolerance
 		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {
@@ -353,12 +389,13 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 	return cidr, xerr
 }
 
-// CIDR returns the CIDR of the subnet
-// Intended to be used when objn is notoriously not nil (because previously checked)
-func (rn network) CIDR(task concurrency.Task) string {
-	cidr, _ := rn.GetCIDR(task)
-	return cidr
-}
+// VPL: not used
+//// CIDR returns the CIDR of the subnet
+//// Intended to be used when objn is notoriously not nil (because previously checked)
+//func (rn network) CIDR(task concurrency.Task) string {
+//	cidr, _ := rn.GetCIDR(task)
+//	return cidr
+//}
 
 // ToProtocol converts resources.Network to protocol.Network
 func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr fail.Error) {
@@ -394,6 +431,10 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			for k := range nsV1.ByName {
+				if task.Aborted() {
+					return fail.AbortedError(nil, "aborted")
+				}
+
 				pn.Subnets = append(pn.Subnets, k)
 			}
 			return nil

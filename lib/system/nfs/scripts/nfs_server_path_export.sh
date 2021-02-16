@@ -21,15 +21,15 @@
 {{.BashHeader}}
 
 function print_error() {
-	  ec=$?
+    ec=$?
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
 }
 trap print_error ERR
 
 function dns_fallback {
-    grep nameserver /etc/resolv.conf && return 0
-    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+    grep nameserver /etc/resolv.conf &>/dev/null && return 0
+    echo -e "nameserver 1.1.1.1\n" >/tmp/resolv.conf
     sudo cp /tmp/resolv.conf /etc/resolv.conf
     return 0
 }
@@ -57,7 +57,9 @@ else
     if [ ! -z "$ACL" ]; then
         # If there is something between parenthesis, checks if there is some fsid directive, and check the values
         # are not already used for other shares
+        set +o pipefail
         ACL_FSIDs=$(echo $ACL | sed -r 's/ /\n/g' | sed -r 's/,/\n/g' | grep fsid= | grep -o [0-9]* | uniq | sort -n)
+        set -o pipefail
         for fsid in $ACL_FSIDs; do
             echo $FSIDs | grep "^${fsid}" && {
                 # FSID value is already used, updating the Access Rights to use the calculated new FSID
@@ -75,6 +77,9 @@ else
 fi
 #VPL: case not managed: nothing between braces...
 
+# Check if path is already exported
+grep "^{{.Path}} $FILTERED_OPTIONS" /etc/exports &>/dev/null && echo "already exported" && exit 192
+
 # Create exported dir if necessary
 mkdir -p "{{.Path}}"
 chmod a+rwx "{{.Path}}"
@@ -84,3 +89,5 @@ echo "{{.Path}} $FILTERED_OPTIONS" >>/etc/exports
 
 # Updates exports
 exportfs -a
+
+

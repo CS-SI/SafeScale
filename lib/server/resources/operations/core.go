@@ -75,10 +75,12 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	if xerr != nil {
 		return nullCore(), xerr
 	}
+
 	props, err := serialize.NewJSONProperties("resources." + kind)
 	if err != nil {
 		return nullCore(), err
 	}
+
 	c := core{
 		kind:       kind,
 		folder:     fld,
@@ -266,6 +268,10 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 }
 
 func (c *core) updateIdentity(task concurrency.Task) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	if c.loaded {
 		return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
 			ident, ok := clonable.(data.Identifiable)
@@ -390,6 +396,10 @@ func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
 
 // readByID reads a metadata identified by ID from Object Storage
 func (c *core) readByID(task concurrency.Task, id string) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
@@ -401,6 +411,10 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 // readByReference gets the data from Object Storage
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
 func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Error) {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(task, ref); innerXErr != nil {
@@ -434,25 +448,15 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 			xerr = fail.Wrap(xerr, "failed to read %s '%s'", c.kind, ref)
 		}
 	}
-	// if xerr = c.readByID(task, ref); xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
-	// 		xerr = c.readByName(task, ref)
-	// 	default:
-	// 		return xerr
-	// 	}
-	// }
-	// if xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound /*, *fail.ErrTimeout*/ :
-	// 		xerr = fail.Wrap(xerr, "failed to find %s '%s'", c.kind, ref)
-	// 	}
-	// }
 	return xerr
 }
 
 // readByName reads a metadata identified by name
 func (c *core) readByName(task concurrency.Task, name string) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Error {
 		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
@@ -463,6 +467,10 @@ func (c *core) readByName(task concurrency.Task, name string) fail.Error {
 
 // write updates the metadata corresponding to the host in the Object Storage
 func (c *core) write(task concurrency.Task) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	if !c.committed {
 		jsoned, xerr := c.Serialize(task)
 		if xerr != nil {
@@ -496,6 +504,10 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 
 	if c.loaded && !c.committed {
 		return fail.InconsistentError("altered and not committed")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	id := c.GetID()
@@ -544,6 +556,10 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 	}
 
 	return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		return callback(buf)
 	})
 }
@@ -570,11 +586,18 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	// Checks entries exist in Object Storage
 	if xerr := c.folder.Lookup(byIDFolderName, id); xerr != nil {
 		// If not found, consider it not an error
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If entry not found, consider it not an error
+		default:
 			errors = append(errors, xerr)
 		}
 	} else {
 		idFound = true
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	if xerr := c.folder.Lookup(byNameFolderName, name); xerr != nil {
@@ -586,6 +609,10 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		}
 	} else {
 		nameFound = true
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Deletes entries found
@@ -621,11 +648,15 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	defer func() {
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to serialize %s resource '%s'", c.kind, c.GetName())
-		}
-	}()
+	//defer func() {
+	//	if xerr != nil {
+	//		xerr = fail.Wrap(xerr, "failed to serialize %s resource '%s'", c.kind, c.GetName())
+	//	}
+	//}()
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	var (
 		shieldedJSONed []byte
@@ -685,6 +716,10 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 	// 		xerr = fail.Wrap(xerr, "failed to deserialize %s resource", c.kind)
 	// 	}
 	// }()
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
