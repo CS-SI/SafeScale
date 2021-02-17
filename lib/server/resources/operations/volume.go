@@ -796,7 +796,7 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 				}
 
 				if strings.Index(v.Path, mount.Path) == 0 {
-					return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', '%s:%s' is shared", volumeName, targetName, mount.Path, targetName, v.Path)
+					return fail.InvalidRequestError("cannot detach volume '%s' from '%s', '%s:%s' is shared", volumeName, targetName, mount.Path, targetName, v.Path)
 				}
 			}
 			return nil
@@ -920,24 +920,28 @@ func (rv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRespo
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 		mnts := rh.(*host).getMounts(task)
-		path, ok := mnts.LocalMountsByDevice[device]
-		if !ok {
-			return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
+		if mnts != nil {
+			path, ok := mnts.LocalMountsByDevice[device]
+			if !ok {
+				return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
+			}
+
+			m, ok := mnts.LocalMountsByPath[path]
+			if !ok {
+				return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
+			}
+
+			a := &protocol.VolumeAttachmentResponse{
+				Host: &protocol.Reference{
+					Name: k,
+					Id:   rh.GetID(),
+				},
+				MountPath: path,
+				Format:    m.FileSystem,
+				Device:    device,
+			}
+			out.Attachments = append(out.Attachments, a)
 		}
-		m, ok := mnts.LocalMountsByPath[path]
-		if !ok {
-			return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
-		}
-		a := &protocol.VolumeAttachmentResponse{
-			Host: &protocol.Reference{
-				Name: k,
-				Id:   rh.GetID(),
-			},
-			MountPath: path,
-			Format:    m.FileSystem,
-			Device:    device,
-		}
-		out.Attachments = append(out.Attachments, a)
 	}
 	return out, nil
 }

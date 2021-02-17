@@ -107,15 +107,20 @@ func IgnoreTraceUntil(callTrace interface{}, search string, stop Occurrence) str
 	}
 	goroutine = scanner.Text() + "\n"
 
-	changeSourcePath := SourceFilePathUpdater()
+	changeSourcePathFunc := SourceFilePathUpdater()
 	for scanner.Scan() {
 		line := scanner.Text()
-		if (stop == LastOccurence || !found) && strings.Contains(line, search) {
+		if stop == LastOccurence && strings.Contains(line, search) {
+			buffer = ""
+			found = true
+			continue
+		} else if !found && stop == FirstOccurence && strings.Contains(line, search) {
 			buffer = ""
 			found = true
 			continue
 		}
-		buffer += changeSourcePath(line) + "\n"
+		buffer += changeSourcePathFunc(line) + "\n"
 	}
+
 	return goroutine + buffer
 }
