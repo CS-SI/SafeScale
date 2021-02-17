@@ -1086,18 +1086,10 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	primaryGatewayTask, xerr = task.StartInSubtask(c.taskInstallGateway, taskInstallGatewayParameters{primaryGateway})
 	if xerr != nil {
 		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	if haveSecondaryGateway {
@@ -1119,7 +1111,7 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
-	// VPL: normally not needed; if parent task aborts,children should abort also
+	// VPL: normally not needed; if parent task aborts, children should abort also
 	// defer func() {
 	// 	if xerr != nil {
 	// Disable abort signal during the clean up
@@ -1160,10 +1152,6 @@ func (c *cluster) createHostResources(
 	// 		}
 	// 	}
 	// }()
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 
 	// Step 2: awaits gateway installation end and masters installation end
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
@@ -2023,32 +2011,10 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 		return nil, fail.NotAvailableError("cluster is being removed")
 	}
 
-	var hostImage string
-	// xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	if !props.Lookup(clusterproperty.DefaultsV2) {
-	// 		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
-	// 		return props.Inspect(task, clusterproperty.DefaultsV1, func(clonable data.Clonable) fail.Error {
-	// 			defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
-	// 			if !ok {
-	// 				return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 			}
-	// 			return props.Alter(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
-	// 				defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-	// 				if !ok {
-	// 					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 				}
-	// 				convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
-	// 				return nil
-	// 			})
-	// 		})
-	// 	}
-	// 	return nil
-	// })
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
-	var nodeDefaultDefinition *propertiesv1.HostSizingRequirements
+	var (
+		hostImage             string
+		nodeDefaultDefinition *propertiesv1.HostSizingRequirements
+	)
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
@@ -2083,10 +2049,6 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 
 	var subtasks []concurrency.Task
 	for i := uint(0); i < count; i++ {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "canceled")
-		}
-
 		subtask, xerr := task.StartInSubtask(c.taskCreateNode, taskCreateNodeParameters{
 			index:         i + 1,
 			nodeDef:       nodeDef,

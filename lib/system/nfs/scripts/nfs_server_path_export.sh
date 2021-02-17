@@ -46,7 +46,7 @@ else
 fi
 
 # Adapts ACL
-OPTIONS="{{.Options}}"
+OPTIONS="*({{.Options}})"
 FILTERED_OPTIONS=
 if [ -z "$OPTIONS" ]; then
     # No access rights, using default ones

@@ -704,7 +704,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				case *fail.ErrDuplicate: // useless to retry on duplicate (no matter on what resource the duplicate is found)...
 					return retry.StopRetryError(innerXErr)
 				}
-				if server != nil {
+				if server != nil && server.ID != "" {
 					if derr := s.rpcDeleteServer(server.ID); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
 					}
