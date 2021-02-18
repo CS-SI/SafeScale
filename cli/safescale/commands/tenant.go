@@ -164,8 +164,8 @@ var tenantCleanup = &cli.Command{
 }
 
 var tenantScan = &cli.Command{
-	Name:  "scan [--dry-run]",
-	Usage: "Scan tenant's templates",
+	Name:  "scan",
+	Usage: "Scan tenant's templates [--dry-run]",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "dry-run"},
 	},
