@@ -222,8 +222,6 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 
 	name := in.GetName()
 
-	// Check Scannable here ? (with currentTenant)
-
 	job, xerr := PrepareJob(ctx, name, "tenant scan")
 	if xerr != nil {
 		return nil, xerr
@@ -235,8 +233,10 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewScannerHandler(job)
+	var resultList *protocol.ScanResultList
+	resultList, err = handler.Scan(name, in.GetDryRun())
 
-	return handler.Scan(name, in.GetDryRun())
+	return resultList, err
 }
 
 // Inspect returns information about a tenant

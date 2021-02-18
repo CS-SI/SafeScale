@@ -32,6 +32,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
@@ -92,6 +93,16 @@ type StoredCPUInfo struct {
 	CPUInfo
 }
 
+const (
+	scanNetworkName   string  = "safescale-scan-network"
+	scanNetworkCIDR   string  = "192.168.20.0/24"
+	scanSubnetName    string  = "safescale-scan-subnet"
+	scanSubnetCIDR    string  = "192.168.20.0/26"
+	defaultScanImage  string  = "Ubuntu 18.04"
+	scannedHostPrefix string  = "scanhost-"
+	maxParallelScans  float64 = 4.0
+)
+
 const cmdNumberOfCPU string = "lscpu | grep 'CPU(s):' | grep -v 'NUMA' | tr -d '[:space:]' | cut -d: -f2"
 const cmdNumberOfCorePerSocket string = "lscpu | grep 'Core(s) per socket' | tr -d '[:space:]' | cut -d: -f2"
 const cmdNumberOfSocket string = "lscpu | grep 'Socket(s)' | tr -d '[:space:]' | cut -d: -f2"
@@ -131,14 +142,16 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
-// ScannerHandler defines API to manipulate images
+// ScannerHandler defines API to manipulate tenants
 type ScannerHandler interface {
 	Scan(string, bool) (_ *protocol.ScanResultList, xerr fail.Error)
 }
 
 // scannerHandler service
 type scannerHandler struct {
-	job server.Job
+	job              server.Job
+	abstractSubnet   *abstract.Subnet
+	scannedHostImage *abstract.Image
 }
 
 // NewScannerHandler creates a scanner service
@@ -147,7 +160,7 @@ func NewScannerHandler(job server.Job) ScannerHandler {
 }
 
 // Scan scans the tenant and updates the database
-func (handler *scannerHandler) Scan(tenantName string, dryRun bool) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *scannerHandler) Scan(tenantName string, isDryRun bool) (_ *protocol.ScanResultList, xerr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -163,296 +176,213 @@ func (handler *scannerHandler) Scan(tenantName string, dryRun bool) (_ *protocol
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	svc := handler.job.GetService()
+	task := handler.job.GetTask()
 
-	params := svc.GetTenantParameters()
-
-	var resultList []*protocol.ScanResult
-
-	compute, ok1 := params["compute"].(map[string]interface{})
-	isScannable, ok2 := compute["Scannable"].(bool)
-	if !(ok1 && ok2) {
-		return nil, fail.InvalidParameterError("scannable", "not set")
+	isScannable, err := handler.checkScannable()
+	if err != nil {
+		return nil, err
 	}
-
 	if !isScannable {
 		return nil, fail.ForbiddenError("tenant is not scannable")
 	}
 
-	if dryRun {
-		templates, xerr := svc.ListTemplates(false)
-		if xerr != nil {
-			return nil, xerr
-		}
-		for _, template := range templates {
-			resultList = append(resultList, &protocol.ScanResult{
-				Template: template.Name,
-				Success:  true,
-			})
-		}
-		return &protocol.ScanResultList{Results: resultList}, xerr
+	if isDryRun {
+		return handler.dryRun()
 	}
-
-	if err := handler.analyze(&resultList); err != nil {
-		return nil, err
-	}
-	if err := handler.collect(); err != nil {
-		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
-	}
-	return &protocol.ScanResultList{Results: resultList}, nil
-}
-
-func (handler *scannerHandler) analyze(resultList *[]*protocol.ScanResult) (xerr fail.Error) {
-	svc := handler.job.GetService()
-	tenantName := svc.GetName()
 
 	if xerr = handler.dumpImages(); xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 
 	if xerr = handler.dumpTemplates(); xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 
 	templates, xerr := svc.ListTemplates(false)
 	if xerr != nil {
-		return xerr
+		return nil, xerr
 	}
-	img, xerr := svc.SearchImage("Ubuntu 18.04")
+
+	handler.scannedHostImage, xerr = svc.SearchImage(defaultScanImage)
 	if xerr != nil {
-		logrus.Warnf("No image here...")
-		return xerr
+		return nil, fail.Wrap(xerr, "could not find needed image in given service")
 	}
 
-	task := handler.job.GetTask()
-
-	// Prepare network if needed
-	netName := "sf-scan" // FIXME: Hardcoded string
-	network, xerr := networkfactory.Load(task, svc, netName)
+	network, xerr := handler.getScanNetwork()
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
-			return xerr
-		}
-		network, xerr = networkfactory.New(svc)
-		if xerr != nil {
-			return xerr
-		}
-		req := abstract.NetworkRequest{
-			Name: netName,
-			//IPVersion: ipversion.IPv4,
-			CIDR: "192.168.20.0/24",
-		}
-		if xerr = network.Create(task, req); xerr != nil {
-			return xerr
-		}
-
-		defer func() {
-			derr := network.Delete(task)
-			if derr != nil {
-				logrus.Warnf("Error deleting network '%s'", network.GetID())
-			}
-			_ = xerr.AddConsequence(derr)
-		}()
+		return nil, fail.Wrap(xerr, "could not get/create the scan network")
 	}
+	defer network.Delete(task)
 
-	// Prepare sub-network if needed
-	subNetName := "sf-scan" // FIXME: Hardcoded string
-	subNetwork, xerr := subnetfactory.Load(task, svc, netName, subNetName)
+	subnet, xerr := handler.getScanSubnet(network.GetID())
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
-			return xerr
-		}
-		subNetwork, xerr = subnetfactory.New(svc)
-		if xerr != nil {
-			return xerr
-		}
-		req := abstract.SubnetRequest{
-			Name:      subNetName,
-			NetworkID: network.GetID(),
-			IPVersion: ipversion.IPv4,
-			CIDR:      "192.168.20.0/26",
-		}
-
-		subnethq := abstract.HostSizingRequirements{
-			MinGPU: -1,
-		}
-		if xerr = subNetwork.Create(task, req, "", &subnethq); xerr != nil {
-			return xerr
-		}
-
-		defer func() {
-			derr := subNetwork.Delete(task)
-			if derr != nil {
-				logrus.Warnf("Error deleting subnetwork '%s'", subNetwork.GetID())
-			}
-			_ = xerr.AddConsequence(derr)
-		}()
+		return nil, fail.Wrap(xerr, "could not get/create the scan subnet")
 	}
+	defer subnet.Delete(task)
 
-	var as *abstract.Subnet
-	xerr = subNetwork.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as = clonable.(*abstract.Subnet)
+	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		handler.abstractSubnet = clonable.(*abstract.Subnet)
 		return nil
 	})
+	if xerr != nil {
+		return nil, xerr
+	}
 
+	var scanResultList []*protocol.ScanResult
+
+	var scanWaitGroup sync.WaitGroup
+	scanChannel := make(chan bool, int(math.Min(maxParallelScans, float64(len(templates)))))
+
+	scanWaitGroup.Add(len(templates))
+
+	for _, targetTemplate := range templates {
+		scanChannel <- true
+		localTarget := targetTemplate
+
+		// TODO: If there is a file with today's date, skip it...
+		fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + tenantName + "#" + localTarget.Name + ".json")
+		if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
+			break
+		}
+
+		go func(innerTemplate abstract.HostTemplate, wg *sync.WaitGroup) {
+			defer wg.Done()
+			defer func() { <-scanChannel }()
+			lerr := handler.analyzeTemplate(innerTemplate, scanWaitGroup)
+			if lerr != nil {
+				logrus.Warnf("Error running scanner: %+v", lerr)
+				scanResultList = append(scanResultList, &protocol.ScanResult{
+					Template: innerTemplate.Name,
+					Success:  false,
+				})
+			} else {
+				scanResultList = append(scanResultList, &protocol.ScanResult{
+					Template: innerTemplate.Name,
+					Success:  true,
+				})
+			}
+		}(localTarget, &scanWaitGroup)
+	}
+
+	for i := 0; i < cap(scanChannel); i++ {
+		scanChannel <- true
+	}
+
+	scanWaitGroup.Wait()
+
+	if err := handler.collect(); err != nil {
+		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
+	}
+	return &protocol.ScanResultList{Results: scanResultList}, nil
+}
+
+func (handler *scannerHandler) analyzeTemplate(template abstract.HostTemplate, scanWaitGroup sync.WaitGroup) (xerr fail.Error) {
+
+	defer scanWaitGroup.Done()
+
+	logrus.Infof("Checking template %s", template.Name)
+
+	svc := handler.job.GetService()
+	task := handler.job.GetTask()
+	tenantName := svc.GetName()
+
+	hostName := scannedHostPrefix + template.Name
+	host, xerr := hostfactory.New(svc)
 	if xerr != nil {
 		return xerr
 	}
 
-	// already done by dump functions above
-	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
+	// Fix harcoded flexible engine host name regex
+	if tenantName == "flexibleengine" {
+		hostName = strings.ReplaceAll(hostName, ".", "_")
+	}
+
+	req := abstract.HostRequest{
+		ResourceName: hostName,
+		Subnets:      []*abstract.Subnet{handler.abstractSubnet},
+		PublicIP:     false,
+		TemplateID:   template.ID,
+	}
+	def := abstract.HostSizingRequirements{
+		Image: defaultScanImage,
+	}
+
+	if _, xerr = host.Create(task, req, def); xerr != nil {
+		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
+	}
+
+	defer func() {
+		logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.GetID())
+		derr := host.Delete(task)
+		if derr != nil {
+			logrus.Warnf("Error deleting host '%s'", hostName)
+		}
+	}()
+
+	_, cout, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
+	if xerr != nil {
+		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
+	}
+	daCPU, xerr := createCPUInfo(cout)
+	if xerr != nil {
+		return fail.Wrap(xerr, "template [%s]: Problem building cpu info", template.Name)
+	}
+
+	daCPU.TemplateName = template.Name
+	daCPU.TemplateID = template.ID
+	daCPU.ImageID = handler.scannedHostImage.ID
+	daCPU.ImageName = handler.scannedHostImage.Name
+	daCPU.TenantName = tenantName
+	daCPU.LastUpdated = time.Now().Format(time.RFC850)
+
+	daOut, err := json.MarshalIndent(daCPU, "", "\t")
+	if err != nil {
+		logrus.Warnf("tenant '%s', template '%s' : Problem marshaling json data: %v", tenantName, template.Name, err)
 		return fail.ToError(err)
 	}
 
-	var wg sync.WaitGroup
-
-	//concurrency := math.Min(4, float64(len(templates)/2)) // Why /2 ?
-	concurrency := math.Min(4.0, float64(len(templates)))
-	sem := make(chan bool, int(concurrency))
-
-	hostAnalysis := func(template abstract.HostTemplate) fail.Error {
-		defer wg.Done()
-
-		// Limit scanner tests for integration test purposes
-		testSubset := ""
-
-		// FIXME: move SCANNER_SUBSET to safescale CLI and pass the value by protobuf to the handler
-		if testSubsetCandidate := os.Getenv("SCANNER_SUBSET"); testSubsetCandidate != "" {
-			testSubset = testSubsetCandidate
-		}
-
-		if len(testSubset) > 0 {
-			if !strings.Contains(template.Name, testSubset) {
-				return nil
-			}
-		}
-
-		// TODO: If there is a file with today's date, skip it...
-		fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + tenantName + "#" + template.Name + ".json")
-		if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
-			return nil
-		}
-
-		logrus.Infof("Checking template %s", template.Name)
-
-		hostName := "scanhost-" + template.Name
-		host, xerr := hostfactory.New(svc)
-		if xerr != nil {
-			return xerr
-		}
-
-		// Fix harcoded flexible engine host name regex
-		if tenantName == "flexibleengine" {
-			hostName = strings.ReplaceAll(hostName, ".", "_")
-		}
-
-		req := abstract.HostRequest{
-			ResourceName: hostName,
-			Subnets:      []*abstract.Subnet{as},
-			PublicIP:     false,
-			TemplateID:   template.ID,
-		}
-		def := abstract.HostSizingRequirements{
-			Image: "Ubuntu 18.04",
-		}
-		if _, xerr = host.Create(task, req, def); xerr != nil {
-			return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
-		}
-
-		defer func() {
-			logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.GetID())
-			derr := host.Delete(task)
-			if derr != nil {
-				logrus.Warnf("Error deleting host '%s'", hostName)
-			}
-		}()
-
-		// sshSvc := handlers.NewSSHHandler(job)
-		// ssh, err := sshSvc.GetConfig(host.GetID())
-		// if err != nil {
-		// 	logrus.Warnf("template [%s] host '%s': error reading SSHConfig: %v", template.GetName, hostName, err.Error())
-		// 	return err
-		// }
-		// _, nerr := ssh.WaitServerReady(job.GetTask(), "ready", time.Duration(6+concurrency-1)*time.Minute)
-		// if nerr != nil {
-		// 	logrus.Warnf("template [%s]: Error waiting for server ready: %v", template.GetName, nerr)
-		// 	return nerr
-		// }
-
-		// c, err := ssh.NewCommand(job.GetTask(), cmd)
-		// if err != nil {
-		// 	logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.GetName, err)
-		// 	return err
-		// }
-		// _, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
-		// if err != nil {
-		// 	logrus.Warnf("template [%s]: Problem running ssh command: %v", template.GetName, err)
-		// 	return err
-		// }
-		_, cout, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
-		if xerr != nil {
-			return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
-		}
-		daCPU, xerr := createCPUInfo(cout)
-		if xerr != nil {
-			return fail.Wrap(xerr, "template [%s]: Problem building cpu info", template.Name)
-		}
-
-		daCPU.TemplateName = template.Name
-		daCPU.TemplateID = template.ID
-		daCPU.ImageID = img.ID
-		daCPU.ImageName = img.Name
-		daCPU.TenantName = tenantName
-		daCPU.LastUpdated = time.Now().Format(time.RFC850)
-
-		daOut, err := json.MarshalIndent(daCPU, "", "\t")
-		if err != nil {
-			logrus.Warnf("tenant '%s', template '%s' : Problem marshaling json data: %v", tenantName, template.Name, err)
-			return fail.ToError(err)
-		}
-
-		nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0666)
-		if nerr != nil {
-			logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
-			return fail.ToError(nerr)
-		}
-		logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
-
-		return nil
+	nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0666)
+	if nerr != nil {
+		logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
+		return fail.ToError(nerr)
 	}
-
-	wg.Add(len(templates))
-
-	for _, target := range templates {
-		sem <- true
-		localTarget := target
-
-		go func(inner abstract.HostTemplate) {
-			defer func() { <-sem }()
-			lerr := hostAnalysis(inner)
-			if lerr != nil {
-				logrus.Warnf("Error running scanner: %+v", lerr)
-				res := append(*resultList, &protocol.ScanResult{
-					Template: inner.Name,
-					Success:  false,
-				})
-				resultList = &res
-			} else {
-				res := append(*resultList, &protocol.ScanResult{
-					Template: inner.Name,
-					Success:  true,
-				})
-				resultList = &res
-			}
-		}(localTarget)
-	}
-
-	for i := 0; i < cap(sem); i++ {
-		sem <- true
-	}
-
-	wg.Wait()
+	logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
 
 	return nil
+}
+
+func (handler *scannerHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.Error) {
+	svc := handler.job.GetService()
+
+	var resultList []*protocol.ScanResult
+
+	templates, xerr := svc.ListTemplates(false)
+	if xerr != nil {
+		return nil, xerr
+	}
+	for _, template := range templates {
+		resultList = append(resultList, &protocol.ScanResult{
+			Template: template.Name,
+			Success:  false,
+		})
+	}
+
+	return &protocol.ScanResultList{Results: resultList}, xerr
+}
+
+func (handler *scannerHandler) checkScannable() (isScannable bool, xerr fail.Error) {
+	svc := handler.job.GetService()
+
+	params := svc.GetTenantParameters()
+
+	compute, ok1 := params["compute"].(map[string]interface{})
+	isScannable, ok2 := compute["Scannable"].(bool)
+
+	if !(ok1 && ok2) {
+		return false, fail.InvalidParameterError("scannable", "not set")
+	}
+
+	return isScannable, xerr
 }
 
 func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
@@ -518,6 +448,62 @@ func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
 	}
 
 	return nil
+}
+
+func (handler *scannerHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
+	task := handler.job.GetTask()
+	svc := handler.job.GetService()
+	network, xerr = networkfactory.Load(task, svc, scanNetworkName)
+	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+			return nil, xerr
+		}
+
+		network, xerr = networkfactory.New(svc)
+		if xerr != nil {
+			return nil, xerr
+		}
+		req := abstract.NetworkRequest{
+			Name: scanNetworkName,
+			CIDR: scanNetworkCIDR,
+		}
+		if xerr = network.Create(task, req); xerr != nil {
+			return nil, xerr
+		}
+		return network, xerr
+	}
+	return network, xerr
+}
+
+func (handler *scannerHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
+	task := handler.job.GetTask()
+	svc := handler.job.GetService()
+	subnet, xerr = subnetfactory.Load(task, svc, scanNetworkName, scanSubnetName)
+	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+			return nil, xerr
+		}
+		subnet, xerr = subnetfactory.New(svc)
+		if xerr != nil {
+			return nil, xerr
+		}
+		req := abstract.SubnetRequest{
+			Name:      scanSubnetName,
+			NetworkID: networkID,
+			IPVersion: ipversion.IPv4,
+			CIDR:      scanSubnetCIDR,
+		}
+
+		subnetHostSizing := abstract.HostSizingRequirements{
+			MinGPU: -1,
+		}
+		if xerr = subnet.Create(task, req, "", &subnetHostSizing); xerr != nil {
+			return nil, xerr
+		}
+
+		return subnet, xerr
+	}
+	return subnet, xerr
 }
 
 func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
