@@ -205,7 +205,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := svc.DeleteNetwork(an.ID); xerr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete n=Network"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
 
 		}
@@ -341,9 +341,11 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 						if recNet != nil {
 							return fmt.Errorf("still there")
 						}
+
 						if _, ok := recErr.(*fail.ErrNotFound); ok {
 							return nil
 						}
+
 						return fail.Wrap(recErr, "another kind of error")
 					},
 					temporal.GetContextTimeout(),
@@ -353,7 +355,8 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 					return innerXErr
 				}
 			default:
-				logrus.Errorf("cannot delete Network, other reason (%s: %s)", reflect.TypeOf(innerXErr).String(), innerXErr.Error())
+				logrus.Errorf(innerXErr.Error())
+				return innerXErr
 			}
 		}
 		return nil

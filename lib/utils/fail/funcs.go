@@ -136,6 +136,9 @@ func Wrap(cause error, msg ...interface{}) Error {
 	}
 
 	switch rerr := cause.(type) {
+	case *ErrorList:
+		rerr.prependToMessage(strprocess.FormatStrings(msg...))
+		return rerr
 	case Error:
 		rerr.prependToMessage(strprocess.FormatStrings(msg...))
 		return rerr

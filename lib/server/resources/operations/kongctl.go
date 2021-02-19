@@ -305,16 +305,21 @@ func (k *KongController) addSourceControl(
 	url += "/plugins"
 	result, _, xerr := k.get(ruleName, url)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
 			return xerr
 		}
 	}
+
 	if kongdata, ok := result["data"].([]interface{}); ok && len(kongdata) > 0 {
 		for _, i := range kongdata {
 			plugin, ok := i.(map[string]interface{})
 			if !ok {
 				return fail.InvalidParameterError("result['data']", "is an invalid map[string]")
 			}
+
 			if plugin["name"] == "ip-restriction" {
 				ref = plugin["id"].(string)
 				break
@@ -344,25 +349,18 @@ func (k *KongController) addSourceControl(
 	return nil
 }
 
-// func (k *KongController) buildSourceControlContent(rules map[string]interface{}) string {
-// 	kongdata := map[string]interface{}{
-// 		"config": rules,
-// 	}
-// 	kongdata["name"] = "ip-restriction"
-// 	jsoned, _ := json.Marshal(&kongdata)
-// 	return string(jsoned)
-// }
-
 func (k *KongController) get(name, url string) (map[string]interface{}, string, fail.Error) {
 	cmd := fmt.Sprintf(curlGet, url)
 	task, xerr := concurrency.NewTask()
 	if xerr != nil {
 		return nil, "", xerr
 	}
+
 	retcode, stdout, _, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, "", xerr
 	}
+
 	if retcode != 0 {
 		return nil, "", fail.NewError("get '%s' failed: retcode=%d", name, retcode)
 	}
@@ -371,6 +369,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 	if xerr != nil {
 		return nil, httpcode, xerr
 	}
+
 	return response, httpcode, nil
 }
 
@@ -380,6 +379,7 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 	if xerr != nil {
 		return nil, "", xerr
 	}
+
 	cmd := fmt.Sprintf(curlPost, url, data)
 	retcode, stdout, stderr, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
@@ -389,6 +389,7 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 		logrus.Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
+
 	response, httpcode, xerr := k.parseResult(stdout)
 	if xerr != nil {
 		return nil, httpcode, xerr
@@ -408,6 +409,7 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 	if xerr != nil {
 		return nil, "", xerr
 	}
+
 	cmd := fmt.Sprintf(curlPut, url, data)
 	retcode, stdout, stderr, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
@@ -422,6 +424,7 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 	if xerr != nil {
 		return nil, httpcode, xerr
 	}
+
 	if propagate {
 		if id, ok := response["id"]; ok {
 			(*v)[name] = id.(string)
@@ -436,6 +439,7 @@ func (k *KongController) patch(name, url, data string, v *data.Map, propagate bo
 	if xerr != nil {
 		return nil, "", xerr
 	}
+
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
 	retcode, stdout, stderr, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {

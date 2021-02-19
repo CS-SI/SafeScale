@@ -17,10 +17,13 @@
 package client
 
 import (
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 )
 
 // share is the part of the safescale client handilng Shares
@@ -46,19 +49,42 @@ func (n share) Create(def *protocol.ShareDefinition, timeout time.Duration) erro
 }
 
 // Delete deletes a share
-func (n share) Delete(name string, timeout time.Duration) error {
+func (n share) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
+
 	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, err := service.Delete(ctx, &protocol.Reference{Name: name})
-	if err != nil {
-		return DecorateTimeoutError(err, "deletion of share", true)
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
+	)
+
+	shareDeleter := func(aname string) {
+		defer wg.Done()
+
+		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {
+			mutex.Lock()
+			errs = append(errs, xerr.Error())
+			mutex.Unlock()
+		}
 	}
+
+	wg.Add(len(names))
+	for _, target := range names {
+		go shareDeleter(target)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+	}
+
 	return nil
 }
 

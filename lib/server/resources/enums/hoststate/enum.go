@@ -26,7 +26,7 @@ const (
 	STARTING               // STARTING when host is starting
 	STARTED                // STARTED when host is started
 	STOPPING               // STOPPING when host is stopping
-	TERMINATED             // TERMINATED when a host can be enumerated but it's already deleted
+	TERMINATED             // TERMINATED when a host can be enumerated, but it's already deleted
 
 	ERROR = 254 // when host is in error state
 

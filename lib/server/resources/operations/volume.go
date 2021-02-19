@@ -296,7 +296,31 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 		return fail.InvalidParameterError("req.Size", "must be an integer > 0")
 	}
 
+	// Check if Volume exists and is managed by SafeScale
 	svc := rv.GetService()
+	if _, xerr = LoadVolume(task, svc, req.Name); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+		// continue
+		default:
+			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
+		}
+	} else {
+		return fail.DuplicateError("'%s' already exists", req.Name)
+	}
+
+	// Check if host exists but is not managed by SafeScale
+	if _, xerr = svc.InspectVolume(req.Name); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return fail.Wrap(xerr, "failed to check if Volume name '%s' is already used", req.Name)
+		}
+	} else {
+		return fail.DuplicateError("found an existing Volume named '%s' (but not managed by SafeScale)", req.Name)
+	}
+
 	av, xerr := svc.CreateVolume(req)
 	if xerr != nil {
 		return xerr
@@ -337,7 +361,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
-		server                                                         *nfs.Server
+		nfsServer                                                      *nfs.Server
 	)
 
 	svc := rv.GetService()
@@ -520,25 +544,15 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 				return xerr
 			}
 
-			server, xerr = nfs.NewServer(sshConfig)
-			if xerr != nil {
-				return xerr
-			}
-			volumeUUID, xerr = server.MountBlockDevice(task, deviceName, mountPoint, format, doNotFormat)
+			nfsServer, xerr = nfs.NewServer(sshConfig)
 			if xerr != nil {
 				return xerr
 			}
 
-			defer func() {
-				if xerr != nil {
-					// Disable abort signal during the clean up
-					defer task.DisarmAbortSignal()()
-
-					if derr := server.UnmountBlockDevice(task, volumeUUID); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(xerr), volumeName, targetName))
-					}
-				}
-			}()
+			volumeUUID, xerr = nfsServer.MountBlockDevice(task, deviceName, mountPoint, format, doNotFormat)
+			if xerr != nil {
+				return xerr
+			}
 
 			// Saves volume information in property
 			hostVolumesV1.VolumesByID[volumeID] = &propertiesv1.HostVolume{
@@ -553,6 +567,17 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 		if innerXErr != nil {
 			return innerXErr
 		}
+
+		defer func() {
+			if innerXErr != nil {
+				// Disable abort signal during the clean up
+				defer task.DisarmAbortSignal()()
+
+				if derr := nfsServer.UnmountBlockDevice(task, volumeUUID); derr != nil {
+					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(innerXErr), volumeName, targetName))
+				}
+			}
+		}()
 
 		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -579,8 +604,8 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
-			if derr := server.UnmountBlockDevice(task, volumeUUID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", actionFromError(xerr), volumeName, targetName))
+			if derr := nfsServer.UnmountBlockDevice(task, volumeUUID); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", actionFromError(xerr), volumeName, targetName))
 			}
 			derr := host.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {

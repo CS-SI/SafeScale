@@ -427,8 +427,7 @@ var hostDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Host.Delete(hostList, temporal.GetExecutionTimeout())
-		if err != nil {
+		if err := clientSession.Host.Delete(hostList, temporal.GetExecutionTimeout()); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of host", false).Error())))
 		}

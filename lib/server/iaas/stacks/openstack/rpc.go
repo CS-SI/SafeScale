@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -130,6 +131,29 @@ func (s Stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Erro
 	}
 
 	return out, nil
+}
+
+// rpcListServers lists servers
+func (s Stack) rpcListServers() ([]*servers.Server, fail.Error) {
+	var resp []*servers.Server
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			allPages, innerErr := servers.List(s.ComputeClient, nil).AllPages()
+			if innerErr != nil {
+				return innerErr
+			}
+			if innerErr := servers.ExtractServersInto(allPages, &resp); innerErr != nil {
+				return innerErr
+			}
+			return nil
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return []*servers.Server{}, xerr
+	}
+
+	return resp, nil
 }
 
 // rpcCreateServer calls openstack to create a server
@@ -275,4 +299,36 @@ func (s Stack) rpcGetPort(id string) (port *ports.Port, xerr fail.Error) {
 	}
 
 	return port, nil
+}
+
+// rpcCreateFloatingIp creates a floating IP
+func (s Stack) rpcCreateFloatingIp() (*floatingips.FloatingIP, fail.Error) {
+	var resp *floatingips.FloatingIP
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			resp, innerErr = floatingips.Create(s.ComputeClient, floatingips.CreateOpts{
+				Pool: s.authOpts.FloatingIPPool,
+			}).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return &floatingips.FloatingIP{}, xerr
+	}
+	return resp, nil
+}
+
+// rpcDeleteFloatingIp deletes a floating IP
+func (s Stack) rpcDeleteFloatingIp(id string) fail.Error {
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	return stacks.RetryableRemoteCall(
+		func() error {
+			return floatingips.Delete(s.ComputeClient, id).ExtractErr()
+		},
+		NormalizeError,
+	)
 }
