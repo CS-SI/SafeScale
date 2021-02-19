@@ -399,6 +399,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		out.Nodes = append(out.Nodes, h)
 	}
 	return out, nil

@@ -412,6 +412,8 @@ message HostTemplate {
 	string gpu_type = 7;
 }
 
+// --- templates ---
+
 message TemplateList {
 	repeated HostTemplate templates = 1;
 }
@@ -421,8 +423,14 @@ message TemplateListRequest {
 	string tenant_id = 2;
 }
 
+message TemplateMatchRequest {
+	string tenant_id = 1;
+	string sizing = 2;
+}
+
 service TemplateService {
 	rpc List(TemplateListRequest) returns (TemplateList){}
+	rpc Match(TemplateMatchRequest) returns (TemplateList){}
 }
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)

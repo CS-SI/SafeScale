@@ -17,6 +17,8 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
@@ -36,17 +38,18 @@ var TemplateCommand = &cli.Command{
 	Usage: "template COMMAND",
 	Subcommands: []*cli.Command{
 		templateList,
+		templateMatch,
 	},
 }
 
 var templateList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available templates",
+	Usage:   "List available templates",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "all",
-			Usage: "ErrorList all available templates in tenant (without any filter)",
+			Usage: "List all available templates in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
@@ -57,6 +60,31 @@ var templateList = &cli.Command{
 		}
 
 		templates, err := clientSession.Template.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
+		}
+		return clitools.SuccessResponse(templates.GetTemplates())
+	},
+}
+
+var templateMatch = &cli.Command{
+	Name:      "match",
+	Usage:     "List templates that match the SIZING",
+	ArgsUsage: "SIZING",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args %s", templateCmdName, c.Command.Name, c.Args())
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		var sizing []string
+		sizing = append(sizing, c.Args().First())
+		sizing = append(sizing, c.Args().Tail()...)
+		sizingAsString := strings.Join(sizing, ",")
+		templates, err := clientSession.Template.Match(sizingAsString, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
