@@ -18,6 +18,7 @@ package fail
 
 import (
 	"github.com/sirupsen/logrus"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
@@ -38,6 +39,11 @@ func NewErrorList(errors []error) Error {
 		errorCore: newError(nil, nil, ""),
 		errors:    errors,
 	}
+}
+
+// ToGRPCStatus returns a grpcstatus struct from ErrorList
+func (el ErrorList) ToGRPCStatus() error {
+	return grpcstatus.Errorf(el.GRPCCode(), el.Error())
 }
 
 // AddConsequence ...
@@ -69,9 +75,11 @@ func (e *ErrorList) Error() string {
 		logrus.Errorf("invalid call of ErrorList.Error() from null instance")
 		return ""
 	}
-	var r string
-	for _, v := range e.errors {
-		r += v.Error() + "\n"
+	r := e.message
+	if len(e.errors) > 0 {
+		for _, v := range e.errors {
+			r += v.Error() + "\n"
+		}
 	}
 	return r
 }

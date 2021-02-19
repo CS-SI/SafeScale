@@ -3092,6 +3092,7 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 		all            map[uint]*propertiesv3.ClusterNode
 		nodes, masters []uint
 	)
+	// Mark the cluster as Removed and get nodes from properties
 	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Updates cluster state to mark cluster as Removing
 		innerXErr := props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
@@ -3166,6 +3167,10 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 				cleaningErrors = append(cleaningErrors, innerXErr)
 			}
 		}
+	}
+
+	if len(cleaningErrors) > 0 {
+		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
 	}
 
 	// From here, make sure there is nothing in nodesV3.ByNumericalID; if there is something, delete all the remaining

@@ -156,10 +156,10 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 	service := protocol.NewHostServiceClient(h.session.connection)
 	hostDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.Reference{Name: aname})
-		if err != nil {
+
+		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {
 			mutex.Lock()
-			errs = append(errs, err.Error())
+			errs = append(errs, xerr.Error())
 			mutex.Unlock()
 		}
 	}

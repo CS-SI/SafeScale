@@ -16,116 +16,80 @@
 
 package data
 
-// Map ...
-type Map map[string]interface{}
+import (
+	"sync"
+)
 
-// NewMap ...
-func NewMap() Map {
-	return Map{}
+// keyValue describes the content of a key/value pair
+type keyValue struct {
+	name  string
+	value interface{}
 }
 
-// Clone clones the content of a Variables
-// satisfies interface Clonable
-func (m Map) Clone() Map {
-	cm := NewMap()
-	return (&cm).Replace(m)
+// Key returns the key of the key/value
+func (kv keyValue) Key() string {
+	return kv.name
 }
 
-// Replace replaces the content of the Map with content of another one
-// satisfies interface Clonable
-func (m *Map) Replace(src Map) Map {
-	*m = make(Map, len(src))
-	for k, v := range src {
-		(*m)[k] = v
-	}
-	return *m
+// Value returns the value of the key/value
+func (kv keyValue) Value() interface{} {
+	return kv.value
 }
 
-// Merge add missing keys from source
-func (m Map) Merge(src Map) Map {
-	for k, v := range src {
-		if _, ok := m[k]; !ok {
-			m[k] = v
-		}
-	}
-	return m
+// ImmutableKeyValue is a key/value that cannot be changed
+type ImmutableKeyValue struct {
+	keyValue
 }
 
-// ForceMerge adds missing keys from source in p and replace the ones in source already in p
-func (m Map) ForceMerge(src Map) Map {
-	for k, v := range src {
-		m[k] = v
+// NewImmutableKeyValue creates a new immutable key/Value
+// If no values is passed, sets the content of value to nil
+// If at least 1 value is passed, the first one only is considered (trick to allow to create an instance with nil value)
+func NewImmutableKeyValue(key string, values ...interface{}) ImmutableKeyValue {
+	var v interface{}
+	if len(values) > 0 {
+		v = values[0]
 	}
-	return m
+	return ImmutableKeyValue{
+		keyValue: keyValue{
+			name:  key,
+			value: v,
+		},
+	}
 }
 
-// Contains tells if a key is present in Map
-func (m Map) Contains(key string) bool {
-	_, ok := m[key]
-	return ok
+// Mutate creates a MutableKeyValue from ImmutableKeyValue
+func (i ImmutableKeyValue) Mutate() MutableKeyValue {
+	return NewMutableKeyValue(i.Key(), i.Value())
 }
 
-// Keys returns a slice with all keys of the map
-func (m Map) Keys() []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
+// MutableKeyValue is a key/value that can be updated
+type MutableKeyValue struct {
+	keyValue
+	mu sync.Mutex
 }
 
-// Values returns a slice with all values of the map
-func (m Map) Values() []interface{} {
-	values := make([]interface{}, 0, len(m))
-	for _, v := range m {
-		values = append(values, v)
+// NewMutableKeyValue creates a new mutable Key/Value
+func NewMutableKeyValue(name string, values ...interface{}) MutableKeyValue {
+	var v interface{}
+	if len(values) > 0 {
+		v = values[0]
 	}
-	return values
+	return MutableKeyValue{
+		keyValue: keyValue{
+			name:  name,
+			value: v,
+		},
+	}
 }
 
-// IndexedListOfStrings contains a list of string (being ID, IP, ...) of nodes indexed by node Numerical ID.
-type IndexedListOfStrings map[uint]string
-
-// KeysAndValues returns a slice with keys and a slice with values from map[uint]string
-func (ilos IndexedListOfStrings) KeysAndValues() ([]uint, []string) {
-	length := len(ilos)
-	if length <= 0 {
-		return []uint{}, []string{}
+// SetValue changes the value of the mutable key/value
+func (m *MutableKeyValue) SetValue(value interface{}) {
+	if m == nil {
+		return
 	}
 
-	keys := make([]uint, 0, length)
-	values := make([]string, 0, length)
-	for k, v := range ilos {
-		keys = append(keys, k)
-		values = append(values, v)
-	}
-	return keys, values
-}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-// Keys returns a slice with keys from map[uint]string
-func (ilos IndexedListOfStrings) Keys() []uint {
-	length := len(ilos)
-	if length <= 0 {
-		return []uint{}
-	}
-
-	keys := make([]uint, 0, length)
-	for k := range ilos {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// Values returns a slice with values from map[uint]string
-func (ilos IndexedListOfStrings) Values() []string {
-	length := len(ilos)
-	if length <= 0 {
-		return []string{}
-	}
-
-	values := make([]string, 0, length)
-	for _, v := range ilos {
-		values = append(values, v)
-	}
-	return values
+	m.value = value
 }

@@ -297,7 +297,7 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 		return xerr
 	}
 	if len(sns) > 0 {
-		return fail.InvalidRequestError("cannot delete a Network with Subnets in it")
+		return fail.InvalidRequestError("cannot delete a Network '%s': there are Subnets in it", network.Name)
 	}
 
 	xerr = stacks.RetryableRemoteCall(

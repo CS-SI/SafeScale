@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -14,9 +15,25 @@ import (
 type ErrTimeout = fail.ErrTimeout
 
 // TimeoutError ...
-func TimeoutError(err error, limit time.Duration) *ErrTimeout {
-	// msg := fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit))
-	msg := callstack.DecorateWith(fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit)), "", "", 0)
+func TimeoutError(err error, limit time.Duration, options ...data.ImmutableKeyValue) *ErrTimeout {
+	var (
+		msg      string
+		decorate bool
+	)
+
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case "callstack":
+				decorate = v.Value().(bool)
+			}
+		}
+	}
+
+	msg = fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit))
+	if decorate {
+		msg = callstack.DecorateWith(msg, "", "", 0)
+	}
 	return fail.TimeoutError(err, limit, msg)
 }
 

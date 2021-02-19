@@ -1541,7 +1541,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 					for _, hostID := range hostShare.ClientsByID {
 						_, inErr := LoadHost(task, svc, hostID)
 						if inErr == nil {
-							return fail.NotAvailableError("exports %d share%s and at least one share is mounted", shareCount, strprocess.Plural(uint(shareCount)))
+							return fail.NotAvailableError("host '%s' exports %d share%s and at least one share is mounted", rh.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 						}
 					}
 				}
@@ -1560,7 +1560,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			}
 			nAttached := len(hostVolumesV1.VolumesByID)
 			if nAttached > 0 {
-				return fail.NotAvailableError("host has %d volume%s attached", nAttached, strprocess.Plural(uint(nAttached)))
+				return fail.NotAvailableError("host '%s' has %d volume%s attached", rh.GetName(), nAttached, strprocess.Plural(uint(nAttached)))
 			}
 			return nil
 		})
