@@ -29,7 +29,7 @@ type template struct {
 	session *Session
 }
 
-// List return the list of availble templates on the current tenant
+// List returns the list of availble templates on the current tenant
 func (t template) List(all bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
@@ -41,4 +41,18 @@ func (t template) List(all bool, timeout time.Duration) (*protocol.TemplateList,
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 	return service.List(ctx, &protocol.TemplateListRequest{All: all})
+}
+
+// Match returns the list of templates that match the sizinf
+func (t template) Match(sizing string, timeout time.Duration) (*protocol.TemplateList, error) {
+	t.session.Connect()
+	defer t.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewTemplateServiceClient(t.session.connection)
+	return service.Match(ctx, &protocol.TemplateMatchRequest{Sizing: sizing})
 }
