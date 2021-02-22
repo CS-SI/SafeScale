@@ -296,9 +296,6 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), name))
 			}

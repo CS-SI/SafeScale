@@ -106,7 +106,7 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 func (n network) Create(
 	name, cidr string,
 	noSubnet bool,
-	gwname string, defaultSSHPort uint32, os, sizing string,
+	gwname string, gwSshPort uint32, os, sizing string,
 	keepOnFailure bool,
 	timeout time.Duration,
 ) (*protocol.Network, error) {
@@ -126,106 +126,9 @@ func (n network) Create(
 		KeepOnFailure: keepOnFailure,
 		Gateway: &protocol.GatewayDefinition{
 			Name:    gwname,
-			SshPort: defaultSSHPort,
+			SshPort: gwSshPort,
 			ImageId: os,
 		},
 	}
 	return service.Create(ctx, def)
 }
-
-//// BindSecurityGroup calls the gRPC server to bind a security group to a network
-//func (n network) BindSecurityGroup(networkRef, sgRef string, enable bool, duration time.Duration) error {
-//	n.session.Connect()
-//	defer n.session.Disconnect()
-//
-//	ctx, xerr := utils.GetContext(true)
-//	if xerr != nil {
-//		return xerr
-//	}
-//
-//	req := &protocol.SecurityGroupBindRequest{
-//		Group:  &protocol.Reference{Name: sgRef},
-//		Target: &protocol.Reference{Name: networkRef},
-//		Enable: enable,
-//	}
-//	service := protocol.NewNetworkServiceClient(n.session.connection)
-//	_, err := service.BindSecurityGroup(ctx, req)
-//	return err
-//}
-//
-//// UnbindSecurityGroup calls the gRPC server to unbind a security group from a network
-//func (n network) UnbindSecurityGroup(networkRef, sgRef string, duration time.Duration) error {
-//	n.session.Connect()
-//	defer n.session.Disconnect()
-//
-//	ctx, xerr := utils.GetContext(true)
-//	if xerr != nil {
-//		return xerr
-//	}
-//
-//	req := &protocol.SecurityGroupBindRequest{
-//		Group:  &protocol.Reference{Name: sgRef},
-//		Target: &protocol.Reference{Name: networkRef},
-//	}
-//	service := protocol.NewHostServiceClient(n.session.connection)
-//	_, err := service.UnbindSecurityGroup(ctx, req)
-//	return err
-//}
-//
-//// EnableSecurityGroup calls the gRPC server to enable a bound security group of a network
-//func (n network) EnableSecurityGroup(networkRef, sgRef string, duration time.Duration) error {
-//	n.session.Connect()
-//	defer n.session.Disconnect()
-//
-//	ctx, xerr := utils.GetContext(true)
-//	if xerr != nil {
-//		return xerr
-//	}
-//
-//	req := &protocol.SecurityGroupBindRequest{
-//		Group:  &protocol.Reference{Name: sgRef},
-//		Target: &protocol.Reference{Name: networkRef},
-//	}
-//	service := protocol.NewNetworkServiceClient(n.session.connection)
-//	_, err := service.EnableSecurityGroup(ctx, req)
-//	return err
-//}
-//
-//// DisableSecurityGroup calls the gRPC server to disable a bound security group of a network
-//func (n network) DisableSecurityGroup(networkRef, sgRef string, duration time.Duration) error {
-//	n.session.Connect()
-//	defer n.session.Disconnect()
-//
-//	ctx, xerr := utils.GetContext(true)
-//	if xerr != nil {
-//		return xerr
-//	}
-//
-//	service := protocol.NewNetworkServiceClient(n.session.connection)
-//
-//	req := &protocol.SecurityGroupBindRequest{
-//		Group:  &protocol.Reference{Name: sgRef},
-//		Target: &protocol.Reference{Name: networkRef},
-//	}
-//	_, err := service.DisableSecurityGroup(ctx, req)
-//	return err
-//}
-//
-//// ListSecurityGroups calls the gRPC server to list bound security groups of a network
-//func (n network) ListSecurityGroups(networkRef, kind string, duration time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
-//	n.session.Connect()
-//	defer n.session.Disconnect()
-//
-//	ctx, xerr := utils.GetContext(true)
-//	if xerr != nil {
-//		return nil, xerr
-//	}
-//
-//	service := protocol.NewNetworkServiceClient(n.session.connection)
-//
-//	req := &protocol.SecurityGroupBondsRequest{
-//		Target: &protocol.Reference{Name: networkRef},
-//		Kind:   strings.ToLower(kind),
-//	}
-//	return service.ListSecurityGroups(ctx, req)
-//}

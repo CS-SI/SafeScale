@@ -213,7 +213,6 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 			if derr := svc.DeleteNetwork(an.ID); xerr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
-
 		}
 	}()
 

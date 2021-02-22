@@ -83,6 +83,15 @@ func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
 	}
 	if len(resp) > 1 {
+		var found uint
+		for _, v := range resp {
+			if v.Name == name {
+				found++
+			}
+		}
+		if found == 0 {
+			return nullServer, nil
+		}
 		return nullServer, fail.InconsistentError("found more than one Host named '%s'", name)
 	}
 	return resp[0], nil

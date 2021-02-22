@@ -510,7 +510,7 @@ func (c *core) write(task concurrency.Task) fail.Error {
 	return nil
 }
 
-// Reload reloads the content of the Object Storage, overriding what is in the metadata instance (being written or not...)
+// Reload reloads the content of the Object Storage, overriding what is in the metadata instance
 func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
