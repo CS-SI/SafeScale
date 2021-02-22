@@ -676,6 +676,31 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	tenantParams := svc.GetTenantParameters()
+
+	objectParams, _ := tenantParams["objectstorage"].(map[string]interface{})
+
+	compute, ok1 := tenantParams["compute"].(map[string]interface{})
+	_, ok2 := compute["CryptKey"].(string)
+
+	var tenantMetadataCrypted bool
+	if ok1 && ok2 {
+		tenantMetadataCrypted = true
+	}
+
+	tenantMetadata := protocol.TenantMetadata{
+		Storage: &protocol.TenantObjectStorage{
+			Type:      fmt.Sprint(objectParams["Type"]),
+			Endpoint:  fmt.Sprint(objectParams["Endpoint"]),
+			AuthUrl:   fmt.Sprint(objectParams["AuthURL"]),
+			AccessKey: fmt.Sprint(objectParams["AccessKey"]),
+			Region:    fmt.Sprint(objectParams["Region"]),
+		},
+		BucketName: svc.GetMetadataBucket().Name,
+		Crypt:      tenantMetadataCrypted,
+	}
+
 	region, ok := authOpts.Get("Region")
 	if !ok {
 		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
@@ -751,6 +776,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	response := protocol.TenantInspectResponse{
 		Name:             tenantName,
 		Provider:         svc.GetName(),
+		Metadata:         &tenantMetadata,
 		ScannedTemplates: scannedTemplateList,
 	}
 

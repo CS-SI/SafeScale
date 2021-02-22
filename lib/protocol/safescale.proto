@@ -167,7 +167,7 @@ message TenantInspectResponse {
 	string provider = 2;
 	//TenantIdentity identity = 3;
 	//TenantCompute compute = 4;
-	//TenantMetadata metadata = 5;
+	TenantMetadata metadata = 5;
 	repeated ScannedTemplate scanned_templates = 6;
 }
 
