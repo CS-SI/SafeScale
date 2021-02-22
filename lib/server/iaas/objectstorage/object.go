@@ -190,29 +190,39 @@ func (o *object) Read(target io.Writer, from, to int64) fail.Error {
 	}
 	defer func() {
 		if clerr := source.Close(); clerr != nil {
-			logrus.Error("Error closing item")
+			logrus.Error("error closing item")
 		}
 	}()
 
 	if seekTo == 0 && length >= size {
-		_, err := io.CopyN(target, source, size)
+		r, err := io.CopyN(target, source, size)
 		if err != nil {
 			return fail.ToError(err)
 		}
+		if r != size {
+			return fail.InconsistentError("read %d bytes instead of expected %d", r, size)
+		}
 	} else {
 		buf := make([]byte, seekTo)
-		if _, err := io.ReadAtLeast(source, buf, int(seekTo)); err != nil {
-			logrus.Fatal(err)
+		r, err := io.ReadAtLeast(source, buf, int(seekTo))
+		if err != nil {
+			return fail.ToError(fail.Wrap(err, "failed to seek Object Storage item"))
+		}
+		if r != int(seekTo) {
+			return fail.InconsistentError("seeked %d bytes instead of expected %d", r, seekTo)
 		}
 
 		bufbis := make([]byte, length)
-		if _, err := io.ReadAtLeast(source, bufbis, int(length)); err != nil {
-			logrus.Println("error ")
-			logrus.Fatal(err)
+		r, err = io.ReadAtLeast(source, bufbis, int(length))
+		if err != nil {
+			return fail.ToError(fail.Wrap(err, "failed to read from Object Storage item"))
+		}
+		if r != int(length) {
+			return fail.InconsistentError("read %d bytes instead of expected %d", r, length)
 		}
 
 		readerbis := bytes.NewReader(bufbis)
-		_, err := io.CopyBuffer(target, readerbis, bufbis)
+		_, err = io.CopyBuffer(target, readerbis, bufbis)
 		if err != nil {
 			return fail.ToError(err)
 		}
