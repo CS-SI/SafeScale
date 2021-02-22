@@ -302,18 +302,36 @@ var clusterCreateCommand = &cli.Command{
 			Name:    "complexity",
 			Aliases: []string{"C"},
 			Value:   "Small",
-			Usage:   "Defines the sizing of the cluster: Small, Normal, Large",
+			Usage: `Defines the sizing of the cluster: Small, Normal, Large
+	Default number of machines (#master, #nodes) depending of flavor are:
+		BOH: Small(1,1), Normal(3,3), Large(5,6)
+		SWARM: Small(1,1), Normal(3,3), Large(5,3)
+		OHPC: Small(1,1), Normal(1,3), Large(1,7)
+		DCOS: Small(1,2), Normal(3,4), Large(5,6)
+		K8S: Small(1,1), Normal(3,3), Large(5,6)
+	`,
 		},
 		&cli.StringFlag{
 			Name:    "flavor",
 			Aliases: []string{"F"},
 			Value:   "K8S",
-			Usage:   "Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S",
+			Usage: `Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S
+	Default sizing for each cluster type is:
+		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
+		SWARM: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[7-16], disk=[80]), nodes(cpu=[4-8], ram=[7-16], disk=[80])
+		OHPC: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[7-16], disk=[80])
+		DCOS: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[80]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
+		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])
+	`,
 		},
 		&cli.BoolFlag{
 			Name:    "keep-on-failure",
 			Aliases: []string{"k"},
 			Usage:   "If used, the resources are not deleted on failure (default: not set)",
+		},
+		&cli.BoolFlag{
+			Name:  "force, f",
+			Usage: "If used, it forces the cluster creation even if requested sizing is less than recommended",
 		},
 		&cli.StringFlag{
 			Name:    "cidr",
@@ -399,6 +417,7 @@ var clusterCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
 		}
 
+		force := c.Bool("force")
 		keep := c.Bool("keep-on-failure")
 		cidr := c.String("cidr")
 		disable := c.StringSlice("disable")
@@ -452,6 +471,7 @@ var clusterCreateCommand = &cli.Command{
 			GatewaySizing: gatewaysDef,
 			MasterSizing:  mastersDef,
 			NodeSizing:    nodesDef,
+			Force:         force,
 			// NodeCount:     uint32(c.Int("initial-node-count")),
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.GetLongOperationTimeout())

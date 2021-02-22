@@ -424,3 +424,75 @@ func (hf *HostFull) SetName(name string) *HostFull {
 
 // HostList contains a list of HostFull
 type HostList []*HostFull
+
+func (x *HostSizingRequirements) LowerThan(y *HostSizingRequirements) (bool, error) {
+	if x == nil {
+		return false, fail.InvalidInstanceError()
+	}
+
+	if y == nil {
+		return false, fail.InvalidParameterError("y", "cannot be nil")
+	}
+
+	less := true
+
+	if x.MinCores >= y.MinCores {
+		less = false
+	}
+	if x.MaxCores >= y.MaxCores {
+		less = false
+	}
+	if x.MinRAMSize >= y.MinRAMSize {
+		less = false
+	}
+	if x.MaxRAMSize >= y.MaxRAMSize {
+		less = false
+	}
+	if x.MinDiskSize >= y.MinDiskSize {
+		less = false
+	}
+	if x.MinGPU >= y.MinGPU {
+		less = false
+	}
+	if x.MinCPUFreq >= y.MinCPUFreq {
+		less = false
+	}
+
+	return less, nil
+}
+
+func (x *HostSizingRequirements) LowerOrEqualThan(y *HostSizingRequirements) (bool, error) {
+	if x == nil {
+		return false, fail.InvalidInstanceError()
+	}
+
+	if y == nil {
+		return false, fail.InvalidParameterError("y", "cannot be nil")
+	}
+
+	less := true
+
+	if x.MinCores > y.MinCores {
+		less = false
+	}
+	if x.MaxCores > y.MaxCores {
+		less = false
+	}
+	if x.MinRAMSize > y.MinRAMSize {
+		less = false
+	}
+	if x.MaxRAMSize > y.MaxRAMSize {
+		less = false
+	}
+	if x.MinDiskSize > y.MinDiskSize {
+		less = false
+	}
+	if x.MinGPU > y.MinGPU {
+		less = false
+	}
+	if x.MinCPUFreq > y.MinCPUFreq {
+		less = false
+	}
+
+	return less, nil
+}
