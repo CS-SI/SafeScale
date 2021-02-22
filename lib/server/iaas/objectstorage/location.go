@@ -352,14 +352,17 @@ func (l location) InspectObject(bucketName string, objectName string) (aosi abst
 	if err != nil {
 		return aosi, err
 	}
+
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return aosi, err
 	}
+
 	m, err := o.GetMetadata()
 	if err != nil {
 		return aosi, err
 	}
+
 	aosi = abstract.ObjectStorageItem{
 		BucketName: bucketName,
 		ItemName:   objectName,
@@ -461,13 +464,16 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 	if err != nil {
 		return err
 	}
+
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err
 	}
+
 	if err = o.Read(writer, from, to); err != nil {
 		return err
 	}
+
 	return nil
 }
 

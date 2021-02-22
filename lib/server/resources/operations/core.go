@@ -276,6 +276,7 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 	if err != nil {
 		return err
 	}
+
 	c.committed = false
 	return c.write(task)
 }
@@ -421,7 +422,12 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			switch innerXErr.(type) {
+			case *fail.ErrSyntax:
+				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			default:
+				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			}
 		}
 		return nil
 	})
@@ -434,6 +440,7 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	timeout := temporal.GetCommunicationTimeout()
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(task, ref); innerXErr != nil {
@@ -453,18 +460,18 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 			}
 			return nil
 		},
-		temporal.GetCommunicationTimeout(),
+		timeout,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to read %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr.Cause(), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			xerr = fail.Wrap(xerr.Cause(), "failed to read %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr.Cause(), "failed to read metadata of %s '%s'", c.kind, ref)
 		case *fail.ErrNotFound:
-			xerr = fail.Wrap(xerr, "failed to find %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr, "failed to find metadata of %s '%s'", c.kind, ref)
 		default:
-			xerr = fail.Wrap(xerr, "failed to read %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr, "failed to read metadata of %s '%s'", c.kind, ref)
 		}
 	}
 	return xerr
@@ -754,12 +761,15 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 		jsoned        []byte
 	)
 
-	if err := json.Unmarshal(buf, &mapped); err != nil {
-		return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
+	if buf != nil {
+		if err := json.Unmarshal(buf, &mapped); err != nil {
+			return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
+		}
+		if props, ok = mapped["properties"].(map[string]interface{}); ok {
+			delete(mapped, "properties")
+		}
 	}
-	if props, ok = mapped["properties"].(map[string]interface{}); ok {
-		delete(mapped, "properties")
-	}
+
 	jsoned, err := json.Marshal(mapped)
 	if err != nil {
 		return fail.SyntaxError("failed to marshal core to JSON: %s", err.Error())

@@ -177,7 +177,7 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 		return nil, xerr
 	}
 	if retcode != 0 {
-		logrus.Warnf("Unexpected problem rebooting...")
+		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
 	if _, xerr := objgw.waitInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
@@ -196,7 +196,7 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 		return nil, xerr
 	}
 	if retcode != 0 {
-		logrus.Warnf("Unexpected problem rebooting...")
+		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
 	if _, xerr = objgw.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
