@@ -79,39 +79,31 @@ func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	if err = json.Unmarshal(jsoned, &resp); err != nil {
 		return nullServer, fail.SyntaxError(err.Error())
 	}
-	if len(resp) == 0 {
-		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
-	}
-	if len(resp) > 1 {
-		var found uint
-		for _, v := range resp {
-			if v.Name == name {
-				found++
-			}
-		}
-		if found == 0 {
-			return nullServer, nil
-		}
-		return nullServer, fail.InconsistentError("found more than one Host named '%s'", name)
-	}
-	return resp[0], nil
 
-	// serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
-	// if found && len(serverList) > 0 {
-	// 	for _, anon := range serverList {
-	// 		entry := anon.(map[string]interface{})
-	// 		if entry["name"].(string) == ahf.Core.Name {
-	// 			host := abstract.NewHostCore()
-	// 			host.ID = entry["id"].(string)
-	// 			host.Name = name
-	// 			hostFull, xerr := s.InspectHost(host)
-	// 			if xerr != nil {
-	// 				return nullAHF, fail.Wrap(xerr, "failed to inspect host '%s'", name)
-	// 			}
-	// 			return hostFull, nil
-	// 		}
-	// 	}
-	// }
+	switch len(resp) {
+	case 0:
+		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
+	case 1:
+		return resp[0], nil
+	}
+
+	var (
+		instance *servers.Server
+		found    uint
+	)
+	for _, v := range resp {
+		if v.Name == name {
+			found++
+			instance = v
+		}
+	}
+	switch found {
+	case 0:
+		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
+	case 1:
+		return instance, nil
+	}
+	return nullServer, fail.InconsistentError("found more than one Host named '%s'", name)
 }
 
 // rpcGetMetadataOfInstance returns the metadata associated with the instance
