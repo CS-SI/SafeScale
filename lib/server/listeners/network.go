@@ -104,6 +104,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 
 	defer func() {
 		if err != nil && !in.GetKeepOnFailure() {
+			defer task.DisarmAbortSignal()()
+
 			if derr := rn.Delete(task); derr != nil {
 				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
@@ -119,6 +121,22 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 
 		logrus.Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", req.Name, subnetNet.String())
 
+		var sizing *abstract.HostSizingRequirements
+		if in.GetGateway() != nil {
+			if in.GetGateway().SizingAsString != "" {
+				sizing, _, xerr = converters.HostSizingRequirementsFromStringToAbstract(in.GetGateway().GetSizingAsString())
+				if xerr != nil {
+					return nil, xerr
+				}
+			} else if in.GetGateway().GetSizing() != nil {
+				sizing = converters.HostSizingRequirementsFromProtocolToAbstract(in.GetGateway().GetSizing())
+			}
+		}
+		if sizing == nil {
+			sizing = &abstract.HostSizingRequirements{MinGPU: -1}
+		}
+		sizing.Image = in.GetGateway().GetImageId()
+
 		rs, xerr := subnetfactory.New(svc)
 		if xerr != nil {
 			return nil, xerr
@@ -130,7 +148,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			KeepOnFailure:  in.GetKeepOnFailure(),
 			DefaultSSHPort: in.GetGateway().GetSshPort(),
 		}
-		xerr = rs.Create(task, req, "", nil)
+		xerr = rs.Create(task, req, in.GetGateway().GetName(), sizing)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}

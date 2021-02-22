@@ -170,7 +170,9 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
 	}
@@ -203,14 +205,14 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	// bufio.Scanner.Scan() may panic...
-	var panicErr error
-	defer func() {
-		if panicErr != nil {
-			xerr = fail.ToError(panicErr)
-		}
-	}()
-	defer fail.OnPanic(&panicErr)
+	// // bufio.Scanner.Scan() may panic...
+	// var panicErr error
+	// defer func() {
+	// 	if panicErr != nil {
+	// 		xerr = fail.ToError(panicErr)
+	// 	}
+	// }()
+	// defer fail.OnPanic(&panicErr)
 
 	scanner := bufio.NewScanner(params.bridge.Reader())
 	scanner.Split(bufio.ScanLines)

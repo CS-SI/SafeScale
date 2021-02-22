@@ -615,13 +615,13 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	if xerr != nil {
 		return xerr
 	}
+
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	list, xerr := c.ListMasterIPs(task)
-	if xerr != nil {
+	if params["MasterIPs"], xerr = c.ListMasterIPs(task); xerr != nil {
 		return xerr
 	}
-	params["MasterIPs"] = list
+
 	params["ClusterAdminUsername"] = "cladm"
 	params["ClusterAdminPassword"] = identity.AdminPassword
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
@@ -653,7 +653,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {

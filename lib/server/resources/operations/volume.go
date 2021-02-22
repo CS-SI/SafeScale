@@ -848,7 +848,7 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 				}
 
 				if strings.Index(v.Path, mount.Path) == 0 {
-					return fail.InvalidRequestError("cannot detach volume '%s' from '%s', '%s:%s' is shared", volumeName, targetName, mount.Path, targetName, v.Path)
+					return fail.InvalidRequestError("cannot detach volume '%s' from '%s': mounted in '%s' and shared", volumeName, targetName, mount.Path)
 				}
 			}
 			return nil

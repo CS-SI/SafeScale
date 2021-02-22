@@ -653,9 +653,6 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
-			// Disable abort signal during the clean up
-			defer task.DisarmAbortSignal()()
-
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), ahf.Core.Name))
 			}
@@ -979,37 +976,6 @@ func (rh *host) setSecurityGroups(task concurrency.Task, req abstract.HostReques
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to query Network of Subnet '%s'", defaultSubnet.GetName())
 		}
-		// sgName := fmt.Sprintf(defaultHostSecurityGroupNamePattern, req.ResourceName, defaultSubnet.GetName(), an.Name)
-		// hostSG, innerXErr := NewSecurityGroup(svc)
-		// if innerXErr != nil {
-		// 	return fail.Wrap(innerXErr, "failed to instantiate a new Security Group")
-		// }
-		// if innerXErr = hostSG.Create(task, an.ID, sgName, fmt.Sprintf("Host %s default Security Group", req.ResourceName), abstract.SecurityGroupRules{}); innerXErr != nil {
-		// 	return fail.Wrap(innerXErr, "failed to create Host '%s' default Security Group '%s'", req.ResourceName, sgName)
-		// }
-		//
-		// // Starting from here, delete host Security group if exiting with error
-		// defer func() {
-		// 	if innerXErr != nil && !req.KeepOnFailure {
-		// 		if derr := hostSG.Delete(task); derr != nil {
-		// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning unp on failure, failed to delete Host's Security Group '%s'", hostSG.GetName()))
-		// 		}
-		// 	}
-		// }()
-		//
-		// // Bind freshly created Security Group to the host as default
-		// if innerXErr = hostSG.BindToHost(task, rh, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); innerXErr != nil {
-		// 	return fail.Wrap(innerXErr, "failed to bind Security Group '%s' to host '%s'", sgName, req.ResourceName)
-		// }
-		//
-		// // Starting from here, unbind hosts security group if exiting with error
-		// defer func() {
-		// 	if innerXErr != nil && !req.KeepOnFailure {
-		// 		if derr := hostSG.UnbindFromHost(task, rh); derr != nil {
-		// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), hostSG.GetName(), rh.GetName()))
-		// 		}
-		// 	}
-		// }()
 
 		// Unbind "default" Security Group from Host if it is bound
 		if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {

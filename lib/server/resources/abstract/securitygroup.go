@@ -349,20 +349,20 @@ func (sg *SecurityGroup) Serialize() ([]byte, fail.Error) {
 
 // Deserialize reads json code and reinstantiates a SecurityGroup
 func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if sg == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	var panicErr error
-	defer func() {
-		if panicErr != nil {
-			xerr = fail.ToError(panicErr) // If panic occured, transforms err to a fail.Error if needed
-		}
-	}()
-	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
+	// var panicErr error
+	// defer func() {
+	// 	if panicErr != nil {
+	// 		xerr = fail.ToError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+	// 	}
+	// }()
 
-	jserr := json.Unmarshal(buf, sg)
-	if jserr != nil {
+	if jserr := json.Unmarshal(buf, sg); jserr != nil {
 		switch jserr.(type) {
 		case *json.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
