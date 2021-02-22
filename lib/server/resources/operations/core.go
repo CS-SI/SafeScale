@@ -540,6 +540,7 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+    
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
