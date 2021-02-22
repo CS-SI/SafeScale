@@ -48,14 +48,14 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ScannerHandler
+//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TenantHandler
 
 // PriceInfo stores price information
 type PriceInfo struct {
-	Devise        string  `json:"device"`                   // contains the device of the price info
+	Currency      string  `json:"currency"`                 // contains the currency of the price info
 	DurationLabel string  `json:"duration_label,omitempty"` // contains a label for the duration "Per Hour" for example
 	Duration      uint    `json:"duration"`                 // number of seconds of the duration
-	Price         float64 `json:"price"`                    // price in the devise for the duration
+	Price         float64 `json:"price"`                    // price in the given currency for the duration
 }
 
 // CPUInfo stores CPU properties
@@ -142,25 +142,26 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
 
-// ScannerHandler defines API to manipulate tenants
-type ScannerHandler interface {
+// TenantHandler defines API to manipulate tenants
+type TenantHandler interface {
 	Scan(string, bool) (_ *protocol.ScanResultList, xerr fail.Error)
+	Inspect(string) (_ *protocol.TenantInspectResponse, xerr fail.Error)
 }
 
-// scannerHandler service
-type scannerHandler struct {
+// tenantHandler service
+type tenantHandler struct {
 	job              server.Job
 	abstractSubnet   *abstract.Subnet
 	scannedHostImage *abstract.Image
 }
 
-// NewScannerHandler creates a scanner service
-func NewScannerHandler(job server.Job) ScannerHandler {
-	return &scannerHandler{job: job}
+// NewTenantHandler creates a scanner service
+func NewTenantHandler(job server.Job) TenantHandler {
+	return &tenantHandler{job: job}
 }
 
 // Scan scans the tenant and updates the database
-func (handler *scannerHandler) Scan(tenantName string, isDryRun bool) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protocol.ScanResultList, xerr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -203,22 +204,32 @@ func (handler *scannerHandler) Scan(tenantName string, isDryRun bool) (_ *protoc
 		return nil, xerr
 	}
 
+	var templateNames []string
+	for _, template := range templates {
+		templateNames = append(templateNames, template.Name)
+	}
+
+	logrus.Infof("Starting scan of tenant %q with templates: %v", tenantName, templateNames)
+	logrus.Infof("Using %q image", defaultScanImage)
+
 	handler.scannedHostImage, xerr = svc.SearchImage(defaultScanImage)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not find needed image in given service")
 	}
 
+	logrus.Infof("Creating scan network: %q", scanNetworkName)
 	network, xerr := handler.getScanNetwork()
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not get/create the scan network")
 	}
-	defer network.Delete(task)
+	//defer network.Delete(task)
 
+	logrus.Infof("Creating scan subnet: %q", scanSubnetName)
 	subnet, xerr := handler.getScanSubnet(network.GetID())
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not get/create the scan subnet")
 	}
-	defer subnet.Delete(task)
+	//defer subnet.Delete(task)
 
 	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		handler.abstractSubnet = clonable.(*abstract.Subnet)
@@ -248,9 +259,10 @@ func (handler *scannerHandler) Scan(tenantName string, isDryRun bool) (_ *protoc
 		go func(innerTemplate abstract.HostTemplate, wg *sync.WaitGroup) {
 			defer wg.Done()
 			defer func() { <-scanChannel }()
-			lerr := handler.analyzeTemplate(innerTemplate, scanWaitGroup)
+			logrus.Infof("Started scan for template %q", innerTemplate.Name)
+			lerr := handler.analyzeTemplate(innerTemplate, &scanWaitGroup)
 			if lerr != nil {
-				logrus.Warnf("Error running scanner: %+v", lerr)
+				logrus.Warnf("Error running scanner for template %q: %+v", innerTemplate.Name, lerr)
 				scanResultList = append(scanResultList, &protocol.ScanResult{
 					Template: innerTemplate.Name,
 					Success:  false,
@@ -276,11 +288,9 @@ func (handler *scannerHandler) Scan(tenantName string, isDryRun bool) (_ *protoc
 	return &protocol.ScanResultList{Results: scanResultList}, nil
 }
 
-func (handler *scannerHandler) analyzeTemplate(template abstract.HostTemplate, scanWaitGroup sync.WaitGroup) (xerr fail.Error) {
+func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate, scanWaitGroup *sync.WaitGroup) (xerr fail.Error) {
 
 	defer scanWaitGroup.Done()
-
-	logrus.Infof("Checking template %s", template.Name)
 
 	svc := handler.job.GetService()
 	task := handler.job.GetTask()
@@ -312,7 +322,7 @@ func (handler *scannerHandler) analyzeTemplate(template abstract.HostTemplate, s
 	}
 
 	defer func() {
-		logrus.Infof("Trying to delete host '%s' with ID '%s'", hostName, host.GetID())
+		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, host.GetID())
 		derr := host.Delete(task)
 		if derr != nil {
 			logrus.Warnf("Error deleting host '%s'", hostName)
@@ -351,7 +361,7 @@ func (handler *scannerHandler) analyzeTemplate(template abstract.HostTemplate, s
 	return nil
 }
 
-func (handler *scannerHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.Error) {
 	svc := handler.job.GetService()
 
 	var resultList []*protocol.ScanResult
@@ -370,7 +380,7 @@ func (handler *scannerHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.E
 	return &protocol.ScanResultList{Results: resultList}, xerr
 }
 
-func (handler *scannerHandler) checkScannable() (isScannable bool, xerr fail.Error) {
+func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Error) {
 	svc := handler.job.GetService()
 
 	params := svc.GetTenantParameters()
@@ -385,7 +395,7 @@ func (handler *scannerHandler) checkScannable() (isScannable bool, xerr fail.Err
 	return isScannable, xerr
 }
 
-func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
+func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 	err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
 		return fail.ToError(err)
@@ -418,7 +428,7 @@ func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 	return nil
 }
 
-func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
+func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ToError(err)
 	}
@@ -450,7 +460,7 @@ func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
 	return nil
 }
 
-func (handler *scannerHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
+func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
 	task := handler.job.GetTask()
 	svc := handler.job.GetService()
 	network, xerr = networkfactory.Load(task, svc, scanNetworkName)
@@ -475,7 +485,7 @@ func (handler *scannerHandler) getScanNetwork() (network resources.Network, xerr
 	return network, xerr
 }
 
-func (handler *scannerHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
+func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
 	task := handler.job.GetTask()
 	svc := handler.job.GetService()
 	subnet, xerr = subnetfactory.Load(task, svc, scanNetworkName, scanSubnetName)
@@ -586,7 +596,7 @@ func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
 	return &info, nil
 }
 
-func (handler *scannerHandler) collect() (xerr fail.Error) {
+func (handler *tenantHandler) collect() (xerr fail.Error) {
 	svc := handler.job.GetService()
 
 	authOpts, xerr := svc.GetAuthenticationOptions()
@@ -643,4 +653,107 @@ func (handler *scannerHandler) collect() (xerr fail.Error) {
 		//}
 	}
 	return nil
+}
+
+func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, xerr fail.Error) {
+	if handler == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+	if tenantName == "" {
+		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+
+	svc := handler.job.GetService()
+
+	authOpts, xerr := svc.GetAuthenticationOptions()
+	if xerr != nil {
+		return nil, xerr
+	}
+	region, ok := authOpts.Get("Region")
+	if !ok {
+		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
+	}
+	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+
+	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
+	if err != nil {
+		return nil, fail.ToError(err)
+	}
+
+	templates, xerr := svc.ListTemplates(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var scannedTemplateList []*protocol.ScannedTemplate
+
+	for _, template := range templates {
+		acpu := StoredCPUInfo{}
+		if err := db.Read(folder, template.Name, &acpu); err != nil {
+			logrus.Debugf("Template %q not found", template.Name)
+			continue
+		}
+
+		scannedTemplateList = append(scannedTemplateList, &protocol.ScannedTemplate{
+			Template: &protocol.HostTemplate{
+				Id:       template.ID,
+				Name:     template.Name,
+				Cores:    int32(template.Cores),
+				Ram:      int32(template.RAMSize),
+				Disk:     int32(template.DiskSize),
+				GpuCount: int32(template.GPUNumber),
+				GpuType:  template.GPUType,
+			},
+			Scanned: &protocol.ScannedInfo{
+				TenantName:           acpu.TenantName,
+				TemplateId:           acpu.ID,
+				TemplateName:         acpu.TemplateName,
+				ImageId:              acpu.ImageID,
+				ImageName:            acpu.ImageName,
+				LastUpdated:          acpu.LastUpdated,
+				NumberOfCpu:          int64(acpu.NumberOfCPU),
+				NumberOfCore:         int64(acpu.NumberOfCore),
+				NumberOfSocket:       int64(acpu.NumberOfSocket),
+				CpuFrequency_Ghz:     acpu.CPUFrequency,
+				CpuArch:              acpu.CPUArch,
+				Hypervisor:           acpu.Hypervisor,
+				CpuModel:             acpu.CPUModel,
+				RamSize_Gb:           acpu.RAMSize,
+				RamFreq:              acpu.RAMFreq,
+				Gpu:                  int64(acpu.GPU),
+				GpuModel:             acpu.GPUModel,
+				DiskSize_Gb:          acpu.DiskSize,
+				MainDiskType:         acpu.MainDiskType,
+				MainDiskSpeed_MBps:   acpu.MainDiskSpeed,
+				SampleNetSpeed_KBps:  acpu.SampleNetSpeed,
+				EphDiskSize_Gb:       acpu.EphDiskSize,
+				PriceInDollarsSecond: acpu.PricePerSecond,
+				PriceInDollarsHour:   acpu.PricePerHour,
+				Prices: []*protocol.PriceInfo{&protocol.PriceInfo{
+					Currency:      "euro-fake",
+					DurationLabel: "perMonth",
+					Duration:      1,
+					Price:         30,
+				}},
+			},
+		})
+	}
+
+	//TODO: complete with TenantIdentity and more details
+
+	response := protocol.TenantInspectResponse{
+		Name:             tenantName,
+		Provider:         svc.GetName(),
+		ScannedTemplates: scannedTemplateList,
+	}
+
+	return &response, nil
+
 }

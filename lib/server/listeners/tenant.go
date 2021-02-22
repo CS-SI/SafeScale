@@ -232,7 +232,7 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewScannerHandler(job)
+	handler := handlers.NewTenantHandler(job)
 	var resultList *protocol.ScanResultList
 	resultList, err = handler.Scan(name, in.GetDryRun())
 
@@ -259,16 +259,19 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, "", "tenant inspect")
+	name := in.GetName()
+
+	job, xerr := PrepareJob(ctx, name, "tenant inspect")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError("tenant inspect not yet implemented")
+	handler := handlers.NewTenantHandler(job)
+
+	return handler.Inspect(name)
 }
