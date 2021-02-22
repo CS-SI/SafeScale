@@ -694,6 +694,7 @@ message ClusterCreateRequest {
 	string gateway_options = 14;    // to store options for gateways than does not concern sizing (like ssh port for example)
 	string master_options = 15;     // same as gateway_options for masters
 	string node_options = 16;       // same as gateway_options for nodes
+	bool force = 17; // ignore cluster sizing recommendations
 }
 
 message ClusterResizeRequest {

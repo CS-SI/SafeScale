@@ -27,6 +27,7 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -756,6 +757,15 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
 	gatewaysDef.Image = imageID
 
+	if lower, err := gatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
+		if !req.Force {
+			return nil, nil, nil, fail.NewError(
+				"requested gateway sizing %s less than recommended %s", spew.Sdump(gatewaysDef),
+				spew.Sdump(gatewaysDefault),
+			)
+		}
+	}
+
 	svc := c.GetService()
 	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
 	if xerr != nil {
@@ -778,6 +788,12 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	}
 	mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
 	mastersDef.Image = imageID
+
+	if lower, err := mastersDef.LowerThan(mastersDefault); err == nil && lower {
+		if !req.Force {
+			return nil, nil, nil, fail.NewError("requested master sizing less than recommended")
+		}
+	}
 
 	if mastersDef.Equals(*gatewaysDef) {
 		mastersDef.Template = gatewaysDef.Template
@@ -804,6 +820,12 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	}
 	nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
 	nodesDef.Image = imageID
+
+	if lower, err := nodesDef.LowerThan(nodesDefault); err == nil && lower {
+		if !req.Force {
+			return nil, nil, nil, fail.NewError("requested node sizing less than recommended")
+		}
+	}
 
 	if nodesDef.Equals(*gatewaysDef) {
 		nodesDef.Template = gatewaysDef.Template
