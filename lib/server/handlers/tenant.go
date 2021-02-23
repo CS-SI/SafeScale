@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -715,6 +716,9 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	identParams, _ := tenantParams["identity"].(map[string]interface{})
 	var idKeyValues []*protocol.KeyValue
 	for key, value := range identParams {
+		if isSecret, _ := regexp.MatchString(`(.*Password.*)|(.*Private.*)|(.*Secret.*)`, key); isSecret {
+			continue
+		}
 		idKeyValues = append(idKeyValues, &protocol.KeyValue{
 			Key:   key,
 			Value: fmt.Sprint(value),
