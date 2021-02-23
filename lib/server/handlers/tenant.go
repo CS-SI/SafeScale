@@ -262,13 +262,13 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protoco
 			if lerr != nil {
 				logrus.Warnf("Error running scanner for template %q: %+v", innerTemplate.Name, lerr)
 				scanResultList = append(scanResultList, &protocol.ScanResult{
-					Template: innerTemplate.Name,
-					Success:  false,
+					TemplateName: innerTemplate.Name,
+					ScanSuccess:  false,
 				})
 			} else {
 				scanResultList = append(scanResultList, &protocol.ScanResult{
-					Template: innerTemplate.Name,
-					Success:  true,
+					TemplateName: innerTemplate.Name,
+					ScanSuccess:  true,
 				})
 			}
 			<-scanChannel
@@ -370,8 +370,8 @@ func (handler *tenantHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.Er
 	}
 	for _, template := range templates {
 		resultList = append(resultList, &protocol.ScanResult{
-			Template: template.Name,
-			Success:  false,
+			TemplateName: template.Name,
+			ScanSuccess:  false,
 		})
 	}
 
@@ -679,12 +679,25 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 
 	objectParams, _ := tenantParams["objectstorage"].(map[string]interface{})
 
-	compute, ok1 := tenantParams["compute"].(map[string]interface{})
-	_, ok2 := compute["CryptKey"].(string)
+	computeParams, ok1 := tenantParams["compute"].(map[string]interface{})
+	_, ok2 := computeParams["CryptKey"].(string)
 
 	var tenantMetadataCrypted bool
 	if ok1 && ok2 {
 		tenantMetadataCrypted = true
+	}
+
+	tenantCompute := protocol.TenantCompute{
+		Region:           fmt.Sprint(computeParams["Region"]),
+		SubRegion:        fmt.Sprint(computeParams["SubRegion"]),
+		AvailabilityZone: fmt.Sprint(computeParams["AvailabilityZone"]),
+		// TODO: add Context & ApiKey
+		WhitelistTemplateRegex: fmt.Sprint(computeParams["WhitelistTemplateRegex"]),
+		BlacklistTemplateRegex: fmt.Sprint(computeParams["BlacklistTemplateRegex"]),
+		DefaultImage:           fmt.Sprint(computeParams["DefaultImage"]),
+		DefaultVolumeSpeed:     fmt.Sprint(computeParams["DefaultVolumeSpeed"]),
+		DnsList:                fmt.Sprint(computeParams["DnsList"]),
+		OperatorUsername:       fmt.Sprint(computeParams["OperatorUsername"]),
 	}
 
 	tenantMetadata := protocol.TenantMetadata{
@@ -700,16 +713,13 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	}
 
 	identParams, _ := tenantParams["identity"].(map[string]interface{})
-
 	var idKeyValues []*protocol.KeyValue
-
 	for key, value := range identParams {
 		idKeyValues = append(idKeyValues, &protocol.KeyValue{
 			Key:   key,
 			Value: fmt.Sprint(value),
 		})
 	}
-
 	tenantIdentity := protocol.TenantIdentity{
 		KeyValues: idKeyValues,
 	}
@@ -730,17 +740,12 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, xerr
 	}
 
-	var scannedTemplateList []*protocol.ScannedTemplate
+	var scannedTemplateList []*protocol.HostTemplate
 
 	for _, template := range templates {
 		acpu := StoredCPUInfo{}
 		if err := db.Read(folder, template.Name, &acpu); err != nil {
-			logrus.Debugf("Template %q not found", template.Name)
-			continue
-		}
-
-		scannedTemplateList = append(scannedTemplateList, &protocol.ScannedTemplate{
-			Template: &protocol.HostTemplate{
+			scannedTemplateList = append(scannedTemplateList, &protocol.HostTemplate{
 				Id:       template.ID,
 				Name:     template.Name,
 				Cores:    int32(template.Cores),
@@ -748,50 +753,61 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 				Disk:     int32(template.DiskSize),
 				GpuCount: int32(template.GPUNumber),
 				GpuType:  template.GPUType,
-			},
-			Scanned: &protocol.ScannedInfo{
-				TenantName:           acpu.TenantName,
-				TemplateId:           acpu.ID,
-				TemplateName:         acpu.TemplateName,
-				ImageId:              acpu.ImageID,
-				ImageName:            acpu.ImageName,
-				LastUpdated:          acpu.LastUpdated,
-				NumberOfCpu:          int64(acpu.NumberOfCPU),
-				NumberOfCore:         int64(acpu.NumberOfCore),
-				NumberOfSocket:       int64(acpu.NumberOfSocket),
-				CpuFrequency_Ghz:     acpu.CPUFrequency,
-				CpuArch:              acpu.CPUArch,
-				Hypervisor:           acpu.Hypervisor,
-				CpuModel:             acpu.CPUModel,
-				RamSize_Gb:           acpu.RAMSize,
-				RamFreq:              acpu.RAMFreq,
-				Gpu:                  int64(acpu.GPU),
-				GpuModel:             acpu.GPUModel,
-				DiskSize_Gb:          acpu.DiskSize,
-				MainDiskType:         acpu.MainDiskType,
-				MainDiskSpeed_MBps:   acpu.MainDiskSpeed,
-				SampleNetSpeed_KBps:  acpu.SampleNetSpeed,
-				EphDiskSize_Gb:       acpu.EphDiskSize,
-				PriceInDollarsSecond: acpu.PricePerSecond,
-				PriceInDollarsHour:   acpu.PricePerHour,
-				Prices: []*protocol.PriceInfo{&protocol.PriceInfo{
-					Currency:      "euro-fake",
-					DurationLabel: "perMonth",
-					Duration:      1,
-					Price:         30,
-				}},
-			},
-		})
+			})
+		} else {
+			scannedTemplateList = append(scannedTemplateList, &protocol.HostTemplate{
+				Id:       template.ID,
+				Name:     template.Name,
+				Cores:    int32(template.Cores),
+				Ram:      int32(template.RAMSize),
+				Disk:     int32(template.DiskSize),
+				GpuCount: int32(template.GPUNumber),
+				GpuType:  template.GPUType,
+				Scanned: &protocol.ScannedInfo{
+					TenantName:           acpu.TenantName,
+					TemplateId:           acpu.ID,
+					TemplateName:         acpu.TemplateName,
+					ImageId:              acpu.ImageID,
+					ImageName:            acpu.ImageName,
+					LastUpdated:          acpu.LastUpdated,
+					NumberOfCpu:          int64(acpu.NumberOfCPU),
+					NumberOfCore:         int64(acpu.NumberOfCore),
+					NumberOfSocket:       int64(acpu.NumberOfSocket),
+					CpuFrequency_Ghz:     acpu.CPUFrequency,
+					CpuArch:              acpu.CPUArch,
+					Hypervisor:           acpu.Hypervisor,
+					CpuModel:             acpu.CPUModel,
+					RamSize_Gb:           acpu.RAMSize,
+					RamFreq:              acpu.RAMFreq,
+					Gpu:                  int64(acpu.GPU),
+					GpuModel:             acpu.GPUModel,
+					DiskSize_Gb:          acpu.DiskSize,
+					MainDiskType:         acpu.MainDiskType,
+					MainDiskSpeed_MBps:   acpu.MainDiskSpeed,
+					SampleNetSpeed_KBps:  acpu.SampleNetSpeed,
+					EphDiskSize_Gb:       acpu.EphDiskSize,
+					PriceInDollarsSecond: acpu.PricePerSecond,
+					PriceInDollarsHour:   acpu.PricePerHour,
+					Prices: []*protocol.PriceInfo{{
+						Currency:      "euro-fake",
+						DurationLabel: "perMonth",
+						Duration:      1,
+						Price:         30,
+					}},
+				},
+			})
+		}
 	}
 
 	//TODO: complete with TenantIdentity and more details
 
 	response := protocol.TenantInspectResponse{
-		Name:             tenantName,
-		Provider:         svc.GetName(),
-		Identity:         &tenantIdentity,
-		Metadata:         &tenantMetadata,
-		ScannedTemplates: scannedTemplateList,
+		TenantName: tenantName,
+		Provider:   svc.GetName(),
+		Identity:   &tenantIdentity,
+		Compute:    &tenantCompute,
+		Metadata:   &tenantMetadata,
+		Templates:  scannedTemplateList,
 	}
 
 	return &response, nil

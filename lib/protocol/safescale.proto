@@ -65,11 +65,12 @@ message TenantCleanupRequest {
 message TenantScanRequest {
 	string name = 1;
 	bool dry_run = 2;
+	string template_name = 3;
 }
 
 message ScanResult {
-	string template = 1;
-	bool success = 2;
+	string template_name = 1;
+	bool scan_success = 2;
 }
 
 message ScanResultList {
@@ -95,7 +96,7 @@ message TenantCompute {
 	string blacklist_template_regex = 7;
 	string default_image = 8;
 	string default_volume_speed = 9;
-	repeated string dns_list = 10;
+	string dns_list = 10;
 	string operator_username = 11;
 }
 
@@ -155,18 +156,13 @@ message ScannedInfo{
 	repeated PriceInfo prices = 25;
 }
 
-message ScannedTemplate {
-	HostTemplate template = 1;
-	ScannedInfo scanned = 2;
-}
-
 message TenantInspectResponse {
-	string name = 1;
+	string tenant_name = 1;
 	string provider = 2;
 	TenantIdentity identity = 3;
-	//TenantCompute compute = 4;
+	TenantCompute compute = 4;
 	TenantMetadata metadata = 5;
-	repeated ScannedTemplate scanned_templates = 6;
+	repeated HostTemplate templates = 6;
 }
 
 service TenantService{
@@ -457,6 +453,7 @@ message HostTemplate {
 	int32 disk = 5;
 	int32 gpu_count = 6;
 	string gpu_type = 7;
+	ScannedInfo scanned = 8;
 }
 
 message TemplateList {
