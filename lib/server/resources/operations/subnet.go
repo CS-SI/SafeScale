@@ -64,6 +64,11 @@ const (
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 )
 
+var (
+	subnetCacheByID data.Cache
+	subnetIDsByName map[string]string
+)
+
 // subnet links Object Storage folder and Subnet
 type subnet struct {
 	*core
@@ -286,13 +291,30 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
+	xerr = fail.NotFoundError()
 	if subnetID != "" {
-		if rs, xerr = NewSubnet(svc); xerr == nil {
-			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			xerr = rs.ReadByID(task, subnetID)
+		ce, xerr := subnetCacheByID.GetEntry(subnetID)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				if rs, xerr = NewSubnet(svc); xerr == nil {
+					// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+					if xerr = rs.ReadByID(task, subnetID); xerr == nil {
+						if ce, xerr = subnetCacheByID.Add(task, rs); xerr != nil {
+							return nil, xerr
+						}
+
+						subnetIDsByName[rs.GetName()] = subnetID
+					}
+				}
+			default:
+				return nil, xerr
+			}
 		}
-	} else {
-		xerr = fail.NotFoundError()
+		if ce != nil {
+			_ = ce.Increment()
+			rs = ce.Content().(resources.Subnet)
+		}
 	}
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2399,29 +2421,10 @@ func (rs subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resourc
 	return sg, xerr
 }
 
-// // InspectNetwork returns the resources.Network instance of parent Network of the Subnet
-// func (rs *subnet) InspectNetwork(task concurrency.Task) (_ resources.Network, xerr fail.Error) {
-// 	defer fail.OnPanic(&xerr)
-//
-// 	if rs.IsNull() {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-//
-// 	var networkID string
-// 	xerr := rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-// 		as, ok := clonable.(*abstract.Subnet)
-// 		if !ok {
-// 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 		}
-// 		networkID = as.Network
-// 		return nil
-// 	})
-// 	if xerr != nil {
-// 		return nil, xerr
-// 	}
-// 	if networkID == "" {
-// 		return nil, fail.InconsistentError("metadata of Subnet does not reference a parent Network")
-// 	}
-//
-// 	return LoadNetwork(task, rs.GetService(), networkID)
-// }
+func init() {
+	var xerr fail.Error
+	if subnetCacheByID, xerr = data.NewCache("subnets_by_id"); xerr != nil {
+		panic("failed to allocate cache for subnets: " + xerr.Error())
+	}
+	subnetIDsByName = map[string]string{}
+}

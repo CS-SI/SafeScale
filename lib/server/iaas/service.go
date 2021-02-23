@@ -19,6 +19,8 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"math"
 	"os"
 	"regexp"
@@ -67,6 +69,9 @@ type Service interface {
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
+	GetCache(string) (*ResourceCache, fail.Error)
+	GetIDForName(string) (string, fail.Error)
+
 	// --- from interface iaas.Providers ---
 	providers.Provider
 
@@ -74,6 +79,44 @@ type Service interface {
 
 	// --- from interface objectstorage.Location ---
 	objectstorage.Location
+}
+
+type ResourceCache struct {
+	byID   *data.Cache
+	byName map[string]string
+}
+
+// GetEntry ...
+func (rc ResourceCache) GetEntry(key string) (*data.CacheEntry, fail.Error) {
+	return rc.byID.GetEntry(key)
+}
+
+// GetIDForName returns the ID corresponding to the name in cache
+func (rc ResourceCache) GetIDForName(name string) string {
+	if id, ok := rc.byName[name]; ok {
+		return id
+	}
+	return ""
+}
+
+// Add ...
+func (rc *ResourceCache) Add(task concurrency.Task, content data.Cacheable) (*data.CacheEntry, fail.Error) {
+	if rc == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	return rc.byID.Add(task, content)
+}
+
+// SetID sets the id for a name
+func (rc *ResourceCache) SetID(name, id string) {
+	if rc == nil {
+		return
+	}
+	rc.byName[name] = id
+}
+
+type serviceCache struct {
+	resources map[string]*ResourceCache
 }
 
 // GetService ...
@@ -89,6 +132,8 @@ type service struct {
 	blacklistTemplateREs []*regexp.Regexp
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
+
+	cache serviceCache
 }
 
 const (
@@ -98,6 +143,16 @@ const (
 	RAMDRFWeight float32 = 1.0 / 8.0
 	// DiskDRFWeight is the Dominant Resource Fairness weight of 1 GB of Disk
 	DiskDRFWeight float32 = 1.0 / 16.0
+)
+
+const (
+	NETWORK_CACHE_NAME        = "networks_by_id"
+	SUBNET_CACHE_NAME         = "subnets_by_id"
+	HOST_CACHE_NAME           = "hosts_by_id"
+	VOLUME_CACHE_NAME         = "volumes_by_id"
+	SECURITY_GROUP_CACHE_NAME = "security_groups_by_id"
+	SHARE_CACHE_NAME          = "shares_by_id"
+	VIRTUALIP_CACHE_NAME      = "virtual_ips_by_id"
 )
 
 // RankDRF computes the Dominant Resource Fairness Rank of an host template
@@ -142,6 +197,30 @@ func (svc service) GetID() string {
 		return ""
 	}
 	return svc.Provider.GetName()
+}
+
+// GetCache returns the data.Cache instance corresponding to the name passed as parameter
+// If the cache does not exist, create it
+func (svc *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
+	if svc.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	if svc.cache.resources == nil {
+		svc.cache.resources = map[string]*ResourceCache{}
+	}
+	if _, ok := svc.cache.resources[name]; !ok {
+		c, xerr := data.NewCache(name)
+		if xerr != nil {
+			return nil, xerr
+		}
+		svc.cache.resources[name].byID = &c
+		svc.cache.resources[name].byName = map[string]string{}
+	}
+	return svc.cache.resources[name], nil
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket

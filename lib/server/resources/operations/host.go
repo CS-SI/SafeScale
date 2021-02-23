@@ -62,6 +62,11 @@ const (
 	// defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
 )
 
+var (
+	hostCacheByID data.Cache
+	hostIDsByName map[string]string
+)
+
 // host ...
 // follows interface resources.Host
 type host struct {
@@ -94,7 +99,7 @@ func nullHost() *host {
 }
 
 // LoadHost ...
-func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) {
+func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -110,13 +115,34 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 		return nullHost(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rh, xerr := NewHost(svc)
+	ce, xerr := hostCacheByID.GetEntry(ref)
 	if xerr != nil {
-		return nullHost(), xerr
-	}
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			if id, ok := hostIDsByName[ref]; ok {
+				ce, xerr = hostCacheByID.GetEntry(id)
+			}
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					rh, xerr := NewHost(svc)
+					if xerr != nil {
+						return nullHost(), xerr
+					}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rh.Read(task, ref); xerr != nil {
+					// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+					if xerr = rh.Read(task, ref); xerr == nil {
+						if ce, xerr = hostCacheByID.Add(task, rh); xerr != nil {
+							return nil, xerr
+						}
+
+						hostIDsByName[rh.GetName()] = rh.GetID()
+					}
+				}
+			}
+		}
+	}
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata message
@@ -125,13 +151,17 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 			return nullHost(), xerr
 		}
 	}
+	if ce != nil {
+		_ = ce.Increment()
+		rh = ce.Content().(resources.Host)
+	}
 
-	if xerr = rh.upgradeIfNeeded(task); xerr != nil {
+	if xerr = rh.(*host).upgradeIfNeeded(task); xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
 	}
 
 	// (re)cache information only if there was no error
-	return rh, rh.cacheAccessInformation(task)
+	return rh, rh.(*host).cacheAccessInformation(task)
 }
 
 // upgradeIfNeeded upgrades IPAddress properties if needed
@@ -1729,7 +1759,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
 		}
 
-		// Conditions are met, delete host
+		// Delete host
 		waitForDeletion := true
 		innerXErr = retry.WhileUnsuccessfulDelay1Second(
 			func() error {
@@ -1824,7 +1854,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 		}
 	}
 
-	rh.Dispose()
+	rh.Destroyed(task)
 
 	newHost := nullHost()
 	*rh = *newHost
@@ -3106,4 +3136,12 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 			return nil
 		})
 	})
+}
+
+func init() {
+	var xerr fail.Error
+	if hostCacheByID, xerr = data.NewCache("hosts_by_id"); xerr != nil {
+		panic("failed to allocate cache for hosts: " + xerr.Error())
+	}
+	hostIDsByName = map[string]string{}
 }
