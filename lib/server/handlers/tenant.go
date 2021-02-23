@@ -256,11 +256,9 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protoco
 			break
 		}
 
-		go func(innerTemplate abstract.HostTemplate, wg *sync.WaitGroup) {
-			defer wg.Done()
-			defer func() { <-scanChannel }()
+		go func(innerTemplate abstract.HostTemplate) {
 			logrus.Infof("Started scan for template %q", innerTemplate.Name)
-			lerr := handler.analyzeTemplate(innerTemplate, &scanWaitGroup)
+			lerr := handler.analyzeTemplate(innerTemplate)
 			if lerr != nil {
 				logrus.Warnf("Error running scanner for template %q: %+v", innerTemplate.Name, lerr)
 				scanResultList = append(scanResultList, &protocol.ScanResult{
@@ -273,7 +271,9 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protoco
 					Success:  true,
 				})
 			}
-		}(localTarget, &scanWaitGroup)
+			<-scanChannel
+			scanWaitGroup.Done()
+		}(localTarget)
 	}
 
 	for i := 0; i < cap(scanChannel); i++ {
@@ -288,9 +288,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protoco
 	return &protocol.ScanResultList{Results: scanResultList}, nil
 }
 
-func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate, scanWaitGroup *sync.WaitGroup) (xerr fail.Error) {
-
-	defer scanWaitGroup.Done()
+func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (xerr fail.Error) {
 
 	svc := handler.job.GetService()
 	task := handler.job.GetTask()
@@ -701,6 +699,21 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		Crypt:      tenantMetadataCrypted,
 	}
 
+	identParams, _ := tenantParams["identity"].(map[string]interface{})
+
+	var idKeyValues []*protocol.KeyValue
+
+	for key, value := range identParams {
+		idKeyValues = append(idKeyValues, &protocol.KeyValue{
+			Key:   key,
+			Value: fmt.Sprint(value),
+		})
+	}
+
+	tenantIdentity := protocol.TenantIdentity{
+		KeyValues: idKeyValues,
+	}
+
 	region, ok := authOpts.Get("Region")
 	if !ok {
 		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
@@ -776,6 +789,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	response := protocol.TenantInspectResponse{
 		Name:             tenantName,
 		Provider:         svc.GetName(),
+		Identity:         &tenantIdentity,
 		Metadata:         &tenantMetadata,
 		ScannedTemplates: scannedTemplateList,
 	}
