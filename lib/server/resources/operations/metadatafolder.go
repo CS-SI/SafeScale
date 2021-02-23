@@ -243,27 +243,8 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 						return innerErr
 					}
 
-					// var diff bool
-					// if bytes.Equal(data, target.Bytes()) {
-					// 	logrus.Trace("source == target, fine")
-					// } else {
-					// 	logrus.Trace("source != target, not fine")
-					// 	diff = true
-					// }
-
-					// remoteHash := md5.New()
-					// _, _ = remoteHash.Write(target.Bytes())
-					// rmtHex := hex.EncodeToString(remoteHash.Sum(nil))
-					//
-					// if srcHex != rmtHex {
-					// 	if diff {
-					// 		return fail.NewError("logically, as contents are different, remote content is different from local reference (local=%s, remote=%s)", srcHex, rmtHex)
-					// 	}
-					// 	return fail.NewError("unlogically, as contents are equal, remote content is different from local reference (local=%s, remote=%s)", srcHex, rmtHex)
-					// }
-
 					if !bytes.Equal(data, target.Bytes()) {
-						return fail.NewError("remote content is different to local reference")
+						return fail.NewError("remote content is different from local reference")
 					}
 
 					return nil
