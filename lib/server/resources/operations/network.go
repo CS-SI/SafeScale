@@ -19,6 +19,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -41,6 +42,11 @@ import (
 const (
 	// networksFolderName is the technical name of the container used to store networks info
 	networksFolderName = "networks"
+)
+
+var (
+	networkCacheByID data.Cache
+	networkIDsByName map[string]string
 )
 
 // network links Object Storage folder and Networking
@@ -67,7 +73,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
+func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resources.Network, xerr fail.Error) {
 	if task == nil {
 		return nullNetwork(), fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -77,17 +83,37 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
-	if ref == "" {
+	if ref = strings.TrimSpace(ref); ref == "" {
 		return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rn, xerr := NewNetwork(svc)
+	ce, xerr := networkCacheByID.GetEntry(ref)
 	if xerr != nil {
-		return nullNetwork(), xerr
-	}
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			if id, ok := networkIDsByName[ref]; ok {
+				ce, xerr = networkCacheByID.GetEntry(id)
+			}
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					if rn, xerr = NewNetwork(svc); xerr != nil {
+						return nullNetwork(), xerr
+					}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rn.Read(task, ref); xerr != nil {
+					// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+					if xerr = rn.Read(task, ref); xerr == nil {
+						if ce, xerr = networkCacheByID.Add(task, rn); xerr != nil {
+							return nil, xerr
+						}
+
+						networkIDsByName[rn.GetName()] = rn.GetID()
+					}
+				}
+			}
+		}
+	}
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -95,6 +121,10 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		default:
 			return nullNetwork(), xerr
 		}
+	}
+	if ce != nil {
+		_ = ce.Increment()
+		rn = ce.Content().(resources.Network)
 	}
 
 	if xerr = upgradeNetworkPropertyIfNeeded(task, rn); xerr != nil {
@@ -482,4 +512,12 @@ func (rn network) InspectSubnet(task concurrency.Task, ref string) (_ resources.
 	}
 
 	return LoadSubnet(task, rn.GetService(), rn.GetID(), ref)
+}
+
+func init() {
+	var xerr fail.Error
+	if networkCacheByID, xerr = data.NewCache("networks_by_id"); xerr != nil {
+		panic("failed to allocate cache for networks: " + xerr.Error())
+	}
+	networkIDsByName = map[string]string{}
 }

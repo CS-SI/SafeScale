@@ -221,6 +221,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	if xerr = c.Reload(task); xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
 	}
+
 	xerr = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
@@ -234,7 +235,12 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	}
 
 	c.committed = false
-	return c.write(task)
+	if xerr = c.write(task); xerr != nil {
+		return xerr
+	}
+
+	// notify observers there has been changed in the instance
+	return fail.ToError(c.NotifyObservers(task))
 }
 
 // Carry links metadata with real data
@@ -272,9 +278,8 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 
 	c.shielded = concurrency.NewShielded(clonable)
 	c.loaded = true
-	err := c.updateIdentity(task)
-	if err != nil {
-		return err
+	if xerr = c.updateIdentity(task); xerr != nil {
+		return xerr
 	}
 
 	c.committed = false
@@ -301,6 +306,12 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 
 	c.name.Store("")
 	c.id.Store("")
+
+	// notify observers there has been changed in the instance
+	if err := c.NotifyObservers(task); err != nil {
+		return fail.ToError(err)
+	}
+
 	return nil
 }
 
@@ -343,7 +354,7 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 	// 	},
 	// 	temporal.GetMinDelay(),
 	// )
-	if xerr := c.readByReference(task, ref); xerr != nil {
+	if xerr = c.readByReference(task, ref); xerr != nil {
 		// switch xerr.(type) {
 		// case *retry.ErrTimeout:
 		// 	return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
@@ -570,7 +581,7 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 
 	c.loaded = true
 	c.committed = true
-	return nil
+	return fail.ToError(c.NotifyObservers(task))
 }
 
 // BrowseFolder walks through folder and executes a callback for each entries
@@ -599,7 +610,7 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 	})
 }
 
-// Delete deletes the matadata
+// Delete deletes the metadata
 func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -622,7 +633,7 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	var errors []error
 	// Checks entries exist in Object Storage
-	if xerr := c.folder.Lookup(byIDFolderName, id); xerr != nil {
+	if xerr = c.folder.Lookup(byIDFolderName, id); xerr != nil {
 		// If not found, consider it not an error
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -638,7 +649,7 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if xerr := c.folder.Lookup(byNameFolderName, name); xerr != nil {
+	if xerr = c.folder.Lookup(byNameFolderName, name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
@@ -655,12 +666,12 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	// Deletes entries found
 	if idFound {
-		if xerr := c.folder.Delete(byIDFolderName, id); xerr != nil {
+		if xerr = c.folder.Delete(byIDFolderName, id); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	if nameFound {
-		if xerr := c.folder.Delete(byNameFolderName, name); xerr != nil {
+		if xerr = c.folder.Delete(byNameFolderName, name); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
@@ -671,6 +682,8 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	if len(errors) > 0 {
 		return fail.NewErrorList(errors)
 	}
+
+	c.Destroyed(task) // notifies cache that the instance has been deleted
 	return nil
 }
 
@@ -792,31 +805,29 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 	return nil
 }
 
-// AddObserver ...
-func (c *core) AddObserver(task concurrency.Task, o data.Observer) fail.Error {
-	if o == nil {
-		return fail.InvalidParameterError("o", "cannot be nil")
-	}
-
-	c.Lock(task)
-	defer c.Unlock(task)
-
-	if _, ok := c.observers[o.GetID()]; ok {
-		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
-	}
-	c.observers[o.GetID()] = o
-	return nil
-}
-
-// NotifyObservers ...
-func (c *core) NotifyObservers(task concurrency.Task) fail.Error {
-	c.RLock(task)
-	defer c.RUnlock(task)
+// Released is used to tell cache that the instance has been used and will not be anymore.
+// Helps the cache handler to know when a cached item can be removed from cache (if needed)
+// Note: Does nothing for now, prepared for future use
+// satisfies interface data.Cacheable
+func (c core) Released(task concurrency.Task) {
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
 	for _, v := range c.observers {
-		v.SignalChange(c.GetID())
+		v.MarkAsFreed(c.GetID())
 	}
-	return nil
+}
+
+// Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
+// Note: Does nothing for now, prepared for future use
+// satisfies interface data.Cacheable
+func (c core) Destroyed(task concurrency.Task) {
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
+	for _, v := range c.observers {
+		v.MarkAsDeleted(c.GetID())
+	}
 }
 
 // RemoveObserver ...
@@ -833,41 +844,43 @@ func (c *core) RemoveObserver(task concurrency.Task, id string) fail.Error {
 }
 
 // AddObserver ...
-func (c *core) AddObserver(task concurrency.Task, o data.Observer) fail.Error {
+func (c *core) AddObserver(task concurrency.Task, o data.Observer) error {
 	if o == nil {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
 
-	c.Lock(task)
-	defer c.Unlock(task)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
-	if _, ok := c.observers[o.GetID()]; ok {
+	id := o.GetID()
+	if _, ok := c.observers[id]; ok {
 		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
 	}
-	c.observers[o.GetID()] = o
+	c.observers[id] = o
 	return nil
 }
 
 // NotifyObservers ...
-func (c *core) NotifyObservers(task concurrency.Task) fail.Error {
-	c.RLock(task)
-	defer c.RUnlock(task)
+func (c *core) NotifyObservers(task concurrency.Task) error {
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
 
+	id := c.GetID()
 	for _, v := range c.observers {
-		v.SignalChange(c.GetID())
+		v.SignalChange(id)
 	}
 	return nil
 }
 
 // RemoveObserver ...
-func (c *core) RemoveObserver(task concurrency.Task, id string) fail.Error {
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+func (c *core) RemoveObserver(task concurrency.Task, name string) error {
+	if name == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	c.Lock(task)
-	defer c.Unlock(task)
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
 
-	delete(c.observers, id)
+	delete(c.observers, name)
 	return nil
 }

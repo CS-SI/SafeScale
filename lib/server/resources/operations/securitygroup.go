@@ -50,6 +50,11 @@ const (
 	securityGroupsFolderName = "security-groups"
 )
 
+//var (
+//	securityGroupCacheByID data.Cache
+//	securityGroupIDsByName map[string]string
+//)
+
 // securityGroup ...
 // follows interface resources.SecurityGroup
 type securityGroup struct {
@@ -107,7 +112,7 @@ func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (b
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
+func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
 	// Do not log error from here; caller has the responsibility to log if needed
 	//defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
@@ -125,13 +130,38 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rsg, xerr := NewSecurityGroup(svc)
+	networkCache, xerr := svc.GetCache(iaas.NETWORK_CACHE_NAME)
 	if xerr != nil {
-		return nullSecurityGroup(), xerr
+		return nullSecurityGroup(), fail.Wrap(xerr, "failed to get cache for Networks")
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rsg.Read(task, ref); xerr != nil {
+	ce, xerr := networkCache.GetEntry(ref)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			id := networkCache.GetIDForName(ref)
+			ce, xerr = networkCacheByID.GetEntry(id)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					rsg, xerr := NewSecurityGroup(svc)
+					if xerr != nil {
+						return nullSecurityGroup(), xerr
+					}
+
+					// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+					if xerr = rsg.Read(task, ref); xerr == nil {
+						if ce, xerr = networkCache.Add(task, rsg); xerr != nil {
+							return nil, xerr
+						}
+
+						networkCache.SetID(rsg.GetName(), rsg.GetID())
+					}
+				}
+			}
+		}
+	}
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -139,6 +169,11 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 		default:
 			return nullSecurityGroup(), xerr
 		}
+	}
+
+	if ce != nil {
+		_ = ce.Increment()
+		rsg = ce.Content().(resources.SecurityGroup)
 	}
 	return rsg, nil
 }
@@ -1233,3 +1268,11 @@ func filterBondsByKind(bonds map[string]*propertiesv1.SecurityGroupBond, state s
 	}
 	return list
 }
+
+//func init() {
+//	var xerr fail.Error
+//	if securityGroupCacheByID, xerr = data.NewCache("security_groups_by_id"); xerr != nil {
+//		panic("failed to allocate cache for security groups: " + xerr.Error())
+//	}
+//	securityGroupIDsByName = map[string]string{}
+//}
