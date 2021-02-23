@@ -82,9 +82,7 @@ message KeyValue {
 }
 
 message TenantIdentity {
-	KeyValue user = 1;
-	KeyValue app_key = 2;
-	KeyValue domain = 3;      // some providers need a domain (name or id)
+	repeated KeyValue key_values = 1;
 }
 
 message TenantCompute {
@@ -165,7 +163,7 @@ message ScannedTemplate {
 message TenantInspectResponse {
 	string name = 1;
 	string provider = 2;
-	//TenantIdentity identity = 3;
+	TenantIdentity identity = 3;
 	//TenantCompute compute = 4;
 	TenantMetadata metadata = 5;
 	repeated ScannedTemplate scanned_templates = 6;
