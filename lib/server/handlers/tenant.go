@@ -693,8 +693,8 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		SubRegion:        fmt.Sprint(computeParams["SubRegion"]),
 		AvailabilityZone: fmt.Sprint(computeParams["AvailabilityZone"]),
 		// TODO: add Context & ApiKey
-		WhitelistTemplateRegex: fmt.Sprint(computeParams["WhitelistTemplateRegex"]),
-		BlacklistTemplateRegex: fmt.Sprint(computeParams["BlacklistTemplateRegex"]),
+		WhitelistTemplateRegex: fmt.Sprint(computeParams["WhitelistTemplateRegexp"]),
+		BlacklistTemplateRegex: fmt.Sprint(computeParams["BlacklistTemplateRegexp"]),
 		DefaultImage:           fmt.Sprint(computeParams["DefaultImage"]),
 		DefaultVolumeSpeed:     fmt.Sprint(computeParams["DefaultVolumeSpeed"]),
 		DnsList:                fmt.Sprint(computeParams["DnsList"]),
