@@ -65,7 +65,7 @@ message TenantCleanupRequest {
 message TenantScanRequest {
 	string name = 1;
 	bool dry_run = 2;
-	string template_name = 3;
+	repeated string templates = 3;
 }
 
 message ScanResult {

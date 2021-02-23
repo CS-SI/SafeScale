@@ -106,7 +106,7 @@ func (t tenant) Cleanup(name string, timeout time.Duration) error {
 }
 
 // Scan ...ScanRequest
-func (t tenant) Scan(name string, dryRun bool, timeout time.Duration) (*protocol.ScanResultList, error) {
+func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.Duration) (*protocol.ScanResultList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -116,6 +116,6 @@ func (t tenant) Scan(name string, dryRun bool, timeout time.Duration) (*protocol
 	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Scan(ctx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun})
+	results, err := service.Scan(ctx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
 	return results, err
 }
