@@ -89,6 +89,10 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resourc
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -123,6 +127,11 @@ func (b *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 	if b.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
+
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "canceled")
+	}
+
 	var res string
 	xerr := b.core.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
@@ -140,6 +149,7 @@ func (b *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 
 // Host ...
 func (b *bucket) Host(task concurrency.Task) string {
+	// FIXME: Ignored error without warning
 	res, _ := b.GetHost(task)
 	return res
 }
@@ -149,6 +159,11 @@ func (b *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error) {
 	if b.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
+
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "canceled")
+	}
+
 	var res string
 	xerr := b.core.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
@@ -166,6 +181,7 @@ func (b *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error) {
 
 // MountPoint ...
 func (b *bucket) MountPoint(task concurrency.Task) string {
+	// FIXME: Ignored error without warning
 	res, _ := b.GetMountPoint(task)
 	return res
 }
@@ -180,6 +196,10 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	}
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
@@ -208,6 +228,10 @@ func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	return b.svc.DeleteBucket(b.GetName())
 }
 
@@ -216,6 +240,10 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	tracer := debug.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	// Get IPAddress data
 	rh, xerr := LoadHost(task, b.svc, hostName)
@@ -277,6 +305,10 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	defer func() {
 		if xerr != nil {
 			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from rh '%s'", b.GetName(), hostName)
@@ -309,6 +341,10 @@ func (b *bucket) exec(task concurrency.Task, host resources.Host, script string,
 	scriptCmd, xerr := getBoxContent(script, data)
 	if xerr != nil {
 		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	_, _, _, xerr = host.Run(task, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())

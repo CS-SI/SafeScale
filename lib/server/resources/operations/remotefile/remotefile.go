@@ -46,6 +46,9 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
@@ -111,6 +114,9 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	f, xerr := system.CreateTempFileFromString(content, 0600)
 	if xerr != nil {
@@ -122,6 +128,10 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 
 // RemoveRemote deletes the remote file from host
 func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil || retcode != 0 {
@@ -148,6 +158,10 @@ func (rfh *RemoteFilesHandler) Count() uint {
 // Upload executes the copy of files
 // TODO: allow to upload to many hosts
 func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	for _, v := range rfh.items {
 		xerr := v.Upload(task, host)
 		if xerr != nil {
@@ -160,11 +174,17 @@ func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host
 // Cleanup executes the removal of remote files.
 // NOTE: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
 // TODO: allow to cleanup on many hosts
-func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, host resources.Host) {
+func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, host resources.Host) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	for _, v := range rfh.items {
 		xerr := v.RemoveRemote(task, host)
 		if xerr != nil {
 			logrus.Warnf(xerr.Error())
 		}
 	}
+
+	return nil
 }

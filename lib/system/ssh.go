@@ -499,6 +499,9 @@ func (scmd *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, stri
 	if task == nil {
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
+	if task.Aborted() {
+		return -1, "", "", fail.AbortedError(nil, "canceled")
+	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -520,6 +523,9 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 	}
 	if task == nil {
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return -1, "", "", fail.AbortedError(nil, "canceled")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
@@ -563,6 +569,9 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	params, ok := p.(taskExecuteParameters)
@@ -834,6 +843,9 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if cmdString = strings.TrimSpace(cmdString); cmdString == "" {
 		return nil, fail.InvalidParameterError("runCmdString", "cannot be empty string")
 	}
@@ -873,6 +885,9 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 	}
 	if task == nil {
 		return "", fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "canceled")
 	}
 	if phase == "" {
 		return "", fail.InvalidParameterError("phase", "cannot be empty string")
@@ -942,12 +957,14 @@ func (sconf *SSHConfig) CopyWithTimeout(
 }
 
 // copy copies a file/directory from/to local to/from remote, and fails after 'timeout' (if timeout > 0)
-func (sconf *SSHConfig) copy(
-	task concurrency.Task,
+func (sconf *SSHConfig) copy(task concurrency.Task,
 	remotePath, localPath string,
 	isUpload bool,
 	timeout time.Duration,
 ) (retcode int, stdout string, stderr string, xerr fail.Error) {
+	if task.Aborted() {
+		return 0, "", "", fail.AbortedError(nil, "canceled")
+	}
 
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
 	if xerr != nil {

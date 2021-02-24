@@ -28,9 +28,17 @@ import (
 
 // List returns a slice of *abstract.Network corresponding to managed networks
 func List(task concurrency.Task, svc iaas.Service) ([]*abstract.Network, fail.Error) {
+	// FIXME: Check inputs
+
 	rn, xerr := New(svc)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	if task != nil {
+		if task.Aborted() {
+			return nil, fail.AbortedError(nil, "canceled")
+		}
 	}
 
 	var list []*abstract.Network
@@ -71,6 +79,10 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Networ
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	return operations.LoadNetwork(task, svc, ref)

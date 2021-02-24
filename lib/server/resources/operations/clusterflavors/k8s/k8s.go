@@ -46,6 +46,10 @@ var (
 )
 
 func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
+	if task.Aborted() {
+		return 0, 0, 0, fail.AbortedError(nil, "canceled")
+	}
+
 	complexity, xerr := c.GetComplexity(task)
 	if xerr != nil {
 		return 0, 0, 0, xerr
@@ -68,7 +72,7 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 	return masterCount, privateNodeCount, publicNodeCount, nil
 }
 
-func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func gatewaySizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -79,7 +83,7 @@ func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizi
 	}
 }
 
-func nodeSizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func nodeSizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    4,
 		MaxCores:    8,
@@ -90,11 +94,15 @@ func nodeSizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizingR
 	}
 }
 
-func defaultImage(task concurrency.Task, _ resources.Cluster) string {
+func defaultImage(_ concurrency.Task, _ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 
 func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 

@@ -81,6 +81,10 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 
 // Add configures and exports the share
 func (s *Share) Add(task concurrency.Task) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	data := map[string]interface{}{
 		"Path": s.Path,
 		// "AccessRights": strings.TrimSpace(acls),

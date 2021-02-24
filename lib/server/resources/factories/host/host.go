@@ -35,6 +35,12 @@ func List(task concurrency.Task, svc iaas.Service, all bool) (abstract.HostList,
 		return nullList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
+	if task != nil {
+		if task.Aborted() {
+			return nil, fail.AbortedError(nil, "canceled")
+		}
+	}
+
 	if all {
 		return svc.ListHosts(all)
 	}
@@ -75,6 +81,10 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Host
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	// FIXME: tracer...

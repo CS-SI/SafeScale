@@ -36,6 +36,10 @@ func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdent
 		return nullList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	objc, xerr := New(task, svc)
 	if xerr != nil {
 		return nil, xerr
@@ -53,6 +57,13 @@ func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fai
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
+
+	if task != nil {
+		if task.Aborted() {
+			return nil, fail.AbortedError(nil, "canceled")
+		}
+	}
+
 	return operations.NewCluster(task, svc)
 }
 
@@ -63,6 +74,10 @@ func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Clu
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	return operations.LoadCluster(task, svc, name)
