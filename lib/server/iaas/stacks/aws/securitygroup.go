@@ -178,10 +178,9 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		if in.PortTo == 0 {
 			in.PortTo = -1
 		}
-	} else {
-		if in.PortTo == 0 {
-			in.PortTo = in.PortFrom
-		}
+	} else if in.PortTo == 0 {
+		in.PortTo = in.PortFrom
+
 	}
 
 	var groupPairs []*ec2.UserIdGroupPair
@@ -348,7 +347,7 @@ func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.
 
 	an, xerr := s.InspectNetwork(networkRef)
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
 		}

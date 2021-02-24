@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package networkstate_obsolete
+package networkstate_obsolete //nolint
 
 //go:generate stringer -type=Enum
 
@@ -26,10 +26,10 @@ const (
 	UNKNOWNSTATE Enum = iota
 
 	// GATEWAY_CREATION when gateway(s) is(are) created
-	GATEWAY_CREATION
+	GATEWAY_CREATION //nolint
 
 	// PHASE2 when gateway(s) is(are) configured
-	GATEWAY_CONFIGURATION
+	GATEWAY_CONFIGURATION //nolint
 
 	// READY when ready
 	READY

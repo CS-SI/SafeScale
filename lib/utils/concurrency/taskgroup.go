@@ -432,7 +432,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 		}
 	}
 
-	select {
+	select { //nolint
 	case <-c:
 		return true, results, err
 	}

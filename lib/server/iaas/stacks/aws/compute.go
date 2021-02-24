@@ -671,7 +671,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 func (s stack) buildAwsSpotMachine(
 	keypairName string,
 	name string,
-	imageId string,
+	imageID string,
 	zone string,
 	netID string,
 	data string,
@@ -687,11 +687,11 @@ func (s stack) buildAwsSpotMachine(
 	lastPrice := resp[len(resp)-1]
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageId), aws.String(keypairName), []byte(data))
+	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	// input := &ec2.RequestSpotInstancesInput{
 	// 	InstanceCount: aws.Int64(1),
 	// 	LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-	// 		ImageId:           aws.String(imageId),
+	// 		ImageId:           aws.String(imageID),
 	// 		InstanceType:      aws.String(template.ID),
 	// 		KeyName:           aws.String(keypairName),
 	// 		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
@@ -727,7 +727,7 @@ func (s stack) buildAwsSpotMachine(
 func (s stack) buildAwsMachine(
 	keypairName string,
 	name string,
-	imageId string,
+	imageID string,
 	zone string,
 	subnetID string,
 	data string,
@@ -736,7 +736,7 @@ func (s stack) buildAwsMachine(
 	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
-	instance, xerr := s.rpcRunInstance(aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageId), aws.String(keypairName), aws.Bool(isGateway), []byte(data))
+	instance, xerr := s.rpcRunInstance(aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), aws.Bool(isGateway), []byte(data))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -912,10 +912,10 @@ func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstrac
 	return *hs, nil
 }
 
-func (s stack) getTagOfSubnet(SubnetId *string, str string) string {
-	resp, xerr := s.rpcDescribeSubnetByID(SubnetId)
+func (s stack) getTagOfSubnet(subnetID *string, str string) string {
+	resp, xerr := s.rpcDescribeSubnetByID(subnetID)
 	if xerr != nil {
-		return aws.StringValue(SubnetId)
+		return aws.StringValue(subnetID)
 	}
 
 	for _, tag := range resp.Tags {
@@ -923,7 +923,7 @@ func (s stack) getTagOfSubnet(SubnetId *string, str string) string {
 			return aws.StringValue(tag.Value)
 		}
 	}
-	return aws.StringValue(SubnetId)
+	return aws.StringValue(subnetID)
 }
 
 // InspectHostByName returns host information by its name
@@ -1192,7 +1192,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
+		switch retryErr.(type) { //nolint
 		case *retry.ErrTimeout:
 			return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
 		}

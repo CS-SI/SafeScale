@@ -30,7 +30,7 @@ import (
 )
 
 func generateErrTimeout() *ErrTimeout {
-	return TimeoutError(nil, 2*time.Minute, "Ouch!!")
+	return TimeoutError(nil, 2*time.Minute, "ouch")
 }
 
 func generateErrNilTimeout() *ErrTimeout {
@@ -93,7 +93,7 @@ func TestInternalUsageWithoutNilCheck(t *testing.T) {
 }
 
 func TestNormalUsage(t *testing.T) {
-	av := TimeoutError(nil, 2*time.Minute, "Ouch!!")
+	av := TimeoutError(nil, 2*time.Minute, "ouch")
 	if av != nil {
 		av.CauseFormatter(
 			func(e Error) string {
@@ -126,7 +126,7 @@ func TestAManuallyCreatedInternalErrorMightBeNil(t *testing.T) {
 }
 
 func TestCanonical(t *testing.T) {
-	e := TimeoutError(fmt.Errorf("Ouch !!"), 1)
+	e := TimeoutError(fmt.Errorf("ouch"), 1)
 	e.CauseFormatter(
 		func(e Error) string {
 			return "toto"

@@ -81,7 +81,7 @@ func (s stack) AddPublicIPToVIP(*abstract.VirtualIP) fail.Error {
 }
 
 func (s stack) getFirstFreeDeviceNumber(hostID string) (int64, fail.Error) {
-	resp, xerr := s.rpcReadNicsOfVm(hostID)
+	resp, xerr := s.rpcReadNicsOfVM(hostID)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -205,5 +205,5 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
 		return xerr
 	}
 
-	return s.rpcDeletePublicIpByIP(vip.PublicIP)
+	return s.rpcDeletePublicIPByIP(vip.PublicIP)
 }

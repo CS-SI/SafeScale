@@ -44,7 +44,7 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by testss
-func NullStack() *stack {
+func NullStack() *stack { //nolint
 	return &stack{}
 }
 

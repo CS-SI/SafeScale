@@ -19,9 +19,9 @@ package userdata
 type Phase string
 
 const (
-	PHASE1_INIT                      Phase = "init"
-	PHASE2_NETWORK_AND_SECURITY      Phase = "netsec"
-	PHASE3_GATEWAY_HIGH_AVAILABILITY Phase = "gwha"
-	PHASE4_SYSTEM_FIXES              Phase = "sysfix"
-	PHASE5_FINAL                     Phase = "final"
+	PHASE1_INIT                      Phase = "init"   //nolint
+	PHASE2_NETWORK_AND_SECURITY      Phase = "netsec" //nolint
+	PHASE3_GATEWAY_HIGH_AVAILABILITY Phase = "gwha"   //nolint
+	PHASE4_SYSTEM_FIXES              Phase = "sysfix" //nolint
+	PHASE5_FINAL                     Phase = "final"  //nolint
 )
