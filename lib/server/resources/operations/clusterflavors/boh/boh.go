@@ -55,6 +55,11 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 		privateNodeCount uint
 		masterNodeCount  uint
 	)
+
+	if task.Aborted() {
+		return 0, 0, 0, fail.AbortedError(nil, "canceled")
+	}
+
 	complexity, xerr := c.GetComplexity(task)
 	if xerr != nil {
 		return 0, 0, 0, xerr
@@ -73,7 +78,7 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 	return masterNodeCount, privateNodeCount, 0, nil
 }
 
-func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func gatewaySizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -84,7 +89,7 @@ func gatewaySizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizi
 	}
 }
 
-func nodeSizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func nodeSizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -95,7 +100,7 @@ func nodeSizing(task concurrency.Task, _ resources.Cluster) abstract.HostSizingR
 	}
 }
 
-func defaultImage(task concurrency.Task, _ resources.Cluster) string {
+func defaultImage(_ concurrency.Task, _ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 

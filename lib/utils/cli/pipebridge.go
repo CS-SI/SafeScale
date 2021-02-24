@@ -118,6 +118,9 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	pipeCount := uint(len(pbc.bridges))
 	// if no pipes, do nothing
@@ -168,6 +171,10 @@ type taskReadParameters struct {
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
 func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	if p == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("p")
 	}
@@ -245,6 +252,10 @@ type taskDisplayParameters struct {
 }
 
 func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	p, ok := params.(taskDisplayParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("p", "must be a 'taskDisplayParameters'")

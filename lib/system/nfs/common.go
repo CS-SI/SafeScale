@@ -57,6 +57,10 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (string, fail.Error) {
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "canceled")
+	}
+
 	bashLibrary, xerr := system.GetBashLibrary()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)

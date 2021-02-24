@@ -420,6 +420,12 @@ func (s ssh) WaitReady(task concurrency.Task, hostName string, timeout time.Dura
 		return err
 	}
 
+	if task != nil {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "canceled")
+		}
+	}
+
 	_, xerr := sshCfg.WaitServerReady(task, "ready", timeout)
 	return xerr
 }

@@ -28,6 +28,10 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -112,6 +116,9 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 // }
 
 func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	out := &protocol.ClusterNodeListResponse{}
 	if len(in) == 0 {
 		return out, nil
@@ -127,7 +134,7 @@ func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in r
 	return out, nil
 }
 
-func FeatureSliceFromResourceToProtocol(task concurrency.Task, in []resources.Feature) *protocol.FeatureListResponse {
+func FeatureSliceFromResourceToProtocol(_ concurrency.Task, in []resources.Feature) *protocol.FeatureListResponse {
 	out := &protocol.FeatureListResponse{}
 	out.Features = make([]*protocol.FeatureResponse, 0, len(in))
 	for _, v := range in {

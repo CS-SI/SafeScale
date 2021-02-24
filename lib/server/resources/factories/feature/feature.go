@@ -78,6 +78,10 @@ func New(task concurrency.Task, svc iaas.Service, name string) (resources.Featur
 		return nil, fail.InvalidParameterError("name", "can't be empty string!")
 	}
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	feat, xerr := operations.NewFeature(task, svc, name)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -106,6 +110,10 @@ func NewEmbedded(task concurrency.Task, svc iaas.Service, name string) (resource
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "canno't be empty string!")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	return operations.NewEmbeddedFeature(task, svc, name)

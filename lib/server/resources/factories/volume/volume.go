@@ -44,6 +44,10 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	// FIXME: tracer...
 	// defer fail.OnPanic(&err)
 

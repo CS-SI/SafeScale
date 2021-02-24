@@ -34,6 +34,10 @@ func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
+
 	if all {
 		return svc.ListSecurityGroups("")
 	}
@@ -73,6 +77,10 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Secu
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	// FIXME: tracer...

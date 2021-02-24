@@ -124,6 +124,9 @@ func (x *JSONProperties) Inspect(task concurrency.Task, key string, inspector fu
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
@@ -173,6 +176,9 @@ func (x *JSONProperties) Alter(task concurrency.Task, key string, alterer func(d
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -242,6 +248,9 @@ func (x *JSONProperties) Serialize(task concurrency.Task) ([]byte, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	x.RLock()
 	defer x.RUnlock()
@@ -270,6 +279,9 @@ func (x *JSONProperties) Deserialize(task concurrency.Task, buf []byte) (xerr fa
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
