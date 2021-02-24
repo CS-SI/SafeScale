@@ -11,9 +11,9 @@ type Bucket interface {
 	Metadata
 	data.Identifiable
 
-	GetHost(concurrency.Task) (string, fail.Error)
-	GetMountPoint(concurrency.Task) (string, fail.Error)
-	Create(concurrency.Task, string) fail.Error
-	Mount(concurrency.Task, string, string) fail.Error
-	Unmount(concurrency.Task, string) fail.Error
+	GetHost(task concurrency.Task) (string, fail.Error)
+	GetMountPoint(task concurrency.Task) (string, fail.Error)
+	Create(task concurrency.Task, name string) fail.Error
+	Mount(task concurrency.Task, hostname string, path string) fail.Error
+	Unmount(task concurrency.Task, hostname string) fail.Error
 }

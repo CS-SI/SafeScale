@@ -68,5 +68,5 @@ type Cluster interface {
 	Shrink(task concurrency.Task, count uint) ([]*propertiesv3.ClusterNode, fail.Error)                              // reduce the size of the cluster of 'count' nodes (the last created)
 	Start(task concurrency.Task) fail.Error                                                                          // starts the cluster
 	Stop(task concurrency.Task) fail.Error                                                                           // stops the cluster
-	ToProtocol(concurrency.Task) (*protocol.ClusterResponse, fail.Error)
+	ToProtocol(task concurrency.Task) (*protocol.ClusterResponse, fail.Error)
 }
