@@ -54,10 +54,10 @@ type TaskResult interface{}
 //       the abort reason is), and permit to end properly. Otherwise this may lead to goroutine leak
 //       (there is no good way to stop forcibly a goroutine).
 // Example:
-// task.Start(func(t concurrency.Task, p TaskParameters) (concurrency.TaskResult, fail.Error) {
+// task.Start(func(task concurrency.Task, p TaskParameters) (concurrency.TaskResult, fail.Error) {
 // ...
 //    for {
-//        if t.ErrAborted() {
+//        if task.ErrAborted() {
 //            break // or return
 //        }
 //        ...

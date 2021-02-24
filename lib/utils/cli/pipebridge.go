@@ -167,7 +167,7 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	if p == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("p")
 	}
@@ -192,7 +192,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	// 	return nil, fail.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
 	// }
 
-	tracer := debug.NewTracer(t, tracing.ShouldTrace("cli")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("cli")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -211,7 +211,7 @@ func taskRead(t concurrency.Task, p concurrency.TaskParameters) (_ concurrency.T
 	var err error
 	for {
 		// If task aborted, stop the loop
-		if t.Aborted() {
+		if task.Aborted() {
 			break
 		}
 		if scanner.Scan() {
@@ -244,7 +244,7 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(t concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
 	p, ok := params.(taskDisplayParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("p", "must be a 'taskDisplayParameters'")

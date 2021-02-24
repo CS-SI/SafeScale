@@ -29,12 +29,12 @@ import (
 type Targetable interface {
 	data.Identifiable
 
-	ComplementFeatureParameters(t concurrency.Task, v data.Map) fail.Error                             // adds parameters corresponding to the Target in preparation of feature installation
-	UnregisterFeature(t concurrency.Task, f string) fail.Error                                         // unregisters a Feature from Target in metadata
-	InstalledFeatures(concurrency.Task) []string                                                       // returns a list of installed features
-	InstallMethods(concurrency.Task) map[uint8]installmethod.Enum                                      // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-	RegisterFeature(t concurrency.Task, f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
-	TargetType() featuretargettype.Enum                                                                // returns the type of the target
+	ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error                             // adds parameters corresponding to the Target in preparation of feature installation
+	UnregisterFeature(task concurrency.Task, f string) fail.Error                                         // unregisters a Feature from Target in metadata
+	InstalledFeatures(task concurrency.Task) []string                                                     // returns a list of installed features
+	InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum                                    // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+	RegisterFeature(task concurrency.Task, f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
+	TargetType() featuretargettype.Enum                                                                   // returns the type of the target
 }
 
 // Feature defines the interface of feature
