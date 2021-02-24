@@ -14,21 +14,18 @@
  * limitations under the License.
  */
 
-package network
+package data
+
+//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Cacheable
 
 import (
-	"sync"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 )
 
-var networkCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
-}
+// Cacheable is the interface a struct must satisfy to be able to be cached
+type Cacheable interface {
+	Observable
 
-func init() {
-	networkCache.ByID = utils.NewMapCache()
-	networkCache.ByName = utils.NewMapCache()
+	Released(concurrency.Task)  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
+	Destroyed(concurrency.Task) // tells cache handler the instance has been deleted and MUST be removed from cache
 }
