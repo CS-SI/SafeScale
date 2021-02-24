@@ -515,7 +515,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {
-		tp := c.service.GetTenantParameters()
+		tp := c.GetService().GetTenantParameters()
 		content := map[string]interface{}{
 			"tenants": []map[string]interface{}{tp},
 		}
@@ -607,7 +607,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	}
 
 	var dnsServers []string
-	cfg, xerr := c.service.GetConfigurationOptions()
+	cfg, xerr := c.GetService().GetConfigurationOptions()
 	if xerr == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}

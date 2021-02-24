@@ -46,8 +46,9 @@ import (
 )
 
 const (
-	// volumesFolderName is the technical name of the container used to store volume info
-	volumesFolderName = "volumes"
+	volumeKind        = "volume"
+	volumesFolderName = "volumes" // is the name of the Object Storage folder used to store volume info
+
 )
 
 // Volume links Object Storage folder and getVolumes
@@ -67,7 +68,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, err := newCore(svc, "volume", volumesFolderName, &abstract.Volume{})
+	coreInstance, err := newCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
 	if err != nil {
 		return nullVolume(), err
 	}
@@ -75,7 +76,9 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if task == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -85,25 +88,53 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 	if svc == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
-	if ref == "" {
-		return nullVolume(), fail.InvalidParameterError("ref", "cannot be empty string")
+	if ref = strings.TrimSpace(ref); ref == "" {
+		return nullVolume(), fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	rv, xerr := NewVolume(svc)
+	cache, xerr := svc.GetCache(volumeKind)
 	if xerr != nil {
-		return rv, xerr
+		return nullVolume(), xerr
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rv.Read(task, ref); xerr != nil {
+	cacheEntry, xerr := cache.Get(ref)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff
+			rv, xerr := NewVolume(svc)
+			if xerr != nil {
+				return rv, xerr
+			}
+
+			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for Stow replacement by rclone)
+			if xerr = rv.Read(task, ref); xerr == nil {
+				if cacheEntry, xerr = cache.Add(task, rv); xerr != nil {
+					return nil, xerr
+				}
+			}
+		}
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
+			logrus.Error(xerr.Error())
 			return nullVolume(), fail.NotFoundError("failed to find Volume '%s'", ref)
 		default:
 			return nullVolume(), xerr
 		}
 	}
+
+	if rv = cacheEntry.Content().(resources.Volume); rv == nil {
+		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
+	}
+	_ = cacheEntry.Increment()
+	defer func() {
+		if xerr != nil {
+			_ = cacheEntry.Decrement()
+		}
+	}()
+
 	return rv, nil
 }
 
@@ -112,8 +143,30 @@ func (rv *volume) IsNull() bool {
 	return rv == nil || rv.core.IsNull()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (rv *volume) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if rv.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := rv.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	var cache *iaas.ResourceCache
+	if cache, xerr = rv.GetService().GetCache(volumeKind); xerr == nil {
+		_, xerr = cache.Add(task, rv)
+	}
+	return xerr
+}
+
 // GetSpeed ...
-func (rv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) {
+func (rv volume) GetSpeed(task concurrency.Task) (_ volumespeed.Enum, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -125,7 +178,7 @@ func (rv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) 
 	}
 
 	var speed volumespeed.Enum
-	xerr := rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -147,7 +200,9 @@ func (rv volume) getSpeed(task concurrency.Task) volumespeed.Enum {
 }
 
 // GetSize ...
-func (rv volume) GetSize(task concurrency.Task) (int, fail.Error) {
+func (rv volume) GetSize(task concurrency.Task) (_ int, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -159,7 +214,7 @@ func (rv volume) GetSize(task concurrency.Task) (int, fail.Error) {
 	}
 
 	var size int
-	xerr := rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -181,7 +236,9 @@ func (rv volume) getSize(task concurrency.Task) int {
 }
 
 // GetAttachments returns where the Volume is attached
-func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error) {
+func (rv volume) GetAttachments(task concurrency.Task) (_ *propertiesv1.VolumeAttachments, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -193,7 +250,7 @@ func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAtta
 	}
 
 	var vaV1 *propertiesv1.VolumeAttachments
-	xerr := rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
@@ -210,7 +267,10 @@ func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAtta
 }
 
 // Browse walks through volume folder and executes a callback for each entry
-func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error {
+func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	// Note: Browse is intended to be callable from null value, so do not validate rv
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -301,8 +361,13 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 
 // Create a volume
 func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xerr fail.Error) {
-	if rv.IsNull() {
+	defer fail.OnPanic(&xerr)
+
+	if rv == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !rv.IsNull() {
+		return fail.InvalidInstanceContentError("sg", "must be null value of 'volume' to be able to create")
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")

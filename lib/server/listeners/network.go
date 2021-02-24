@@ -98,6 +98,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	if xerr = rn.Create(task, req); xerr != nil {
 		return nil, xerr
 	}

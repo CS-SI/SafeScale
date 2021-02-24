@@ -61,6 +61,7 @@ import (
 )
 
 const (
+	clusterKind = "cluster"
 	// Path is the path to use to reach Cluster Definitions/Metadata
 	clustersFolderName = "clusters"
 )
@@ -72,7 +73,6 @@ type cluster struct {
 
 	installMethods      map[uint8]installmethod.Enum
 	lastStateCollection time.Time
-	service             iaas.Service
 	makers              flavors.Makers
 }
 
@@ -100,15 +100,11 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 		return nullCluster(), xerr
 	}
 
-	rc := cluster{
-		service: svc,
-		core:    c,
-	}
-	return &rc, nil
+	return &cluster{core: c}, nil
 }
 
 // LoadCluster ...
-func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (rc resources.Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -125,12 +121,28 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
-	rc, xerr := NewCluster(task, svc)
+	cache, xerr := svc.GetCache(clusterKind)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
 
-	if xerr = rc.Read(task, name); xerr != nil {
+	cacheEntry, xerr := cache.Get(name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			rc, xerr := NewCluster(task, svc)
+			if xerr != nil {
+				return nullCluster(), xerr
+			}
+
+			if xerr = rc.Read(task, name); xerr == nil {
+				if cacheEntry, xerr = cache.Add(task, rc); xerr != nil {
+					return nullCluster(), xerr
+				}
+			}
+		}
+	}
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -140,13 +152,20 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (_ resour
 		}
 	}
 
+	if rc = cacheEntry.Content().(resources.Cluster); rc == nil {
+		return nullCluster(), fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
+	}
+	_ = cacheEntry.Increment()
+
 	// From here, we can deal with legacy
 	if xerr = rc.(*cluster).updateClusterNodesPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
+
 	if xerr = rc.(*cluster).updateClusterNetworkPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
+
 	if xerr = rc.(*cluster).updateClusterDefaultsPropertyIfNeeded(task); xerr != nil {
 		return nullCluster(), xerr
 	}
@@ -450,11 +469,30 @@ func (c cluster) GetID() string {
 	return c.core.GetName()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (c *cluster) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := c.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	var cache *iaas.ResourceCache
+	if cache, xerr = c.GetService().GetCache(clusterKind); xerr == nil {
+		_, xerr = cache.Add(task, c)
+	}
+	return xerr
+}
+
 // Create creates the necessary infrastructure of the Cluster
 func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	// Note: do not use .IsNull() here
+	if c == nil {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -896,7 +934,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 	}
 
 	// Determine if getGateway Failover must be set
-	caps := c.service.GetCapabilities()
+	caps := c.GetService().GetCapabilities()
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
@@ -910,7 +948,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 	// Creates Network
 	var rn resources.Network
 	if req.NetworkID != "" {
-		if rn, xerr = LoadNetwork(task, c.service, req.NetworkID); xerr != nil {
+		if rn, xerr = LoadNetwork(task, c.GetService(), req.NetworkID); xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to use network %s to contain cluster Subnet", req.NetworkID)
 		}
 	} else {
@@ -921,7 +959,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 			KeepOnFailure: req.KeepOnFailure,
 		}
 
-		if rn, xerr = NewNetwork(c.service); xerr != nil {
+		if rn, xerr = NewNetwork(c.GetService()); xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to instanciate new Network")
 		}
 
@@ -971,7 +1009,7 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 
-	rs, xerr := NewSubnet(c.service)
+	rs, xerr := NewSubnet(c.GetService())
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1469,11 +1507,10 @@ func (c *cluster) Bootstrap(task concurrency.Task, flavor clusterflavor.Enum) (x
 func (c cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterIdentity) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// c cannot be nil but can be Null value
-	// this means we can call Browse() on a new (as returned by NewCluster()) instance without first loading it
-	if c.IsNull() {
-		return fail.InvalidInstanceError()
-	}
+	// Note: Browse is intended to be callable from null value, so do not validate c
+	// if c.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -2310,7 +2347,7 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv3.Clus
 		return nil, xerr
 	}
 
-	rh, xerr := LoadHost(task, c.service, node.ID)
+	rh, xerr := LoadHost(task, c.GetService(), node.ID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2353,7 +2390,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 
 	var selectedMaster resources.Host
 	if selectedMasterID != "" {
-		selectedMaster, xerr = LoadHost(task, c.service, selectedMasterID)
+		selectedMaster, xerr = LoadHost(task, c.GetService(), selectedMasterID)
 	} else {
 		selectedMaster, xerr = c.FindAvailableMaster(task)
 	}
@@ -2361,7 +2398,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 		return xerr
 	}
 
-	rh, xerr := LoadHost(task, c.service, hostID)
+	rh, xerr := LoadHost(task, c.GetService(), hostID)
 	if xerr != nil {
 		return xerr
 	}
@@ -2403,7 +2440,7 @@ func (c cluster) ListMasters(task concurrency.Task) (list resources.IndexedListO
 
 			for _, v := range nodesV3.Masters {
 				if node, found := nodesV3.ByNumericalID[v]; found {
-					list[node.NumericalID], innerXErr = LoadHost(task, c.service, node.ID)
+					list[node.NumericalID], innerXErr = LoadHost(task, c.GetService(), node.ID)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -2661,7 +2698,7 @@ func (c cluster) ListNodes(task concurrency.Task) (list resources.IndexedListOfC
 						return fail.AbortedError(nil, "aborted")
 					}
 
-					host, innerErr := LoadHost(task, c.service, node.ID)
+					host, innerErr := LoadHost(task, c.GetService(), node.ID)
 					if innerErr != nil {
 						return innerErr
 					}
@@ -2908,7 +2945,7 @@ func (c cluster) LookupNode(task concurrency.Task, ref string) (found bool, xerr
 	}
 
 	var host resources.Host
-	if host, xerr = LoadHost(task, c.service, ref); xerr != nil {
+	if host, xerr = LoadHost(task, c.GetService(), ref); xerr != nil {
 		return false, xerr
 	}
 

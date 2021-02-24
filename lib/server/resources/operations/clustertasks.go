@@ -364,7 +364,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task, c.GetService(), "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -863,7 +863,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task, c.GetService(), "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}

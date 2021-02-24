@@ -400,7 +400,7 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 	if xerr != nil {
 		return xerr
 	}
-	defer rgw.Dispose()
+	defer rgw.Released(task)
 
 	rgwi := rgw.(*host)
 	v["PrimaryGatewayIP"] = rgwi.getPrivateIP(task)
@@ -414,7 +414,7 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 			return xerr
 		}
 	} else {
-		defer rgw.Dispose()
+		defer rgw.Released(task)
 
 		rgwi = rgw.(*host)
 		v["SecondaryGatewayIP"] = rgwi.getPrivateIP(task)

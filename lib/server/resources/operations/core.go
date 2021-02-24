@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -51,7 +52,7 @@ type core struct {
 	committed  bool
 	name       atomic.Value
 	id         atomic.Value
-	observers  map[string]data.Observer
+	observers  map[string]observer.Observer
 }
 
 func nullCore() *core {
@@ -88,6 +89,7 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		properties: props,
 		TaskedLock: concurrency.NewTaskedLock(),
 		shielded:   concurrency.NewShielded(instance),
+		observers:  map[string]observer.Observer{},
 	}
 	return &c, nil
 }
@@ -809,7 +811,11 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c core) Released(task concurrency.Task) {
+func (c *core) Released(task concurrency.Task) {
+	if c.IsNull() || task == nil {
+		return
+	}
+
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
 
@@ -821,7 +827,11 @@ func (c core) Released(task concurrency.Task) {
 // Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c core) Destroyed(task concurrency.Task) {
+func (c *core) Destroyed(task concurrency.Task) {
+	if c.IsNull() || task == nil {
+		return
+	}
+
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
 
@@ -844,7 +854,7 @@ func (c *core) RemoveObserver(task concurrency.Task, id string) fail.Error {
 }
 
 // AddObserver ...
-func (c *core) AddObserver(task concurrency.Task, o data.Observer) error {
+func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
 	if o == nil {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
@@ -853,8 +863,11 @@ func (c *core) AddObserver(task concurrency.Task, o data.Observer) error {
 	defer c.SafeUnlock(task)
 
 	id := o.GetID()
-	if _, ok := c.observers[id]; ok {
-		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+	if pre, ok := c.observers[id]; ok {
+		if pre == o {
+			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+		}
+		return nil
 	}
 	c.observers[id] = o
 	return nil

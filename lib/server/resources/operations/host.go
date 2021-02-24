@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -56,15 +56,11 @@ import (
 )
 
 const (
+	hostKind = "host"
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
 
 	// defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
-)
-
-var (
-	hostCacheByID data.Cache
-	hostIDsByName map[string]string
 )
 
 // host ...
@@ -85,7 +81,7 @@ func NewHost(svc iaas.Service) (_ *host, xerr fail.Error) { //nolint
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, "host", hostsFolderName, &abstract.HostCore{})
+	coreInstance, xerr := newCore(svc, hostKind, hostsFolderName, &abstract.HostCore{})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -115,29 +111,24 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources
 		return nullHost(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	ce, xerr := hostCacheByID.GetEntry(ref)
+	cache, xerr := svc.GetCache(hostKind)
+	if xerr != nil {
+		return nullHost(), xerr
+	}
+
+	ce, xerr := cache.Get(ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			if id, ok := hostIDsByName[ref]; ok {
-				ce, xerr = hostCacheByID.GetEntry(id)
-			}
+			rh, xerr := NewHost(svc)
 			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					rh, xerr := NewHost(svc)
-					if xerr != nil {
-						return nullHost(), xerr
-					}
+				return nullHost(), xerr
+			}
 
-					// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-					if xerr = rh.Read(task, ref); xerr == nil {
-						if ce, xerr = hostCacheByID.Add(task, rh); xerr != nil {
-							return nil, xerr
-						}
-
-						hostIDsByName[rh.GetName()] = rh.GetID()
-					}
+			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if xerr = rh.Read(task, ref); xerr == nil {
+				if ce, xerr = cache.Add(task, rh); xerr != nil {
+					return nullHost(), xerr
 				}
 			}
 		}
@@ -151,16 +142,28 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources
 			return nullHost(), xerr
 		}
 	}
-	if ce != nil {
-		_ = ce.Increment()
-		rh = ce.Content().(resources.Host)
-	}
 
+	if rh = ce.Content().(resources.Host); rh == nil {
+		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
+	}
+	_ = ce.Increment()
+	defer func() {
+		if xerr != nil {
+			_ = ce.Decrement()
+		}
+	}()
+
+	// Now, deal with legacy
 	if xerr = rh.(*host).upgradeIfNeeded(task); xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
+		switch xerr.(type) {
+		case *fail.ErrAlteredNothing:
+			// nothing changed, continue
+		default:
+			return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
+		}
 	}
 
-	// (re)cache information only if there was no error
+	// cache access information only if there was no error
 	return rh, rh.(*host).cacheAccessInformation(task)
 }
 
@@ -205,7 +208,7 @@ func (rh *host) upgradeIfNeeded(task concurrency.Task) fail.Error {
 			}
 		}
 
-		return nil
+		return fail.AlteredNothingError()
 	})
 }
 
@@ -360,15 +363,34 @@ func (rh *host) IsNull() bool {
 	return rh == nil || rh.core.IsNull()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (rh *host) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	if rh.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := rh.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	var cache *iaas.ResourceCache
+	if cache, xerr = rh.GetService().GetCache(hostKind); xerr == nil {
+		_, xerr = cache.Add(task, rh)
+	}
+	return xerr
+}
+
 // Browse walks through host folder and executes a callback for each entries
 func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	// Note: Browse is intended to be callable from null value, so do not validate rh
+	// if rh.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
 	}
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
@@ -535,7 +557,8 @@ func (rh host) GetState(task concurrency.Task) (state hoststate.Enum) {
 func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	// Note: do not use .IsNull() here
+	if rh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1592,8 +1615,9 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 				if count > 0 {
 					// clients found, checks if these clients already exists...
 					for _, hostID := range hostShare.ClientsByID {
-						_, inErr := LoadHost(task, svc, hostID)
+						instance, inErr := LoadHost(task, svc, hostID)
 						if inErr == nil {
+							instance.Released(task)
 							return fail.NotAvailableError("host '%s' exports %d share%s and at least one share is mounted", rh.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 						}
 					}
@@ -1637,6 +1661,10 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 					return loopErr
 				}
 
+				defer func(instance resources.Share) {
+					instance.Released(task)
+				}(rshare)
+
 				// Retrieve data about the server serving the item
 				rhServer, loopErr := rshare.GetServer(task)
 				if loopErr != nil {
@@ -1663,6 +1691,11 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			if loopErr != nil {
 				return loopErr
 			}
+
+			defer func(instance resources.Share) {
+				instance.Released(task)
+			}(rs)
+
 			loopErr = rs.Unmount(task, rh)
 			if loopErr != nil {
 				return loopErr
@@ -1694,6 +1727,10 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			for k := range hostNetworkV2.SubnetsByID {
 				rs, loopErr := LoadSubnet(task, svc, "", k)
 				if loopErr == nil {
+					defer func(instance resources.Subnet) {
+						instance.Released(task)
+					}(rs)
+
 					loopErr = rs.UnbindHost(task, hostID)
 				}
 				if loopErr != nil {
@@ -1738,6 +1775,10 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			for _, v := range hsgV1.ByID {
 				rsg, derr := LoadSecurityGroup(task, svc, v.ID)
 				if derr == nil {
+					defer func(instance resources.SecurityGroup) {
+						instance.Released(task)
+					}(rsg)
+
 					derr = rsg.UnbindFromHost(task, rh)
 				}
 				if derr != nil {
@@ -1854,7 +1895,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 		}
 	}
 
-	rh.Destroyed(task)
+	// rh.Destroyed(task)
 
 	newHost := nullHost()
 	*rh = *newHost
@@ -3136,12 +3177,4 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 			return nil
 		})
 	})
-}
-
-func init() {
-	var xerr fail.Error
-	if hostCacheByID, xerr = data.NewCache("hosts_by_id"); xerr != nil {
-		panic("failed to allocate cache for hosts: " + xerr.Error())
-	}
-	hostIDsByName = map[string]string{}
 }
