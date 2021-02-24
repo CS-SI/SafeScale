@@ -114,7 +114,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		CIDR:           in.GetCidr(),
 		Domain:         in.GetDomain(),
 		HA:             in.GetFailOver(),
-		DefaultSshPort: in.GetGateway().GetSshPort(),
+		DefaultSSHPort: in.GetGateway().GetSshPort(),
 		KeepOnFailure:  in.GetKeepOnFailure(),
 	}
 	rs, xerr := subnetfactory.New(svc)

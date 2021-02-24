@@ -36,10 +36,10 @@ const (
 )
 
 // Is checks the version of a IP address in string representation
-func (i Enum) Is(str string) bool {
+func (e Enum) Is(str string) bool {
 	ip := net.ParseIP(str)
 	isV6 := ip != nil && strings.Contains(str, ":")
-	switch i {
+	switch e {
 	case IPv4:
 		return !isV6
 	case IPv6:

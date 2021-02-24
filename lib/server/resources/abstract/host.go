@@ -166,7 +166,7 @@ type HostRequest struct {
 	TemplateID       string              // TemplateID is the UUID of the template used to size the host (see SelectTemplates)
 	ImageID          string              // ImageID is the UUID of the image that contains the server's OS and initial state.
 	KeyPair          *KeyPair            // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
-	SshPort          uint32              // contains the port to use for SSH
+	SSHPort          uint32              // contains the port to use for SSH
 	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
 	DiskSize         int                 // DiskSize allows to ask for a specific size for system disk (in GB)
 	IsGateway        bool                // IsGateway tells if the host will act as a gateway
@@ -221,14 +221,14 @@ type HostCore struct {
 	ID         string         `json:"id,omitempty"`
 	Name       string         `json:"name,omitempty"`
 	PrivateKey string         `json:"private_key,omitempty"`
-	SshPort    uint32         `json:"ssh_port,omitempty"`
+	SSHPort    uint32         `json:"ssh_port,omitempty"`
 	Password   string         `json:"password,omitempty"`
 	LastState  hoststate.Enum `json:"last_state,omitempty"`
 }
 
 // NewHostCore ...
 func NewHostCore() *HostCore {
-	return &HostCore{SshPort: 22}
+	return &HostCore{SSHPort: 22}
 }
 
 // IsNull tells if the instance should be considered as a null value
@@ -425,8 +425,9 @@ func (hf *HostFull) SetName(name string) *HostFull {
 // HostList contains a list of HostFull
 type HostList []*HostFull
 
-func (x *HostSizingRequirements) LowerThan(y *HostSizingRequirements) (bool, error) {
-	if x == nil {
+// LowerThan compares host sizing requirements, returns true if hsr requirements are lower than y
+func (hsr *HostSizingRequirements) LowerThan(y *HostSizingRequirements) (bool, error) {
+	if hsr == nil {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -436,33 +437,33 @@ func (x *HostSizingRequirements) LowerThan(y *HostSizingRequirements) (bool, err
 
 	less := true
 
-	if x.MinCores >= y.MinCores {
+	if hsr.MinCores >= y.MinCores {
 		if y.MinCores != 0 {
 			less = false
 		}
 	}
-	if x.MaxCores >= y.MaxCores {
+	if hsr.MaxCores >= y.MaxCores {
 		less = false
 	}
-	if x.MinRAMSize >= y.MinRAMSize {
+	if hsr.MinRAMSize >= y.MinRAMSize {
 		if y.MinRAMSize != 0 {
 			less = false
 		}
 	}
-	if x.MaxRAMSize >= y.MaxRAMSize {
+	if hsr.MaxRAMSize >= y.MaxRAMSize {
 		less = false
 	}
-	if x.MinDiskSize >= y.MinDiskSize {
+	if hsr.MinDiskSize >= y.MinDiskSize {
 		if y.MinDiskSize != 0 {
 			less = false
 		}
 	}
-	if x.MinGPU >= 0 && y.MinGPU >= 0 {
-		if x.MinGPU >= y.MinGPU {
+	if hsr.MinGPU >= 0 && y.MinGPU >= 0 {
+		if hsr.MinGPU >= y.MinGPU {
 			less = false
 		}
 	}
-	if x.MinCPUFreq >= y.MinCPUFreq {
+	if hsr.MinCPUFreq >= y.MinCPUFreq {
 		if y.MinCPUFreq != 0 {
 			less = false
 		}
@@ -471,8 +472,9 @@ func (x *HostSizingRequirements) LowerThan(y *HostSizingRequirements) (bool, err
 	return less, nil
 }
 
-func (x *HostSizingRequirements) LowerOrEqualThan(y *HostSizingRequirements) (bool, error) {
-	if x == nil {
+// LowerOrEqualThan compares host sizing requirements, returns true if hsr requirements are lower or equal than y
+func (hsr *HostSizingRequirements) LowerOrEqualThan(y *HostSizingRequirements) (bool, error) {
+	if hsr == nil {
 		return false, fail.InvalidInstanceError()
 	}
 
@@ -482,27 +484,27 @@ func (x *HostSizingRequirements) LowerOrEqualThan(y *HostSizingRequirements) (bo
 
 	less := true
 
-	if x.MinCores > y.MinCores {
+	if hsr.MinCores > y.MinCores {
 		less = false
 	}
-	if x.MaxCores > y.MaxCores {
+	if hsr.MaxCores > y.MaxCores {
 		less = false
 	}
-	if x.MinRAMSize > y.MinRAMSize {
+	if hsr.MinRAMSize > y.MinRAMSize {
 		less = false
 	}
-	if x.MaxRAMSize > y.MaxRAMSize {
+	if hsr.MaxRAMSize > y.MaxRAMSize {
 		less = false
 	}
-	if x.MinDiskSize > y.MinDiskSize {
+	if hsr.MinDiskSize > y.MinDiskSize {
 		less = false
 	}
-	if x.MinGPU >= 0 && y.MinGPU >= 0 {
-		if x.MinGPU > y.MinGPU {
+	if hsr.MinGPU >= 0 && y.MinGPU >= 0 {
+		if hsr.MinGPU > y.MinGPU {
 			less = false
 		}
 	}
-	if x.MinCPUFreq > y.MinCPUFreq {
+	if hsr.MinCPUFreq > y.MinCPUFreq {
 		less = false
 	}
 

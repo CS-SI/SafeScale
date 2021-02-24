@@ -270,14 +270,14 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
-					switch v {
+					switch v { //nolint
 					case verdict.Retry:
 						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying...", bucketName, absolutePath, t.Err.Error())
 					}
 				},
 			)
 			if innerXErr != nil {
-				switch innerXErr.(type) {
+				switch innerXErr.(type) { //nolint
 				case *retry.ErrTimeout:
 					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
 				}
@@ -289,14 +289,14 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
-			switch v {
+			switch v { //nolint
 			case verdict.Retry:
 				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(timeout))
 			}
 		},
 	)
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
 			xerr = fail.ToError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
 		}

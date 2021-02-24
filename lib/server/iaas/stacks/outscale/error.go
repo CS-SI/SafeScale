@@ -41,8 +41,8 @@ func normalizeError(err error) fail.Error {
 					return out
 				}
 
-				reqId := model.ResponseContext.RequestId
-				return fail.UnknownError("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqId)
+				reqID := model.ResponseContext.RequestId
+				return fail.UnknownError("from outscale driver, code='%s', type='%s', details='%s', requestId='%s'", merr.Code, merr.Type, merr.Details, reqID)
 			}
 			if out := qualifyFromBody(realErr.Body()); out != nil {
 				return out

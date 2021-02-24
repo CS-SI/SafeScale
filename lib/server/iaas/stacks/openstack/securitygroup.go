@@ -198,7 +198,7 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		func() (innerErr error) {
 			if r, innerErr = secgroups.Get(s.NetworkClient, asg.ID).Extract(); innerErr != nil {
 				innerErr = NormalizeError(innerErr)
-				switch innerErr.(type) {
+				switch innerErr.(type) { //nolint
 				case *fail.ErrNotFound: // If not found by id, try to get id of security group by name
 					var id string
 					id, innerErr = secgroups.IDFromName(s.NetworkClient, asg.ID)

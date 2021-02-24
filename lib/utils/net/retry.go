@@ -64,7 +64,7 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 			// if v != verdict.Done {
 			// 	spew.Dump(v)
 			// }
-			switch v {
+			switch v { //nolint
 			case verdict.Retry:
 				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())
 			}
@@ -110,7 +110,7 @@ func normalizeError(in error) (err error) {
 			return normalizeURLError(realErr)
 		case fail.Error: // a fail.Error may contain a cause of type *url.Error; it's the way used to propagate an *url.Error received by drivers.
 			// In this case, normalize this url.Error accordingly
-			switch cause := realErr.Cause().(type) {
+			switch cause := realErr.Cause().(type) { //nolint
 			case *url.Error:
 				return normalizeURLError(cause)
 			}

@@ -40,7 +40,7 @@ const (
 	// Ansible is supported by target
 	Ansible
 	// DCOS packager is supported by cluster target
-	DCOS_deprecated
+	DCOS_deprecated //nolint
 	// Helm is supported by cluster target
 	Helm
 	// Nonedoes nothing; check always fail, add and remove always succeed

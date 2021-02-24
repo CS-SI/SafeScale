@@ -105,9 +105,11 @@ func NewEndpoint(s string, options ...EndpointOption) (_ *Endpoint, err error) {
 	}
 
 	for _, opt := range options {
-		err = opt(endpoint)
-		if err != nil {
-			return &Endpoint{}, err
+		if opt != nil {
+			err = opt(endpoint)
+			if err != nil {
+				return &Endpoint{}, err
+			}
 		}
 	}
 

@@ -350,12 +350,9 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 		default:
 			return xerr
 		}
-	} else {
-		// Delete remaining nics (may happen when something goes wrong during VM deletions)
-		if len(resp) > 0 {
-			if xerr = s.deleteNICs(resp); xerr == nil {
-				return xerr
-			}
+	} else if len(resp) > 0 { // Delete remaining nics (may happen when something goes wrong during VM deletions)
+		if xerr = s.deleteNICs(resp); xerr == nil {
+			return xerr
 		}
 	}
 
@@ -576,7 +573,7 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 
 	resp, xerr := s.rpcReadNics("", hostID)
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrNotFound:
 			// No nics found, consider as successful and returns empty slices
 			return emptySubnetSlice, emptyNicSlice, nil

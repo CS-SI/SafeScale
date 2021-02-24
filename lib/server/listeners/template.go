@@ -104,8 +104,8 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	ahsr, _, xerr := converters.HostSizingRequirementsFromStringToAbstract(sizing)
-	if err != nil {
-		return nil, err
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	templates, xerr := job.GetService().ListTemplatesBySizing(*ahsr, false)

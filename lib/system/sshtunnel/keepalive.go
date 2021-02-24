@@ -31,15 +31,15 @@ type keepAliveCfg struct {
 	tcpKeepaliveProbes uint
 }
 
-func NewKeepAliveCfg(tcpKeepaliveTime uint, tcpKeepaliveIntvl uint, tcpKeepaliveProbes uint) *keepAliveCfg {
+func NewKeepAliveCfg(tcpKeepaliveTime uint, tcpKeepaliveIntvl uint, tcpKeepaliveProbes uint) *keepAliveCfg { //nolint
 	return &keepAliveCfg{tcpKeepaliveTime: tcpKeepaliveTime, tcpKeepaliveIntvl: tcpKeepaliveIntvl, tcpKeepaliveProbes: tcpKeepaliveProbes}
 }
 
-func NewDefaultKeepAliveCfg() *keepAliveCfg {
+func NewDefaultKeepAliveCfg() *keepAliveCfg { //nolint
 	return NewKeepAliveCfg(7200, 75, 9)
 }
 
-func NewKeepAliveCfgFromSystem() *keepAliveCfg {
+func NewKeepAliveCfgFromSystem() *keepAliveCfg { //nolint
 	ka := NewDefaultKeepAliveCfg()
 	ka.readFromCfg()
 	return ka
@@ -65,9 +65,9 @@ func readIntFromFile(name string) (uint, error) {
 	if len(theLines) == 0 {
 		return 0, fmt.Errorf("error: empty file")
 	}
-	theIp := strings.TrimSpace(theLines[0])
+	theIP := strings.TrimSpace(theLines[0])
 
-	theNum, err := strconv.Atoi(theIp)
+	theNum, err := strconv.Atoi(theIP)
 	return uint(theNum), err
 }
 

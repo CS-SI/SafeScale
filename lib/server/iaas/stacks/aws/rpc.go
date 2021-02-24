@@ -1585,7 +1585,7 @@ func (s stack) rpcStopInstances(ids []*string, force *bool) fail.Error {
 	)
 }
 
-func (s stack) rpcDescribeNetworkInterfacesOfVm(id *string) ([]*ec2.NetworkInterface, fail.Error) {
+func (s stack) rpcDescribeNetworkInterfacesOfVM(id *string) ([]*ec2.NetworkInterface, fail.Error) {
 	var emptySlice []*ec2.NetworkInterface
 	request := ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
