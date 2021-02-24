@@ -234,7 +234,7 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 
 	handler := handlers.NewTenantHandler(job)
 	var resultList *protocol.ScanResultList
-	resultList, err = handler.Scan(name, in.GetDryRun())
+	resultList, err = handler.Scan(name, in.GetDryRun(), in.GetTemplates())
 
 	return resultList, err
 }

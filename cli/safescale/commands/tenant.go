@@ -165,10 +165,10 @@ var tenantCleanup = &cli.Command{
 
 var tenantScan = &cli.Command{
 	Name:  "scan",
-	Usage: "Scan tenant's templates [--dry-run] [--templates list]",
+	Usage: "Scan tenant's templates [--dry-run] [--template <template name>]",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "dry-run", Aliases: []string{"n"}},
-		&cli.StringSliceFlag{Name: "templates", Aliases: []string{"t"}},
+		&cli.StringSliceFlag{Name: "template", Aliases: []string{"t"}},
 	},
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
@@ -183,7 +183,7 @@ var tenantScan = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		results, err := clientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("templates"), temporal.GetExecutionTimeout())
+		results, err := clientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
