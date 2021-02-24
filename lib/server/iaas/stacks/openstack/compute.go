@@ -492,7 +492,7 @@ func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 
 	host.Sizing = s.toHostSize(server.Flavor)
 
-	if len(hostNets) >= 0 {
+	if len(hostNets) > 0 {
 		if len(hostPorts) != len(hostNets) {
 			return nil, fail.InconsistentError("count of host ports must be equal to the count of host subnets")
 		}
@@ -815,7 +815,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		// 	},
 		// 	NormalizeError,
 		// )
-		if ip, xerr = s.rpcCreateFloatingIp(); xerr != nil {
+		if ip, xerr = s.rpcCreateFloatingIP(); xerr != nil {
 			return nullAHF, nullUDC, xerr
 		}
 
@@ -829,7 +829,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				// 	},
 				// 	NormalizeError,
 				// )
-				if derr := s.rpcDeleteFloatingIp(ip.ID); derr != nil {
+				if derr := s.rpcDeleteFloatingIP(ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = xerr.AddConsequence(derr)
 					logrus.Error(derr.Error())
@@ -1294,7 +1294,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
 					if gerr != nil {
-						switch gerr.(type) {
+						switch gerr.(type) { //nolint
 						case *fail.ErrNotFound:
 							state = hoststate.TERMINATED
 							return nil

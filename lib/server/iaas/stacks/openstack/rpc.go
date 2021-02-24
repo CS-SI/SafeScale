@@ -301,8 +301,8 @@ func (s Stack) rpcGetPort(id string) (port *ports.Port, xerr fail.Error) {
 	return port, nil
 }
 
-// rpcCreateFloatingIp creates a floating IP
-func (s Stack) rpcCreateFloatingIp() (*floatingips.FloatingIP, fail.Error) {
+// rpcCreateFloatingIP creates a floating IP
+func (s Stack) rpcCreateFloatingIP() (*floatingips.FloatingIP, fail.Error) {
 	var resp *floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
@@ -319,8 +319,8 @@ func (s Stack) rpcCreateFloatingIp() (*floatingips.FloatingIP, fail.Error) {
 	return resp, nil
 }
 
-// rpcDeleteFloatingIp deletes a floating IP
-func (s Stack) rpcDeleteFloatingIp(id string) fail.Error {
+// rpcDeleteFloatingIP deletes a floating IP
+func (s Stack) rpcDeleteFloatingIP(id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}

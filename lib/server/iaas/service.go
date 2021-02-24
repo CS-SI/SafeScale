@@ -117,7 +117,7 @@ func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 
 // NullService creates a service instance corresponding to null value
-func NullService() *service {
+func NullService() *service { //nolint
 	return &service{}
 }
 

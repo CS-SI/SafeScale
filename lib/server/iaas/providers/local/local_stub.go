@@ -306,7 +306,7 @@ func (provider *provider) DisableSecurityGroup(*abstract.SecurityGroup) fail.Err
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+func (provider provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	return nil
 }
 

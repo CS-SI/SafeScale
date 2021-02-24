@@ -210,7 +210,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	defaultSubnetID := defaultSubnet.ID
 	an, xerr := s.InspectNetwork(defaultSubnet.Network)
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(defaultSubnet.Network)
 		}
@@ -337,7 +337,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
+		switch retryErr.(type) { //nolint
 		case *retry.ErrStopRetry:
 			retryErr = fail.ToError(retryErr.Cause())
 		}

@@ -222,7 +222,7 @@ func (t *task) IsNull() bool {
 	return t == nil || t.id == ""
 }
 
-func (t *task) GetLastError() (error, fail.Error) {
+func (t *task) GetLastError() (error, fail.Error) { //nolint
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -387,8 +387,8 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, f
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	subtaskId, _ := st.GetID()
-	t.subtasks[subtaskId] = st
+	subtaskID, _ := st.GetID()
+	t.subtasks[subtaskID] = st
 
 	return st.Start(action, params)
 }
@@ -683,7 +683,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 		}
 	}
 
-	select {
+	select { //nolint
 	case <-c:
 		return true, result, err
 	}

@@ -47,37 +47,37 @@ func (el ErrorList) ToGRPCStatus() error {
 }
 
 // AddConsequence ...
-func (e *ErrorList) AddConsequence(err error) Error {
-	if e.IsNull() {
+func (el *ErrorList) AddConsequence(err error) Error {
+	if el.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
-		return e
+		return el
 	}
-	_ = e.errorCore.AddConsequence(err)
-	return e
+	_ = el.errorCore.AddConsequence(err)
+	return el
 }
 
 // Annotate ...
 // satisfies interface data.Annotatable
-func (e *ErrorList) Annotate(key string, value data.Annotation) data.Annotatable {
-	if e.IsNull() {
+func (el *ErrorList) Annotate(key string, value data.Annotation) data.Annotatable {
+	if el.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
-		return e
+		return el
 	}
-	_ = e.errorCore.Annotate(key, value)
-	return e
+	_ = el.errorCore.Annotate(key, value)
+	return el
 }
 
 // Note: no Reset() overloading, it's wanted... It doesn't have that much sense with ErrorList
 
 // Error returns a string containing all the errors
-func (e *ErrorList) Error() string {
-	if e.IsNull() {
+func (el *ErrorList) Error() string {
+	if el.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.Error() from null instance")
 		return ""
 	}
-	r := e.message
-	if len(e.errors) > 0 {
-		for _, v := range e.errors {
+	r := el.message
+	if len(el.errors) > 0 {
+		for _, v := range el.errors {
 			r += v.Error() + "\n"
 		}
 	}
@@ -85,10 +85,10 @@ func (e *ErrorList) Error() string {
 }
 
 // ToErrorSlice transforms ErrorList to []error
-func (e *ErrorList) ToErrorSlice() []error {
-	if e.IsNull() {
+func (el *ErrorList) ToErrorSlice() []error {
+	if el.IsNull() {
 		logrus.Errorf("invalid call of ErrNotFound.AddConsequence() from null instance")
 		return []error{}
 	}
-	return e.errors
+	return el.errors
 }

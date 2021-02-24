@@ -82,7 +82,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	//for _, vpc := range out.Vpcs {
 	//	nets := &abstract.Network{}
 	//	nets.Targets = aws.StringValue(vpc.CidrBlock)
-	//	nets.ID = aws.StringValue(vpc.VpcId)
+	//	nets.ID = aws.StringValue(vpc.VpcID)
 	//	for _, tag := range vpc.Tags {
 	//		if aws.StringValue(tag.Key) == tagNameLabel && aws.StringValue(tag.Value) == s.AwsConfig.NetworkName {
 	//			theVpc = vpc
@@ -297,7 +297,7 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	//	vpcnet.ID = aws.StringValue(subn.SubnetId)
 	//	vpcnet.Targets = aws.StringValue(subn.CidrBlock)
 	//	vpcnet.Subnet = true
-	//	vpcnet.Parent = aws.StringValue(subn.VpcId)
+	//	vpcnet.Parent = aws.StringValue(subn.VpcID)
 	//	for _, tag := range subn.Tags {
 	//		if aws.StringValue(tag.Key) == tagNameLabel {
 	//			if aws.StringValue(tag.Value) != "" {
@@ -622,7 +622,7 @@ func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fai
 	//var nets []*abstract.Network
 	//for _, vpc := range out.Vpcs {
 	//	vpcnet := abstract.Network{}
-	//	vpcnet.ID = aws.StringValue(vpc.VpcId)
+	//	vpcnet.ID = aws.StringValue(vpc.VpcID)
 	//	vpcnet.Targets = aws.StringValue(vpc.CidrBlock)
 	//	for _, tag := range vpc.Tags {
 	//		if aws.StringValue(tag.Key) == tagNameLabel {

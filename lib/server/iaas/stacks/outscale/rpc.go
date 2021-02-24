@@ -119,8 +119,8 @@ func (s stack) rpcReadSecurityGroupByName(networkID, name string) (osc.SecurityG
 	return osc.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group named '%s' in Network %s", name, networkID)
 }
 
-// rpcReadVms gets VM information from provider
-func (s stack) rpcReadVms(vmIDs []string) ([]osc.Vm, fail.Error) {
+// rpcReadVMs gets VM information from provider
+func (s stack) rpcReadVMs(vmIDs []string) ([]osc.Vm, fail.Error) {
 	query := osc.ReadVmsOpts{}
 	if len(vmIDs) > 0 {
 		query.ReadVmsRequest = optional.NewInterface(osc.ReadVmsRequest{
@@ -150,13 +150,13 @@ func (s stack) rpcReadVms(vmIDs []string) ([]osc.Vm, fail.Error) {
 	return resp.Vms, nil
 }
 
-// rpcReadVmByID gets VM information from provider
-func (s stack) rpcReadVmByID(id string) (osc.Vm, fail.Error) {
+// rpcReadVMByID gets VM information from provider
+func (s stack) rpcReadVMByID(id string) (osc.Vm, fail.Error) {
 	if id == "" {
 		return osc.Vm{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	vms, xerr := s.rpcReadVms([]string{id})
+	vms, xerr := s.rpcReadVMs([]string{id})
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -200,7 +200,7 @@ func localizeInstance(instances []osc.Vm) (osc.Vm, fail.Error) {
 	return instance, nil
 }
 
-func (s stack) rpcReadVmByName(name string) (osc.Vm, fail.Error) {
+func (s stack) rpcReadVMByName(name string) (osc.Vm, fail.Error) {
 	if name == "" {
 		return osc.Vm{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -822,7 +822,7 @@ func (s stack) rpcDeleteFlexibleGpu(id string) fail.Error {
 
 }
 
-func (s stack) rpcUpdateVmSecurityGroups(id string, sgs []string) fail.Error {
+func (s stack) rpcUpdateVMSecurityGroups(id string, sgs []string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1594,7 +1594,7 @@ func (s stack) rpcReadImageByID(id string) (osc.Image, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcLinkPublicIp(ipID, nicID string) fail.Error {
+func (s stack) rpcLinkPublicIP(ipID, nicID string) fail.Error {
 	if ipID == "" {
 		return fail.InvalidParameterError("ipID", "cannot be empty string")
 	}
@@ -1618,7 +1618,7 @@ func (s stack) rpcLinkPublicIp(ipID, nicID string) fail.Error {
 	)
 }
 
-func (s stack) rpcDeletePublicIpByID(id string) fail.Error {
+func (s stack) rpcDeletePublicIPByID(id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1638,7 +1638,7 @@ func (s stack) rpcDeletePublicIpByID(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcDeletePublicIpByIP(ip string) fail.Error {
+func (s stack) rpcDeletePublicIPByIP(ip string) fail.Error {
 	opts := osc.DeletePublicIpOpts{
 		DeletePublicIpRequest: optional.NewInterface(osc.DeletePublicIpRequest{
 			PublicIp: ip,
@@ -1654,7 +1654,7 @@ func (s stack) rpcDeletePublicIpByIP(ip string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreatePublicIp() (osc.PublicIp, fail.Error) {
+func (s stack) rpcCreatePublicIP() (osc.PublicIp, fail.Error) {
 	var resp osc.CreatePublicIpResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
@@ -1670,7 +1670,7 @@ func (s stack) rpcCreatePublicIp() (osc.PublicIp, fail.Error) {
 	return resp.PublicIp, nil
 }
 
-func (s stack) rpcCreateVms(request osc.CreateVmsRequest) ([]osc.Vm, fail.Error) {
+func (s stack) rpcCreateVMs(request osc.CreateVmsRequest) ([]osc.Vm, fail.Error) {
 	var resp osc.CreateVmsResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
@@ -1691,7 +1691,7 @@ func (s stack) rpcCreateVms(request osc.CreateVmsRequest) ([]osc.Vm, fail.Error)
 	return resp.Vms, nil
 }
 
-func (s stack) rpcReadPublicIpsOfVm(id string) ([]osc.PublicIp, fail.Error) {
+func (s stack) rpcReadPublicIPsOfVM(id string) ([]osc.PublicIp, fail.Error) {
 	if id == "" {
 		return []osc.PublicIp{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1719,7 +1719,7 @@ func (s stack) rpcReadPublicIpsOfVm(id string) ([]osc.PublicIp, fail.Error) {
 	return resp.PublicIps, nil
 }
 
-func (s stack) rpcStopVms(ids []string) fail.Error {
+func (s stack) rpcStopVMs(ids []string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -1740,7 +1740,7 @@ func (s stack) rpcStopVms(ids []string) fail.Error {
 	)
 }
 
-func (s stack) rpcStartVms(ids []string) fail.Error {
+func (s stack) rpcStartVMs(ids []string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -1761,7 +1761,7 @@ func (s stack) rpcStartVms(ids []string) fail.Error {
 
 }
 
-func (s stack) rpcRebootVms(ids []string) fail.Error {
+func (s stack) rpcRebootVMs(ids []string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -1781,7 +1781,7 @@ func (s stack) rpcRebootVms(ids []string) fail.Error {
 	)
 }
 
-func (s stack) rpcUpdateVmType(id string, typ string) fail.Error {
+func (s stack) rpcUpdateVMType(id string, typ string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1805,7 +1805,7 @@ func (s stack) rpcUpdateVmType(id string, typ string) fail.Error {
 	)
 }
 
-func (s stack) rpcReadNicsOfVm(id string) ([]osc.Nic, fail.Error) {
+func (s stack) rpcReadNicsOfVM(id string) ([]osc.Nic, fail.Error) {
 	opts := osc.ReadNicsOpts{
 		ReadNicsRequest: optional.NewInterface(osc.ReadNicsRequest{
 			Filters: osc.FiltersNic{

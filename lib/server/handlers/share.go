@@ -35,6 +35,8 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_nasapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ShareHandler
 
+// TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
+
 // ShareHandler defines API to manipulate Shares
 type ShareHandler interface {
 	Create(string, string, string, string /*[]string, bool, bool, bool, bool, bool, bool, bool*/) (resources.Share, fail.Error)
@@ -55,7 +57,7 @@ func NewShareHandler(job server.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 
-func sanitize(in string) (string, fail.Error) {
+func sanitize(in string) (string, fail.Error) { //nolint
 	sanitized := path.Clean(in)
 	if !path.IsAbs(sanitized) {
 		return "", fail.InvalidRequestError("exposed path must be absolute")

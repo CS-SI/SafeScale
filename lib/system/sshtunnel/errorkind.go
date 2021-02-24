@@ -80,7 +80,7 @@ func convertErrorToTunnelError(inErr error) (err error) {
 		}
 	}
 
-	if isNativeSshLibError(inErr) {
+	if isNativeSSHLibError(inErr) {
 		return tunnelError{
 			error:       inErr,
 			isTimeout:   false,
@@ -99,14 +99,14 @@ func convertErrorToTunnelError(inErr error) (err error) {
 	return inErr
 }
 
-func isHostNotFoundError(err error) bool {
+func isHostNotFoundError(err error) bool { //nolint
 	if err == nil {
 		return false
 	}
 
 	err = lastUnwrap(err)
 
-	if !isNativeSshLibError(err) {
+	if !isNativeSSHLibError(err) {
 		return false
 	}
 
@@ -124,14 +124,14 @@ func isHostNotFoundError(err error) bool {
 	return false
 }
 
-func isConnectionRefusedError(err error) bool {
+func isConnectionRefusedError(err error) bool { //nolint
 	if err == nil {
 		return false
 	}
 
 	err = lastUnwrap(err)
 
-	if !isNativeSshLibError(err) {
+	if !isNativeSSHLibError(err) {
 		return false
 	}
 
@@ -149,7 +149,7 @@ func isConnectionRefusedError(err error) bool {
 	return false
 }
 
-func isNativeSshLibError(err error) bool {
+func isNativeSSHLibError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -179,7 +179,7 @@ func isNativeSshLibError(err error) bool {
 	return false
 }
 
-func isConnectionRefused(err error) bool {
+func isConnectionRefused(err error) bool { //nolint
 	if err == nil {
 		return false
 	}
@@ -223,7 +223,7 @@ func isHandshakeError(err error) bool {
 	return false
 }
 
-func isConnectionResetByPeer(err error) bool {
+func isConnectionResetByPeer(err error) bool { //nolint
 	if err == nil {
 		return false
 	}
