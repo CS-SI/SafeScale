@@ -121,7 +121,7 @@ type location struct {
 }
 
 // NewLocation creates an Object Storage location based on config
-func NewLocation(conf Config) (*location, fail.Error) {
+func NewLocation(conf Config) (*location, fail.Error) { //nolint
 	l := &location{
 		config: conf,
 	}

@@ -344,7 +344,7 @@ func (c *cluster) updateClusterNetworkPropertyIfNeeded(task concurrency.Task) fa
 		return nil
 	})
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrAlteredNothing:
 			xerr = nil
 		}
@@ -824,7 +824,7 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 		}
 	}
 
-	if nodesDef.Equals(*gatewaysDef) {
+	if nodesDef.Equals(*gatewaysDef) { //nolint
 		nodesDef.Template = gatewaysDef.Template
 	} else if nodesDef.Equals(*mastersDef) {
 		nodesDef.Template = mastersDef.Template
@@ -1105,10 +1105,18 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	primaryGatewayTask, xerr = task.StartInSubtask(c.taskInstallGateway, taskInstallGatewayParameters{primaryGateway})
 	if xerr != nil {
 		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	if haveSecondaryGateway {
@@ -1171,6 +1179,10 @@ func (c *cluster) createHostResources(
 	// 		}
 	// 	}
 	// }()
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	// Step 2: awaits gateway installation end and masters installation end
 	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
@@ -3820,18 +3832,18 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 }
 
 // IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
-func (rc cluster) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
+func (c cluster) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
 	found = false
 	defer fail.OnPanic(&xerr)
 
-	if rc.IsNull() {
+	if c.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	return found, rc.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return found, c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {

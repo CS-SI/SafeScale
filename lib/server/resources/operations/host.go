@@ -73,7 +73,7 @@ type host struct {
 }
 
 // NewHost ...
-func NewHost(svc iaas.Service) (_ *host, xerr fail.Error) {
+func NewHost(svc iaas.Service) (_ *host, xerr fail.Error) { //nolint
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -230,7 +230,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 					ip := rgw.(*host).getAccessIP(task)
 					primaryGatewayConfig = &system.SSHConfig{
 						PrivateKey: gwahc.PrivateKey,
-						Port:       int(gwahc.SshPort),
+						Port:       int(gwahc.SSHPort),
 						IPAddress:  ip,
 						Hostname:   gwahc.Name,
 						User:       abstract.DefaultUser,
@@ -258,7 +258,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						}
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
-							Port:       int(gwahc.SshPort),
+							Port:       int(gwahc.SSHPort),
 							IPAddress:  rgw.(*host).getAccessIP(task),
 							Hostname:   rgw.GetName(),
 							User:       abstract.DefaultUser,
@@ -277,7 +277,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 		}
 
 		rh.sshProfile = &system.SSHConfig{
-			Port:                   int(ahc.SshPort),
+			Port:                   int(ahc.SSHPort),
 			IPAddress:              rh.accessIP,
 			Hostname:               rh.GetName(),
 			User:                   abstract.DefaultUser,
@@ -615,10 +615,10 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}()
 
 	// Make sure ssh port wanted is set
-	if hostReq.SshPort > 0 {
-		ahf.Core.SshPort = hostReq.SshPort
+	if hostReq.SSHPort > 0 {
+		ahf.Core.SSHPort = hostReq.SSHPort
 	} else {
-		ahf.Core.SshPort = 22
+		ahf.Core.SSHPort = 22
 	}
 
 	// Creates metadata early to "reserve" host name
@@ -1178,7 +1178,7 @@ func (rh *host) waitInstallPhase(task concurrency.Task, phase userdata.Phase, ti
 	duration := time.Duration(sshDefaultTimeout) * time.Minute
 	status, xerr := sshCfg.WaitServerReady(task, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrTimeout:
 			return status, fail.Wrap(xerr.Cause(), "failed to wait for SSH on Host '%s' to be ready after %s (phase %s): %s", rh.GetName(), temporal.FormatDuration(duration), phase, status)
 		}
@@ -1356,7 +1356,7 @@ func (rh *host) finalizeProvisioning(task concurrency.Task, userdataContent *use
 		}
 
 		if _, xerr = rh.waitInstallPhase(task, userdata.PHASE5_FINAL, temporal.GetHostTimeout()); xerr != nil {
-			switch xerr.(type) {
+			switch xerr.(type) { //nolint
 			case *fail.ErrTimeout:
 				return fail.Wrap(xerr, "timeout creating a host")
 			}
@@ -1749,7 +1749,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 				time.Minute*2, // FIXME: hardcoded duration
 			)
 			if innerXErr != nil {
-				switch innerXErr.(type) {
+				switch innerXErr.(type) { //nolint
 				case *retry.ErrStopRetry:
 					innerXErr = fail.ToError(innerXErr.Cause())
 				}
@@ -1921,7 +1921,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 			var innerXErr fail.Error
 			retcode = -1
 			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outs, timeout); innerXErr != nil {
-				switch innerXErr.(type) {
+				switch innerXErr.(type) { //nolint
 				case *fail.ErrExecution:
 					// Adds stdout annotation to xerr
 					_ = innerXErr.Annotate("stdout", stdout)
@@ -1984,8 +1984,8 @@ func (rh host) Pull(task concurrency.Task, target, source string, timeout time.D
 			if retcode, stdout, stderr, innerXErr = ssh.Copy(task, target, source, false); innerXErr != nil {
 				return innerXErr
 			}
-			switch retcode {
-			case 1:
+			switch retcode { //nolint
+			case 1: // FIXME: Check errorcodes
 				if strings.Contains(stdout, "lost connection") {
 					return fail.NewError("lost connection, retrying...")
 				}
@@ -2054,7 +2054,7 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 	if cmd != "" {
 		retcode, stdout, stderr, xerr = run(task, ssh, cmd, outputs.DISPLAY, timeout)
 		if xerr != nil {
-			switch xerr.(type) {
+			switch xerr.(type) { //nolint
 			case *fail.ErrTimeout:
 				xerr = fail.Wrap(xerr.Cause(), "failed to update access rights in %v delay", timeout)
 			}

@@ -537,7 +537,7 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 
 	r, xerr := subtask.Wait()
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrTimeout:
 			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout))
 		}
@@ -649,10 +649,8 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		if params.collectOutputs {
 			result["stdout"] = string(msgOut)
 			result["stderr"] = string(msgErr)
-		} else {
-			if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-				logrus.Error(pbcErr.Error())
-			}
+		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+			logrus.Error(pbcErr.Error())
 
 		}
 	} else {
@@ -736,7 +734,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel,
 				time.Minute,
 			)
 			if xerr != nil {
-				switch xerr.(type) {
+				switch xerr.(type) { //nolint
 				case *retry.ErrTimeout:
 					xerr = fail.ToError(xerr.Cause())
 				}

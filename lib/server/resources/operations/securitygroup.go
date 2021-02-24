@@ -494,7 +494,7 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 		)
 	})
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
 			xerr = fail.ToError(xerr.Cause())
 		}

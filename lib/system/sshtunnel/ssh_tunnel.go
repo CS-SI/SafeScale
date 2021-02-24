@@ -27,7 +27,6 @@ import (
 
 	"github.com/sanity-io/litter"
 	"github.com/satori/go.uuid"
-	_ "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -40,7 +39,7 @@ type extendedLogger interface {
 	Errorf(string, ...interface{})
 }
 
-type dumper interface {
+type dumper interface { //nolint
 	Dump() string
 }
 
@@ -150,7 +149,7 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 			resLis: theCli,
 			resErr: theErr,
 		}
-		return
+		return //nolint
 	}()
 
 	if timeout != 0 {
@@ -166,7 +165,7 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 		}
 	}
 
-	select {
+	select { //nolint
 	case res := <-resChan:
 		return res.resLis, res.resErr
 	}
@@ -221,7 +220,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				defer close(errCh)
 				errCh <- cwErr
 			}
-			return
+			return //nolint
 		}()
 
 		tunnel.logf("listening for new ssh connections...")
@@ -264,13 +263,12 @@ func (tunnel *SSHTunnel) Start() (err error) {
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
 					tunnel.Close()
 				}
-				return
+				return //nolint
 			}()
 		}
 	}
 
-	var total int
-	total = len(tunnel.conns) + len(tunnel.serverConns) + 1
+	total := len(tunnel.conns) + len(tunnel.serverConns) + 1
 	for i, conn := range tunnel.conns {
 		tunnel.logf("[%d/%d] closing the netConn", i+1, total)
 		err := conn.Close()
@@ -364,7 +362,7 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 			resCli: theCli,
 			resErr: theErr,
 		}
-		return
+		return //nolint
 	}()
 
 	if timeout != 0 {
@@ -380,7 +378,7 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 		}
 	}
 
-	select {
+	select { //nolint
 	case res := <-resChan:
 		return res.resCli, res.resErr
 	}
@@ -418,7 +416,7 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 			resConn: theConn,
 			resErr:  theErr,
 		}
-		return
+		return //nolint
 	}()
 
 	if timeout != 0 {
@@ -436,7 +434,7 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 		}
 	}
 
-	select {
+	select { //nolint
 	case res := <-resChan:
 		expired = true
 		return res.resConn, res.resErr
@@ -494,7 +492,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 			}
 			tunnel.logf("io.Copy [%s] ended without error", copier)
 			endCopy <- true
-			return
+			return //nolint
 		}()
 		select {
 		case <-endCopy:
@@ -508,14 +506,14 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 	go copyConn("upstream", localConn, remoteConn, &tunnel.inBuffer)
 	go copyConn("downstream", remoteConn, localConn, &tunnel.outBuffer)
 
-	return nil
+	return nil //nolint
 }
 
 func (tunnel *SSHTunnel) Close() {
 	if tunnel.isOpen {
 		tunnel.closer <- struct{}{}
 	}
-	return
+	return //nolint
 }
 
 func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options ...Option) (_ *SSHTunnel, err error) {

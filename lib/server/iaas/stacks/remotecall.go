@@ -20,7 +20,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	if convertError != nil {
 		normalizeError = func(err error) fail.Error { return convertError(err) }
 	} else {
-		normalizeError = func(err error) fail.Error { return fail.ToError(err) }
+		normalizeError = fail.ToError
 	}
 
 	// Execute the remote call with tolerance for transient communication failure
@@ -29,7 +29,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 		func() error {
 			if innerErr := callback(); innerErr != nil {
 				innerErr = normalizeError(innerErr)
-				switch innerErr.(type) {
+				switch innerErr.(type) { //nolint
 				case *fail.ErrNotFound:
 					return retry.StopRetryError(innerErr)
 				}

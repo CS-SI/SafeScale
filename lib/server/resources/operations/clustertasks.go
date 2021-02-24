@@ -55,7 +55,7 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	if xerr = c.service.StartHost(id); xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already started is considered as a successful run
 			return nil, nil
 		}
@@ -79,7 +79,7 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 	}
 
 	if xerr = c.service.StopHost(id); xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
 			return nil, nil
 		}
@@ -1144,7 +1144,7 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 
 	logrus.Debugf("Deleting Node '%s'", p.node.Name)
 	var host resources.Host
-	if p.node.ID != "" {
+	if p.node.ID != "" { //nolint
 		host, xerr = LoadHost(task, c.GetService(), p.node.ID)
 	} else if p.node.Name != "" {
 		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
@@ -1183,7 +1183,7 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 	}
 
 	var host resources.Host
-	if p.node.ID != "" {
+	if p.node.ID != "" { //nolint
 		host, xerr = LoadHost(task, c.GetService(), p.node.ID)
 	} else if p.node.Name != "" {
 		host, xerr = LoadHost(task, c.GetService(), p.node.Name)

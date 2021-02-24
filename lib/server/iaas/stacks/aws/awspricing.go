@@ -158,7 +158,7 @@ func (p Price) GetDiskSize() float64 {
 // TODO: comment
 // parseMemory ...
 func (p Price) parseFloat(str string) float64 {
-	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
+	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`) //nolint
 	if err != nil {
 		return 0.0
 	}
@@ -178,7 +178,7 @@ func (p Price) parseFloat(str string) float64 {
 // TODO: comment
 // parseStorage ...
 func (p Price) parseStorage(str string) float64 {
-	r, err := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`)
+	r, err := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`) //nolint
 	if err != nil {
 		return 0.0
 	}
@@ -186,7 +186,7 @@ func (p Price) parseStorage(str string) float64 {
 	b := bytes.Buffer{}
 	b.WriteString(str)
 	tokens := r.FindAllStringSubmatch(str, -1)
-	if len(tokens) <= 0 || len(tokens[0]) <= 1 {
+	if len(tokens) == 0 || len(tokens[0]) <= 1 {
 		return 0.0
 	}
 	factor, err := strconv.ParseFloat(tokens[0][1], 64)
@@ -199,7 +199,7 @@ func (p Price) parseStorage(str string) float64 {
 		return 0.0
 	}
 	if size < 10 {
-		size = size * 1000
+		size *= 1000
 	}
 	return factor * size
 }

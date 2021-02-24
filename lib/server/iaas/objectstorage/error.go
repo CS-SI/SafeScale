@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func normalizeError(err error) fail.Error {
+func normalizeError(err error) fail.Error { //nolint
 	if err == nil {
 		return nil
 	}

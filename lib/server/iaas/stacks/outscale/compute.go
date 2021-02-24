@@ -471,7 +471,7 @@ func hostState(state string) hoststate.Enum {
 }
 
 func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
-	vm, xerr := s.rpcReadVmByID(id)
+	vm, xerr := s.rpcReadVMByID(id)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -661,21 +661,21 @@ func (s stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.
 
 func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
 	// Allocate public IP
-	resp, xerr := s.rpcCreatePublicIp()
+	resp, xerr := s.rpcCreatePublicIP()
 	if xerr != nil {
 		return osc.PublicIp{}, xerr
 	}
 
 	defer func() {
 		if xerr != nil {
-			if derr := s.rpcDeletePublicIpByID(resp.PublicIpId); derr != nil {
+			if derr := s.rpcDeletePublicIPByID(resp.PublicIpId); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete public IP with ID %s", resp.PublicIpId))
 			}
 		}
 	}()
 
 	// Attach public ip
-	if xerr = s.rpcLinkPublicIp(resp.PublicIpId, nic.NicId); xerr != nil {
+	if xerr = s.rpcLinkPublicIP(resp.PublicIpId, nic.NicId); xerr != nil {
 		return osc.PublicIp{}, xerr
 	}
 
@@ -915,7 +915,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	var vm osc.Vm
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			resp, innerXErr := s.rpcCreateVms(vmsRequest)
+			resp, innerXErr := s.rpcCreateVMs(vmsRequest)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -945,7 +945,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		switch retryErr.(type) {
+		switch retryErr.(type) { //nolint
 		case *retry.ErrStopRetry:
 			retryErr = fail.ToError(retryErr.Cause())
 		}
@@ -1053,7 +1053,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	publicIPs, xerr := s.rpcReadPublicIpsOfVm(ahf.Core.ID)
+	publicIPs, xerr := s.rpcReadPublicIPsOfVM(ahf.Core.ID)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to read public IPs of Host with ID %s", ahf.Core.ID)
 	}
@@ -1075,7 +1075,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	}
 	var lastErr fail.Error
 	for _, ip := range publicIPs {
-		if xerr = s.rpcDeletePublicIpByID(ip.PublicIpId); xerr != nil { // continue to delete even if error
+		if xerr = s.rpcDeletePublicIPByID(ip.PublicIpId); xerr != nil { // continue to delete even if error
 			lastErr = xerr
 			logrus.Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
 		}
@@ -1115,9 +1115,9 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 
 	var vm osc.Vm
 	if ahf.Core.ID != "" {
-		vm, xerr = s.rpcReadVmByID(ahf.Core.ID)
+		vm, xerr = s.rpcReadVMByID(ahf.Core.ID)
 	} else {
-		vm, xerr = s.rpcReadVmByName(ahf.Core.Name)
+		vm, xerr = s.rpcReadVMByName(ahf.Core.Name)
 	}
 	if xerr != nil {
 		return nullAHF, xerr
@@ -1157,7 +1157,7 @@ func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 // 	defer tracer.Exiting()
 // 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 //
-// 	vm, xerr := s.rpcReadVmByName(name)
+// 	vm, xerr := s.rpcReadVMByName(name)
 // 	if xerr != nil {
 // 		return nullAHF, xerr
 // 	}
@@ -1193,7 +1193,7 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	resp, xerr := s.rpcReadVms(nil)
+	resp, xerr := s.rpcReadVMs(nil)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -1241,7 +1241,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer tracer.Exiting()
 	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	return s.rpcStopVms([]string{ahf.Core.ID})
+	return s.rpcStopVMs([]string{ahf.Core.ID})
 }
 
 // StartHost starts the host identified by id
@@ -1258,7 +1258,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	return s.rpcStartVms([]string{ahf.Core.ID})
+	return s.rpcStartVMs([]string{ahf.Core.ID})
 }
 
 // RebootHost Reboot host
@@ -1275,7 +1275,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	return s.rpcRebootVms([]string{ahf.Core.ID})
+	return s.rpcRebootVMs([]string{ahf.Core.ID})
 }
 
 func (s stack) perfFromFreq(freq float32) int {
@@ -1311,7 +1311,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSi
 	perf := s.perfFromFreq(sizing.MinCPUFreq)
 	t := gpuTemplateName(0, sizing.MaxCores, int(sizing.MaxRAMSize), perf, 0, "")
 
-	if xerr := s.rpcUpdateVmType(ahf.Core.ID, t); xerr != nil {
+	if xerr := s.rpcUpdateVMType(ahf.Core.ID, t); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1339,7 +1339,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 		return xerr
 	}
 
-	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
+	vm, xerr := s.rpcReadVMByID(ahf.Core.ID)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 	}
@@ -1360,7 +1360,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 
 	// Add new SG to IPAddress
 	sgs = append(sgs, asg.ID)
-	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
+	return s.rpcUpdateVMSecurityGroups(ahf.Core.ID, sgs)
 }
 
 // UnbindSecurityGroupFromHost ...
@@ -1377,7 +1377,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		return xerr
 	}
 
-	vm, xerr := s.rpcReadVmByID(ahf.Core.ID)
+	vm, xerr := s.rpcReadVMByID(ahf.Core.ID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1402,5 +1402,5 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	}
 
 	// Update Security Groups of IPAddress
-	return s.rpcUpdateVmSecurityGroups(ahf.Core.ID, sgs)
+	return s.rpcUpdateVMSecurityGroups(ahf.Core.ID, sgs)
 }

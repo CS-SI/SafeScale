@@ -106,7 +106,7 @@ func (n network) Inspect(name string, timeout time.Duration) (*protocol.Network,
 func (n network) Create(
 	name, cidr string,
 	noSubnet bool,
-	gwname string, defaultSshPort uint32, os, sizing string,
+	gwname string, defaultSSHPort uint32, os, sizing string,
 	keepOnFailure bool,
 	timeout time.Duration,
 ) (*protocol.Network, error) {
@@ -126,7 +126,7 @@ func (n network) Create(
 		KeepOnFailure: keepOnFailure,
 		Gateway: &protocol.GatewayDefinition{
 			Name:    gwname,
-			SshPort: defaultSshPort,
+			SshPort: defaultSSHPort,
 			ImageId: os,
 		},
 	}

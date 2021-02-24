@@ -307,10 +307,10 @@ var networkCreate = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		defaultSshPort := uint32(c.Int("ssh-port"))
+		defaultSSHPort := uint32(c.Int("ssh-port"))
 		network, err := clientSession.Network.Create(
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
-			c.String("gwname"), defaultSshPort, c.String("os"), sizing,
+			c.String("gwname"), defaultSSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
 			temporal.GetExecutionTimeout(),
 		)

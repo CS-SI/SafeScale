@@ -92,6 +92,6 @@ func TryConnection(bucketName, key string) fail.Error {
 func main() {
 	err := TryConnection("", "")
 	if err != nil {
-		fmt.Printf(err.Error())
+		fmt.Println(err.Error())
 	}
 }

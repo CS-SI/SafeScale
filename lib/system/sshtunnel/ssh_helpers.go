@@ -23,7 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func RunCommandInSshSessionWithTimeout(se *ssh.Session, cmd string, timeout time.Duration) (err error) {
+func RunCommandInSSHSessionWithTimeout(se *ssh.Session, cmd string, timeout time.Duration) (err error) {
 	defer OnPanic(&err)
 
 	if se == nil {
@@ -41,7 +41,7 @@ func RunCommandInSshSessionWithTimeout(se *ssh.Session, cmd string, timeout time
 		resChan <- result{
 			resErr: theErr,
 		}
-		return
+		return //nolint
 	}()
 
 	if timeout != 0 {
@@ -57,7 +57,7 @@ func RunCommandInSshSessionWithTimeout(se *ssh.Session, cmd string, timeout time
 		}
 	}
 
-	select {
+	select { //nolint
 	case res := <-resChan:
 		return res.resErr
 	}
@@ -81,7 +81,7 @@ func DialSSHWithTimeout(network, addr string, config *ssh.ClientConfig, timeout 
 			resCli: theCli,
 			resErr: theErr,
 		}
-		return
+		return //nolint
 	}()
 
 	if timeout != 0 {
@@ -97,7 +97,7 @@ func DialSSHWithTimeout(network, addr string, config *ssh.ClientConfig, timeout 
 		}
 	}
 
-	select {
+	select { //nolint
 	case res := <-resChan:
 		return res.resCli, res.resErr
 	}

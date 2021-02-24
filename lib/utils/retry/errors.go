@@ -23,7 +23,7 @@ func TimeoutError(err error, limit time.Duration, options ...data.ImmutableKeyVa
 
 	if len(options) > 0 {
 		for _, v := range options {
-			switch v.Key() {
+			switch v.Key() { //nolint
 			case "callstack":
 				decorate = v.Value().(bool)
 			}

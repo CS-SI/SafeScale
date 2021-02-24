@@ -128,7 +128,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			Name:           in.GetName(),
 			CIDR:           subnetNet.String(),
 			KeepOnFailure:  in.GetKeepOnFailure(),
-			DefaultSshPort: in.GetGateway().GetSshPort(),
+			DefaultSSHPort: in.GetGateway().GetSshPort(),
 		}
 		xerr = rs.Create(task, req, "", nil)
 		if xerr != nil {
@@ -292,7 +292,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 				}
 			}
 			if xerr != nil {
-				switch xerr.(type) {
+				switch xerr.(type) { //nolint
 				case *fail.ErrNotFound:
 					return empty, fail.NotFoundError("failed to find Network %s", refLabel)
 				}

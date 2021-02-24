@@ -261,7 +261,7 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	// delete volume
 	if xerr = rv.GetService().DeleteVolume(rv.GetID()); xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *retry.ErrTimeout:
 			if xerr.Cause() != nil {
 				xerr = fail.ToError(xerr.Cause())

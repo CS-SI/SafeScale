@@ -216,7 +216,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		switch commRetryErr.(type) {
+		switch commRetryErr.(type) { //nolint
 		case *fail.ErrInvalidRequest: // In case of VPC, when id does not exist, huaweicloud returns InvalidRequest... which cannot be the case because we validated that id is not empty
 			return nil, fail.NotFoundError("failed to find Network with id %s", id)
 		}
@@ -356,7 +356,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 
 	an, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { //nolint
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(req.NetworkID)
 		}
@@ -511,7 +511,7 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	as.ID = resp.Subnet.ID
 	as.Name = resp.Subnet.Name
 	as.CIDR = resp.Subnet.CIDR
-	as.Network = resp.VpcId
+	as.Network = resp.VpcID
 	as.IPVersion = fromIntIPVersion(resp.IPVersion)
 	return as, nil
 }
@@ -651,7 +651,7 @@ type subnetCommonResult struct {
 type subnetEx struct {
 	subnets.Subnet
 	Status string `json:"status"`
-	VpcId  string `json:"vpc_id"`
+	VpcID  string `json:"vpc_id"`
 }
 
 // Extract is a function that accepts a result and extracts a Subnet from FlexibleEngine response.
@@ -670,7 +670,7 @@ type subnetCreateResult struct {
 type subnetGetResult struct {
 	subnetCommonResult
 }
-type subnetDeleteResult struct {
+type subnetDeleteResult struct { //nolint
 	gophercloud.ErrResult
 }
 
