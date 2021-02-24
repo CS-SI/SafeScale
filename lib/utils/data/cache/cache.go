@@ -19,68 +19,12 @@ package cache
 //go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Cacheable
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-
-	"sync/atomic"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
-
-// Cacheable is the interface a struct must satisfy to be able to be cached
-type Cacheable interface {
-	data.Observable
-
-	Released(concurrency.Task)  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
-	Destroyed(concurrency.Task) // tells cache handler the instance has been deleted and MUST be removed from cache
-}
-
-// CacheEntry is a struct containing information about a cache entry
-type CacheEntry struct {
-	content     Cacheable
-	use         atomic.Value
-	lastUpdated atomic.Value
-	name        atomic.Value
-	id          atomic.Value
-}
-
-// newCacheEntry allocates a new cache entry
-func newCacheEntry(content Cacheable) CacheEntry {
-	ce := CacheEntry{
-		content: content,
-	}
-	ce.name.Store(content.GetName())
-	ce.id.Store(content.GetID())
-	return ce
-}
-
-// GetID returns the ID of the cache entry
-func (ce CacheEntry) GetID() string {
-	return ce.id.Load().(string)
-}
-
-// GetName returns the name of the cache entry
-func (ce CacheEntry) GetName() string {
-	return ce.name.Load().(string)
-}
-
-// Content returns the content of the cache
-func (ce CacheEntry) Content() interface{} {
-	return ce.content
-}
-
-// Increment increments the counter of use of cache entry
-func (ce *CacheEntry) Increment() uint {
-	ce.use.Store(ce.use.Load().(uint) + 1)
-	return ce.use.Load().(uint)
-}
-
-// Decrement decrements the counter of use of cache entry
-func (ce *CacheEntry) Decrement() uint {
-	ce.use.Store(ce.use.Load().(uint) - 1)
-	return ce.use.Load().(uint)
-}
 
 // Cache ...
 type Cache struct {
@@ -102,10 +46,12 @@ func NewCache(name string) (Cache, fail.Error) {
 	return c, nil
 }
 
+// satisfies interface data.Identifiable
 func (c Cache) GetID() string {
 	return c.name
 }
 
+// satisfies interface data.Identifiable
 func (c Cache) GetName() string {
 	return c.name
 }
@@ -144,9 +90,7 @@ func (c *Cache) Add(task concurrency.Task, content Cacheable) (*CacheEntry, fail
 	ce := newCacheEntry(content)
 	c.cache[id] = &ce
 
-	content.AddObserver(task, c)
-
-	return &ce, nil
+	return &ce, fail.ToError(content.AddObserver(task, c))
 }
 
 // SignalChange tells the cache entry something has been changed in the content
