@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -29,7 +30,7 @@ type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
-	data.Cacheable
+	cache.Cacheable
 
 	Alter(task concurrency.Task, callback Callback) fail.Error                           // protects the data for exclusive write
 	BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) fail.Error // walks through host folder and executes a callback for each entries

@@ -25,6 +25,8 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -32,7 +34,8 @@ import (
 type Subnet interface {
 	Metadata
 	data.Identifiable
-	data.Observable
+	observer.Observable
+	cache.Cacheable
 
 	BindHost(task concurrency.Task, _ Host) fail.Error                                                                             // links Host to the Subnet
 	BindSecurityGroup(task concurrency.Task, _ SecurityGroup, _ SecurityGroupActivation) fail.Error                                // binds a Security Group to the Subnet
