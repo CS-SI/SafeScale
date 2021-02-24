@@ -27,7 +27,6 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -754,15 +753,13 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 			MinGPU:      -1,
 		}
 	}
+
 	gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
 	gatewaysDef.Image = imageID
 
-	if lower, err := gatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
+	if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
 		if !req.Force {
-			return nil, nil, nil, fail.NewError(
-				"requested gateway sizing %s less than recommended %s", spew.Sdump(gatewaysDef),
-				spew.Sdump(gatewaysDefault),
-			)
+			return nil, nil, nil, fail.NewError("requested gateway sizing less than recommended")
 		}
 	}
 
@@ -789,7 +786,7 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
 	mastersDef.Image = imageID
 
-	if lower, err := mastersDef.LowerThan(mastersDefault); err == nil && lower {
+	if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
 		if !req.Force {
 			return nil, nil, nil, fail.NewError("requested master sizing less than recommended")
 		}
@@ -821,7 +818,7 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
 	nodesDef.Image = imageID
 
-	if lower, err := nodesDef.LowerThan(nodesDefault); err == nil && lower {
+	if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
 		if !req.Force {
 			return nil, nil, nil, fail.NewError("requested node sizing less than recommended")
 		}
