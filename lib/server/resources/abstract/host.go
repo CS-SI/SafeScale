@@ -437,25 +437,35 @@ func (x *HostSizingRequirements) LowerThan(y *HostSizingRequirements) (bool, err
 	less := true
 
 	if x.MinCores >= y.MinCores {
-		less = false
+		if y.MinCores != 0 {
+			less = false
+		}
 	}
 	if x.MaxCores >= y.MaxCores {
 		less = false
 	}
 	if x.MinRAMSize >= y.MinRAMSize {
-		less = false
+		if y.MinRAMSize != 0 {
+			less = false
+		}
 	}
 	if x.MaxRAMSize >= y.MaxRAMSize {
 		less = false
 	}
 	if x.MinDiskSize >= y.MinDiskSize {
-		less = false
+		if y.MinDiskSize != 0 {
+			less = false
+		}
 	}
-	if x.MinGPU >= y.MinGPU {
-		less = false
+	if x.MinGPU >= 0 && y.MinGPU >= 0 {
+		if x.MinGPU >= y.MinGPU {
+			less = false
+		}
 	}
 	if x.MinCPUFreq >= y.MinCPUFreq {
-		less = false
+		if y.MinCPUFreq != 0 {
+			less = false
+		}
 	}
 
 	return less, nil
@@ -487,8 +497,10 @@ func (x *HostSizingRequirements) LowerOrEqualThan(y *HostSizingRequirements) (bo
 	if x.MinDiskSize > y.MinDiskSize {
 		less = false
 	}
-	if x.MinGPU > y.MinGPU {
-		less = false
+	if x.MinGPU >= 0 && y.MinGPU >= 0 {
+		if x.MinGPU > y.MinGPU {
+			less = false
+		}
 	}
 	if x.MinCPUFreq > y.MinCPUFreq {
 		less = false
