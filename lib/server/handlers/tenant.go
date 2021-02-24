@@ -145,7 +145,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
-	Scan(string, bool) (_ *protocol.ScanResultList, xerr fail.Error)
+	Scan(string, bool, []string) (_ *protocol.ScanResultList, xerr fail.Error)
 	Inspect(string) (_ *protocol.TenantInspectResponse, xerr fail.Error)
 }
 
@@ -162,7 +162,7 @@ func NewTenantHandler(job server.Job) TenantHandler {
 }
 
 // Scan scans the tenant and updates the database
-func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -188,29 +188,40 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protoco
 		return nil, fail.ForbiddenError("tenant is not scannable")
 	}
 
+	// TODO: make dry run use cli-given templates
 	if isDryRun {
 		return handler.dryRun()
 	}
 
-	if xerr = handler.dumpImages(); xerr != nil {
-		return nil, xerr
+	var templatesToScan []abstract.HostTemplate
+	if templateNamesToScan != nil {
+		for _, templateName := range templateNamesToScan {
+			template, err := svc.FindTemplateByName(templateName)
+			if err != nil {
+				return nil, fail.AbortedError(err)
+			}
+			templatesToScan = append(templatesToScan, *template)
+		}
+	} else {
+		if xerr = handler.dumpImages(); xerr != nil {
+			return nil, xerr
+		}
+
+		if xerr = handler.dumpTemplates(); xerr != nil {
+			return nil, xerr
+		}
+
+		templatesToScan, xerr = svc.ListTemplates(false)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		for _, template := range templatesToScan {
+			templateNamesToScan = append(templateNamesToScan, template.Name)
+		}
 	}
 
-	if xerr = handler.dumpTemplates(); xerr != nil {
-		return nil, xerr
-	}
-
-	templates, xerr := svc.ListTemplates(false)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var templateNames []string
-	for _, template := range templates {
-		templateNames = append(templateNames, template.Name)
-	}
-
-	logrus.Infof("Starting scan of tenant %q with templates: %v", tenantName, templateNames)
+	logrus.Infof("Starting scan of tenant %q with templates: %v", tenantName, templateNamesToScan)
 	logrus.Infof("Using %q image", defaultScanImage)
 
 	handler.scannedHostImage, xerr = svc.SearchImage(defaultScanImage)
@@ -243,15 +254,14 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool) (_ *protoco
 	var scanResultList []*protocol.ScanResult
 
 	var scanWaitGroup sync.WaitGroup
-	scanChannel := make(chan bool, int(math.Min(maxParallelScans, float64(len(templates)))))
+	scanChannel := make(chan bool, int(math.Min(maxParallelScans, float64(len(templatesToScan)))))
 
-	scanWaitGroup.Add(len(templates))
+	scanWaitGroup.Add(len(templatesToScan))
 
-	for _, targetTemplate := range templates {
+	for _, targetTemplate := range templatesToScan {
 		scanChannel <- true
 		localTarget := targetTemplate
 
-		// TODO: If there is a file with today's date, skip it...
 		fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + tenantName + "#" + localTarget.Name + ".json")
 		if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
 			break
