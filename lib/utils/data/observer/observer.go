@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 
-package data
+package observer
 
-import "github.com/CS-SI/SafeScale/lib/utils/concurrency"
+import (
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+)
 
 //go:generate mockgen -destination=../mocks/mock_observer.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Observer
 
 // Observer is the interface a struct must satisfy to be observed by outside
 type Observer interface {
-	Identifiable
+	data.Identifiable
 
 	SignalChange(id string)  // is called by Observable to signal an Observer a change occurred
 	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
@@ -31,7 +34,7 @@ type Observer interface {
 
 // Observable is the interface a struct must satisfy to signal internal change to observers
 type Observable interface {
-	Identifiable
+	data.Identifiable
 
 	AddObserver(task concurrency.Task, o Observer) error     // register an Observer to be kept in touch
 	NotifyObservers(task concurrency.Task) error             // notify observers a change occurred on content (using Observer.SignalChange)
