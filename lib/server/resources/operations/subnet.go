@@ -53,6 +53,7 @@ import (
 )
 
 const (
+	subnetKind = "subnet"
 	// networksFolderName is the technical name of the container used to store networks info
 	subnetsFolderName = "subnets"
 
@@ -64,18 +65,13 @@ const (
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 )
 
-var (
-	subnetCacheByID data.Cache
-	subnetIDsByName map[string]string
-)
-
 // subnet links Object Storage folder and Subnet
 type subnet struct {
 	*core
 
 	cacheLock      *sync.Mutex
 	cachedGateways [2]*host
-	cachedNetwork  *network
+	cachedNetwork  resources.Network
 }
 
 func nullSubnet() *subnet {
@@ -128,7 +124,7 @@ func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 		return nullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, "subnet", subnetsFolderName, &abstract.Subnet{})
+	coreInstance, xerr := newCore(svc, subnetKind, subnetsFolderName, &abstract.Subnet{})
 	if xerr != nil {
 		return nullSubnet(), xerr
 	}
@@ -221,6 +217,7 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
+	// First step: identify subnetID from (networkRef, subnetRef)
 	var subnetID string
 	switch networkRef {
 	case "":
@@ -293,40 +290,45 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 
 	xerr = fail.NotFoundError()
 	if subnetID != "" {
-		ce, xerr := subnetCacheByID.GetEntry(subnetID)
+		cache, xerr := svc.GetCache(subnetKind)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		cacheEntry, xerr := cache.Get(subnetID)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				if rs, xerr = NewSubnet(svc); xerr == nil {
-					// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+					// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 					if xerr = rs.ReadByID(task, subnetID); xerr == nil {
-						if ce, xerr = subnetCacheByID.Add(task, rs); xerr != nil {
+						if cacheEntry, xerr = cache.Add(task, rs); xerr != nil {
 							return nil, xerr
 						}
-
-						subnetIDsByName[rs.GetName()] = subnetID
 					}
 				}
 			default:
 				return nil, xerr
 			}
 		}
-		if ce != nil {
-			_ = ce.Increment()
-			rs = ce.Content().(resources.Subnet)
+
+		if rs = cacheEntry.Content().(resources.Subnet); rs == nil {
+			return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
 		}
-	}
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			if networkRef != "" {
-				// rewrite NotFoundError, user does not bother about metadata stuff
-				return nullSubnet(), fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		_ = cacheEntry.Increment()
+		defer func() {
+			if xerr != nil {
+				_ = cacheEntry.Decrement()
 			}
-			return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
-		default:
-			return nullSubnet(), xerr
+		}()
+	}
+
+	if rs == nil {
+		if networkRef != "" {
+			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
+			return nullSubnet(), fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
+		return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 	}
 
 	return rs, nil
@@ -337,12 +339,31 @@ func (rs *subnet) IsNull() bool {
 	return rs == nil || rs.core.IsNull()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (rs *subnet) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	if rs.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := rs.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	var cache *iaas.ResourceCache
+	if cache, xerr = rs.GetService().GetCache(subnetKind); xerr == nil {
+		_, xerr = cache.Add(task, rs)
+	}
+	return xerr
+}
+
 // Create creates a subnet
 // FIXME: split up this function for readability
 func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	// Note: do not use .IsNull() here
+	if rs == nil {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1222,9 +1243,10 @@ func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host)
 func (rs subnet) Browse(task concurrency.Task, callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
-		return fail.InvalidInstanceError()
-	}
+	// Note: Browse is intended to be callable from null value, so do not validate rs
+	// if rs.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
 	if task == nil {
 		return fail.InvalidParameterError("task", "can't be nil")
 	}
@@ -1644,14 +1666,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		sgs := [3]string{as.GWSecurityGroupID, as.PublicIPSecurityGroupID, as.InternalSecurityGroupID}
 		for _, v := range sgs {
 			if v != "" {
-				if rsg, innerXErr = LoadSecurityGroup(task, svc, v); innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// Security Group not found, consider this as a success
-					default:
-						return innerXErr
-					}
-				} else {
+				if rsg, innerXErr = LoadSecurityGroup(task, svc, v); innerXErr == nil {
 					sgName = rsg.GetName()
 					logrus.Debugf("Deleting Security Group '%s'...", sgName)
 					if innerXErr = rsg.Delete(task); innerXErr != nil {
@@ -1661,6 +1676,13 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 						default:
 							return innerXErr
 						}
+					}
+				} else {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// Security Group not found, consider this as a success
+					default:
+						return innerXErr
 					}
 				}
 			}
@@ -1676,6 +1698,8 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 				return fail.Wrap(innerXErr, "failed to query parent Network of Subnet")
 			}
 		} else {
+			defer rn.Released(task)
+
 			return rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 					nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
@@ -1780,24 +1804,27 @@ func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.
 	var rsg resources.SecurityGroup
 	svc := rs.GetService()
 	for k, v := range sgs.ByName {
-		if rsg, xerr = LoadSecurityGroup(task, svc, v); xerr == nil {
-			xerr = rsg.UnbindFromSubnet(task, rs)
-		}
-		if xerr != nil {
+		if rsg, xerr = LoadSecurityGroup(task, svc, v); xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a Security Group not found as a successful unbind
 			default:
 				return xerr
 			}
-		} else if xerr = rsg.Delete(task); xerr != nil {
+		}
+		defer func(item resources.SecurityGroup) {
+			item.Released(task)
+		}(rsg)
+
+		if xerr = rsg.UnbindFromSubnet(task, rs); xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// Consider a Security Group not found as a successful deletion and continue
+				// consider a Security Group not found as a successful unbind
 			default:
 				return xerr
 			}
 		}
+
 		delete(sgs.ByID, v)
 		delete(sgs.ByName, k)
 	}
@@ -2419,12 +2446,4 @@ func (rs subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resourc
 		return innerXErr
 	})
 	return sg, xerr
-}
-
-func init() {
-	var xerr fail.Error
-	if subnetCacheByID, xerr = data.NewCache("subnets_by_id"); xerr != nil {
-		panic("failed to allocate cache for subnets: " + xerr.Error())
-	}
-	subnetIDsByName = map[string]string{}
 }

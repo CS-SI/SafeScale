@@ -1247,7 +1247,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 			return xerr
 		}
 	}
-	defer rs.Dispose() // will not used the instance outside of the function
+	defer rs.Released(task) // will not used the instance outside of the function
 
 	// gatewayPublicIPs, xerr := rs.GetGatewayPublicIPs(task)
 	// if xerr != nil {
@@ -1276,7 +1276,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 			if xerr != nil {
 				return xerr
 			}
-			defer gwSG.Dispose()
+			defer gwSG.Released(task)
 
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
