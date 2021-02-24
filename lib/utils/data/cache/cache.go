@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package data
+package cache
 
 //go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Cacheable
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+
 	"sync/atomic"
 	"time"
 
@@ -28,7 +30,7 @@ import (
 
 // Cacheable is the interface a struct must satisfy to be able to be cached
 type Cacheable interface {
-	Observable
+	data.Observable
 
 	Released(concurrency.Task)  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
 	Destroyed(concurrency.Task) // tells cache handler the instance has been deleted and MUST be removed from cache
