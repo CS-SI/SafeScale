@@ -155,8 +155,7 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
-			logrus.Error(xerr.Error())
+			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nullSecurityGroup(), fail.NotFoundError("failed to find Security Group '%s'", ref)
 		default:
 			return nullSecurityGroup(), xerr
@@ -166,10 +165,10 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg
 	if rsg = ce.Content().(resources.SecurityGroup); rsg == nil {
 		return nullSecurityGroup(), fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
 	}
-	_ = ce.Increment()
+	_ = ce.LockContent()
 	defer func() {
 		if xerr != nil {
-			_ = ce.Decrement()
+			_ = ce.UnlockContent()
 		}
 	}()
 

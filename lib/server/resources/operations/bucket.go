@@ -136,7 +136,7 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 	if b = cacheEntry.Content().(resources.Bucket); b == nil {
 		return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
 	}
-	_ = cacheEntry.Increment()
+	_ = cacheEntry.LockContent()
 
 	return b, nil
 }

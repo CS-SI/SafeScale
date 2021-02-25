@@ -103,7 +103,7 @@ func (c Cache) SignalChange(key string) {
 // MarkAsFreed tells the cache to decrease the counter of uses
 func (c *Cache) MarkAsFreed(id string) {
 	if ce, ok := c.cache[id]; ok {
-		ce.Decrement()
+		ce.UnlockContent()
 	}
 }
 

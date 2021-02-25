@@ -161,15 +161,13 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (rs resource
 				if cacheEntry, xerr = cache.Add(task, rs); xerr != nil {
 					return nil, xerr
 				}
-
 			}
 		}
 	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
-			logrus.Error(xerr.Error())
+			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nullShare(), fail.NotFoundError("failed to find a Share '%s'", ref)
 		default:
 			return nullShare(), xerr
@@ -179,10 +177,10 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (rs resource
 	if rs = cacheEntry.Content().(resources.Share); rs == nil {
 		return nullShare(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
-	_ = cacheEntry.Increment()
+	_ = cacheEntry.LockContent()
 	defer func() {
 		if xerr != nil {
-			_ = cacheEntry.Decrement()
+			_ = cacheEntry.UnlockContent()
 		}
 	}()
 

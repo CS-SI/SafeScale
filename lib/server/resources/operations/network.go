@@ -107,8 +107,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resour
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
-			logrus.Error(xerr.Error())
+			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nullNetwork(), fail.NotFoundError("failed to find Network '%s'", ref)
 		default:
 			return nullNetwork(), xerr
@@ -118,10 +117,10 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resour
 	if rn = cacheEntry.Content().(resources.Network); rn == nil {
 		return nullNetwork(), fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
-	_ = cacheEntry.Increment()
+	_ = cacheEntry.LockContent()
 	defer func() {
 		if xerr != nil {
-			_ = cacheEntry.Decrement()
+			_ = cacheEntry.UnlockContent()
 		}
 	}()
 

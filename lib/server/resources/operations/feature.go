@@ -345,19 +345,6 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 	// 	return anon.(Results), nil
 	// }
 
-	// methods := target.InstallMethods(f.task)
-	// var installer Installer
-	// for _, meth := range methods {
-	// 	if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
-	// 		installer = f.installerOfMethod(meth)
-	// 		if installer != nil {
-	// 			break
-	// 		}
-	// 	}
-	// }
-	// if installer == nil {
-	// 	return nil, fail.NewError("failed to find a way to check '%s'", featureName)
-	// }
 	installer, xerr := f.findInstallerForTarget(f.task, target, "check")
 	if xerr != nil {
 		return nil, xerr
@@ -383,6 +370,8 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 	}
 
 	r, xerr := installer.Check(&f, target, myV, s)
+
+	// FIXME: restore feature check using iaas.ResourceCache
 	// _ = checkCache.ForceSet(cacheKey, results)
 	return r, xerr
 }
@@ -446,19 +435,6 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),
 	)()
 
-	// methods := target.InstallMethods(f.task)
-	// w := f.specs.GetStringMap("feature.install")
-	// for i = 1; i <= uint8(len(methods)); i++ {
-	// 	meth := methods[i]
-	// 	if _, ok := w[strings.ToLower(meth.String())]; ok {
-	// 		if installer = f.installerOfMethod(meth); installer != nil {
-	// 			break
-	// 		}
-	// 	}
-	// }
-	// if installer == nil {
-	// 	return nil, fail.NotAvailableError("failed to find a way to install '%s'", featureName)
-	// }
 	installer, xerr := f.findInstallerForTarget(f.task, target, "check")
 	if xerr != nil {
 		return nil, xerr
@@ -482,6 +458,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check feature '%s'", featureName)
 		}
+
 		if results.Successful() {
 			logrus.Infof("Feature '%s' is already installed.", featureName)
 			return results, nil
@@ -503,6 +480,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 		return nil, xerr
 	}
 
+	// FIXME: restore feature check cache using iaas.ResourceCache
 	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
 
 	return results, target.RegisterFeature(f.task, f, nil, target.TargetType() == featuretargettype.CLUSTER)

@@ -52,14 +52,14 @@ func (ce CacheEntry) Content() interface{} {
 	return ce.content.Value()
 }
 
-// Increment increments the counter of use of cache entry
-func (ce *CacheEntry) Increment() uint {
+// LockContent increments the counter of use of cache entry
+func (ce *CacheEntry) LockContent() uint {
 	ce.use.Store(ce.use.Load().(uint) + 1)
 	return ce.use.Load().(uint)
 }
 
-// Decrement decrements the counter of use of cache entry
-func (ce *CacheEntry) Decrement() uint {
+// UnlockContent decrements the counter of use of cache entry
+func (ce *CacheEntry) UnlockContent() uint {
 	ce.use.Store(ce.use.Load().(uint) - 1)
 	return ce.use.Load().(uint)
 }
