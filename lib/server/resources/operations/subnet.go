@@ -315,17 +315,17 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		if rs = cacheEntry.Content().(resources.Subnet); rs == nil {
 			return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
 		}
-		_ = cacheEntry.Increment()
+		_ = cacheEntry.LockContent()
 		defer func() {
 			if xerr != nil {
-				_ = cacheEntry.Decrement()
+				_ = cacheEntry.UnlockContent()
 			}
 		}()
 	}
 
 	if rs == nil {
 		if networkRef != "" {
-			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
+			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nullSubnet(), fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
 		return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)

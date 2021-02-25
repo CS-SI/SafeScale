@@ -256,7 +256,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 				func(t retry.Try, v verdict.Enum) {
 					switch v { //nolint
 					case verdict.Retry:
-						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying...", bucketName, absolutePath, t.Err.Error())
+						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
 					}
 				},
 			)

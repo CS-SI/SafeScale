@@ -117,8 +117,7 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resourc
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// rewrite NotFoundError, user does not bother about metadata stuff, but still log it
-			logrus.Error(xerr.Error())
+			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nullVolume(), fail.NotFoundError("failed to find Volume '%s'", ref)
 		default:
 			return nullVolume(), xerr
@@ -128,10 +127,10 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resourc
 	if rv = cacheEntry.Content().(resources.Volume); rv == nil {
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
-	_ = cacheEntry.Increment()
+	_ = cacheEntry.LockContent()
 	defer func() {
 		if xerr != nil {
-			_ = cacheEntry.Decrement()
+			_ = cacheEntry.UnlockContent()
 		}
 	}()
 
@@ -387,7 +386,7 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 	if _, xerr = LoadVolume(task, svc, req.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		// continue
+			// continue
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}

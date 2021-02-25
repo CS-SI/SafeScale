@@ -70,6 +70,7 @@ func (i *noneInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer w.Terminate()
 
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Error(xerr.Error())
@@ -108,6 +109,7 @@ func (i *noneInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer w.Terminate()
 
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Error(xerr.Error())

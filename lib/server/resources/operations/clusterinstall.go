@@ -144,25 +144,28 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if xerr != nil {
 		return xerr
 	}
+
 	v["ClusterComplexity"] = strings.ToLower(complexity.String())
 	clusterFlavor, xerr := c.GetFlavor(task)
 	if xerr != nil {
 		return xerr
 	}
+
 	v["ClusterFlavor"] = strings.ToLower(clusterFlavor.String())
 	v["ClusterName"] = c.GetName()
 	v["ClusterAdminUsername"] = "cladm"
 	if v["ClusterAdminPassword"], xerr = c.GetAdminPassword(task); xerr != nil {
 		return xerr
 	}
+
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
 	}
-
 	networkCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
+
 	v["PrimaryGatewayIP"] = networkCfg.GatewayIP
 	v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
 	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
@@ -193,6 +196,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if xerr != nil {
 		return xerr
 	}
+
 	if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
 		v["ClusterControlplaneUsesVIP"] = true
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
@@ -202,37 +206,46 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		if xerr != nil {
 			return xerr
 		}
+
 		if v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(task); xerr != nil {
 			return xerr
 		}
+
 		v["ClusterControlplaneUsesVIP"] = false
 	}
 	if v["ClusterMasters"], xerr = c.ListMasters(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterMasterNames"], xerr = c.ListMasterNames(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterMasterIDs"], xerr = c.ListMasterIDs(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterMasterIPs"], xerr = c.ListMasterIPs(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodes"], xerr = c.ListNodes(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodeNames"], xerr = c.ListNodeNames(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodeIDs"], xerr = c.ListNodeIDs(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodeIPs"], xerr = c.ListNodeIPs(task); xerr != nil {
 		return xerr
 	}
-	v["IPRanges"] = networkCfg.CIDR
 
+	v["IPRanges"] = networkCfg.CIDR
 	return nil
 }
 

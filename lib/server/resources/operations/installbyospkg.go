@@ -62,6 +62,8 @@ func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v d
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer worker.Terminate()
+
 	if xerr = worker.CanProceed(s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
@@ -97,6 +99,8 @@ func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v dat
 		logrus.Println(xerr.Error())
 		return nil, xerr
 	}
+	defer worker.Terminate()
+
 	if xerr = worker.CanProceed(s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
@@ -135,6 +139,7 @@ func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v 
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
+	defer worker.Terminate()
 
 	if r, xerr = worker.Proceed(v, s); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())

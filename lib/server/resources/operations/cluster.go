@@ -155,7 +155,7 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (rc resou
 	if rc = cacheEntry.Content().(resources.Cluster); rc == nil {
 		return nullCluster(), fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
 	}
-	_ = cacheEntry.Increment()
+	_ = cacheEntry.LockContent()
 
 	// From here, we can deal with legacy
 	if xerr = rc.(*cluster).updateClusterNodesPropertyIfNeeded(task); xerr != nil {
@@ -1677,7 +1677,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv3.
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
 			if !ok {

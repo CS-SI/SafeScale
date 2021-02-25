@@ -146,10 +146,10 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources
 	if rh = ce.Content().(resources.Host); rh == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
-	_ = ce.Increment()
+	_ = ce.LockContent()
 	defer func() {
 		if xerr != nil {
-			_ = ce.Decrement()
+			_ = ce.UnlockContent()
 		}
 	}()
 
