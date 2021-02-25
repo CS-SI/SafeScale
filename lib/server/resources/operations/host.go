@@ -228,12 +228,17 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 					ip := rgw.(*host).getAccessIP(task)
+					opUser, opUserErr := getOperatorUsernameFromCfg(svc)
+					if opUserErr != nil {
+						return opUserErr
+					}
+
 					primaryGatewayConfig = &system.SSHConfig{
 						PrivateKey: gwahc.PrivateKey,
 						Port:       int(gwahc.SSHPort),
 						IPAddress:  ip,
 						Hostname:   gwahc.Name,
-						User:       abstract.DefaultUser,
+						User:       opUser,
 					}
 					return nil
 				})
@@ -256,12 +261,16 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
+						opUser, opUserErr := getOperatorUsernameFromCfg(svc)
+						if opUserErr != nil {
+							return opUserErr
+						}
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       int(gwahc.SSHPort),
 							IPAddress:  rgw.(*host).getAccessIP(task),
 							Hostname:   rgw.GetName(),
-							User:       abstract.DefaultUser,
+							User:       opUser,
 						}
 						return nil
 					})
@@ -276,17 +285,41 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 			return innerXErr
 		}
 
+		opUser, opUserErr := getOperatorUsernameFromCfg(svc)
+		if opUserErr != nil {
+			return opUserErr
+		}
+
 		rh.sshProfile = &system.SSHConfig{
 			Port:                   int(ahc.SSHPort),
 			IPAddress:              rh.accessIP,
 			Hostname:               rh.GetName(),
-			User:                   abstract.DefaultUser,
+			User:                   opUser,
 			PrivateKey:             ahc.PrivateKey,
 			GatewayConfig:          primaryGatewayConfig,
 			SecondaryGatewayConfig: secondaryGatewayConfig,
 		}
 		return nil
 	})
+}
+
+func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
+	cfg, xerr := svc.GetConfigurationOptions()
+	if xerr != nil {
+		return "", xerr
+	}
+	var user string
+	if anon, ok := cfg.Get("OperatorUsername"); ok {
+		user = anon.(string)
+		if user == "" {
+			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
+		}
+	}
+	if user == "" {
+		user = abstract.DefaultUser
+	}
+
+	return user, nil
 }
 
 // IsNull tests if instance is nil or empty
