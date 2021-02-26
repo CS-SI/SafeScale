@@ -73,9 +73,9 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 	if xerr != nil {
 		switch realErr := xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(realErr.Cause())
+			xerr = fail.ConvertError(realErr.Cause())
 		case *retry.ErrTimeout:
-			xerr = fail.ToError(realErr.Cause())
+			xerr = fail.ConvertError(realErr.Cause())
 		}
 		return xerr
 	}

@@ -462,7 +462,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 
 			buffer := bytes.NewBufferString("")
 			if err := varTemplate.Execute(buffer, variables); err != nil {
-				return nil, fail.ToError(err)
+				return nil, fail.ConvertError(err)
 			}
 
 			cloneV[k] = buffer.String()

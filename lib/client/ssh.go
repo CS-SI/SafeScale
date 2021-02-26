@@ -126,7 +126,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return -1, "", "", fail.ToError(retryErr.Cause())
+			return -1, "", "", fail.ConvertError(retryErr.Cause())
 		default:
 			return -1, "", "", retryErr
 		}
@@ -138,7 +138,7 @@ func (s ssh) getHostSSHConfig(hostname string) (*system.SSHConfig, fail.Error) {
 	host := &host{session: s.session}
 	cfg, err := host.SSHConfig(hostname)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return cfg, nil
 }
@@ -302,7 +302,7 @@ func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConf
 	service := protocol.NewHostServiceClient(s.session.connection)
 	sshConfig, err := service.SSH(ctx, &protocol.Reference{Name: name})
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
 }

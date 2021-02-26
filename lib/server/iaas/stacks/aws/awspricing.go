@@ -126,11 +126,11 @@ func NewPriceFromJSONValue(in aws.JSONValue) (Price, fail.Error) {
 	nullPrice := Price{}
 	jsonPrice, err := json.Marshal(in)
 	if err != nil {
-		return nullPrice, fail.ToError(err)
+		return nullPrice, fail.ConvertError(err)
 	}
 	price := Price{}
 	if err = json.Unmarshal(jsonPrice, &price); err != nil {
-		return nullPrice, fail.ToError(err)
+		return nullPrice, fail.ConvertError(err)
 	}
 	return price, nil
 }

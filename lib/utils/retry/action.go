@@ -330,7 +330,7 @@ func (a action) loopWithSoftTimeout() fail.Error {
 	if a.First != nil {
 		err := a.First()
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 	}
 
@@ -396,7 +396,7 @@ func (a action) loopWithHardTimeout(timeout time.Duration) fail.Error {
 	if a.First != nil {
 		err := a.First()
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 	}
 

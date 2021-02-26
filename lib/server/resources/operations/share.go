@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -68,14 +69,14 @@ func (si ShareIdentity) GetName() string {
 // satisfies interface data.Serializable
 func (si ShareIdentity) Serialize() ([]byte, fail.Error) {
 	r, err := json.Marshal(&si)
-	return r, fail.ToError(err)
+	return r, fail.ConvertError(err)
 }
 
 // Deserialize ...
 // satisfies interface data.Serializable
 func (si *ShareIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
-	return fail.ToError(json.Unmarshal(buf, si))
+	return fail.ConvertError(json.Unmarshal(buf, si))
 }
 
 // Clone ...
@@ -142,28 +143,27 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (rs resource
 		return nullShare(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cache, xerr := svc.GetCache(shareKind)
+	shareCache, xerr := svc.GetCache(shareKind)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	cacheEntry, xerr := cache.Get(ref)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			rs, xerr := NewShare(svc)
-			if xerr != nil {
-				return rs, xerr
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rs, innerXErr := NewShare(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
 			}
 
-			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if xerr = rs.Read(task, ref); xerr == nil {
-				if cacheEntry, xerr = cache.Add(task, rs); xerr != nil {
-					return nil, xerr
-				}
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rs.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
 			}
-		}
+
+			return rs, nil
+		}),
 	}
+	cacheEntry, xerr := shareCache.Get(task, ref, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -203,11 +203,18 @@ func (objs *share) Carry(task concurrency.Task, clonable data.Clonable) (xerr fa
 		return xerr
 	}
 
-	var cache *iaas.ResourceCache
-	if cache, xerr = objs.GetService().GetCache(shareKind); xerr == nil {
-		_, xerr = cache.Add(task, objs)
+	shareCache, xerr := objs.GetService().GetCache(shareKind)
+	if xerr != nil {
+		return xerr
 	}
-	return xerr
+
+	cacheEntry, xerr := shareCache.AddEntry(task, objs)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // Browse walks through shares folder and executes a callback for each entry
@@ -459,7 +466,7 @@ func (objs share) GetServer(task concurrency.Task) (_ resources.Host, xerr fail.
 	}
 
 	var hostID, hostName string
-	xerr = objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = objs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())

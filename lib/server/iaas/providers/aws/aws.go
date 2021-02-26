@@ -199,7 +199,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	newP := &provider{
 		Stack:            awsStack,

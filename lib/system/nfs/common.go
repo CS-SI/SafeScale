@@ -46,7 +46,7 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 		var err error
 		tmplBox, err = rice.FindBox("../nfs/scripts")
 		if err != nil {
-			return nil, fail.ToError(err)
+			return nil, fail.ConvertError(err)
 		}
 	}
 	return tmplBox, nil
@@ -65,7 +65,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ToError(err)
+		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 	data["reserved_BashLibrary"] = bashLibrary
@@ -93,20 +93,20 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
-		// return 255, "", "", fail.ToError(err)
+		// return 255, "", "", fail.ConvertError(err)
 		xerr = fail.ExecutionError(err)
 		_ = xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ToError(err)
+		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 
 	// Prepare the template for execution
 	tmplPrepared, err := template.Parse(name, tmplContent)
 	if err != nil {
-		// return 255, "", "", fail.ToError(err)
+		// return 255, "", "", fail.ConvertError(err)
 		xerr = fail.ExecutionError(err)
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ToError(err)
+		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 

@@ -108,7 +108,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			defer task.DisarmAbortSignal()()
 
 			if derr := rn.Delete(task); derr != nil {
-				_ = fail.ToError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+				_ = fail.ConvertError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}
 	}()

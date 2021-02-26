@@ -67,7 +67,7 @@ type Host interface {
 	PushStringToFile(task concurrency.Task, content string, filename string) fail.Error                                                            // creates a file 'filename' on remote 'host' with the content 'content'
 	PushStringToFileWithOwnership(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                           // creates a file 'filename' on remote 'host' with the content 'content' and apply ownership to it
 	Reboot(task concurrency.Task) fail.Error                                                                                                       // reboots the host
-	Resize(hostSize abstract.HostSizingRequirements) fail.Error                                                                                    // resize the host (probably not yet implemented on some proviers if not all)
+	Resize(task concurrency.Task, hostSize abstract.HostSizingRequirements) fail.Error                                                             // resize the host (probably not yet implemented on some proviers if not all)
 	Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
 	Start(task concurrency.Task) fail.Error                                                                                                        // starts the host
 	Stop(task concurrency.Task) fail.Error                                                                                                         // stops the host

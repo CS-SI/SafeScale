@@ -27,9 +27,9 @@ import (
 type Observer interface {
 	data.Identifiable
 
-	SignalChange(id string)  // is called by Observable to signal an Observer a change occurred
-	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
-	MarkAsDeleted(id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
+	SignalChange(task concurrency.Task, id string)  // is called by Observable to signal an Observer a change occurred
+	MarkAsFreed(task concurrency.Task, id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
+	MarkAsDeleted(task concurrency.Task, id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
 }
 
 // Observable is the interface a struct must satisfy to signal internal change to observers

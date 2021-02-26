@@ -49,6 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -121,27 +122,25 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (rc resou
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
-	cache, xerr := svc.GetCache(clusterKind)
+	clusterCache, xerr := svc.GetCache(clusterKind)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
 
-	cacheEntry, xerr := cache.Get(name)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			rc, xerr := NewCluster(task, svc)
-			if xerr != nil {
-				return nullCluster(), xerr
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rc, innerXErr := NewCluster(task, svc)
+			if innerXErr != nil {
+				return nil, innerXErr
 			}
-
-			if xerr = rc.Read(task, name); xerr == nil {
-				if cacheEntry, xerr = cache.Add(task, rc); xerr != nil {
-					return nullCluster(), xerr
-				}
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rc.Read(task, name); innerXErr != nil {
+				return nil, innerXErr
 			}
-		}
+			return rc, nil
+		}),
 	}
+	cacheEntry, xerr := clusterCache.Get(task, name, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -451,12 +450,13 @@ func (c *cluster) IsNull() bool {
 	return c == nil || c.core.IsNull()
 }
 
-// GetName returns the name if the cluster
+// GetName returns the name of the cluster
 // Satisfies interface data.Identifiable
 func (c cluster) GetName() string {
 	if c.IsNull() {
 		return ""
 	}
+
 	return c.core.GetName()
 }
 
@@ -466,6 +466,7 @@ func (c cluster) GetID() string {
 	if c.IsNull() {
 		return ""
 	}
+
 	return c.core.GetName()
 }
 
@@ -480,11 +481,18 @@ func (c *cluster) Carry(task concurrency.Task, clonable data.Clonable) (xerr fai
 		return xerr
 	}
 
-	var cache *iaas.ResourceCache
-	if cache, xerr = c.GetService().GetCache(clusterKind); xerr == nil {
-		_, xerr = cache.Add(task, c)
+	clusterCache, xerr := c.GetService().GetCache(clusterKind)
+	if xerr != nil {
+		return xerr
 	}
-	return xerr
+
+	cacheEntry, xerr := clusterCache.AddEntry(task, c)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // Create creates the necessary infrastructure of the Cluster
@@ -769,7 +777,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		// Generate needed password for account cladm
 		cladmPassword, innerErr := utils.GeneratePassword(16)
 		if innerErr != nil {
-			return fail.ToError(innerErr)
+			return fail.ConvertError(innerErr)
 		}
 		aci.AdminPassword = cladmPassword
 
@@ -1446,7 +1454,7 @@ func (c *cluster) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 	defer c.SafeRUnlock(task)
 
 	r, err := json.Marshal(c) // nolint
-	return r, fail.ToError(err)
+	return r, fail.ConvertError(err)
 }
 
 // Deserialize reads json code and reinstantiates cluster
@@ -1471,7 +1479,7 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
 	defer c.SafeUnlock(task)
 
 	err := json.Unmarshal(buf, c) // nolint
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // Bootstrap (re)connects controller with the appropriate Makers
@@ -1677,7 +1685,7 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv3.
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
 			if !ok {
@@ -1920,7 +1928,7 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 			case *retry.ErrTimeout:
 				xerr = fail.Wrap(xerr, "timeout waiting cluster transitioning from state Stopping to Stopped")
 			case *retry.ErrStopRetry:
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
 		return xerr
@@ -2376,7 +2384,7 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(hostID=%s)", hostID).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -3154,9 +3162,9 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(host='%s')", host.GetName()).Entering()
+	// defer tracer.Exiting()
+	// // defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Identify the node to delete and remove it preventive from metadata
 	var node *propertiesv3.ClusterNode
@@ -3450,9 +3458,9 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			case *fail.ErrAborted:
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
 		if xerr != nil {
@@ -3490,9 +3498,9 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			case *fail.ErrAborted:
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
 		if xerr != nil {

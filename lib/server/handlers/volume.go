@@ -540,7 +540,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 // 	disks := strings.Split(stdout, "\n")
 // 	set = mapset.NewThreadUnsafeSet()
 // 	for _, k := range disks {
-// 		set.Add(k)
+// 		set.AddEntry(k)
 // 	}
 // 	return set, nil
 // }

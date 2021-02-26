@@ -73,7 +73,7 @@ func generateUUID(store bool) (string, fail.Error) {
 	defer mutexContextManager.Unlock()
 	newUUID, err := uuid.NewV4()
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	if store {
 		uuidSet = true

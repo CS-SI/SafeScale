@@ -272,7 +272,7 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 	dataBuffer := bytes.NewBufferString("")
 	err := contentTmpl.Execute(dataBuffer, v)
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	return dataBuffer.String(), nil
 }
@@ -470,7 +470,7 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 	var response map[string]interface{}
 	err := json.Unmarshal([]byte(output[0]), &response)
 	if err != nil {
-		return nil, "", fail.ToError(err)
+		return nil, "", fail.ConvertError(err)
 	}
 
 	switch httpcode {

@@ -35,12 +35,12 @@ func GenerateRSAKeyPair(name string) (privKey string, pubKey string, xerr fail.E
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", "", fail.ToError(err)
+		return "", "", fail.ConvertError(err)
 	}
 	publicKey := privateKey.PublicKey
 	pub, err := ssh.NewPublicKey(&publicKey)
 	if err != nil {
-		return "", "", fail.ToError(err)
+		return "", "", fail.ConvertError(err)
 	}
 	pubBytes := ssh.MarshalAuthorizedKey(pub)
 

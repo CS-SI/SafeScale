@@ -460,7 +460,7 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 
 	box, err := getTemplateBox()
 	if err != nil {
-		return 0, "", "", fail.ToError(err)
+		return 0, "", "", fail.ConvertError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
@@ -534,7 +534,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 		}
 		jsoned, err := json.MarshalIndent(content, "", "    ")
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 		params["reserved_TenantJSON"] = string(jsoned)
 
@@ -598,8 +598,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
 		}
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
-		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
-		if suffix != "" {
+		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())

@@ -128,7 +128,7 @@ func (s *Subnet) Serialize() ([]byte, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	r, err := json.Marshal(s)
-	return r, fail.ToError(err)
+	return r, fail.ConvertError(err)
 }
 
 // Deserialize reads json code and reinstantiates an IPAddress
@@ -137,7 +137,7 @@ func (s *Subnet) Deserialize(buf []byte) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
-	return fail.ToError(json.Unmarshal(buf, s))
+	return fail.ConvertError(json.Unmarshal(buf, s))
 }
 
 // GetName ...

@@ -48,7 +48,7 @@ func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, fai
 
 	result, err := service.List(ctx, &protocol.Reference{})
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return result, nil
 }
@@ -72,7 +72,7 @@ func (c cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.C
 
 	result, err := service.Inspect(ctx, &protocol.Reference{Name: clusterName})
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return result, nil
 }
@@ -352,7 +352,7 @@ func (c cluster) ListInstalledFeatures(clusterName string, all bool, duration ti
 	}
 	list, err := service.List(ctx, request)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return list, nil
 }
@@ -377,7 +377,7 @@ func (c cluster) FindAvailableMaster(clusterName string, duration time.Duration)
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	host, err := service.FindAvailableMaster(ctx, &protocol.Reference{Name: clusterName})
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return host, nil
 }
@@ -402,7 +402,7 @@ func (c cluster) ListMasters(clusterName string, duration time.Duration) (*proto
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	list, err := service.ListMasters(ctx, &protocol.Reference{Name: clusterName})
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return list, nil
 }
@@ -427,7 +427,7 @@ func (c cluster) ListNodes(clusterName string, duration time.Duration) (*protoco
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	list, err := service.ListNodes(ctx, &protocol.Reference{Name: clusterName})
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return list, nil
 }

@@ -31,8 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/xrash/smetrics"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -164,15 +162,11 @@ func (svc *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
 		svc.cache.resources = map[string]*ResourceCache{}
 	}
 	if _, ok := svc.cache.resources[name]; !ok {
-		c, xerr := cache.NewCache(name)
+		rc, xerr := NewResourceCache(name)
 		if xerr != nil {
-			return nil, xerr
+			return rc, xerr
 		}
-
-		svc.cache.resources[name] = &ResourceCache{
-			byID:   &c,
-			byName: map[string]string{},
-		}
+		svc.cache.resources[name] = rc
 	}
 	return svc.cache.resources[name], nil
 }
@@ -722,7 +716,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, nil, nil, fail.ToError(err)
+		return nil, nil, nil, fail.ConvertError(err)
 	}
 
 	kpName := kpNameuuid.String()

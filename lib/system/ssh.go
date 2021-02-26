@@ -162,6 +162,8 @@ func SCPErrorString(retcode int) string {
 
 // Close closes ssh tunnel
 func (stun *SSHTunnel) Close() fail.Error {
+	defer debug.NewTracer(nil, true).Entering().Exiting()
+
 	defer func() {
 		if lazyErr := utils.LazyRemove(stun.keyFile.Name()); lazyErr != nil {
 			logrus.Error(lazyErr)
@@ -283,7 +285,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	cmd := exec.Command("sh", "-c", cmdString)
 	cerr := cmd.Start()
 	if cerr != nil {
-		return nil, fail.ToError(cerr)
+		return nil, fail.ConvertError(cerr)
 	}
 
 	/*
@@ -369,7 +371,7 @@ func (scmd *SSHCommand) Kill() fail.Error {
 	}
 
 	if err := scmd.cmd.Process.Kill(); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	return nil
 }
@@ -388,7 +390,7 @@ func (scmd *SSHCommand) getStdoutPipe() (io.ReadCloser, fail.Error) {
 
 	pipe, err := scmd.cmd.StdoutPipe()
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return pipe, nil
 }
@@ -407,7 +409,7 @@ func (scmd *SSHCommand) getStderrPipe() (io.ReadCloser, fail.Error) {
 
 	pipe, err := scmd.cmd.StderrPipe()
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return pipe, nil
 }
@@ -426,7 +428,7 @@ func (scmd *SSHCommand) getStdinPipe() (io.WriteCloser, fail.Error) {
 
 	pipe, err := scmd.cmd.StdinPipe()
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return pipe, nil
 }
@@ -477,7 +479,7 @@ func (scmd *SSHCommand) Start() fail.Error {
 	}
 
 	if err := scmd.cmd.Start(); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	return nil
 }
@@ -640,11 +642,11 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 
 	if params.collectOutputs {
 		if msgOut, err = ioutil.ReadAll(stdoutPipe /*params.stdout*/); err != nil {
-			return result, fail.ToError(err)
+			return result, fail.ConvertError(err)
 		}
 
 		if msgErr, err = ioutil.ReadAll(stderrPipe /*params.stderr*/); err != nil {
-			return result, fail.ToError(err)
+			return result, fail.ConvertError(err)
 		}
 	}
 
@@ -745,7 +747,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel,
 			if xerr != nil {
 				switch xerr.(type) { //nolint
 				case *retry.ErrTimeout:
-					xerr = fail.ToError(xerr.Cause())
+					xerr = fail.ConvertError(xerr.Cause())
 				}
 				return nil, xerr
 			}
@@ -1106,7 +1108,7 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 // 	publicKey := privateKey.PublicKey
 // 	pub, err := ssh.NewPublicKey(&publicKey)
 // 	if err != nil {
-// 		return nil, nil, fail.ToError(err)
+// 		return nil, nil, fail.ConvertError(err)
 // 	}
 //
 // 	publicKeyBytes = ssh.MarshalAuthorizedKey(pub)

@@ -358,7 +358,7 @@ func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 	// var panicErr error
 	// defer func() {
 	// 	if panicErr != nil {
-	// 		xerr = fail.ToError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+	// 		xerr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
 	// 	}
 	// }()
 

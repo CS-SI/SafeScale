@@ -234,7 +234,7 @@ func errorMeansServiceUnavailable(err error) bool {
 // 			return nil, fail.SyntaxError(err.Error())
 // 		default:
 // 			logrus.Debugf(err.Error())
-// 			return nil, fail.ToError(err)
+// 			return nil, fail.ConvertError(err)
 // 		}
 // 	}
 // 	if content, ok := unjsoned["NeutronError"]; ok {

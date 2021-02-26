@@ -27,18 +27,17 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
@@ -46,6 +45,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -111,28 +111,28 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources
 		return nullHost(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cache, xerr := svc.GetCache(hostKind)
+	hostCache, xerr := svc.GetCache(hostKind)
 	if xerr != nil {
 		return nullHost(), xerr
 	}
 
-	ce, xerr := cache.Get(ref)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			rh, xerr := NewHost(svc)
-			if xerr != nil {
-				return nullHost(), xerr
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rh, innerXErr := NewHost(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
 			}
 
-			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if xerr = rh.Read(task, ref); xerr == nil {
-				if ce, xerr = cache.Add(task, rh); xerr != nil {
-					return nullHost(), xerr
-				}
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rh.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
 			}
-		}
+
+			return rh, nil
+		}),
 	}
+
+	ce, xerr := hostCache.Get(task, ref, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -374,11 +374,18 @@ func (rh *host) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.
 		return xerr
 	}
 
-	var cache *iaas.ResourceCache
-	if cache, xerr = rh.GetService().GetCache(hostKind); xerr == nil {
-		_, xerr = cache.Add(task, rh)
+	hostCache, xerr := rh.GetService().GetCache(hostKind)
+	if xerr != nil {
+		return xerr
 	}
-	return xerr
+
+	cacheEntry, xerr := hostCache.AddEntry(task, rh)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // Browse walks through host folder and executes a callback for each entries
@@ -399,6 +406,10 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitTraceError(&xerr, "failed to create host")
+
 	return rh.core.BrowseFolder(task, func(buf []byte) (innerXErr fail.Error) {
 		ahc := abstract.NewHostCore()
 		if innerXErr = ahc.Deserialize(buf); innerXErr != nil {
@@ -409,7 +420,7 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 	})
 }
 
-// ForceGetState returns the current state of the provider host
+// ForceGetState returns the current state of the provider host after reloading metadata
 func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -424,15 +435,20 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr
 		return state, fail.AbortedError(nil, "canceled")
 	}
 
-	if xerr = rh.Reload(task); xerr != nil {
-		return state, xerr
-	}
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitTraceError(&xerr, "failed to create host")
+
+	// if xerr = rh.Reload(task); xerr != nil {
+	// 	return state, xerr
+	// }
 
 	xerr = rh.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		state = ahc.LastState
 		return nil
 
@@ -454,21 +470,34 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
-	// Read data from metadata storage
-	hostID := rh.GetID()
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return rh.Read(task, hostID)
-		},
-		10*time.Second,
-	)
-	if xerr != nil {
+	hostName := rh.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitTraceError(&xerr, "failed to create host")
+
+	if xerr = rh.core.Reload(task); xerr != nil {
 		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(*retry.ErrTimeout); ok {
-			xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostID)
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostName)
 		}
 		return xerr
 	}
+	// // Read data from metadata storage
+	// hostID := rh.GetID()
+	// xerr = retry.WhileUnsuccessfulDelay1Second(
+	// 	func() error {
+	// 		return rh.Read(task, hostID)
+	// 	},
+	// 	10*time.Second,
+	// )
+	// if xerr != nil {
+	// 	// If retry timed out, log it and return error ErrNotFound
+	// 	if _, ok := xerr.(*retry.ErrTimeout); ok {
+	// 		xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostID)
+	// 	}
+	// 	return xerr
+	// }
 
 	// Request host inspection from provider
 	ahf, xerr := rh.GetService().InspectHost(rh.GetID())
@@ -541,7 +570,7 @@ func (rh host) GetState(task concurrency.Task) (state hoststate.Enum) {
 		return state
 	}
 
-	_ = rh.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	_ = rh.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1097,22 +1126,6 @@ func (rh *host) undoSetSecurityGroups(task concurrency.Task, errorPtr *fail.Erro
 					return fail.Wrap(fail.NewErrorList(errors), "cleaning up on %s, failed to unbind Security Groups from Host", actionFromError(*errorPtr))
 				}
 
-				// // delete host default security group
-				// if hsgV1.DefaultID != "" {
-				// 	sg, innerXErr = LoadSecurityGroup(task, svc, hsgV1.DefaultID)
-				// 	if innerXErr != nil {
-				// 		switch innerXErr.(type) {
-				// 		case *fail.ErrNotFound:
-				// 		// consider non existence as a deletion success
-				// 		default:
-				// 			return innerXErr
-				// 		}
-				// 	} else {
-				// 		if innerXErr = sg.Delete(task); innerXErr != nil {
-				// 			return innerXErr
-				// 		}
-				// 	}
-				// }
 				return nil
 			})
 		})
@@ -1451,6 +1464,10 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (_ st
 		return "", fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL, timeout)
 }
 
@@ -1557,6 +1574,10 @@ func (rh *host) Delete(task concurrency.Task) (xerr fail.Error) {
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
@@ -1845,7 +1866,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 			if innerXErr != nil {
 				switch innerXErr.(type) { //nolint
 				case *retry.ErrStopRetry:
-					innerXErr = fail.ToError(innerXErr.Cause())
+					innerXErr = fail.ConvertError(innerXErr.Cause())
 				}
 			}
 			if innerXErr != nil {
@@ -1859,29 +1880,6 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 		}
 
 		return nil
-		// // Delete default Security Group of Host
-		// return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-		// 	hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
-		// 	if !ok {
-		// 		return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 	}
-		//
-		// 	if hsgV1.DefaultID != "" {
-		// 		rsg, derr := LoadSecurityGroup(task, svc, hsgV1.DefaultID)
-		// 		if derr == nil {
-		// 			derr = rsg.Delete(task)
-		// 		}
-		// 		if derr != nil {
-		// 			switch derr.(type) {
-		// 			case *fail.ErrNotFound:
-		// 				// Consider a Security Group that cannot be found as a success
-		// 			default:
-		// 				return fail.Wrap(derr, "failed to delete default Security Group of Host")
-		// 			}
-		// 		}
-		// 	}
-		// 	return nil
-		// })
 	})
 	if xerr != nil {
 		return xerr
@@ -1945,6 +1943,10 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 		return 0, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var (
 		stdOut, stdErr string
 		retCode        int
@@ -1973,7 +1975,7 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
 			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ToError(cerr)
+				xerr = fail.ConvertError(cerr)
 			}
 		case *fail.ErrTimeout:
 			switch xerr.Cause().(type) {
@@ -2043,7 +2045,7 @@ func run(task concurrency.Task, ssh *system.SSHConfig, cmd string, outs outputs.
 			xerr = fail.Wrap(xerr.Cause(), "failed to execute command after %s", temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			if xerr.Cause() != nil {
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
 	}
@@ -2058,11 +2060,15 @@ func (rh host) Pull(task concurrency.Task, target, source string, timeout time.D
 		return 0, "", "", fail.InvalidInstanceError()
 	}
 	if source == "" {
-		return 0, "", "", fail.InvalidParameterError("source", "cannot be empty string")
+		return 0, "", "", fail.InvalidParameterCannotBeEmptyStringError("source")
 	}
 	if target == "" {
-		return 0, "", "", fail.InvalidParameterError("target", "cannot be empty string")
+		return 0, "", "", fail.InvalidParameterCannotBeEmptyStringError("target")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	// retrieve ssh config to perform some commands
 	ssh, xerr := rh.GetSSHConfig(task)
@@ -2110,6 +2116,10 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 	if target == "" {
 		return 0, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	// retrieve ssh config to perform some commands
 	ssh, xerr := rh.GetSSHConfig(task)
@@ -2180,6 +2190,10 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (_ *propertiesv1
 		return nil, fail.InvalidParameterError("shareRef", "cannot be empty string")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(shareRef=%s)", shareRef).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var (
 		hostShare *propertiesv1.HostShare
 		// ok        bool
@@ -2222,6 +2236,10 @@ func (rh host) GetVolumes(task concurrency.Task) (_ *propertiesv1.HostVolumes, x
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var hvV1 *propertiesv1.HostVolumes
 	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -2259,6 +2277,10 @@ func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	hostName := rh.GetName()
 	hostID := rh.GetID()
 
@@ -2280,7 +2302,7 @@ func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
-			if cerr := fail.ToError(xerr.Cause()); cerr != nil {
+			if cerr := fail.ConvertError(xerr.Cause()); cerr != nil {
 				return cerr
 			}
 			return xerr
@@ -2307,6 +2329,10 @@ func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	hostName := rh.GetName()
 	hostID := rh.GetID()
 
@@ -2329,7 +2355,7 @@ func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
-			if cerr := fail.ToError(xerr.Cause()); cerr != nil {
+			if cerr := fail.ConvertError(xerr.Cause()); cerr != nil {
 				return cerr
 			}
 			return xerr
@@ -2356,6 +2382,10 @@ func (rh host) Reboot(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	if xerr := rh.Stop(task); xerr != nil {
 		return xerr
 	}
@@ -2364,8 +2394,12 @@ func (rh host) Reboot(task concurrency.Task) (xerr fail.Error) {
 
 // Resize ...
 // not yet implemented
-func (rh *host) Resize(hostSize abstract.HostSizingRequirements) (xerr fail.Error) {
+func (rh *host) Resize(task concurrency.Task, hostSize abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
@@ -2464,6 +2498,10 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 		return ip, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", subnetID).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
@@ -2541,6 +2579,10 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 		return shares, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -2568,6 +2610,10 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 	if task.Aborted() {
 		return mounts, fail.AbortedError(nil, "canceled")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -2605,6 +2651,10 @@ func (rh host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error
 		return yes, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.ClusterMembershipV1, func(clonable data.Clonable) fail.Error {
 			hostClusterMembershipV1, ok := clonable.(*propertiesv1.HostClusterMembership)
@@ -2625,6 +2675,10 @@ func (rh host) IsGateway(task concurrency.Task) (_ bool, xerr fail.Error) {
 	if rh.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var state bool
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2666,6 +2720,14 @@ func (rh host) PushStringToFileWithOwnership(task concurrency.Task, content stri
 	}
 	if filename == "" {
 		return fail.InvalidParameterError("filename", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner, mode).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	hostName := rh.GetName()
@@ -2752,7 +2814,7 @@ func (rh host) PushStringToFileWithOwnership(task concurrency.Task, content stri
 			switch retryErr.(type) {
 			case *fail.ErrAborted:
 				if cerr := retryErr.Cause(); cerr != nil {
-					retryErr = fail.ToError(cerr)
+					retryErr = fail.ConvertError(cerr)
 				}
 			case *retry.ErrTimeout:
 				return xerr
@@ -2778,6 +2840,10 @@ func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xer
 	if task.Aborted() {
 		return nullSubnet(), fail.AbortedError(nil, "canceled")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
@@ -2822,6 +2888,11 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -2883,7 +2954,7 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 }
 
 // BindSecurityGroup binds a security group to the host; if enabled is true, apply it immediately
-func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
+func (rh *host) BindSecurityGroup(task concurrency.Task, rsg resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rh.IsNull() {
@@ -2892,12 +2963,16 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if rsg == nil {
+		return fail.InvalidParameterCannotBeNilError("rsg")
+	}
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
-	if sg == nil {
-		return fail.InvalidParameterCannotBeNilError("sg")
-	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s', enable=%v", rsg.GetName(), enable).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -2906,7 +2981,7 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			sgID := rsg.GetID()
 			// If the Security Group is already bound to the host with the exact same state, consider as a success
 			if v, ok := hsgV1.ByID[sgID]; ok && v.Disabled == !bool(enable) {
 				return nil
@@ -2915,14 +2990,14 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 			// Not found, add it
 			item := &propertiesv1.SecurityGroupBond{
 				ID:       sgID,
-				Name:     sg.GetName(),
+				Name:     rsg.GetName(),
 				Disabled: bool(!enable),
 			}
 			hsgV1.ByID[sgID] = item
 			hsgV1.ByName[item.Name] = item.ID
 
 			// If enabled, apply it
-			if innerXErr := sg.BindToHost(task, rh, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			if innerXErr := rsg.BindToHost(task, rh, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
 					// already bound, success
@@ -2952,7 +3027,10 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
-	// FIXME: add traces
+	sgName := sg.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -2971,7 +3049,7 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 
 				if k == sgID {
 					if v.FromSubnet {
-						return fail.InvalidRequestError("cannot unbind Security Group '%s': inherited from Subnet", sg.GetName())
+						return fail.InvalidRequestError("cannot unbind Security Group '%s': inherited from Subnet", sgName)
 					}
 					found = true
 					break
@@ -3011,6 +3089,10 @@ func (rh host) ListSecurityGroups(task concurrency.Task, state securitygroupstat
 		return emptySlice, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(state=%s)", state.String()).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -3044,6 +3126,11 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
+	sgName := sg.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	svc := rh.GetService()
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -3077,7 +3164,7 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sg.GetName(), rh.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sgName, rh.GetID())
 			}
 
 			if svc.GetCapabilities().CanDisableSecurityGroup {
@@ -3104,7 +3191,7 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 }
 
 // DisableSecurityGroup disables a binded security group to host
-func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) (xerr fail.Error) {
+func (rh *host) DisableSecurityGroup(task concurrency.Task, rsg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rh.IsNull() {
@@ -3113,12 +3200,18 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if rsg == nil {
+		return fail.InvalidParameterError("rsg", "cannot be nil")
+	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
-	if sg == nil {
-		return fail.InvalidParameterError("sg", "cannot be nil")
-	}
+
+	sgName := rsg.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s')", sgName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	svc := rh.GetService()
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -3129,7 +3222,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr := rsg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -3153,7 +3246,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sg.GetName(), sg.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to host '%s'", sgName, rsg.GetID())
 			}
 
 			if svc.GetCapabilities().CanDisableSecurityGroup {
