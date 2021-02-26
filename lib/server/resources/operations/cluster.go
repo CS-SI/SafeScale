@@ -3910,6 +3910,9 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 	if task == nil {
 		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if count == 0 {
 		return emptySlice, fail.InvalidParameterError("count", "cannot be 0")
 	}

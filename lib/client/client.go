@@ -176,6 +176,10 @@ func (s *Session) SetTask(task concurrency.Task) fail.Error {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
+
 	s.task = task
 	return nil
 }

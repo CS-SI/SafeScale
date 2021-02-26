@@ -80,15 +80,14 @@ func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (b
 	if task == nil {
 		return false, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return false, fail.AbortedError(nil, "aborted")
+	}
 	if svc == nil {
 		return false, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	if task.Aborted() {
-		return false, fail.AbortedError(nil, "aborted")
 	}
 
 	rsg, xerr := NewSecurityGroup(svc)
@@ -115,6 +114,9 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 
 	if task == nil {
 		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	if svc == nil {
 		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be nil")
@@ -156,6 +158,9 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
@@ -188,7 +193,6 @@ func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -228,6 +232,9 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
@@ -334,6 +341,9 @@ func (sg *securityGroup) ForceDelete(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	return sg.delete(task, true)
 }
@@ -347,6 +357,9 @@ func (sg *securityGroup) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	return sg.delete(task, false)
@@ -616,6 +629,9 @@ func (sg *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	return sg.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
@@ -636,6 +652,9 @@ func (sg *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	sg.SafeLock(task)
@@ -767,6 +786,9 @@ func (sg securityGroup) GetBoundHosts(task concurrency.Task) (_ []*propertiesv1.
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	var list []*propertiesv1.SecurityGroupBond
 	xerr = sg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -794,6 +816,9 @@ func (sg securityGroup) GetBoundSubnets(task concurrency.Task) (list []*properti
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	xerr = sg.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

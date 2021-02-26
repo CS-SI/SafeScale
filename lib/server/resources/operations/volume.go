@@ -79,6 +79,9 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 	if task == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nullVolume(), fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -117,6 +120,9 @@ func (rv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) 
 	if task == nil {
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return 0, fail.AbortedError(nil, "canceled")
+	}
 
 	var speed volumespeed.Enum
 	xerr := rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -147,6 +153,9 @@ func (rv volume) GetSize(task concurrency.Task) (int, fail.Error) {
 	}
 	if task == nil {
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return 0, fail.AbortedError(nil, "canceled")
 	}
 
 	var size int
@@ -179,6 +188,9 @@ func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAtta
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	var vaV1 *propertiesv1.VolumeAttachments
 	xerr := rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -205,6 +217,9 @@ func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) f
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
@@ -228,6 +243,9 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	rv.SafeLock(task)
@@ -289,6 +307,9 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if req.Name == "" {
 		return fail.InvalidParameterError("req.GetName", "cannot be empty string")
 	}
@@ -348,6 +369,9 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if host == nil {
 		return fail.InvalidParameterError("host", "cannot be nil")
@@ -710,6 +734,9 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
@@ -916,6 +943,9 @@ func (rv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRespo
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	volumeID := rv.GetID()

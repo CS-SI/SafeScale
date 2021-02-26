@@ -578,6 +578,9 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -994,6 +997,9 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	clusterName := c.GetName()
