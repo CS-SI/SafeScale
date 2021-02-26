@@ -49,9 +49,7 @@ func (rc reservation) RemoveObserver(task concurrency.Task, name string) error {
 }
 
 func (rc reservation) Released(task concurrency.Task) {
-	return //nolint
 }
 
 func (rc reservation) Destroyed(task concurrency.Task) {
-	return //nolint
 }
