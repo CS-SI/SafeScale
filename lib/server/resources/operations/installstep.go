@@ -430,6 +430,8 @@ type runOnHostParameters struct {
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	var ok bool
 	if params == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("params")
@@ -437,6 +439,12 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	p, ok := params.(runOnHostParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
+	}
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	// Updates variables in step script

@@ -48,6 +48,9 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	id, ok := params.(string)
 	if !ok || id == "" {
@@ -71,6 +74,9 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	id, ok := params.(string)
@@ -101,6 +107,9 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
@@ -156,6 +165,9 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	// validate and convert parameters
 	p, ok := params.(taskConfigureGatewayParameters)
@@ -198,6 +210,9 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
@@ -270,6 +285,9 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
@@ -626,6 +644,9 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -685,6 +706,9 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	// Convert then validate params
@@ -757,6 +781,9 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	// Convert then validate parameters
@@ -1041,6 +1068,9 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	// Convert and validate params
 	p, ok := params.(taskConfigureNodeParameters)
@@ -1092,6 +1122,9 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	// Convert and validate params
 	rh := params.(taskDeleteHostOnFailureParameters).host
@@ -1117,7 +1150,6 @@ type taskDeleteNodeParameters struct {
 }
 
 func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	// defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
 	if c.IsNull() {
@@ -1125,6 +1157,9 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	// Convert and validate params
@@ -1171,6 +1206,9 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	// Convert and validate params

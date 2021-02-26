@@ -42,6 +42,13 @@ type taskCreateGatewayParameters struct {
 func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	hostReq := params.(taskCreateGatewayParameters).request
 	if hostReq.TemplateID == "" {
 		return nil, fail.InvalidRequestError("params.request.TemplateID cannot be empty string")
@@ -130,6 +137,13 @@ type taskFinalizeGatewayConfigurationParameters struct {
 
 func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
 
 	objgw := params.(taskFinalizeGatewayConfigurationParameters).host
 	if objgw.IsNull() {
