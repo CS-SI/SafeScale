@@ -212,7 +212,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if f.crypt {
 		var err error
 		if data, err = crypt.Encrypt(content, f.cryptKey); err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 	} else {
 		data = content
@@ -282,7 +282,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
+			xerr = fail.ConvertError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
 		}
 	}
 	return xerr
@@ -318,7 +318,7 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 		data := buffer.Bytes()
 		if f.crypt {
 			if data, err = crypt.Decrypt(data, f.cryptKey); err != nil {
-				return fail.ToError(err)
+				return fail.ConvertError(err)
 			}
 		}
 		if xerr = callback(data); xerr != nil {

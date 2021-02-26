@@ -19,47 +19,79 @@ package cache
 //go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Cacheable
 
 import (
+	"sync"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 
 	"sync/atomic"
 )
 
-// CacheEntry is a struct containing information about a cache entry
-type CacheEntry struct {
+// Entry is a struct containing information about a cache entry
+type Entry struct {
 	// key         atomic.Value
 	// content     data.Cacheable
 	content     data.ImmutableKeyValue
 	use         atomic.Value
 	lastUpdated atomic.Value
+	mu          *sync.Mutex
 }
 
-// newCacheEntry allocates a new cache entry
-func newCacheEntry(content Cacheable) CacheEntry {
-	ce := CacheEntry{
+// newEntry allocates a new cache entry
+func newEntry(content Cacheable) Entry {
+	ce := Entry{
 		content: data.NewImmutableKeyValue(content.GetID(), content),
+		mu:      &sync.Mutex{},
 	}
 	ce.use.Store(uint(0))
 	return ce
 }
 
 // GetKey returns the key of the cache entry
-func (ce CacheEntry) GetKey() string {
+func (ce Entry) GetKey() string {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
 	return ce.content.Key()
 }
 
 // Content returns the content of the cache
-func (ce CacheEntry) Content() interface{} {
+func (ce Entry) Content() interface{} {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
 	return ce.content.Value()
 }
 
 // LockContent increments the counter of use of cache entry
-func (ce *CacheEntry) LockContent() uint {
+func (ce *Entry) LockContent() uint {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
 	ce.use.Store(ce.use.Load().(uint) + 1)
 	return ce.use.Load().(uint)
 }
 
 // UnlockContent decrements the counter of use of cache entry
-func (ce *CacheEntry) UnlockContent() uint {
+func (ce *Entry) UnlockContent() uint {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
 	ce.use.Store(ce.use.Load().(uint) - 1)
 	return ce.use.Load().(uint)
+}
+
+// LockCount returns the current count of locks of the content
+func (ce Entry) LockCount() uint {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
+	return ce.use.Load().(uint)
+}
+
+func (ce *Entry) lock() {
+	ce.mu.Lock()
+}
+
+func (ce *Entry) unlock() {
+	ce.mu.Unlock()
 }

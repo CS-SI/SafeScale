@@ -55,7 +55,7 @@ func normalizeError(err error) fail.Error {
 			return fail.UnknownError("from outscale driver, type='%s', error='%s'", reflect.TypeOf(realErr), realErr.Error())
 		}
 	default:
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 }
 
@@ -103,7 +103,7 @@ func qualifyFromCode(code, details string) fail.Error {
 func qualifyFromBody(in []byte) fail.Error {
 	var jsoned map[string]interface{}
 	if err := json.Unmarshal(in, &jsoned); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	if errs, ok := jsoned["Errors"].([]interface{}); ok {
 		for _, v := range errs {

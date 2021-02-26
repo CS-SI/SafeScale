@@ -361,7 +361,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	// Checks if CIDR is valid...
 	// if req.CIDR != "" {
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
-		return nullAS, fail.ToError(err)
+		return nullAS, fail.ConvertError(err)
 	}
 	// } else { // CIDR is empty, choose the first Class C possible
 	// 	tracer.Trace("CIDR is empty, choosing one...")
@@ -431,7 +431,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	if xerr != nil {
 		// switch xerr.(type) {
 		// case *retry.ErrStopRetry:
-		// 	xerr = fail.ToError(xerr.Cause())
+		// 	xerr = fail.ConvertError(xerr.Cause())
 		// }
 		return nullAS, xerr
 	}

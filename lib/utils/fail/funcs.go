@@ -177,8 +177,8 @@ func Cause(err error) (resp error) {
 	return resp
 }
 
-// ToError converts an error to a fail.Error
-func ToError(err error) Error {
+// ConvertError converts an error to a fail.Error
+func ConvertError(err error) Error {
 	if err != nil {
 		if casted, ok := err.(Error); ok {
 			return casted

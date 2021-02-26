@@ -469,7 +469,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.ToError(retryErr.Cause())
+			return nullAHC, fail.ConvertError(retryErr.Cause())
 		case *retry.ErrTimeout:
 			return nullAHC, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout)
 		default:
@@ -642,7 +642,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHF, nullUDC, fail.ToError(xerr.Cause())
+			return nullAHF, nullUDC, fail.ConvertError(xerr.Cause())
 		case *fail.ErrTimeout:
 			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "failed to create Host because of timeout")
 		default:

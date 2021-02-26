@@ -19,11 +19,6 @@ package operations
 import (
 	"reflect"
 	"strings"
-	"time"
-
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/sirupsen/logrus"
 
@@ -32,17 +27,21 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -130,28 +129,27 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	cache, xerr := svc.GetCache(securityGroupKind)
+	sgCache, xerr := svc.GetCache(securityGroupKind)
 	if xerr != nil {
 		return nullSecurityGroup(), fail.Wrap(xerr, "failed to get cache for Security Groups")
 	}
 
-	ce, xerr := cache.Get(ref)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			rsg, xerr := NewSecurityGroup(svc)
-			if xerr != nil {
-				return nullSecurityGroup(), xerr
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rsg, innerXErr := NewSecurityGroup(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
 			}
 
-			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if xerr = rsg.Read(task, ref); xerr == nil {
-				if ce, xerr = cache.Add(task, rsg); xerr != nil {
-					return nullSecurityGroup(), xerr
-				}
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rsg.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
 			}
-		}
+
+			return rsg, nil
+		}),
 	}
+	cacheEntry, xerr := sgCache.Get(task, ref, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -162,13 +160,13 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg
 		}
 	}
 
-	if rsg = ce.Content().(resources.SecurityGroup); rsg == nil {
+	if rsg = cacheEntry.Content().(resources.SecurityGroup); rsg == nil {
 		return nullSecurityGroup(), fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
 	}
-	_ = ce.LockContent()
+	_ = cacheEntry.LockContent()
 	defer func() {
 		if xerr != nil {
-			_ = ce.UnlockContent()
+			_ = cacheEntry.UnlockContent()
 		}
 	}()
 
@@ -191,11 +189,18 @@ func (sg *securityGroup) Carry(task concurrency.Task, clonable data.Clonable) (x
 		return xerr
 	}
 
-	var cache *iaas.ResourceCache
-	if cache, xerr = sg.GetService().GetCache(securityGroupKind); xerr == nil {
-		_, xerr = cache.Add(task, sg)
+	sgCache, xerr := sg.GetService().GetCache(securityGroupKind)
+	if xerr != nil {
+		return xerr
 	}
-	return xerr
+
+	cacheEntry, xerr := sgCache.AddEntry(task, sg)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // Browse walks through securityGroup folder and executes a callback for each entries
@@ -555,7 +560,7 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(xerr.Cause())
+			xerr = fail.ConvertError(xerr.Cause())
 		}
 	}
 	if xerr != nil {
@@ -1281,11 +1286,3 @@ func filterBondsByKind(bonds map[string]*propertiesv1.SecurityGroupBond, state s
 	}
 	return list
 }
-
-//func init() {
-//	var xerr fail.Error
-//	if securityGroupCacheByID, xerr = data.NewCache("security_groups_by_id"); xerr != nil {
-//		panic("failed to allocate cache for security groups: " + xerr.Error())
-//	}
-//	securityGroupIDsByName = map[string]string{}
-//}

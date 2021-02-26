@@ -242,7 +242,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	}
 
 	// notify observers there has been changed in the instance
-	return fail.ToError(c.NotifyObservers(task))
+	return fail.ConvertError(c.NotifyObservers(task))
 }
 
 // Carry links metadata with real data
@@ -311,7 +311,7 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 
 	// notify observers there has been changed in the instance
 	if err := c.NotifyObservers(task); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	return nil
@@ -362,7 +362,7 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 		// 	return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
 		// case *retry.ErrStopRetry:
 		// 	// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
-		// 	return fail.ToError(xerr.Cause())
+		// 	return fail.ConvertError(xerr.Cause())
 		// default:
 		return xerr
 		// }
@@ -583,7 +583,7 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 
 	c.loaded = true
 	c.committed = true
-	return fail.ToError(c.NotifyObservers(task))
+	return fail.ConvertError(c.NotifyObservers(task))
 }
 
 // BrowseFolder walks through folder and executes a callback for each entries
@@ -730,7 +730,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 			if jserr := json.Unmarshal(propsJSONed, &propsMapped); jserr != nil {
 				// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
-				return nil, fail.ToError(jserr)
+				return nil, fail.ConvertError(jserr)
 			}
 		}
 	}
@@ -740,7 +740,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 
 	r, err := json.Marshal(shieldedMapped)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return r, nil
 }
@@ -820,7 +820,7 @@ func (c *core) Released(task concurrency.Task) {
 	defer c.SafeRUnlock(task)
 
 	for _, v := range c.observers {
-		v.MarkAsFreed(c.GetID())
+		v.MarkAsFreed(task, c.GetID())
 	}
 }
 
@@ -836,25 +836,18 @@ func (c *core) Destroyed(task concurrency.Task) {
 	defer c.SafeRUnlock(task)
 
 	for _, v := range c.observers {
-		v.MarkAsDeleted(c.GetID())
+		v.MarkAsDeleted(task, c.GetID())
 	}
-}
-
-// RemoveObserver ...
-func (c *core) RemoveObserver(task concurrency.Task, id string) fail.Error {
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
-	}
-
-	c.Lock(task)
-	defer c.Unlock(task)
-
-	delete(c.observers, id)
-	return nil
 }
 
 // AddObserver ...
 func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
 	if o == nil {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
@@ -875,18 +868,31 @@ func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
 
 // NotifyObservers ...
 func (c *core) NotifyObservers(task concurrency.Task) error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
 
 	id := c.GetID()
 	for _, v := range c.observers {
-		v.SignalChange(id)
+		v.SignalChange(task, id)
 	}
 	return nil
 }
 
 // RemoveObserver ...
 func (c *core) RemoveObserver(task concurrency.Task, name string) error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
 	if name == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}

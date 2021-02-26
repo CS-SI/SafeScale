@@ -455,10 +455,10 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 	if reduce {
-		logrus.Warn("Asking for less resource..., ain't gonna happen :(")
+		logrus.Warn("Asking for less resource... is not going to happen")
 	}
 
-	if xerr = rh.Resize(sizing); xerr != nil {
+	if xerr = rh.Resize(task, sizing); xerr != nil {
 		return nil, xerr
 	}
 

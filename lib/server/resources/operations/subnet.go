@@ -42,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -63,6 +64,8 @@ const (
 	subnetGWSecurityGroupDescriptionPattern       = "SG for gateways in Subnet %s of Network %s"
 	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip.%s.%s"
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
+
+	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s"
 )
 
 // subnet links Object Storage folder and Subnet
@@ -290,28 +293,30 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 
 	xerr = fail.NotFoundError()
 	if subnetID != "" {
-		cache, xerr := svc.GetCache(subnetKind)
+		subnetCache, xerr := svc.GetCache(subnetKind)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		cacheEntry, xerr := cache.Get(subnetID)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				if rs, xerr = NewSubnet(svc); xerr == nil {
-					// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-					if xerr = rs.ReadByID(task, subnetID); xerr == nil {
-						if cacheEntry, xerr = cache.Add(task, rs); xerr != nil {
-							return nil, xerr
-						}
-					}
+		options := []data.ImmutableKeyValue{
+			data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+				rs, innerXErr := NewSubnet(svc)
+				if innerXErr != nil {
+					return nil, innerXErr
 				}
-			default:
-				return nil, xerr
-			}
-		}
 
+				// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+				if innerXErr = rs.ReadByID(task, subnetID); innerXErr != nil {
+					return nil, innerXErr
+				}
+
+				return rs, nil
+			}),
+		}
+		cacheEntry, xerr := subnetCache.Get(task, subnetID, options...)
+		if xerr != nil {
+			return nil, xerr
+		}
 		if rs = cacheEntry.Content().(resources.Subnet); rs == nil {
 			return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
 		}
@@ -350,11 +355,18 @@ func (rs *subnet) Carry(task concurrency.Task, clonable data.Clonable) (xerr fai
 		return xerr
 	}
 
-	var cache *iaas.ResourceCache
-	if cache, xerr = rs.GetService().GetCache(subnetKind); xerr == nil {
-		_, xerr = cache.Add(task, rs)
+	subnetCache, xerr := rs.GetService().GetCache(subnetKind)
+	if xerr != nil {
+		return xerr
 	}
-	return xerr
+
+	cacheEntry, xerr := subnetCache.AddEntry(task, rs)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // Create creates a subnet
@@ -501,7 +513,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 
 	// Creates VIP for gateways if asked for
 	if failover {
-		if as.VIP, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf("for gateways of subnet %s", as.Name), []string{subnetGWSG.GetID()}); xerr != nil {
+		if as.VIP, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()}); xerr != nil {
 			return fail.Wrap(xerr, "failed to create VIP")
 		}
 
@@ -520,6 +532,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		as.State = subnetstate.GATEWAY_CREATION
 		as.GWSecurityGroupID = subnetGWSG.GetID()
 		as.InternalSecurityGroupID = subnetInternalSG.GetID()
@@ -667,7 +680,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 
 	keepalivedPassword, err := utils.GeneratePassword(16)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	gwRequest := abstract.HostRequest{
@@ -895,7 +908,7 @@ func (rs subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Netw
 
 		_, subnetDesc, err := net.ParseCIDR(req.CIDR)
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 		// ... and if CIDR is inside VPC's one
 		if !netutils.CIDROverlap(*networkDesc, *subnetDesc) {
@@ -1340,7 +1353,7 @@ func (rs *subnet) UnbindHost(task concurrency.Task, hostID string) (xerr fail.Er
 	})
 }
 
-// ListHosts returns the list of IPAddress attached to the subnet (excluding gateway)
+// ListHosts returns the list of Hosts attached to the subnet (excluding gateway)
 func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -1357,7 +1370,7 @@ func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail
 	defer debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering().Exiting()
 
 	var list []resources.Host
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rs.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
@@ -1397,7 +1410,7 @@ func (rs *subnet) InspectGateway(task concurrency.Task, primary bool) (_ resourc
 		primaryStr = "secondary"
 		gwIdx = 1
 	}
-	tracer := debug.NewTracer(nil, true, "(%s)", primaryStr).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", primaryStr).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -1406,7 +1419,7 @@ func (rs *subnet) InspectGateway(task concurrency.Task, primary bool) (_ resourc
 
 	if rs.cachedGateways[gwIdx] == nil {
 		var gatewayID string
-		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1436,6 +1449,7 @@ func (rs *subnet) InspectGateway(task concurrency.Task, primary bool) (_ resourc
 		if xerr != nil {
 			return nullHost(), xerr
 		}
+
 		rs.cachedGateways[gwIdx] = rh.(*host)
 	}
 	return rs.cachedGateways[gwIdx], nil
@@ -1455,9 +1469,13 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		return "", fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%v)", primary).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var ip string
 	svc := rs.GetService()
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1480,6 +1498,7 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		if rgw, innerXErr = LoadHost(task, svc, id); innerXErr != nil {
 			return innerXErr
 		}
+		defer rgw.Released(task)
 
 		if ip, innerXErr = rgw.GetPublicIP(task); innerXErr != nil {
 			return innerXErr
@@ -1509,8 +1528,12 @@ func (rs subnet) GetGatewayPublicIPs(task concurrency.Task) (_ []string, xerr fa
 		return emptySlice, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var gatewayIPs []string
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1523,6 +1546,10 @@ func (rs subnet) GetGatewayPublicIPs(task concurrency.Task) (_ []string, xerr fa
 			if innerXErr != nil {
 				return innerXErr
 			}
+
+			defer func(instance resources.Host) {
+				instance.Released(task)
+			}(rgw)
 
 			ip, innerXErr := rgw.GetPublicIP(task)
 			if innerXErr != nil {
@@ -1736,12 +1763,16 @@ func (rs *subnet) InspectNetwork(task concurrency.Task) (rn resources.Network, x
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	rs.cacheLock.Lock()
 	defer rs.cacheLock.Unlock()
 
 	if rs.cachedNetwork == nil {
 		var networkID string
-		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1845,8 +1876,12 @@ func (rs subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.
 		return "", fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	ip = ""
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1894,7 +1929,11 @@ func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Erro
 		return ip, fail.AbortedError(nil, "canceled")
 	}
 
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1931,8 +1970,12 @@ func (rs subnet) HasVirtualIP(task concurrency.Task) bool {
 		return false
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var found bool
-	xerr := rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1957,7 +2000,11 @@ func (rs subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, x
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	xerr = rs.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1989,8 +2036,12 @@ func (rs subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
 		return "", fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	cidr = ""
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2022,7 +2073,11 @@ func (rs subnet) GetState(task concurrency.Task) (state subnetstate.Enum, xerr f
 		return subnetstate.UNKNOWN, fail.AbortedError(nil, "canceled")
 	}
 
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2054,7 +2109,7 @@ func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fai
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "").Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
 	defer tracer.Exiting()
 
 	defer func() {
@@ -2125,6 +2180,10 @@ func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
@@ -2168,6 +2227,10 @@ func (rs *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.Securi
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -2219,6 +2282,10 @@ func (rs *subnet) ListSecurityGroups(task concurrency.Task, state securitygroups
 		return nullList, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	return list, rs.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
@@ -2247,6 +2314,10 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	svc := rs.GetService()
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2319,6 +2390,10 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 		return fail.InvalidParameterCannotBeNilError("sg")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	svc := rs.GetService()
 	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -2368,30 +2443,35 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 }
 
 // InspectGatewaySecurityGroup returns the instance of SecurityGroup in Subnet related to external access on gateways
-func (rs subnet) InspectGatewaySecurityGroup(task concurrency.Task) (sg resources.SecurityGroup, xerr fail.Error) {
+func (rs subnet) InspectGatewaySecurityGroup(task concurrency.Task) (rsg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	sg = nullSecurityGroup()
+	rsg = nullSecurityGroup()
 	if rs.IsNull() {
-		return sg, fail.InvalidInstanceError()
+		return rsg, fail.InvalidInstanceError()
 	}
 	if task == nil {
-		return sg, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return sg, fail.AbortedError(nil, "canceled")
+		return rsg, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	if task.Aborted() {
+		return rsg, fail.AbortedError(nil, "canceled")
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sg, innerXErr = LoadSecurityGroup(task, rs.GetService(), as.GWSecurityGroupID)
+		rsg, innerXErr = LoadSecurityGroup(task, rs.GetService(), as.GWSecurityGroupID)
 		return innerXErr
 	})
-	return sg, xerr
+	return rsg, xerr
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
@@ -2409,7 +2489,11 @@ func (rs subnet) InspectInternalSecurityGroup(task concurrency.Task) (sg resourc
 		return sg, fail.AbortedError(nil, "canceled")
 	}
 
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2436,7 +2520,11 @@ func (rs subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resourc
 		return sg, fail.AbortedError(nil, "canceled")
 	}
 
-	xerr = rs.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

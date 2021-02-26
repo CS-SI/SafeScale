@@ -798,7 +798,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, sgs []string) (*abstr
 	}
 	port, err := ports.Create(s.NetworkClient, options).Extract()
 	if err != nil {
-		return nullAVIP, fail.ToError(err)
+		return nullAVIP, fail.ConvertError(err)
 	}
 	vip := abstract.VirtualIP{
 		ID:        port.ID,

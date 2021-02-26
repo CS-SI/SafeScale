@@ -35,13 +35,13 @@ func GetBashLibrary() (string, fail.Error) {
 	if anon == nil {
 		box, err := rice.FindBox("../system/scripts")
 		if err != nil {
-			return "", fail.ToError(err)
+			return "", fail.ConvertError(err)
 		}
 
 		// get file contents as string
 		tmplContent, err := box.String("bash_library.sh")
 		if err != nil {
-			return "", fail.ToError(err)
+			return "", fail.ConvertError(err)
 		}
 		bashLibraryContent.Store(tmplContent)
 		anon = bashLibraryContent.Load()

@@ -90,5 +90,5 @@ func normalizeError(err error) fail.Error {
 		}
 	}
 
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }

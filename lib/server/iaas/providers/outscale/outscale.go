@@ -157,7 +157,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 
 	stack, err := outscale.New(options)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	p.Stack = stack
 	return p, nil

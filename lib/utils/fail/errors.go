@@ -151,7 +151,7 @@ func defaultCauseFormatter(e Error) string {
 func (e *errorCore) ForceSetCause(err error) Error {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from null value", 0))
-		return ToError(err)
+		return ConvertError(err)
 	}
 	if e.cause != nil {
 		return e
@@ -873,7 +873,7 @@ type ErrInvalidParameter struct {
 }
 
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), 4))
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), 1))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())

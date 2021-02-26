@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -84,45 +85,26 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	cache, xerr := svc.GetCache(bucketKind)
+	bucketCache, xerr := svc.GetCache(bucketKind)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	cacheEntry, xerr := cache.Get(name)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// VPL: need to figure out why bucket is handled differently before swapping code
-			// b, xerr := NewBucket(svc)
-			// if xerr != nil {
-			// 	return nil, xerr
-			// }
-			// if xerr = b.Read(task, name); xerr == nil {
-			// 	cacheEntry, xerr = bucketCache.Add(task, b)
-			// }
-			anon, xerr := NewBucket(svc)
-			if xerr != nil {
-				return nil, xerr
-			}
-			b := anon.(*bucket)
-
-			ab, xerr := svc.InspectBucket(name)
-			if xerr != nil {
-				if xerr.Error() == "not found" {
-					return nil, abstract.ResourceNotFoundError("bucket", name)
-				}
-				return nil, fail.NewError(xerr, nil, "failed to read bucket information")
-			}
-			if xerr = b.Carry(task, &ab); xerr != nil {
-				return nil, xerr
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			b, innerXErr := NewBucket(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
 			}
 
-			if cacheEntry, xerr = cache.Add(task, b); xerr != nil {
-				return nil, xerr
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = b.Read(task, name); innerXErr != nil {
+				return nil, innerXErr
 			}
-		}
+			return b, nil
+		}),
 	}
+	cacheEntry, xerr := bucketCache.Get(task, name, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -157,11 +139,18 @@ func (b *bucket) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail
 		return xerr
 	}
 
-	var cache *iaas.ResourceCache
-	if cache, xerr = b.GetService().GetCache(bucketKind); xerr == nil {
-		_, xerr = cache.Add(task, b)
+	bucketCache, xerr := b.GetService().GetCache(bucketKind)
+	if xerr != nil {
+		return xerr
 	}
-	return xerr
+
+	cacheEntry, xerr := bucketCache.AddEntry(task, b)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // GetHost ...
@@ -277,7 +266,7 @@ func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
-	return b.svc.DeleteBucket(b.GetName())
+	return b.GetService().DeleteBucket(b.GetName())
 }
 
 // Mount a bucket on an host on the given mount point
@@ -291,7 +280,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	}
 
 	// Get Host data
-	rh, xerr := LoadHost(task, b.svc, hostName)
+	rh, xerr := LoadHost(task, b.GetService(), hostName)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", b.GetName(), hostName)
 	}
@@ -341,7 +330,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	}
 
 	err := b.exec(task, rh, "mount_object_storage.sh", d)
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // Unmount a bucket
@@ -378,7 +367,7 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 	}
 
 	err := b.exec(task, rh, "umount_object_storage.sh", data)
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
@@ -402,20 +391,20 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 
 	box, err := rice.FindBox("../operations/scripts")
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	tpl, err := template.Parse("TemplateName", scriptContent)
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 
 	tplcmd = buffer.String()

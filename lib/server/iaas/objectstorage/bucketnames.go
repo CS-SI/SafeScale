@@ -39,7 +39,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
 	_, herr := hash.Write([]byte(sig))
 	if herr != nil {
-		return "", fail.ToError(herr)
+		return "", fail.ConvertError(herr)
 	}
 	hashed := hex.EncodeToString(hash.Sum(nil))
 	name = bucketNamePrefix + "-" + hashed

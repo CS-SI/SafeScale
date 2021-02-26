@@ -1,4 +1,3 @@
-// +build ignore
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
@@ -15,14 +14,6 @@
  * limitations under the License.
  */
 
-package vclouddirector
+package iaas_test
 
-import "github.com/CS-SI/SafeScale/lib/utils/fail"
-
-// normalizeError translates AWS error to SafeScale one
-func normalizeError(err error) fail.Error {
-	if err == nil {
-		return nil
-	}
-	return fail.ConvertError(err)
-}
+// FIXME: implement tests for caches.go

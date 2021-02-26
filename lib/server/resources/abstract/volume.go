@@ -84,7 +84,7 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	r, err := json.Marshal(v)
-	return r, fail.ToError(err)
+	return r, fail.ConvertError(err)
 }
 
 // Deserialize reads json code and restores an IPAddress
@@ -94,7 +94,7 @@ func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
 	}
 
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
-	return fail.ToError(json.Unmarshal(buf, v))
+	return fail.ConvertError(json.Unmarshal(buf, v))
 }
 
 // GetName returns the name of the volume
