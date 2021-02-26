@@ -404,7 +404,7 @@ func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 	content, err := json.Marshal(TemplateList{
 		Templates: templates,
 	})
-	if xerr != nil {
+	if err != nil {
 		return fail.ConvertError(err)
 	}
 
