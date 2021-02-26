@@ -47,7 +47,7 @@ func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install(task concurrency.Task) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install nfs server")
@@ -62,7 +62,7 @@ func (s *Server) Install(task concurrency.Task) fail.Error {
 // AddShare configures a local path to be exported by NFS
 func (s *Server) AddShare(task concurrency.Task, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	share, xerr := NewShare(s, path, options)
@@ -110,7 +110,7 @@ func (s *Server) AddShare(task concurrency.Task, path string, options string /*s
 // RemoveShare stops export of a local mount point by NFS on the remote server
 func (s *Server) RemoveShare(task concurrency.Task, path string) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	data := map[string]interface{}{
@@ -129,7 +129,7 @@ func (s *Server) RemoveShare(task concurrency.Task, path string) fail.Error {
 // MountBlockDevice mounts a block device in the remote system
 func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint, format string, doNotFormat bool) (string, fail.Error) {
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	data := map[string]interface{}{
@@ -151,7 +151,7 @@ func (s *Server) MountBlockDevice(task concurrency.Task, deviceName, mountPoint,
 // UnmountBlockDevice unmounts a local block device on the remote system
 func (s *Server) UnmountBlockDevice(task concurrency.Task, volumeUUID string) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	data := map[string]interface{}{

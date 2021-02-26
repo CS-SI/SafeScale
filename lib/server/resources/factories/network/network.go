@@ -37,7 +37,7 @@ func List(task concurrency.Task, svc iaas.Service) ([]*abstract.Network, fail.Er
 
 	if task != nil {
 		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "canceled")
+			return nil, fail.AbortedError(nil, "aborted")
 		}
 	}
 
@@ -80,7 +80,7 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Networ
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")

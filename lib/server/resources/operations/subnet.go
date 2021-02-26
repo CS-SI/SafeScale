@@ -89,7 +89,7 @@ func ListSubnets(task concurrency.Task, svc iaas.Service, networkID string, all 
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -206,7 +206,7 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		return nullSubnet(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullSubnet(), fail.AbortedError(nil, "canceled")
+		return nullSubnet(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
@@ -382,7 +382,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
@@ -1264,7 +1264,7 @@ func (rs subnet) Browse(task concurrency.Task, callback func(*abstract.Subnet) f
 		return fail.InvalidParameterError("task", "can't be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "can't be nil")
@@ -1290,7 +1290,7 @@ func (rs *subnet) BindHost(task concurrency.Task, host resources.Host) (xerr fai
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -1327,7 +1327,7 @@ func (rs *subnet) UnbindHost(task concurrency.Task, hostID string) (xerr fail.Er
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
@@ -1364,7 +1364,7 @@ func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	defer debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering().Exiting()
@@ -1401,7 +1401,7 @@ func (rs *subnet) InspectGateway(task concurrency.Task, primary bool) (_ resourc
 		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullHost(), fail.AbortedError(nil, "canceled")
+		return nullHost(), fail.AbortedError(nil, "aborted")
 	}
 
 	primaryStr := "primary"
@@ -1466,7 +1466,7 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%v)", primary).Entering()
@@ -1525,7 +1525,7 @@ func (rs subnet) GetGatewayPublicIPs(task concurrency.Task) (_ []string, xerr fa
 		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return emptySlice, fail.AbortedError(nil, "canceled")
+		return emptySlice, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -1578,7 +1578,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("operations.subnet")*/).WithStopwatch().Entering()
@@ -1760,7 +1760,7 @@ func (rs *subnet) InspectNetwork(task concurrency.Task) (rn resources.Network, x
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -1873,7 +1873,7 @@ func (rs subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.
 		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -1926,7 +1926,7 @@ func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Erro
 		return ip, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return ip, fail.AbortedError(nil, "canceled")
+		return ip, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -1966,7 +1966,7 @@ func (rs subnet) HasVirtualIP(task concurrency.Task) bool {
 		return false
 	}
 	if task.Aborted() {
-		logrus.Errorf(fail.AbortedError(nil, "canceled").Error())
+		logrus.Errorf(fail.AbortedError(nil, "aborted").Error())
 		return false
 	}
 
@@ -1997,7 +1997,7 @@ func (rs subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, x
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -2033,7 +2033,7 @@ func (rs subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
 		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -2070,7 +2070,7 @@ func (rs subnet) GetState(task concurrency.Task) (state subnetstate.Enum, xerr f
 		return subnetstate.UNKNOWN, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return subnetstate.UNKNOWN, fail.AbortedError(nil, "canceled")
+		return subnetstate.UNKNOWN, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -2106,7 +2106,7 @@ func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fai
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -2174,7 +2174,7 @@ func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
@@ -2222,7 +2222,7 @@ func (rs *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.Securi
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
@@ -2279,7 +2279,7 @@ func (rs *subnet) ListSecurityGroups(task concurrency.Task, state securitygroups
 		return nullList, fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
 	}
 	if task.Aborted() {
-		return nullList, fail.AbortedError(nil, "canceled")
+		return nullList, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()
@@ -2309,7 +2309,7 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
@@ -2384,7 +2384,7 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
@@ -2454,7 +2454,7 @@ func (rs subnet) InspectGatewaySecurityGroup(task concurrency.Task) (rsg resourc
 		return rsg, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return rsg, fail.AbortedError(nil, "canceled")
+		return rsg, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -2485,7 +2485,7 @@ func (rs subnet) InspectInternalSecurityGroup(task concurrency.Task) (sg resourc
 		return sg, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return sg, fail.AbortedError(nil, "canceled")
+		return sg, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
@@ -2516,7 +2516,7 @@ func (rs subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resourc
 		return sg, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return sg, fail.AbortedError(nil, "canceled")
+		return sg, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()

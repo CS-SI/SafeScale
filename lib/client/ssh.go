@@ -422,7 +422,7 @@ func (s ssh) WaitReady(task concurrency.Task, hostName string, timeout time.Dura
 
 	if task != nil {
 		if task.Aborted() {
-			return fail.AbortedError(nil, "canceled")
+			return fail.AbortedError(nil, "aborted")
 		}
 	}
 

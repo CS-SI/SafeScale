@@ -502,7 +502,7 @@ func (scmd *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, stri
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
 	}
 	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "canceled")
+		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
@@ -527,7 +527,7 @@ func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum,
 		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "canceled")
+		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
@@ -573,7 +573,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	params, ok := p.(taskExecuteParameters)
@@ -844,7 +844,7 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if cmdString = strings.TrimSpace(cmdString); cmdString == "" {
 		return nil, fail.InvalidParameterError("runCmdString", "cannot be empty string")
@@ -887,7 +887,7 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 		return "", fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 	if phase == "" {
 		return "", fail.InvalidParameterError("phase", "cannot be empty string")
@@ -963,7 +963,7 @@ func (sconf *SSHConfig) copy(task concurrency.Task,
 	timeout time.Duration,
 ) (retcode int, stdout string, stderr string, xerr fail.Error) {
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "canceled")
+		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()

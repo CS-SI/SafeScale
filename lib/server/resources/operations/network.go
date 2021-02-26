@@ -75,7 +75,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resour
 		return nullNetwork(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullNetwork(), fail.AbortedError(nil, "canceled")
+		return nullNetwork(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
@@ -183,7 +183,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(
@@ -293,7 +293,7 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -324,7 +324,7 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
@@ -448,7 +448,7 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	cidr = ""
@@ -475,7 +475,7 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, true, "").Entering()
@@ -528,7 +528,7 @@ func (rn network) InspectSubnet(task concurrency.Task, ref string) (_ resources.
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	return LoadSubnet(task, rn.GetService(), rn.GetID(), ref)

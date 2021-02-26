@@ -29,7 +29,7 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	if in == nil {
@@ -117,7 +117,7 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 
 func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	out := &protocol.ClusterNodeListResponse{}
 	if len(in) == 0 {

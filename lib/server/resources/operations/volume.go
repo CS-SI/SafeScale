@@ -86,7 +86,7 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resourc
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullVolume(), fail.AbortedError(nil, "canceled")
+		return nullVolume(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
@@ -186,7 +186,7 @@ func (rv volume) GetSpeed(task concurrency.Task) (_ volumespeed.Enum, xerr fail.
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return 0, fail.AbortedError(nil, "canceled")
+		return 0, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
@@ -226,7 +226,7 @@ func (rv volume) GetSize(task concurrency.Task) (_ int, xerr fail.Error) {
 		return 0, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return 0, fail.AbortedError(nil, "canceled")
+		return 0, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
@@ -266,7 +266,7 @@ func (rv volume) GetAttachments(task concurrency.Task) (_ *propertiesv1.VolumeAt
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
@@ -302,7 +302,7 @@ func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) f
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -333,7 +333,7 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
@@ -405,7 +405,7 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if req.Name == "" {
 		return fail.InvalidParameterError("req.GetName", "cannot be empty string")
@@ -472,7 +472,7 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if host == nil {
 		return fail.InvalidParameterError("host", "cannot be nil")
@@ -840,7 +840,7 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -1051,7 +1051,7 @@ func (rv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRespo
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()

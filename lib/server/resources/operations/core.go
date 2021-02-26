@@ -142,7 +142,7 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -174,7 +174,7 @@ func (c *core) Review(task concurrency.Task, callback resources.Callback) (xerr 
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -199,7 +199,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -262,7 +262,7 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -328,7 +328,7 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
@@ -384,7 +384,7 @@ func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
@@ -541,7 +541,7 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	c.SafeLock(task)
@@ -597,7 +597,7 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
@@ -623,7 +623,7 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	c.SafeLock(task)
@@ -849,7 +849,7 @@ func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if o == nil {
 		return fail.InvalidParameterError("o", "cannot be nil")
@@ -878,7 +878,7 @@ func (c *core) NotifyObservers(task concurrency.Task) error {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	c.SafeRLock(task)
@@ -900,7 +900,7 @@ func (c *core) RemoveObserver(task concurrency.Task, name string) error {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if name == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")

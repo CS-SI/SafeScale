@@ -63,7 +63,7 @@ func (rc *ResourceCache) Get(task concurrency.Task, key string, options ...data.
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -124,7 +124,7 @@ func (rc *ResourceCache) ReserveEntry(task concurrency.Task, key string) fail.Er
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -142,7 +142,7 @@ func (rc *ResourceCache) CommitEntry(task concurrency.Task, key string, content 
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -168,7 +168,7 @@ func (rc *ResourceCache) FreeEntry(task concurrency.Task, key string) fail.Error
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -189,7 +189,7 @@ func (rc *ResourceCache) AddEntry(task concurrency.Task, content cache.Cacheable
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	rc.lock.SafeLock(task)

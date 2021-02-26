@@ -49,7 +49,7 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -103,7 +103,7 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -141,7 +141,7 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -213,7 +213,7 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		return map[uint8]installmethod.Enum{}
 	}
 	if task.Aborted() {
-		logrus.Error(fail.AbortedError(nil, "canceled").Error())
+		logrus.Error(fail.AbortedError(nil, "aborted").Error())
 		return map[uint8]installmethod.Enum{}
 	}
 
@@ -274,7 +274,7 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if feat == nil {
 		return fail.InvalidParameterCannotBeNilError("feat")
@@ -317,7 +317,7 @@ func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
@@ -358,7 +358,7 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if v == nil {
 		return fail.InvalidParameterCannotBeNilError("v")

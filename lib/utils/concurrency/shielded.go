@@ -133,7 +133,7 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	var jsoned []byte
@@ -162,7 +162,7 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")

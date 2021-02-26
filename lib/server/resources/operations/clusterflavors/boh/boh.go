@@ -57,7 +57,7 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 	)
 
 	if task.Aborted() {
-		return 0, 0, 0, fail.AbortedError(nil, "canceled")
+		return 0, 0, 0, fail.AbortedError(nil, "aborted")
 	}
 
 	complexity, xerr := c.GetComplexity(task)

@@ -119,7 +119,7 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	pipeCount := uint(len(pbc.bridges))
@@ -174,7 +174,7 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	defer fail.OnPanic(&xerr)
 
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	if p == nil {
@@ -221,7 +221,7 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	for {
 		// If task aborted, stop the loop
 		if task.Aborted() {
-			err = fail.AbortedError(nil, "canceled")
+			err = fail.AbortedError(nil, "aborted")
 			break
 		}
 

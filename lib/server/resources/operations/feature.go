@@ -60,7 +60,7 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -137,7 +137,7 @@ func NewFeature(task concurrency.Task, svc iaas.Service, name string) (_ resourc
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullFeature(), fail.AbortedError(nil, "canceled")
+		return nullFeature(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("svc")
@@ -198,7 +198,7 @@ func NewEmbeddedFeature(task concurrency.Task, svc iaas.Service, name string) (_
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullFeature(), fail.AbortedError(nil, "canceled")
+		return nullFeature(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("svc")
