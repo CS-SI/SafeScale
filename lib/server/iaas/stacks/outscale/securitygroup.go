@@ -112,7 +112,7 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules []
 		}
 	}
 	if len(resp.InboundRules) > 0 {
-		if xerr = s.rpcDeleteSecurityGroupRules(asg.ID, "Inbound", resp.InboundRules); xerr != nil {
+		if xerr = s.rpcDeleteSecurityGroupRules(resp.SecurityGroupId, "Inbound", resp.InboundRules); xerr != nil {
 			return asg, xerr
 		}
 	}
