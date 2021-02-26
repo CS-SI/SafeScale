@@ -71,7 +71,7 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -159,7 +159,7 @@ func (b *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 	}
 
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	var res string
@@ -191,7 +191,7 @@ func (b *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error) {
 	}
 
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	var res string
@@ -228,7 +228,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
@@ -261,7 +261,7 @@ func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	return b.GetService().DeleteBucket(b.GetName())
@@ -274,7 +274,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Get Host data
@@ -338,7 +338,7 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	defer func() {
@@ -376,7 +376,7 @@ func (b *bucket) exec(task concurrency.Task, host resources.Host, script string,
 	}
 
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	_, _, _, xerr = host.Run(task, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())

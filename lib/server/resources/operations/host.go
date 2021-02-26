@@ -102,7 +102,7 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources
 		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullHost(), fail.AbortedError(nil, "canceled")
+		return nullHost(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullHost(), fail.InvalidParameterCannotBeNilError("svc")
@@ -400,7 +400,7 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
@@ -435,7 +435,7 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr
 		return state, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return state, fail.AbortedError(nil, "canceled")
+		return state, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -470,7 +470,7 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	hostName := rh.GetName()
@@ -596,7 +596,7 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	hostname := rh.GetName()
 	if hostname != "" {
@@ -1463,7 +1463,7 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (_ st
 		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return "", fail.AbortedError(nil, "canceled")
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
@@ -1574,7 +1574,7 @@ func (rh *host) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
@@ -1615,7 +1615,7 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	rh.SafeLock(task)
@@ -1919,7 +1919,7 @@ func (rh host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, xerr fa
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	rh.SafeRLock(task)
@@ -1939,7 +1939,7 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 		return 0, "", "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "canceled")
+		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
 	if cmd == "" {
 		return 0, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
@@ -2186,7 +2186,7 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (_ *propertiesv1
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if shareRef == "" {
 		return nil, fail.InvalidParameterError("shareRef", "cannot be empty string")
@@ -2235,7 +2235,7 @@ func (rh host) GetVolumes(task concurrency.Task) (_ *propertiesv1.HostVolumes, x
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2276,7 +2276,7 @@ func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2328,7 +2328,7 @@ func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2381,7 +2381,7 @@ func (rh host) Reboot(task concurrency.Task) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2421,7 +2421,7 @@ func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
 		return ip, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return ip, fail.AbortedError(nil, "canceled")
+		return ip, fail.AbortedError(nil, "aborted")
 	}
 
 	if ip = rh.getPublicIP(task); ip == "" {
@@ -2459,7 +2459,7 @@ func (rh host) GetPrivateIP(task concurrency.Task) (ip string, xerr fail.Error) 
 		return ip, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return ip, fail.AbortedError(nil, "canceled")
+		return ip, fail.AbortedError(nil, "aborted")
 	}
 
 	return rh.getPrivateIP(task), nil
@@ -2494,7 +2494,7 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return ip, fail.AbortedError(nil, "canceled")
+		return ip, fail.AbortedError(nil, "aborted")
 	}
 	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
 		return ip, fail.InvalidParameterError("subnetID", "cannot be empty string")
@@ -2543,7 +2543,7 @@ func (rh host) GetAccessIP(task concurrency.Task) (ip string, xerr fail.Error) {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return ip, fail.AbortedError(nil, "canceled")
+		return ip, fail.AbortedError(nil, "aborted")
 	}
 
 	return rh.getAccessIP(task), nil
@@ -2578,7 +2578,7 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 		return shares, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return shares, fail.AbortedError(nil, "canceled")
+		return shares, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2610,7 +2610,7 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 		return mounts, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return mounts, fail.AbortedError(nil, "canceled")
+		return mounts, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2650,7 +2650,7 @@ func (rh host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error
 		return yes, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return yes, fail.AbortedError(nil, "canceled")
+		return yes, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2840,7 +2840,7 @@ func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xer
 		return nullSubnet(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nullSubnet(), fail.AbortedError(nil, "canceled")
+		return nullSubnet(), fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -2964,7 +2964,7 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, rsg resources.SecurityG
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if rsg == nil {
 		return fail.InvalidParameterCannotBeNilError("rsg")
@@ -3021,7 +3021,7 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
@@ -3086,7 +3086,7 @@ func (rh host) ListSecurityGroups(task concurrency.Task, state securitygroupstat
 		return emptySlice, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return emptySlice, fail.AbortedError(nil, "canceled")
+		return emptySlice, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(state=%s)", state.String()).WithStopwatch().Entering()
@@ -3120,7 +3120,7 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if sg == nil {
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
@@ -3201,7 +3201,7 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, rsg resources.Securi
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if rsg == nil {
 		return fail.InvalidParameterError("rsg", "cannot be nil")

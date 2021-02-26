@@ -134,7 +134,7 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (rs resource
 		return nullShare(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nullShare(), fail.AbortedError(nil, "canceled")
+		return nullShare(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullShare(), fail.InvalidParameterCannotBeNilError("svc")
@@ -229,7 +229,7 @@ func (objs share) Browse(task concurrency.Task, callback func(string, string) fa
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -264,7 +264,7 @@ func (objs *share) Create(
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if shareName == "" {
 		return fail.InvalidParameterError("shareName", "cannot be empty string")
@@ -462,7 +462,7 @@ func (objs share) GetServer(task concurrency.Task) (_ resources.Host, xerr fail.
 		return nil, fail.InvalidParameterError("task", "cannot be il")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	var hostID, hostName string
@@ -503,7 +503,7 @@ func (objs share) Mount(task concurrency.Task, target resources.Host, path strin
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if target == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("target")
@@ -779,7 +779,7 @@ func (objs share) Unmount(task concurrency.Task, target resources.Host) (xerr fa
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if target == nil {
 		return fail.InvalidParameterCannotBeNilError("target")
@@ -1013,7 +1013,7 @@ func (objs share) ToProtocol(task concurrency.Task) (_ *protocol.ShareMountList,
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	shareID := objs.GetID()

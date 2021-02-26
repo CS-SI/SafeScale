@@ -47,7 +47,7 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -115,7 +115,7 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	f, xerr := system.CreateTempFileFromString(content, 0600)
@@ -129,7 +129,7 @@ func (rfc Item) UploadString(task concurrency.Task, content string, host resourc
 // RemoveRemote deletes the remote file from host
 func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	cmd := "rm -rf " + rfc.Remote
@@ -159,7 +159,7 @@ func (rfh *RemoteFilesHandler) Count() uint {
 // TODO: allow to upload to many hosts
 func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	for _, v := range rfh.items {
@@ -176,7 +176,7 @@ func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host
 // TODO: allow to cleanup on many hosts
 func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, host resources.Host) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	for _, v := range rfh.items {

@@ -40,7 +40,7 @@ func Load(task concurrency.Task, svc iaas.Service, name string) (resources.Bucke
 
 	if task != nil {
 		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "canceled")
+			return nil, fail.AbortedError(nil, "aborted")
 		}
 	}
 

@@ -47,7 +47,7 @@ var (
 
 func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
 	if task.Aborted() {
-		return 0, 0, 0, fail.AbortedError(nil, "canceled")
+		return 0, 0, 0, fail.AbortedError(nil, "aborted")
 	}
 
 	complexity, xerr := c.GetComplexity(task)
@@ -100,7 +100,7 @@ func defaultImage(_ concurrency.Task, _ resources.Cluster) string {
 
 func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
 	if task.Aborted() {
-		return fail.AbortedError(nil, "canceled")
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	clusterName := c.GetName()
