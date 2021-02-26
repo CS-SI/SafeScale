@@ -1382,6 +1382,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// if host is not found, consider operation as a success; continue
+			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 		default:
 			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 		}

@@ -449,7 +449,7 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-		// continue
+			return nullAHF, xerr
 		default:
 			return nullAHF, xerr
 		}
