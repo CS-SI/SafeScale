@@ -436,7 +436,7 @@ func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 			}
 
 		case "-": // Manages negative number (can be used for gpu)
-			for tok = s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+			for tok = s.Scan(); tok != scanner.EOF; tok = s.Scan() { // FIXME: OPP Unreachable code ?
 				t += s.TokenText()
 				break
 			}

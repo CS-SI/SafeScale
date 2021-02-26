@@ -260,11 +260,11 @@ func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature,
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if feat == nil {
-		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
-	}
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
+	}
+	if feat == nil {
+		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
 	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {

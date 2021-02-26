@@ -2453,7 +2453,6 @@ func (rs subnet) InspectGatewaySecurityGroup(task concurrency.Task) (rsg resourc
 	if task == nil {
 		return rsg, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return rsg, fail.AbortedError(nil, "canceled")
 	}

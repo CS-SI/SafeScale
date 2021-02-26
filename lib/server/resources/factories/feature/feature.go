@@ -71,15 +71,14 @@ func New(task concurrency.Task, svc iaas.Service, name string) (resources.Featur
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "can't be empty string!")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	feat, xerr := operations.NewFeature(task, svc, name)
@@ -105,15 +104,14 @@ func NewEmbedded(task concurrency.Task, svc iaas.Service, name string) (resource
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "canno't be empty string!")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	return operations.NewEmbeddedFeature(task, svc, name)

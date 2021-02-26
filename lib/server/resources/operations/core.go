@@ -540,7 +540,6 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
@@ -849,6 +848,9 @@ func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if o == nil {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
@@ -875,6 +877,9 @@ func (c *core) NotifyObservers(task concurrency.Task) error {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	c.SafeRLock(task)
 	defer c.SafeRUnlock(task)
@@ -893,6 +898,9 @@ func (c *core) RemoveObserver(task concurrency.Task, name string) error {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if name == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")

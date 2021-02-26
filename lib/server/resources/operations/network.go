@@ -75,7 +75,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resour
 		return nullNetwork(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nullNetwork(), fail.AbortedError(nil, "canceled")
 	}
 	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")

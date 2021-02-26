@@ -48,7 +48,6 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -76,7 +75,6 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -110,7 +108,6 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -168,7 +165,6 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -215,14 +211,12 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMastersParameters)
@@ -291,7 +285,6 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -484,7 +477,6 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
 	}
@@ -554,7 +546,6 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -618,7 +609,6 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -694,7 +684,6 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -908,7 +897,6 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
 	}
@@ -985,7 +973,6 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -1040,7 +1027,6 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
