@@ -88,12 +88,11 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 	if task == nil {
 		return nullCluster(), fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc == nil {
-		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
-	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
+	}
+	if svc == nil {
+		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	c, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
@@ -111,15 +110,14 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (rc resou
 	if task == nil {
 		return nullCluster(), fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nullCluster(), fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	clusterCache, xerr := svc.GetCache(clusterKind)
@@ -506,7 +504,6 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
@@ -640,17 +637,6 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 					}
 				}
 
-				// if list, merr = c.ListNodes(task); merr != nil {
-				// 	_ = xerr.AddConsequence(merr)
-				// } else {
-				// 	logrus.Debugf("Cleaning up on failure, deleting Nodes...")
-				// 	for _, v := range list {
-				// 		if _, tgerr = tg.StartInSubtask(c.taskDeleteHostOnFailure, v); tgerr != nil {
-				// 			_ = xerr.AddConsequence(tgerr)
-				// 		}
-				// 	}
-				// }
-
 				if _, _, tgerr = tg.WaitGroupFor(temporal.GetLongOperationTimeout()); tgerr != nil {
 					_ = xerr.AddConsequence(tgerr)
 				}
@@ -684,12 +670,11 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
-		return fail.InvalidParameterError("req.Name", "cannot be empty string")
-	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
+	}
+	if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
+		return fail.InvalidParameterError("req.Name", "cannot be empty string")
 	}
 
 	// Initializes instance
@@ -1119,6 +1104,19 @@ func (c *cluster) createNetworkingResources(task concurrency.Task, req abstract.
 	return rn, rs, nil
 }
 
+func abortTaskIfStillRunningDuringCleanup(task concurrency.Task, inErr *fail.Error) {
+	if st, err := task.GetStatus(); err == nil {
+		if st != concurrency.DONE {
+			abErr := task.Abort()
+			if abErr != nil {
+				_ = (*inErr).AddConsequence(abErr)
+			}
+		}
+	} else {
+		_ = (*inErr).AddConsequence(err)
+	}
+}
+
 // createHostResources creates and configures hosts for the cluster
 func (c *cluster) createHostResources(
 	task concurrency.Task,
@@ -1138,6 +1136,8 @@ func (c *cluster) createHostResources(
 		primaryGatewayStatus, secondaryGatewayStatus fail.Error
 		mastersStatus, privateNodesStatus            fail.Error
 		primaryGatewayTask, secondaryGatewayTask     concurrency.Task
+		cfgGatewayTask                               concurrency.Task
+		cfg2ndGatewayTask                            concurrency.Task
 	)
 
 	if primaryGateway, xerr = subnet.InspectGateway(task, true); xerr != nil {
@@ -1193,6 +1193,12 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
+	defer func() {
+		if xerr != nil {
+			abortTaskIfStillRunningDuringCleanup(primaryGatewayTask, &xerr)
+		}
+	}()
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -1202,9 +1208,15 @@ func (c *cluster) createHostResources(
 			return xerr
 		}
 
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
+		defer func() {
+			if xerr != nil {
+				abortTaskIfStillRunningDuringCleanup(secondaryGatewayTask, &xerr)
+			}
+		}()
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	mastersTask, xerr := task.StartInSubtask(c.taskCreateMasters, taskCreateMastersParameters{
@@ -1216,19 +1228,11 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
-	// VPL: normally not needed; if parent task aborts, children should abort also
-	// defer func() {
-	// 	if xerr != nil {
-	// Disable abort signal during the clean up
-	// defer task.DisarmAbortSignal()()
-	//
-	//
-	// 		if st, _ := mastersTask.GetStatus(); st == concurrency.RUNNING {
-	// 			_ = mastersTask.Abort()
-	// 			_, _ = mastersTask.Wait()
-	// 		}
-	// 	}
-	// }()
+	defer func() {
+		if xerr != nil {
+			abortTaskIfStillRunningDuringCleanup(mastersTask, &xerr)
+		}
+	}()
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -1244,19 +1248,11 @@ func (c *cluster) createHostResources(
 		return xerr
 	}
 
-	// VPL: normally not needed, if parent task aborts, children should abort also
-	// defer func() {
-	// 	if xerr != nil {
-	// // Disable abort signal during the clean up
-	// defer task.DisarmAbortSignal()()
-	//
-	//
-	// 		if st, _ := privateNodesTask.GetStatus(); st == concurrency.RUNNING {
-	// 			_ = privateNodesTask.Abort()
-	// 			_, _ = privateNodesTask.Wait()
-	// 		}
-	// 	}
-	// }()
+	defer func() {
+		if xerr != nil {
+			abortTaskIfStillRunningDuringCleanup(privateNodesTask, &xerr)
+		}
+	}()
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -1299,12 +1295,7 @@ func (c *cluster) createHostResources(
 		}
 	}()
 
-	_, mastersStatus = mastersTask.Wait()
-	if mastersStatus != nil {
-		abortNodesErr := privateNodesTask.Abort()
-		if abortNodesErr != nil {
-			_ = mastersStatus.AddConsequence(abortNodesErr)
-		}
+	if _, mastersStatus = mastersTask.Wait(); mastersStatus != nil {
 		return mastersStatus
 	}
 
@@ -1314,25 +1305,34 @@ func (c *cluster) createHostResources(
 
 	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure getGateway(s) and waits for the result
-	if primaryGatewayTask, xerr = task.StartInSubtask(c.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}); xerr != nil {
+	if cfgGatewayTask, xerr = task.StartInSubtask(c.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}); xerr != nil {
 		return xerr
 	}
+
+	defer func() {
+		if xerr != nil {
+			abortTaskIfStillRunningDuringCleanup(cfgGatewayTask, &xerr)
+		}
+	}()
+
 	if haveSecondaryGateway {
-		if secondaryGatewayTask, xerr = task.StartInSubtask(c.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway}); xerr != nil {
+		if cfg2ndGatewayTask, xerr = task.StartInSubtask(c.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway}); xerr != nil {
 			return xerr
 		}
-	}
-	if _, primaryGatewayStatus = primaryGatewayTask.Wait(); primaryGatewayStatus != nil {
-		if haveSecondaryGateway && secondaryGatewayTask != nil {
-			if secondaryGatewayErr := secondaryGatewayTask.Abort(); secondaryGatewayErr != nil {
-				_ = primaryGatewayStatus.AddConsequence(secondaryGatewayErr)
+
+		defer func() {
+			if xerr != nil {
+				abortTaskIfStillRunningDuringCleanup(cfg2ndGatewayTask, &xerr)
 			}
-		}
+		}()
+	}
+
+	if _, primaryGatewayStatus = cfgGatewayTask.Wait(); primaryGatewayStatus != nil {
 		return primaryGatewayStatus
 	}
 
-	if haveSecondaryGateway && secondaryGatewayTask != nil {
-		if _, secondaryGatewayStatus = secondaryGatewayTask.Wait(); secondaryGatewayStatus != nil {
+	if haveSecondaryGateway && cfg2ndGatewayTask != nil {
+		if _, secondaryGatewayStatus = cfg2ndGatewayTask.Wait(); secondaryGatewayStatus != nil {
 			return secondaryGatewayStatus
 		}
 	}
@@ -1445,7 +1445,6 @@ func (c *cluster) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
 	}
@@ -1522,11 +1521,11 @@ func (c cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterId
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if callback == nil {
-		return fail.InvalidParameterCannotBeNilError("callback")
-	}
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
+	}
+	if callback == nil {
+		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
 	return c.core.BrowseFolder(task, func(buf []byte) fail.Error {
@@ -1584,7 +1583,6 @@ func (c cluster) GetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, xe
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	aci, xerr := c.GetIdentity(task)
 	if xerr != nil {
@@ -1609,7 +1607,6 @@ func (c cluster) GetComplexity(task concurrency.Task) (_ clustercomplexity.Enum,
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	aci, xerr := c.GetIdentity(task)
 	if xerr != nil {
@@ -1635,7 +1632,6 @@ func (c cluster) GetAdminPassword(task concurrency.Task) (adminPassword string, 
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	aci, xerr := c.GetIdentity(task)
 	if xerr != nil {
@@ -1678,12 +1674,11 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv3.
 		return config, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return config, fail.AbortedError(nil, "canceled")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
@@ -1714,7 +1709,6 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// If the cluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
@@ -1893,7 +1887,6 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// If the cluster is stopped, do nothing
 	var prevState clusterstate.Enum
@@ -2017,8 +2010,8 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 		}
 
 		for _, n := range nodes {
-			if _, innerXErr = taskGroup.Start(c.taskStopHost, n); innerErr != nil {
-				return innerXErr
+			if _, innerErr = taskGroup.Start(c.taskStopHost, n); innerErr != nil {
+				return innerErr
 			}
 		}
 		// Stop masters
@@ -2070,7 +2063,6 @@ func (c *cluster) GetState(task concurrency.Task) (state clusterstate.Enum, xerr
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	if task.Aborted() {
 		return clusterstate.Unknown, fail.AbortedError(nil, "aborted by cancellation")
@@ -2127,7 +2119,6 @@ func (c *cluster) AddNode(task concurrency.Task, def abstract.HostSizingRequirem
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	nodes, xerr := c.AddNodes(task, 1, def)
 	if xerr != nil {
@@ -2156,7 +2147,6 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
 	defer tracer.Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2317,7 +2307,6 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv3.Clus
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2426,7 +2415,7 @@ func (c cluster) ListMasters(task concurrency.Task) (list resources.IndexedListO
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return emptyList, fail.AbortedError(nil, "canceled")
 	}
 
 	var state clusterstate.Enum
@@ -2476,7 +2465,7 @@ func (c cluster) ListMasterNames(task concurrency.Task) (list data.IndexedListOf
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return emptyList, fail.AbortedError(nil, "canceled")
 	}
 
 	var state clusterstate.Enum
@@ -2735,7 +2724,7 @@ func (c cluster) ListNodeNames(task concurrency.Task) (list data.IndexedListOfSt
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return emptyList, fail.AbortedError(nil, "canceled")
 	}
 
 	var state clusterstate.Enum
@@ -2766,7 +2755,6 @@ func (c cluster) ListNodeNames(task concurrency.Task) (list data.IndexedListOfSt
 		})
 	})
 	if xerr != nil {
-		// logrus.Errorf("failed to get list of node IDs: %v", err)
 		return emptyList, xerr
 	}
 
@@ -2785,7 +2773,7 @@ func (c cluster) ListNodeIDs(task concurrency.Task) (list data.IndexedListOfStri
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return emptyList, fail.AbortedError(nil, "canceled")
 	}
 
 	var state clusterstate.Enum
@@ -2835,7 +2823,7 @@ func (c cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedListOfStri
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return emptyList, fail.AbortedError(nil, "canceled")
 	}
 
 	var state clusterstate.Enum
@@ -2984,8 +2972,6 @@ func (c cluster) CountNodes(task concurrency.Task) (count uint, xerr fail.Error)
 	if task.Aborted() {
 		return 0, fail.AbortedError(nil, "canceled")
 	}
-
-	// defer fail.OnExitLogError(&xerr, debug.NewTracer(task, tracing.ShouldTrace("cluster")).TraceMessage())
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -3956,7 +3942,7 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return emptySlice, fail.AbortedError(nil, "canceled")
 	}
 	if count == 0 {
 		return emptySlice, fail.InvalidParameterError("count", "cannot be 0")
