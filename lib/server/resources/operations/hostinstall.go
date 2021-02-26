@@ -203,6 +203,7 @@ func (rh host) TargetType() featuretargettype.Enum {
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
 func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+	// FIXME: Return error
 	if rh.IsNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
@@ -212,6 +213,7 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		return map[uint8]installmethod.Enum{}
 	}
 	if task.Aborted() {
+		logrus.Error(fail.AbortedError(nil, "canceled").Error())
 		return map[uint8]installmethod.Enum{}
 	}
 

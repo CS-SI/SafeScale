@@ -70,15 +70,14 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
@@ -228,12 +227,11 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if name == "" {
-		return fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
+	}
+	if name == "" {
+		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()

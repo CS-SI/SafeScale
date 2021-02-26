@@ -79,15 +79,14 @@ func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Networ
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	return operations.LoadNetwork(task, svc, ref)

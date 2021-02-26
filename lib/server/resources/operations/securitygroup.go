@@ -120,7 +120,7 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg
 		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be nil")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
+		return nullSecurityGroup(), fail.AbortedError(nil, "canceled")
 	}
 	if svc == nil {
 		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be nil")

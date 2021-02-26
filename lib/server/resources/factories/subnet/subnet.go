@@ -31,12 +31,11 @@ func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) (
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
+	}
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	return operations.ListSubnets(task, svc, networkID, all)
@@ -56,15 +55,14 @@ func Load(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string)
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if subnetRef == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	return operations.LoadSubnet(task, svc, networkRef, subnetRef)

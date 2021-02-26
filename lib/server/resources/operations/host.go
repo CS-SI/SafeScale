@@ -344,18 +344,18 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 	if xerr != nil {
 		return "", xerr
 	}
-	var user string
+	var userName string
 	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		user = anon.(string)
-		if user == "" {
+		userName = anon.(string)
+		if userName == "" {
 			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 		}
 	}
-	if user == "" {
-		user = abstract.DefaultUser
+	if userName == "" {
+		userName = abstract.DefaultUser
 	}
 
-	return user, nil
+	return userName, nil
 }
 
 // IsNull tests if instance is nil or empty
@@ -398,6 +398,9 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 	// }
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
@@ -466,7 +469,6 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
@@ -474,15 +476,14 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	hostName := rh.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
 	if xerr = rh.core.Reload(task); xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
+		// If retry timed out, log it and return error ErrNotFound
+		switch xerr.(type) { //nolint
+		case *retry.ErrTimeout:
 			xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostName)
-		default:
-			return xerr
 		}
+		return xerr
 	}
 	// // Read data from metadata storage
 	// hostID := rh.GetID()
@@ -2889,14 +2890,12 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	var (
 		ahc           *abstract.HostCore
@@ -2964,11 +2963,11 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, rsg resources.SecurityG
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if rsg == nil {
-		return fail.InvalidParameterCannotBeNilError("rsg")
-	}
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
+	}
+	if rsg == nil {
+		return fail.InvalidParameterCannotBeNilError("rsg")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s', enable=%v", rsg.GetName(), enable).WithStopwatch().Entering()
@@ -3201,12 +3200,11 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, rsg resources.Securi
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if rsg == nil {
-		return fail.InvalidParameterError("rsg", "cannot be nil")
-	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
+	}
+	if rsg == nil {
+		return fail.InvalidParameterError("rsg", "cannot be nil")
 	}
 
 	sgName := rsg.GetName()
