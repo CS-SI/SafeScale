@@ -254,7 +254,5 @@ func (c cache) MarkAsDeleted(task concurrency.Task, key string) {
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
-	if _, ok := c.cache[key]; ok {
-		delete(c.cache, key)
-	}
+	delete(c.cache, key)
 }

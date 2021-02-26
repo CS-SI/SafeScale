@@ -308,10 +308,10 @@ var networkCreate = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		gatewaySshPort := uint32(c.Int("gwport"))
+		gatewaySSHPort := uint32(c.Int("gwport"))
 		network, err := clientSession.Network.Create(
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
-			c.String("gwname"), gatewaySshPort, c.String("os"), sizing,
+			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
 			temporal.GetExecutionTimeout(),
 		)
