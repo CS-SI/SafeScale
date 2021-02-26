@@ -154,8 +154,8 @@ func extracthostName(in string) (string, fail.Error) {
 		return "", fail.OverflowError(nil, 2, "too many parts in path")
 	}
 	hostName := strings.TrimSpace(parts[0])
-	for _, protocol := range []string{"file", "http", "https", "ftp"} {
-		if strings.ToLower(hostName) == protocol {
+	for _, proto := range []string{"file", "http", "https", "ftp"} {
+		if strings.ToLower(hostName) == proto {
 			return "", fail.SyntaxError("no protocol expected. Only host name")
 		}
 	}
