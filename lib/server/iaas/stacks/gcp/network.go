@@ -182,11 +182,12 @@ func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
 			return xerr
 		}
 	}
-	// if !theNetwork.OK() {
-	// 	logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
-	// }
 
-	return s.rpcDeleteNetworkByID(theNetwork.ID)
+	if theNetwork != nil {
+		return s.rpcDeleteNetworkByID(theNetwork.ID)
+	}
+
+	return nil
 }
 
 // ------ VIP methods ------

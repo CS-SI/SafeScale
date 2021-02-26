@@ -273,7 +273,10 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Validating name of the host
 	if ok, xerr := validateHostname(request); !ok {
-		return nullAhf, nullUdc, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error())
+		if xerr != nil {
+			return nullAhf, nullUdc, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error())
+		}
+		return nullAhf, nullUdc, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host", request.ResourceName)
 	}
 
 	// The default Network is the first of the provided list, by convention
