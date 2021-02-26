@@ -41,6 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -443,7 +444,8 @@ func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 	)
 
 	if w.cluster != nil {
-		if netCfg, xerr := w.cluster.GetNetworkConfig(w.feature.task); xerr == nil {
+		var netCfg *propertiesv3.ClusterNetwork
+		if netCfg, xerr = w.cluster.GetNetworkConfig(w.feature.task); xerr == nil {
 			rs, xerr = LoadSubnet(w.feature.task, w.cluster.GetService(), "", netCfg.SubnetID)
 		}
 	} else {
@@ -1252,7 +1254,8 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 	)
 	if w.cluster != nil {
 		svc = w.cluster.GetService()
-		if netprops, xerr := w.cluster.GetNetworkConfig(task); xerr == nil {
+		var netprops *propertiesv3.ClusterNetwork
+		if netprops, xerr = w.cluster.GetNetworkConfig(task); xerr == nil {
 			rs, xerr = LoadSubnet(task, svc, netprops.NetworkID, netprops.SubnetID)
 		}
 	} else if w.host != nil {

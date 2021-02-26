@@ -466,6 +466,7 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
@@ -476,12 +477,12 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
 	if xerr = rh.core.Reload(task); xerr != nil {
-		// If retry timed out, log it and return error ErrNotFound
 		switch xerr.(type) {
-		case *retry.ErrTimeout:
+		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
 			xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostName)
+		default:
+			return xerr
 		}
-		return xerr
 	}
 	// // Read data from metadata storage
 	// hostID := rh.GetID()
