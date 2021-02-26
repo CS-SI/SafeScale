@@ -138,6 +138,9 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
@@ -167,6 +170,9 @@ func (c *core) Review(task concurrency.Task, callback resources.Callback) (xerr 
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
@@ -188,6 +194,9 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -242,6 +251,9 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -300,6 +312,9 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -352,6 +367,9 @@ func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
@@ -501,6 +519,9 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	if c.loaded && !c.committed {
 		return fail.InconsistentError("altered and not committed")
@@ -551,6 +572,9 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
@@ -573,6 +597,9 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	c.SafeLock(task)
@@ -647,13 +674,6 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
-	//defer func() {
-	//	if xerr != nil {
-	//		xerr = fail.Wrap(xerr, "failed to serialize %s resource '%s'", c.kind, c.GetName())
-	//	}
-	//}()
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -710,13 +730,6 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-
-	// defer func() {
-	// 	if xerr != nil {
-	// 		xerr = fail.Wrap(xerr, "failed to deserialize %s resource", c.kind)
-	// 	}
-	// }()
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}

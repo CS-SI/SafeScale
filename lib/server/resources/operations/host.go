@@ -100,6 +100,9 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (_ resources.
 	if task == nil {
 		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nullHost(), fail.AbortedError(nil, "canceled")
+	}
 	if svc == nil {
 		return nullHost(), fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -334,6 +337,9 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -362,6 +368,9 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr
 	if task == nil {
 		return state, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return state, fail.AbortedError(nil, "canceled")
+	}
 
 	if xerr = rh.Reload(task); xerr != nil {
 		return state, xerr
@@ -388,6 +397,9 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	// Read data from metadata storage
@@ -498,6 +510,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	hostname := rh.GetName()
 	if hostname != "" {
@@ -1413,6 +1428,9 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (_ st
 	if task == nil {
 		return "", fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "canceled")
+	}
 
 	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL, timeout)
 }
@@ -1517,6 +1535,9 @@ func (rh *host) Delete(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
@@ -1550,6 +1571,9 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	rh.SafeLock(task)
@@ -1857,6 +1881,9 @@ func (rh host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, xerr fa
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	rh.SafeRLock(task)
 	defer rh.SafeRUnlock(task)
@@ -1873,6 +1900,9 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 	}
 	if task == nil {
 		return 0, "", "", fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return 0, "", "", fail.AbortedError(nil, "canceled")
 	}
 	if cmd == "" {
 		return 0, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
@@ -2106,6 +2136,9 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (_ *propertiesv1
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if shareRef == "" {
 		return nil, fail.InvalidParameterError("shareRef", "cannot be empty string")
 	}
@@ -2148,6 +2181,9 @@ func (rh host) GetVolumes(task concurrency.Task) (_ *propertiesv1.HostVolumes, x
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	var hvV1 *propertiesv1.HostVolumes
 	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2181,6 +2217,9 @@ func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	hostName := rh.GetName()
@@ -2226,6 +2265,9 @@ func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	hostName := rh.GetName()
@@ -2273,6 +2315,9 @@ func (rh host) Reboot(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	if xerr := rh.Stop(task); xerr != nil {
 		return xerr
@@ -2302,6 +2347,9 @@ func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
 	if task == nil {
 		return ip, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return ip, fail.AbortedError(nil, "canceled")
+	}
 
 	if ip = rh.getPublicIP(task); ip == "" {
 		return ip, fail.NotFoundError("no public IP associated with Host '%s'", rh.GetName())
@@ -2312,7 +2360,11 @@ func (rh host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
 // getPublicIP returns the public IP address of the host
 // To be used when rh is notoriously not null value
 func (rh host) getPublicIP(task concurrency.Task) string {
+	// FIXME: Return error
 	if task == nil {
+		return ""
+	}
+	if task.Aborted() {
 		return ""
 	}
 
@@ -2333,6 +2385,9 @@ func (rh host) GetPrivateIP(task concurrency.Task) (ip string, xerr fail.Error) 
 	if task == nil {
 		return ip, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return ip, fail.AbortedError(nil, "canceled")
+	}
 
 	return rh.getPrivateIP(task), nil
 }
@@ -2340,7 +2395,11 @@ func (rh host) GetPrivateIP(task concurrency.Task) (ip string, xerr fail.Error) 
 // getPrivateIP returns the private IP of the host on its default Networking
 // To be used when rh is notoriously not nil
 func (rh host) getPrivateIP(task concurrency.Task) string {
+	// FIXME: Return error
 	if task == nil {
+		return ""
+	}
+	if task.Aborted() {
 		return ""
 	}
 
@@ -2360,6 +2419,9 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 	}
 	if task == nil {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return ip, fail.AbortedError(nil, "canceled")
 	}
 	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
 		return ip, fail.InvalidParameterError("subnetID", "cannot be empty string")
@@ -2403,6 +2465,9 @@ func (rh host) GetAccessIP(task concurrency.Task) (ip string, xerr fail.Error) {
 	if task == nil {
 		return ip, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return ip, fail.AbortedError(nil, "canceled")
+	}
 
 	return rh.getAccessIP(task), nil
 }
@@ -2410,7 +2475,11 @@ func (rh host) GetAccessIP(task concurrency.Task) (ip string, xerr fail.Error) {
 // getAccessIP returns the IP to reach the host
 // To be used when rh is notoriously not nil
 func (rh host) getAccessIP(task concurrency.Task) string {
+	// FIXME: Check error
 	if task == nil {
+		return ""
+	}
+	if task.Aborted() {
 		return ""
 	}
 
@@ -2430,6 +2499,9 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 	}
 	if task == nil {
 		return shares, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return shares, fail.AbortedError(nil, "canceled")
 	}
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2455,6 +2527,9 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 	}
 	if task == nil {
 		return mounts, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return mounts, fail.AbortedError(nil, "canceled")
 	}
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2488,6 +2563,9 @@ func (rh host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error
 	}
 	if task == nil {
 		return yes, fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return yes, fail.AbortedError(nil, "canceled")
 	}
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2543,15 +2621,14 @@ func (rh host) PushStringToFileWithOwnership(task concurrency.Task, content stri
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 	if content == "" {
 		return fail.InvalidParameterError("content", "cannot be empty string")
 	}
 	if filename == "" {
 		return fail.InvalidParameterError("filename", "cannot be empty string")
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	hostName := rh.GetName()
@@ -2661,6 +2738,9 @@ func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xer
 	if task == nil {
 		return nullSubnet(), fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return nullSubnet(), fail.AbortedError(nil, "canceled")
+	}
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
@@ -2705,7 +2785,6 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 	if task == nil {
 		return nil, fail.InvalidParameterError("task", "cannot be nil")
 	}
-
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -2776,6 +2855,9 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGr
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
 	}
@@ -2825,6 +2907,9 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
@@ -2885,6 +2970,9 @@ func (rh host) ListSecurityGroups(task concurrency.Task, state securitygroupstat
 	if task == nil {
 		return emptySlice, fail.InvalidParameterError("task", "cannot be nil")
 	}
+	if task.Aborted() {
+		return emptySlice, fail.AbortedError(nil, "canceled")
+	}
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -2911,6 +2999,9 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if sg == nil {
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
@@ -2984,6 +3075,9 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, sg resources.Securit
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if sg == nil {
 		return fail.InvalidParameterError("sg", "cannot be nil")

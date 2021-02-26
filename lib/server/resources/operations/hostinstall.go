@@ -48,6 +48,9 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -99,6 +102,9 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
@@ -133,6 +139,9 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
@@ -202,6 +211,9 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		logrus.Error(fail.InvalidParameterCannotBeNilError("task").Error())
 		return map[uint8]installmethod.Enum{}
 	}
+	if task.Aborted() {
+		return map[uint8]installmethod.Enum{}
+	}
 
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
@@ -259,6 +271,9 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if feat == nil {
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
@@ -299,6 +314,9 @@ func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
@@ -336,6 +354,9 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if v == nil {
 		return fail.InvalidParameterCannotBeNilError("v")

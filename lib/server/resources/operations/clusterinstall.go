@@ -86,12 +86,18 @@ func (c *cluster) TargetType() featuretargettype.Enum {
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies resources.Targetable interface
 func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+	// FIXME: Return error
+
 	if c == nil {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
 	if task == nil {
 		logrus.Errorf(fail.InvalidParameterCannotBeNilError("task").Error())
+		return nil
+	}
+	if task.Aborted() {
+		logrus.Error(fail.AbortedError(nil, "canceled").Error())
 		return nil
 	}
 
@@ -129,6 +135,9 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 
 	complexity, xerr := c.GetComplexity(task)
@@ -241,6 +250,9 @@ func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature,
 	if feat == nil {
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 
 	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -278,6 +290,9 @@ func (c *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fa
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
@@ -306,6 +321,9 @@ func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Featu
 	}
 	if task == nil {
 		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 
 	var list map[string]*propertiesv1.ClusterInstalledFeature
@@ -343,6 +361,9 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -361,6 +382,9 @@ func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -381,6 +405,9 @@ func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Ma
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -403,6 +430,9 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 	}
 	if task == nil {
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return -1, "", "", fail.AbortedError(nil, "canceled")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")

@@ -52,15 +52,14 @@ func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fai
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 	if inspector == nil {
 		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
 	if d.witness == nil {
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	if xerr = d.lock.RLock(task); xerr != nil {
@@ -91,15 +90,14 @@ func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xer
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 	if alterer == nil {
 		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
 	if d.witness == nil {
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 
 	xerr = d.lock.Lock(task)
@@ -134,6 +132,9 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	var jsoned []byte
 	xerr := d.Inspect(task, func(clonable data.Clonable) fail.Error {
@@ -159,6 +160,9 @@ func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")

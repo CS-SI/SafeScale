@@ -62,6 +62,9 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 
 	var (
 		cfgFiles []interface{}
@@ -132,6 +135,9 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 func NewFeature(task concurrency.Task, svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
 	if task == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nullFeature(), fail.AbortedError(nil, "canceled")
 	}
 	if svc == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("svc")
