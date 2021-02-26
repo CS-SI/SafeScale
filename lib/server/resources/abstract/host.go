@@ -58,7 +58,7 @@ func NewKeyPair(name string) (*KeyPair, fail.Error) {
 	}
 
 	privKey, pubKey, xerr := crypt.GenerateRSAKeyPair(name)
-	if err != nil {
+	if xerr != nil {
 		return nil, xerr
 	}
 	return &KeyPair{
