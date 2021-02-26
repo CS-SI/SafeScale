@@ -87,6 +87,9 @@ func (c *cache) GetEntry(task concurrency.Task, key string) (*Entry, fail.Error)
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
+	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
@@ -109,6 +112,9 @@ func (c *cache) ReserveEntry(task concurrency.Task, key string) (xerr fail.Error
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("trask")
+	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -134,6 +140,9 @@ func (c *cache) CommitEntry(task concurrency.Task, key string, content Cacheable
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
@@ -163,6 +172,9 @@ func (c *cache) FreeEntry(task concurrency.Task, key string) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "canceled")
+	}
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
@@ -189,6 +201,9 @@ func (c *cache) AddEntry(task concurrency.Task, content Cacheable) (*Entry, fail
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "canceled")
 	}
 	if content == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("content")
