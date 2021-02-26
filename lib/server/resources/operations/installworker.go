@@ -582,6 +582,8 @@ type taskLaunchStepParameters struct {
 
 // taskLaunchStep starts the step
 func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -590,6 +592,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 	if w.feature == nil {
 		return nil, fail.InvalidInstanceContentError("w.feature", "cannot be nil")
+	}
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	var (
@@ -1047,6 +1055,15 @@ type taskApplyProxyRuleParameters struct {
 }
 
 func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	p := params.(taskApplyProxyRuleParameters)
 	hostName, ok := (*p.variables)["Hostname"].(string)
 	if !ok {

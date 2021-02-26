@@ -17,8 +17,9 @@
 package operations
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"reflect"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
@@ -30,7 +31,16 @@ import (
 
 // taskUnbindFromHost unbinds a host from the security group
 // params is intended to receive a '*host'
-func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	rh, ok := params.(*host)
 	if !ok || rh == nil {
 		return nil, fail.InvalidParameterError("params", "must be a '*host' and cannot be nil")
@@ -39,7 +49,7 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 	sgID := sg.GetID()
 
 	// Unbind Security Group from Host on provider side
-	xerr := sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
+	xerr = sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -67,6 +77,15 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a network
 // 'params" expects to be a '*network'
 func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	subnetID, ok := params.(string)
 	if !ok || subnetID == "" {
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
@@ -125,7 +144,16 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Ta
 
 // taskEnableOnHost applies rules of security group on host
 // params is intended to receive a non-empty string corresponding to host ID
-func (sg *securityGroup) taskEnableOnHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (sg *securityGroup) taskEnableOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	hostID, ok := params.(string)
 	if !ok || hostID == "" {
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
@@ -141,12 +169,24 @@ func (sg *securityGroup) taskEnableOnHost(task concurrency.Task, params concurre
 		}
 	}
 
-	return nil, rh.EnableSecurityGroup(task, sg)
+	if rh != nil {
+		return nil, rh.EnableSecurityGroup(task, sg)
+	}
+	return nil, nil
 }
 
 // taskDisableOnHost removes rules of security group from host
 // params is intended to receive a non-empty string corresponding to host ID
-func (sg *securityGroup) taskDisableOnHost(task concurrency.Task, params concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (sg *securityGroup) taskDisableOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	hostID, ok := params.(string)
 	if !ok || hostID == "" {
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
@@ -162,5 +202,9 @@ func (sg *securityGroup) taskDisableOnHost(task concurrency.Task, params concurr
 			return nil, innerXErr
 		}
 	}
-	return nil, rh.DisableSecurityGroup(task, sg)
+
+	if rh != nil {
+		return nil, rh.DisableSecurityGroup(task, sg)
+	}
+	return nil, nil
 }

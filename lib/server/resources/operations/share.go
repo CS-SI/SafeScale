@@ -974,14 +974,14 @@ func (objs share) ToProtocol(task concurrency.Task) (_ *protocol.ShareMountList,
 			logrus.Errorf(xerr.Error())
 			continue
 		}
-		path, ok := mounts.RemoteMountsByShareID[shareID]
+		sharePath, ok := mounts.RemoteMountsByShareID[shareID]
 		if !ok {
 			logrus.Error(fail.InconsistentError("failed to find the path on host '%s' where share '%s' is mounted", h.GetName(), shareName).Error())
 			continue
 		}
-		mount, ok := mounts.RemoteMountsByPath[path]
+		mount, ok := mounts.RemoteMountsByPath[sharePath]
 		if !ok {
-			logrus.Error(fail.InconsistentError("failed to find a mount associated to share path '%s' for host '%s'", path, h.GetName()).Error())
+			logrus.Error(fail.InconsistentError("failed to find a mount associated to share path '%s' for host '%s'", sharePath, h.GetName()).Error())
 			continue
 		}
 		psmd := &protocol.ShareMountDefinition{

@@ -17,12 +17,13 @@
 package operations
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/sirupsen/logrus"
 
@@ -812,7 +813,7 @@ func (sg securityGroup) GetBoundSubnets(task concurrency.Task) (list []*properti
 }
 
 // CheckConsistency checks the rules in the security group on provider side are identical to the ones registered in metadata
-func (sg securityGroup) CheckConsistency(task concurrency.Task) fail.Error {
+func (sg securityGroup) CheckConsistency(_ concurrency.Task) fail.Error {
 	return fail.NotImplementedError()
 }
 
