@@ -219,7 +219,7 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
 					ek, err := crypt.NewEncryptionKey([]byte(key))
 					if err != nil {
-						return NullService(), fail.ToError(err)
+						return NullService(), fail.ConvertError(err)
 					}
 					metadataCryptKey = ek
 				}
@@ -414,7 +414,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
 		if jserr != nil {
-			return config, fail.ToError(jserr)
+			return config, fail.ConvertError(jserr)
 		}
 
 		config.Credentials = string(d1)
@@ -585,7 +585,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 
 		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
 		if jserr != nil {
-			return config, fail.ToError(jserr)
+			return config, fail.ConvertError(jserr)
 		}
 
 		config.Credentials = string(d1)

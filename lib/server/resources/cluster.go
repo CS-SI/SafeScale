@@ -25,6 +25,8 @@ import (
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -34,6 +36,8 @@ type IndexedListOfClusterNodes map[uint]Host
 type Cluster interface {
 	Metadata
 	Targetable
+	observer.Observable
+	cache.Cacheable
 
 	AddFeature(task concurrency.Task, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)    // adds feature on cluster
 	AddNode(task concurrency.Task, def abstract.HostSizingRequirements) (Host, fail.Error)                           // adds a node

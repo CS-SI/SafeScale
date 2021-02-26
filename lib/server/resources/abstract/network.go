@@ -101,7 +101,7 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	r, err := json.Marshal(n)
-	return r, fail.ToError(err)
+	return r, fail.ConvertError(err)
 }
 
 // Deserialize reads json code and reinstantiates an IPAddress
@@ -110,7 +110,7 @@ func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
-	return fail.ToError(json.Unmarshal(buf, n))
+	return fail.ConvertError(json.Unmarshal(buf, n))
 }
 
 // GetName ...

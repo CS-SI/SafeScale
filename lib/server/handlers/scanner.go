@@ -233,7 +233,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 	//}
 
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	var wg sync.WaitGroup
@@ -346,13 +346,13 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		daOut, err := json.MarshalIndent(daCPU, "", "\t")
 		if err != nil {
 			logrus.Warnf("tenant '%s', template '%s' : Problem marshaling json data: %v", tenantName, template.Name, err)
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 
 		nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0666)
 		if nerr != nil {
 			logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
-			return fail.ToError(nerr)
+			return fail.ConvertError(nerr)
 		}
 		logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
 		//} else {
@@ -388,7 +388,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 	err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	type TemplateList struct {
@@ -405,14 +405,14 @@ func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 		Templates: templates,
 	})
 	if xerr != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svc.GetName())
 	f = utils.AbsPathify(f)
 
 	if err = ioutil.WriteFile(f, content, 0666); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	return nil
@@ -420,7 +420,7 @@ func (handler *scannerHandler) dumpTemplates() (xerr fail.Error) {
 
 func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	type ImageList struct {
@@ -437,14 +437,14 @@ func (handler *scannerHandler) dumpImages() (xerr fail.Error) {
 		Images: images,
 	})
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svc.GetName())
 	f = utils.AbsPathify(f)
 
 	if err := ioutil.WriteFile(f, content, 0666); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	return nil
@@ -545,17 +545,17 @@ func (handler *scannerHandler) collect() (xerr fail.Error) {
 	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
 
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	files, err := ioutil.ReadDir(utils.AbsPathify("$HOME/.safescale/scanner"))
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	for _, file := range files {
@@ -566,17 +566,17 @@ func (handler *scannerHandler) collect() (xerr fail.Error) {
 
 			byteValue, err := ioutil.ReadFile(theFile)
 			if err != nil {
-				return fail.ToError(err)
+				return fail.ConvertError(err)
 			}
 
 			if err = json.Unmarshal(byteValue, &acpu); err != nil {
-				return fail.ToError(err)
+				return fail.ConvertError(err)
 			}
 
 			acpu.ID = acpu.ImageID
 
 			if err = db.Write(folder, acpu.TemplateName, acpu); err != nil {
-				return fail.ToError(err)
+				return fail.ConvertError(err)
 			}
 		}
 		if !file.IsDir() {

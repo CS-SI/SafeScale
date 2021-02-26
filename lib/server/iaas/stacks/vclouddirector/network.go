@@ -273,7 +273,7 @@ func ipv4MaskString(m []byte) (string, fail.Error) {
 func toIPRange(cidr string) (types.IPRanges, fail.Error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return types.IPRanges{}, fail.ToError(err)
+		return types.IPRanges{}, fail.ConvertError(err)
 	}
 	var first net.IP
 	var last net.IP
@@ -324,7 +324,7 @@ func dupIP(ip net.IP) net.IP {
 func getGateway(cidr string) (net.IP, fail.Error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return net.IP{}, fail.ToError(err)
+		return net.IP{}, fail.ConvertError(err)
 	}
 	var first net.IP
 	found := false
@@ -342,7 +342,7 @@ func getGateway(cidr string) (net.IP, fail.Error) {
 func toValidIPRange(cidr string) (types.IPRanges, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return types.IPRanges{}, fail.ToError(err)
+		return types.IPRanges{}, fail.ConvertError(err)
 	}
 	var first net.IP
 	var last net.IP

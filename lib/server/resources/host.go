@@ -22,6 +22,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -36,6 +38,8 @@ import (
 type Host interface {
 	Metadata
 	Targetable
+	observer.Observable
+	cache.Cacheable
 
 	BindSecurityGroup(task concurrency.Task, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                          // Binds a security group to host
 	Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) fail.Error                                                         // ...
@@ -63,7 +67,7 @@ type Host interface {
 	PushStringToFile(task concurrency.Task, content string, filename string) fail.Error                                                            // creates a file 'filename' on remote 'host' with the content 'content'
 	PushStringToFileWithOwnership(task concurrency.Task, content string, filename string, owner, mode string) fail.Error                           // creates a file 'filename' on remote 'host' with the content 'content' and apply ownership to it
 	Reboot(task concurrency.Task) fail.Error                                                                                                       // reboots the host
-	Resize(hostSize abstract.HostSizingRequirements) fail.Error                                                                                    // resize the host (probably not yet implemented on some proviers if not all)
+	Resize(task concurrency.Task, hostSize abstract.HostSizingRequirements) fail.Error                                                             // resize the host (probably not yet implemented on some proviers if not all)
 	Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
 	Start(task concurrency.Task) fail.Error                                                                                                        // starts the host
 	Stop(task concurrency.Task) fail.Error                                                                                                         // stops the host

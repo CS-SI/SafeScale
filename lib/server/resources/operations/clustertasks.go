@@ -48,6 +48,7 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -57,7 +58,7 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	if xerr = c.service.StartHost(id); xerr != nil {
+	if xerr = c.GetService().StartHost(id); xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already started is considered as a successful run
 			return nil, nil
@@ -75,6 +76,7 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -84,7 +86,7 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	if xerr = c.service.StopHost(id); xerr != nil {
+	if xerr = c.GetService().StopHost(id); xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
 			return nil, nil
@@ -108,6 +110,7 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -165,6 +168,7 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -211,6 +215,7 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -286,6 +291,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -359,17 +365,21 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		}
 	}()
 
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
 	netCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task, c.GetService(), "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// Create the rh
+	// Create the Host
 	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -461,110 +471,6 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 	logrus.Debugf("[%s] Host creation successful.", hostLabel)
 	return rh, nil
-
-	// hostLabel := fmt.Sprintf("master #%d", p.index)
-	// logrus.Debugf("[%s] starting Host creation...", hostLabel)
-	//
-	// netCfg, xerr := c.GetNetworkConfig(task)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	// subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// hostReq := abstract.HostRequest{}
-	// xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-	// 	as, ok := clonable.(*abstract.Subnet)
-	// 	if !ok {
-	// 		return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 	}
-	// 	hostReq.Subnets = []*abstract.Subnet{as}
-	// 	return nil
-	// })
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// if hostReq.ResourceName, xerr = c.buildHostname(task, "master", clusternodetype.Master); xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// hostReq.DefaultRouteIP = netCfg.DefaultRouteIP
-	// hostReq.PublicIP = false
-	// hostReq.KeepOnFailure = p.keepOnFailure
-	// // hostReq.ImageID = def.Image
-	//
-	// rh, xerr := NewHost(c.service)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// if _, xerr = rh.Create(task, hostReq, p.masterDef); xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// defer func() {
-	// 	if xerr != nil && !p.keepOnFailure {
-	// 		if derr := rh.Delete(task); derr != nil {
-	// 			_ = xerr.AddConsequence(derr)
-	// 		}
-	// 	}
-	// }()
-	//
-	// // Updates cluster metadata to keep track of created IPAddress, before testing if an error occurred during the creation
-	// xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	// References new node in cluster
-	// 	return props.Alter(task, clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
-	// 		nodesV2 := clonable.(*propertiesv2.ClusterNodes)
-	// 		nodesV2.GlobalLastIndex++
-	// 		pubIP, innerXErr := rh.GetPublicIP(task)
-	// 		if innerXErr != nil {
-	// 			switch innerXErr.(type) {
-	// 			case *fail.ErrNotFound:
-	// 				// no public IP, this can happen, continue
-	// 			default:
-	// 				return innerXErr
-	// 			}
-	// 		}
-	//
-	// 		privIP, innerXErr := rh.GetPrivateIP(task)
-	// 		if innerXErr != nil {
-	// 			return innerXErr
-	// 		}
-	// 		node := &propertiesv2.ClusterNode{
-	// 			ID:          rh.GetID(),
-	// 			NumericalID: nodesV2.GlobalLastIndex,
-	// 			Name:        rh.GetName(),
-	// 			PrivateIP:   privIP,
-	// 			PublicIP:    pubIP,
-	// 		}
-	// 		nodesV2.Masters = append(nodesV2.Masters, node)
-	// 		return nil
-	// 	})
-	// })
-	// if xerr != nil && !p.keepOnFailure {
-	// 	if derr := rh.Delete(task); derr != nil {
-	// 		_ = xerr.AddConsequence(derr)
-	// 	}
-	// 	return nil, fail.Wrap(xerr, "[%s] Host creation failed")
-	// }
-	//
-	// hostLabel = fmt.Sprintf("%s (%s)", hostLabel, rh.GetName())
-	// logrus.Debugf("[%s] Host creation successful", hostLabel)
-	//
-	// if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// // Installs cluster-level system requirements...
-	// if xerr = c.installNodeRequirements(task, clusternodetype.Master, rh, hostLabel); xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// logrus.Debugf("[%s] Host creation successful.", hostLabel)
-	// return nil, nil
 }
 
 // taskConfigureMasters configure masters
@@ -578,6 +484,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
 	}
@@ -647,6 +554,7 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -710,6 +618,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -785,6 +694,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -863,7 +773,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.service, "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task, c.GetService(), "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -998,6 +908,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "canceled")
 	}
@@ -1074,6 +985,7 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -1128,6 +1040,7 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}

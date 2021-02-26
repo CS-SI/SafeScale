@@ -80,59 +80,6 @@ func (sr stepResult) ErrorMessage() string {
 	return msg
 }
 
-// // stepResults contains the errors of the step for each host target
-// type stepResults map[string]stepResult
-
-// // ErrorMessages returns a string containing all the errors registered
-// func (s stepResults) ErrorMessages() string {
-// 	output := ""
-// 	for h, k := range s {
-// 		val := k.ErrorMessage()
-// 		if val != "" {
-// 			output += h + ": " + val + "\n"
-// 		}
-// 	}
-// 	return output
-// }
-
-// // UncompletedEntries returns an array of string of all keys where the script
-// // to run action wasn't completed
-// func (s stepResults) UncompletedEntries() []string {
-// 	var output []string
-// 	for k, v := range s {
-// 		if !v.Completed() {
-// 			output = append(output, k)
-// 		}
-// 	}
-// 	return output
-// }
-
-// // Successful tells if all the steps have been successful
-// func (s stepResults) Successful() bool {
-// 	if len(s) == 0 {
-// 		return false
-// 	}
-// 	for _, k := range s {
-// 		if !k.Successful() {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
-
-// // Completed tells if all the scripts corresponding to action have been completed.
-// func (s stepResults) Completed() bool {
-// 	if len(s) == 0 {
-// 		return false
-// 	}
-// 	for _, k := range s {
-// 		if !k.Completed() {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
-
 type stepTargets map[string]string
 
 // parse converts the content of specification file loaded inside struct to
@@ -359,7 +306,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			}
 			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = h.Review(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
@@ -515,7 +462,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 
 			buffer := bytes.NewBufferString("")
 			if err := varTemplate.Execute(buffer, variables); err != nil {
-				return nil, fail.ToError(err)
+				return nil, fail.ConvertError(err)
 			}
 
 			cloneV[k] = buffer.String()

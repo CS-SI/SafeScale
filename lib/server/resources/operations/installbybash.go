@@ -51,6 +51,7 @@ func (i *bashInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer w.Terminate()
 
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Error(xerr.Error())
@@ -88,6 +89,7 @@ func (i *bashInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer w.Terminate()
 
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Info(xerr.Error())
@@ -129,6 +131,7 @@ func (i *bashInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer w.Terminate()
 
 	if xerr = w.CanProceed(s); xerr != nil {
 		logrus.Info(xerr.Error())

@@ -14,21 +14,6 @@
  * limitations under the License.
  */
 
-package network
+package iaas_test
 
-import (
-	"sync"
-
-	"github.com/CS-SI/SafeScale/lib/utils"
-)
-
-var networkCache struct {
-	lock   sync.Mutex
-	ByID   utils.Cache
-	ByName utils.Cache
-}
-
-func init() {
-	networkCache.ByID = utils.NewMapCache()
-	networkCache.ByName = utils.NewMapCache()
-}
+// FIXME: implement tests for caches.go

@@ -23,6 +23,8 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -30,6 +32,8 @@ import (
 type Volume interface {
 	Metadata
 	data.Identifiable
+	observer.Observable
+	cache.Cacheable
 
 	Attach(task concurrency.Task, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
 	Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network

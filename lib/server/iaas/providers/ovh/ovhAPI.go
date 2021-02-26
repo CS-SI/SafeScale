@@ -50,14 +50,14 @@ func (p *provider) requestOVHAPI(url string, httpCode string) (interface{}, fail
 		alternateAPIConsumerKey,
 	)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	var result interface{}
 	switch httpCode {
 	case "GET":
 		if err := client.Get(url, &result); err != nil {
-			return nil, fail.ToError(err)
+			return nil, fail.ConvertError(err)
 		}
 	case "PUT":
 		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode))

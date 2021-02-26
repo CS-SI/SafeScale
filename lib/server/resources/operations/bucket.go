@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -40,23 +41,14 @@ import (
 )
 
 const (
-	// bucketsFolderName is the technical name of the object storage folder used to store buckets info
+	bucketKind = "bucket"
+	// bucketsFolderName is the name of the object storage folder used to store buckets info
 	bucketsFolderName = "buckets"
 )
 
 // bucket describes a bucket and satisfies interface resources.ObjectStorageBucket
 type bucket struct {
 	*core
-
-	// GetID         string `json:"id,omitempty"`
-	// GetName       string `json:"name,omitempty"`
-	// IPAddress       string `json:"host,omitempty"`
-	// MountPoint string `json:"mountPoint,omitempty"`
-	// // NbItems    int    `json:"nbitems,omitempty"`
-
-	svc iaas.Service
-	// location objectstorage.Location
-	// container objectstorage.Bucket
 }
 
 // NewBucket intanciates bucket struct
@@ -65,20 +57,16 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, "bucket", bucketsFolderName, &abstract.ObjectStorageBucket{})
+	coreInstance, xerr := newCore(svc, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	b := &bucket{
-		core: coreInstance,
-		svc:  svc,
-	}
-	return b, nil
+	return &bucket{core: coreInstance}, nil
 }
 
 // LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resources.Bucket, xerr fail.Error) {
+func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -95,31 +83,74 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (_ resourc
 
 	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	anon, xerr := NewBucket(svc)
+	bucketCache, xerr := svc.GetCache(bucketKind)
 	if xerr != nil {
 		return nil, xerr
 	}
-	b := anon.(*bucket)
 
-	ab, xerr := svc.InspectBucket(name)
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			b, innerXErr := NewBucket(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = b.Read(task, name); innerXErr != nil {
+				return nil, innerXErr
+			}
+			return b, nil
+		}),
+	}
+	cacheEntry, xerr := bucketCache.Get(task, name, options...)
 	if xerr != nil {
-		if xerr.Error() == "not found" {
-			return nil, abstract.ResourceNotFoundError("bucket", name)
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// rewrite NotFoundError, user does not bother about metadata stuff
+			return nil, fail.NotFoundError("failed to find Bucket '%s'", name)
+		default:
+			return nil, xerr
 		}
-		return nil, fail.NewError(xerr, nil, "failed to read bucket information")
 	}
-	xerr = b.Carry(task, &ab)
-	if xerr != nil {
-		return nil, xerr
+
+	if b = cacheEntry.Content().(resources.Bucket); b == nil {
+		return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
 	}
+	_ = cacheEntry.LockContent()
+
 	return b, nil
 }
 
 // IsNull tells if the instance corresponds to null value
 func (b *bucket) IsNull() bool {
 	return b == nil || b.core.IsNull()
+}
+
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (b *bucket) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	if b.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := b.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	bucketCache, xerr := b.GetService().GetCache(bucketKind)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := bucketCache.AddEntry(task, b)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
 }
 
 // GetHost ...
@@ -188,6 +219,9 @@ func (b *bucket) MountPoint(task concurrency.Task) string {
 
 // Create a bucket
 func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	// Note: do not use .IsNull() here
 	if b == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -206,7 +240,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	ab, xerr := b.svc.InspectBucket(name)
+	ab, xerr := b.GetService().InspectBucket(name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
@@ -215,7 +249,7 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	if !ab.IsNull() {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
-	if ab, xerr = b.svc.CreateBucket(name); xerr != nil {
+	if ab, xerr = b.GetService().CreateBucket(name); xerr != nil {
 		return xerr
 	}
 
@@ -232,7 +266,7 @@ func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
-	return b.svc.DeleteBucket(b.GetName())
+	return b.GetService().DeleteBucket(b.GetName())
 }
 
 // Mount a bucket on an host on the given mount point
@@ -245,10 +279,10 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 		return fail.AbortedError(nil, "canceled")
 	}
 
-	// Get IPAddress data
-	rh, xerr := LoadHost(task, b.svc, hostName)
+	// Get Host data
+	rh, xerr := LoadHost(task, b.GetService(), hostName)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to mount bucket '%s' on rh '%s'", b.GetName(), hostName)
+		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", b.GetName(), hostName)
 	}
 
 	// Create mount point
@@ -257,7 +291,7 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 		mountPoint = abstract.DefaultBucketMountPoint + b.GetName()
 	}
 
-	authOpts, _ := b.svc.GetAuthenticationOptions()
+	authOpts, _ := b.GetService().GetAuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -270,12 +304,12 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	regionCfg, _ := authOpts.Config("Region")
 	region := regionCfg.(string)
 
-	objStorageProtocol := b.svc.ObjectStorageProtocol()
+	objStorageProtocol := b.GetService().ObjectStorageProtocol()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
 	}
 
-	data := struct {
+	d := struct {
 		Bucket     string
 		Tenant     string
 		Login      string
@@ -295,8 +329,8 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 		Protocol:   objStorageProtocol,
 	}
 
-	err := b.exec(task, rh, "mount_object_storage.sh", data)
-	return fail.ToError(err)
+	err := b.exec(task, rh, "mount_object_storage.sh", d)
+	return fail.ConvertError(err)
 }
 
 // Unmount a bucket
@@ -311,17 +345,17 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 
 	defer func() {
 		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from rh '%s'", b.GetName(), hostName)
+			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from Host '%s'", b.GetName(), hostName)
 		}
 	}()
 
 	// Check bucket existence
-	if _, xerr = b.svc.InspectBucket(b.GetName()); xerr != nil {
+	if _, xerr = b.GetService().InspectBucket(b.GetName()); xerr != nil {
 		return xerr
 	}
 
 	// Get IPAddress ID
-	rh, xerr := LoadHost(task, b.svc, hostName)
+	rh, xerr := LoadHost(task, b.GetService(), hostName)
 	if xerr != nil {
 		return xerr
 	}
@@ -333,7 +367,7 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 	}
 
 	err := b.exec(task, rh, "umount_object_storage.sh", data)
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
@@ -357,20 +391,20 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 
 	box, err := rice.FindBox("../operations/scripts")
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	scriptContent, err := box.String(script)
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	tpl, err := template.Parse("TemplateName", scriptContent)
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 
 	var buffer bytes.Buffer
 	if err = tpl.Execute(&buffer, data); err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 
 	tplcmd = buffer.String()

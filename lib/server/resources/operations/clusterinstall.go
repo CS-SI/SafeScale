@@ -144,25 +144,28 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if xerr != nil {
 		return xerr
 	}
+
 	v["ClusterComplexity"] = strings.ToLower(complexity.String())
 	clusterFlavor, xerr := c.GetFlavor(task)
 	if xerr != nil {
 		return xerr
 	}
+
 	v["ClusterFlavor"] = strings.ToLower(clusterFlavor.String())
 	v["ClusterName"] = c.GetName()
 	v["ClusterAdminUsername"] = "cladm"
 	if v["ClusterAdminPassword"], xerr = c.GetAdminPassword(task); xerr != nil {
 		return xerr
 	}
+
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
 	}
-
 	networkCfg, xerr := c.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
+
 	v["PrimaryGatewayIP"] = networkCfg.GatewayIP
 	v["DefaultRouteIP"] = networkCfg.DefaultRouteIP
 	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
@@ -193,6 +196,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	if xerr != nil {
 		return xerr
 	}
+
 	if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
 		v["ClusterControlplaneUsesVIP"] = true
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
@@ -202,37 +206,46 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		if xerr != nil {
 			return xerr
 		}
+
 		if v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(task); xerr != nil {
 			return xerr
 		}
+
 		v["ClusterControlplaneUsesVIP"] = false
 	}
 	if v["ClusterMasters"], xerr = c.ListMasters(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterMasterNames"], xerr = c.ListMasterNames(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterMasterIDs"], xerr = c.ListMasterIDs(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterMasterIPs"], xerr = c.ListMasterIPs(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodes"], xerr = c.ListNodes(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodeNames"], xerr = c.ListNodeNames(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodeIDs"], xerr = c.ListNodeIDs(task); xerr != nil {
 		return xerr
 	}
+
 	if v["ClusterNodeIPs"], xerr = c.ListNodeIPs(task); xerr != nil {
 		return xerr
 	}
-	v["IPRanges"] = networkCfg.CIDR
 
+	v["IPRanges"] = networkCfg.CIDR
 	return nil
 }
 
@@ -447,7 +460,7 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 
 	box, err := getTemplateBox()
 	if err != nil {
-		return 0, "", "", fail.ToError(err)
+		return 0, "", "", fail.ConvertError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
@@ -515,13 +528,13 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {
-		tp := c.service.GetTenantParameters()
+		tp := c.GetService().GetTenantParameters()
 		content := map[string]interface{}{
 			"tenants": []map[string]interface{}{tp},
 		}
 		jsoned, err := json.MarshalIndent(content, "", "    ")
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 		params["reserved_TenantJSON"] = string(jsoned)
 
@@ -585,8 +598,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 			return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
 		}
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
-		suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX")
-		if suffix != "" {
+		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
@@ -607,7 +619,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	}
 
 	var dnsServers []string
-	cfg, xerr := c.service.GetConfigurationOptions()
+	cfg, xerr := c.GetService().GetConfigurationOptions()
 	if xerr == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
@@ -615,13 +627,13 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	if xerr != nil {
 		return xerr
 	}
+
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	list, xerr := c.ListMasterIPs(task)
-	if xerr != nil {
+	if params["MasterIPs"], xerr = c.ListMasterIPs(task); xerr != nil {
 		return xerr
 	}
-	params["MasterIPs"] = list
+
 	params["ClusterAdminUsername"] = "cladm"
 	params["ClusterAdminPassword"] = identity.AdminPassword
 	params["DefaultRouteIP"] = netCfg.DefaultRouteIP
@@ -653,7 +665,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {

@@ -34,7 +34,7 @@ func Parse(title, content string) (*txttmpl.Template, fail.Error) {
 	}
 	r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Parse(content)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return r, nil
 }

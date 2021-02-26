@@ -30,6 +30,6 @@ func normalizeError(err error) fail.Error { //nolint
 	case fail.Error:
 		return realErr
 	default:
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 }

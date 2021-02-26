@@ -69,7 +69,7 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	}
 	userData, cerr := rgw.Create(task, hostReq, hostSizing) // cerr is tested later
 
-	// Set link to subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in subnet
+	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
 	xerr = rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -177,7 +177,7 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 		return nil, xerr
 	}
 	if retcode != 0 {
-		logrus.Warnf("Unexpected problem rebooting...")
+		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
 	if _, xerr := objgw.waitInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
@@ -196,7 +196,7 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 		return nil, xerr
 	}
 	if retcode != 0 {
-		logrus.Warnf("Unexpected problem rebooting...")
+		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
 	if _, xerr = objgw.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {

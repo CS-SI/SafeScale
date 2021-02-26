@@ -54,14 +54,14 @@ func refreshResult(oco opContext) (res result, xerr fail.Error) {
 		if oco.Operation.Zone != "" { // nolint
 			zoneURL, ierr := url.Parse(oco.Operation.Zone)
 			if ierr != nil {
-				return res, fail.ToError(ierr)
+				return res, fail.ConvertError(ierr)
 			}
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 		} else if oco.Operation.Region != "" {
 			regionURL, ierr := url.Parse(oco.Operation.Region)
 			if ierr != nil {
-				return res, fail.ToError(ierr)
+				return res, fail.ConvertError(ierr)
 			}
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
@@ -73,14 +73,14 @@ func refreshResult(oco opContext) (res result, xerr fail.Error) {
 			if err == nil {
 				return res, fail.NewError("no operation")
 			}
-			return res, fail.ToError(err)
+			return res, fail.ConvertError(err)
 		}
 
 		res.State = oco.Operation.Status
 		res.Error = err
 		res.Done = res.State == oco.DesiredState
 
-		return res, fail.ToError(err)
+		return res, fail.ConvertError(err)
 	}
 
 	return res, fail.NewError("no operation")
@@ -138,7 +138,7 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 		duration,
 	)
 
-	return fail.ToError(retryErr)
+	return fail.ConvertError(retryErr)
 }
 
 func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {

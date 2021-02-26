@@ -156,7 +156,7 @@ func (b bucket) ListObjects(path, prefix string) ([]string, fail.Error) {
 		},
 	)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return list, nil
 }
@@ -183,7 +183,7 @@ func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) fa
 			return nil
 		},
 	)
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // Clear empties a bucket
@@ -212,7 +212,7 @@ func (b bucket) Clear(path, prefix string) fail.Error {
 			return nil
 		},
 	)
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // DeleteObject deletes an object from a bucket
@@ -339,7 +339,7 @@ func (b bucket) GetCount(path, prefix string) (int64, fail.Error) {
 		},
 	)
 	if err != nil {
-		return -1, fail.ToError(err)
+		return -1, fail.ConvertError(err)
 	}
 	return count, nil
 }
@@ -373,7 +373,7 @@ func (b bucket) GetSize(path, prefix string) (int64, string, fail.Error) {
 		},
 	)
 	if err != nil {
-		return -1, "", fail.ToError(err)
+		return -1, "", fail.ConvertError(err)
 	}
 	return totalSize, humanReadableSize(totalSize), nil
 }

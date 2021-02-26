@@ -111,7 +111,7 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 					return verdict.Retry, nil
 				}
 
-				return verdict.Done, fail.ToError(t.Err)
+				return verdict.Done, fail.ConvertError(t.Err)
 			}
 		}
 		return verdict.Done, nil

@@ -75,17 +75,17 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 
 	d1, err := json.MarshalIndent(localCfg, "", "  ")
 	if err != nil {
-		return &stack{}, fail.ToError(err)
+		return &stack{}, fail.ConvertError(err)
 	}
 
 	cred, err := google.CredentialsFromJSON(context.Background(), d1, iam.CloudPlatformScope)
 	if err != nil {
-		return &stack{}, fail.ToError(err)
+		return &stack{}, fail.ConvertError(err)
 	}
 
 	gcpStack.ComputeService, err = compute.NewService(context.Background(), option.WithTokenSource(cred.TokenSource))
 	if err != nil {
-		return &stack{}, fail.ToError(err)
+		return &stack{}, fail.ConvertError(err)
 	}
 
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID

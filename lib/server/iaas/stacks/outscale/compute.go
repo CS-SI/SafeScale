@@ -127,11 +127,11 @@ func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
 	var err error
 	cpus, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return 0, 0, 0, fail.ToError(err)
+		return 0, 0, 0, fail.ConvertError(err)
 	}
 	ram, err = strconv.Atoi(tokens[1])
 	if err != nil {
-		return 0, 0, 0, fail.ToError(err)
+		return 0, 0, 0, fail.ConvertError(err)
 	}
 	perf = 2
 	if len(tokens) < 3 {
@@ -139,7 +139,7 @@ func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
 	}
 	perf, err = strconv.Atoi(tokens[2])
 	if err != nil {
-		return 0, 0, 0, fail.ToError(err)
+		return 0, 0, 0, fail.ConvertError(err)
 	}
 
 	return
@@ -155,7 +155,7 @@ func parseGPU(s string) (gpus int, gpuType string, xerr fail.Error) {
 	var err error
 	gpus, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return 0, "", fail.ToError(err)
+		return 0, "", fail.ConvertError(err)
 	}
 	gpuType = tokens[1]
 	return
@@ -544,7 +544,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return nullAHC, fail.ToError(xerr.Cause())
+			return nullAHC, fail.ConvertError(xerr.Cause())
 		case *retry.ErrStopRetry:
 			return nullAHC, fail.NotFoundError("failed to find Host %s", hostLabel)
 		default:
@@ -947,7 +947,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if retryErr != nil {
 		switch retryErr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			retryErr = fail.ToError(retryErr.Cause())
+			retryErr = fail.ConvertError(retryErr.Cause())
 		}
 	}
 	if retryErr != nil {

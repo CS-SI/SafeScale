@@ -133,7 +133,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	providerName := "huaweicloud"
