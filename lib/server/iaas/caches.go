@@ -88,6 +88,7 @@ func (rc *ResourceCache) Get(task concurrency.Task, key string, options ...data.
 			switch v.Key() { //nolint
 			case "onMiss":
 				onMissFunc = v.Value().(func() (cache.Cacheable, fail.Error))
+			default:
 			}
 		}
 
