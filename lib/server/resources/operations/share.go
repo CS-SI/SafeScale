@@ -34,11 +34,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 const (
+	shareKind = "share"
 	// nasFolderName is the technical name of the container used to store nas info
 	sharesFolderName = "shares"
 )
@@ -67,14 +69,14 @@ func (si ShareIdentity) GetName() string {
 // satisfies interface data.Serializable
 func (si ShareIdentity) Serialize() ([]byte, fail.Error) {
 	r, err := json.Marshal(&si)
-	return r, fail.ToError(err)
+	return r, fail.ConvertError(err)
 }
 
 // Deserialize ...
 // satisfies interface data.Serializable
 func (si *ShareIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
-	return fail.ToError(json.Unmarshal(buf, si))
+	return fail.ConvertError(json.Unmarshal(buf, si))
 }
 
 // Clone ...
@@ -112,10 +114,11 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 		return nullShare(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, "share", sharesFolderName, &ShareIdentity{})
+	coreInstance, xerr := newCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
 	if xerr != nil {
 		return nullShare(), xerr
 	}
+
 	return &share{core: coreInstance}, nil
 }
 
@@ -124,7 +127,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (_ resources.Share, xerr fail.Error) {
+func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (rs resources.Share, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -140,13 +143,28 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (_ resources
 		return nullShare(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rs, xerr := NewShare(svc)
+	shareCache, xerr := svc.GetCache(shareKind)
 	if xerr != nil {
-		return rs, xerr
+		return nil, xerr
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rs.Read(task, ref); xerr != nil {
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rs, innerXErr := NewShare(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rs.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			return rs, nil
+		}),
+	}
+	cacheEntry, xerr := shareCache.Get(task, ref, options...)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -155,6 +173,17 @@ func LoadShare(task concurrency.Task, svc iaas.Service, ref string) (_ resources
 			return nullShare(), xerr
 		}
 	}
+
+	if rs = cacheEntry.Content().(resources.Share); rs == nil {
+		return nullShare(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
+	}
+	_ = cacheEntry.LockContent()
+	defer func() {
+		if xerr != nil {
+			_ = cacheEntry.UnlockContent()
+		}
+	}()
+
 	return rs, nil
 }
 
@@ -163,13 +192,39 @@ func (objs *share) IsNull() bool {
 	return objs == nil || objs.core.IsNull()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (objs *share) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	if objs.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := objs.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	shareCache, xerr := objs.GetService().GetCache(shareKind)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := shareCache.AddEntry(task, objs)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
+}
+
 // Browse walks through shares folder and executes a callback for each entry
 func (objs share) Browse(task concurrency.Task, callback func(string, string) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if objs.IsNull() {
-		return fail.InvalidInstanceError()
-	}
+	// Note: Browse is intended to be callable from null value, so do not validate objs
+	// if objs.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -201,7 +256,8 @@ func (objs *share) Create(
 
 	defer fail.OnPanic(&xerr)
 
-	if objs.IsNull() {
+	// Note: do not use .IsNull() here
+	if objs == nil {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -410,7 +466,7 @@ func (objs share) GetServer(task concurrency.Task) (_ resources.Host, xerr fail.
 	}
 
 	var hostID, hostName string
-	xerr = objs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = objs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		share, ok := clonable.(*ShareIdentity)
 		if !ok {
 			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -996,7 +1052,7 @@ func (objs share) ToProtocol(task concurrency.Task) (_ *protocol.ShareMountList,
 		}
 		sharePath, ok := mounts.RemoteMountsByShareID[shareID]
 		if !ok {
-			logrus.Error(fail.InconsistentError("failed to find the path on host '%s' where share '%s' is mounted", h.GetName(), shareName).Error())
+			logrus.Error(fail.InconsistentError("failed to find the sharePath on host '%s' where share '%s' is mounted", h.GetName(), shareName).Error())
 			continue
 		}
 		mount, ok := mounts.RemoteMountsByPath[sharePath]

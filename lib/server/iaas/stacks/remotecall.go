@@ -20,7 +20,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	if convertError != nil {
 		normalizeError = func(err error) fail.Error { return convertError(err) }
 	} else {
-		normalizeError = fail.ToError
+		normalizeError = fail.ConvertError
 	}
 
 	// Execute the remote call with tolerance for transient communication failure
@@ -43,7 +43,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.ToError(xerr.Cause())
+			return fail.ConvertError(xerr.Cause())
 		case *retry.ErrTimeout: // On timeout, raise a NotFound error with the cause as message
 			return fail.NotFoundError(xerr.Cause().Error())
 		default:

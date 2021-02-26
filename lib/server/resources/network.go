@@ -22,6 +22,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -29,6 +31,8 @@ import (
 type Network interface {
 	Metadata
 	data.Identifiable
+	observer.Observable
+	cache.Cacheable
 
 	Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error // ...
 	Create(task concurrency.Task, req abstract.NetworkRequest) fail.Error                 // creates a network

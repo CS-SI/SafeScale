@@ -66,7 +66,7 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../clusterflavors/scripts")
 		if err != nil {
-			return nil, fail.ToError(err)
+			return nil, fail.ConvertError(err)
 		}
 		templateBox.Store(b)
 		anon = templateBox.Load()

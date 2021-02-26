@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -51,6 +52,7 @@ type core struct {
 	committed  bool
 	name       atomic.Value
 	id         atomic.Value
+	observers  map[string]observer.Observer
 }
 
 func nullCore() *core {
@@ -87,6 +89,7 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		properties: props,
 		TaskedLock: concurrency.NewTaskedLock(),
 		shielded:   concurrency.NewShielded(instance),
+		observers:  map[string]observer.Observer{},
 	}
 	return &c, nil
 }
@@ -220,6 +223,7 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	if xerr = c.Reload(task); xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
 	}
+
 	xerr = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
@@ -233,7 +237,12 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	}
 
 	c.committed = false
-	return c.write(task)
+	if xerr = c.write(task); xerr != nil {
+		return xerr
+	}
+
+	// notify observers there has been changed in the instance
+	return fail.ConvertError(c.NotifyObservers(task))
 }
 
 // Carry links metadata with real data
@@ -271,10 +280,10 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 
 	c.shielded = concurrency.NewShielded(clonable)
 	c.loaded = true
-	err := c.updateIdentity(task)
-	if err != nil {
-		return err
+	if xerr = c.updateIdentity(task); xerr != nil {
+		return xerr
 	}
+
 	c.committed = false
 	return c.write(task)
 }
@@ -299,6 +308,12 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 
 	c.name.Store("")
 	c.id.Store("")
+
+	// notify observers there has been changed in the instance
+	if err := c.NotifyObservers(task); err != nil {
+		return fail.ConvertError(err)
+	}
+
 	return nil
 }
 
@@ -341,13 +356,13 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 	// 	},
 	// 	temporal.GetMinDelay(),
 	// )
-	if xerr := c.readByReference(task, ref); xerr != nil {
+	if xerr = c.readByReference(task, ref); xerr != nil {
 		// switch xerr.(type) {
 		// case *retry.ErrTimeout:
 		// 	return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
 		// case *retry.ErrStopRetry:
 		// 	// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
-		// 	return fail.ToError(xerr.Cause())
+		// 	return fail.ConvertError(xerr.Cause())
 		// default:
 		return xerr
 		// }
@@ -420,7 +435,12 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			switch innerXErr.(type) {
+			case *fail.ErrSyntax:
+				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			default:
+				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			}
 		}
 		return nil
 	})
@@ -433,6 +453,7 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	timeout := temporal.GetCommunicationTimeout()
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(task, ref); innerXErr != nil {
@@ -452,18 +473,18 @@ func (c *core) readByReference(task concurrency.Task, ref string) (xerr fail.Err
 			}
 			return nil
 		},
-		temporal.GetCommunicationTimeout(),
+		timeout,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to read %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr.Cause(), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			xerr = fail.Wrap(xerr.Cause(), "failed to read %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr.Cause(), "failed to read metadata of %s '%s'", c.kind, ref)
 		case *fail.ErrNotFound:
-			xerr = fail.Wrap(xerr, "failed to find %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr, "failed to find metadata of %s '%s'", c.kind, ref)
 		default:
-			xerr = fail.Wrap(xerr, "failed to read %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(xerr, "failed to read metadata of %s '%s'", c.kind, ref)
 		}
 	}
 	return xerr
@@ -509,7 +530,7 @@ func (c *core) write(task concurrency.Task) fail.Error {
 	return nil
 }
 
-// Reload reloads the content of the Object Storage, overriding what is in the metadata instance (being written or not...)
+// Reload reloads the content from the Object Storage
 func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -523,8 +544,11 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "canceled")
 	}
 
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
+
 	if c.loaded && !c.committed {
-		return fail.InconsistentError("altered and not committed")
+		return fail.InconsistentError("cannot reload a not committed data")
 	}
 
 	if task.Aborted() {
@@ -559,7 +583,7 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 
 	c.loaded = true
 	c.committed = true
-	return nil
+	return fail.ConvertError(c.NotifyObservers(task))
 }
 
 // BrowseFolder walks through folder and executes a callback for each entries
@@ -588,7 +612,7 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 	})
 }
 
-// Delete deletes the matadata
+// Delete deletes the metadata
 func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -611,7 +635,7 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	var errors []error
 	// Checks entries exist in Object Storage
-	if xerr := c.folder.Lookup(byIDFolderName, id); xerr != nil {
+	if xerr = c.folder.Lookup(byIDFolderName, id); xerr != nil {
 		// If not found, consider it not an error
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -627,7 +651,7 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if xerr := c.folder.Lookup(byNameFolderName, name); xerr != nil {
+	if xerr = c.folder.Lookup(byNameFolderName, name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
@@ -644,12 +668,12 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	// Deletes entries found
 	if idFound {
-		if xerr := c.folder.Delete(byIDFolderName, id); xerr != nil {
+		if xerr = c.folder.Delete(byIDFolderName, id); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	if nameFound {
-		if xerr := c.folder.Delete(byNameFolderName, name); xerr != nil {
+		if xerr = c.folder.Delete(byNameFolderName, name); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
@@ -660,6 +684,8 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	if len(errors) > 0 {
 		return fail.NewErrorList(errors)
 	}
+
+	c.Destroyed(task) // notifies cache that the instance has been deleted
 	return nil
 }
 
@@ -704,7 +730,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 			if jserr := json.Unmarshal(propsJSONed, &propsMapped); jserr != nil {
 				// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
-				return nil, fail.ToError(jserr)
+				return nil, fail.ConvertError(jserr)
 			}
 		}
 	}
@@ -714,7 +740,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 
 	r, err := json.Marshal(shieldedMapped)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	return r, nil
 }
@@ -750,12 +776,15 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 		jsoned        []byte
 	)
 
-	if err := json.Unmarshal(buf, &mapped); err != nil {
-		return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
+	if buf != nil {
+		if err := json.Unmarshal(buf, &mapped); err != nil {
+			return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
+		}
+		if props, ok = mapped["properties"].(map[string]interface{}); ok {
+			delete(mapped, "properties")
+		}
 	}
-	if props, ok = mapped["properties"].(map[string]interface{}); ok {
-		delete(mapped, "properties")
-	}
+
 	jsoned, err := json.Marshal(mapped)
 	if err != nil {
 		return fail.SyntaxError("failed to marshal core to JSON: %s", err.Error())
@@ -778,17 +807,99 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 	return nil
 }
 
-// Dispose is used to tell cache that the instance has been used and will not be anymore.
+// Released is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c core) Dispose() {
+func (c *core) Released(task concurrency.Task) {
+	if c.IsNull() || task == nil {
+		return
+	}
 
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
+	for _, v := range c.observers {
+		v.MarkAsFreed(task, c.GetID())
+	}
 }
 
-// Discard is used to tell cache that the instance has been deleted and MUST be removed from cache.
+// Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c core) Discard() {
+func (c *core) Destroyed(task concurrency.Task) {
+	if c.IsNull() || task == nil {
+		return
+	}
 
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
+	for _, v := range c.observers {
+		v.MarkAsDeleted(task, c.GetID())
+	}
+}
+
+// AddObserver ...
+func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if o == nil {
+		return fail.InvalidParameterError("o", "cannot be nil")
+	}
+
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
+
+	id := o.GetID()
+	if pre, ok := c.observers[id]; ok {
+		if pre == o {
+			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+		}
+		return nil
+	}
+	c.observers[id] = o
+	return nil
+}
+
+// NotifyObservers ...
+func (c *core) NotifyObservers(task concurrency.Task) error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+
+	c.SafeRLock(task)
+	defer c.SafeRUnlock(task)
+
+	id := c.GetID()
+	for _, v := range c.observers {
+		v.SignalChange(task, id)
+	}
+	return nil
+}
+
+// RemoveObserver ...
+func (c *core) RemoveObserver(task concurrency.Task, name string) error {
+	if c.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if name == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	c.SafeLock(task)
+	defer c.SafeUnlock(task)
+
+	delete(c.observers, name)
+	return nil
 }

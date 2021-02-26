@@ -17,13 +17,13 @@
 package data
 
 import (
-	"sync"
+	"sync/atomic"
 )
 
 // keyValue describes the content of a key/value pair
 type keyValue struct {
 	name  string
-	value interface{}
+	value atomic.Value
 }
 
 // Key returns the key of the key/value
@@ -33,7 +33,7 @@ func (kv keyValue) Key() string {
 
 // Value returns the value of the key/value
 func (kv keyValue) Value() interface{} {
-	return kv.value
+	return kv.value.Load()
 }
 
 // ImmutableKeyValue is a key/value that cannot be changed
@@ -43,53 +43,51 @@ type ImmutableKeyValue struct {
 
 // NewImmutableKeyValue creates a new immutable key/Value
 // If no values is passed, sets the content of value to nil
-// If at least 1 value is passed, the first one only is considered (trick to allow to create an instance with nil value)
+// If at least 1 value is passed, the first one only is considered (trick to allow to create an instance without value parameter)
 func NewImmutableKeyValue(key string, values ...interface{}) ImmutableKeyValue {
 	var v interface{}
 	if len(values) > 0 {
 		v = values[0]
 	}
-	return ImmutableKeyValue{
+	ikv := ImmutableKeyValue{
 		keyValue: keyValue{
-			name:  key,
-			value: v,
+			name: key,
 		},
 	}
+	ikv.value.Store(v)
+	return ikv
 }
 
-// Mutate creates a MutableKeyValue from ImmutableKeyValue
-func (i ImmutableKeyValue) Mutate() MutableKeyValue {
-	return NewMutableKeyValue(i.Key(), i.Value())
+// Mutate creates a KeyValue from ImmutableKeyValue
+func (i ImmutableKeyValue) Mutate() KeyValue {
+	return NewKeyValue(i.Key(), i.Value())
 }
 
-// MutableKeyValue is a key/value that can be updated
-type MutableKeyValue struct {
+// KeyValue is a key/value that can be updated (mutable)
+type KeyValue struct {
 	keyValue
-	mu sync.Mutex
 }
 
-// NewMutableKeyValue creates a new mutable Key/Value
-func NewMutableKeyValue(name string, values ...interface{}) MutableKeyValue {
+// NewKeyValue creates a new mutable Key/Value
+func NewKeyValue(name string, values ...interface{}) KeyValue {
 	var v interface{}
 	if len(values) > 0 {
 		v = values[0]
 	}
-	return MutableKeyValue{
+	kv := KeyValue{
 		keyValue: keyValue{
-			name:  name,
-			value: v,
+			name: name,
 		},
 	}
+	kv.value.Store(v)
+	return kv
 }
 
 // SetValue changes the value of the mutable key/value
-func (m *MutableKeyValue) SetValue(value interface{}) {
+func (m *KeyValue) SetValue(value interface{}) {
 	if m == nil {
 		return
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.value = value
+	m.value.Store(value)
 }

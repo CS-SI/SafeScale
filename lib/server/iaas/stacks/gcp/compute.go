@@ -339,7 +339,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if retryErr != nil {
 		switch retryErr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			retryErr = fail.ToError(retryErr.Cause())
+			retryErr = fail.ConvertError(retryErr.Cause())
 		}
 	}
 	if retryErr != nil {
@@ -649,9 +649,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.ToError(xerr.Cause())
+			return fail.ConvertError(xerr.Cause())
 		case *retry.ErrTimeout:
-			return fail.ToError(xerr.Cause())
+			return fail.ConvertError(xerr.Cause())
 		default:
 			return xerr
 		}

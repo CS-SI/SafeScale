@@ -18,8 +18,6 @@ package operations
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"strings"
 	"time"
 
@@ -158,9 +156,8 @@ func (f folder) Delete(path string, name string) fail.Error {
 }
 
 // Read loads the content of the object stored in metadata bucket
-// returns false, nil if the object is not found
-// returns false, err if an error occured
 // returns true, nil if the object has been found
+// returns false, fail.Error if an error occured (including object not found)
 // The callback function has to know how to decode it and where to store the result
 func (f folder) Read(path string, name string, callback func([]byte) fail.Error) fail.Error {
 	if f.IsNull() {
@@ -173,20 +170,10 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	// if xerr := f.Lookup(path, name); xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		return xerr
-	// 	default:
-	// 		return fail.Wrap(xerr, "failed to search in Metadata Storage")
-	// 	}
-	// }
-
 	var buffer bytes.Buffer
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			innerErr := f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
-			return innerErr
+			return f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -225,7 +212,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if f.crypt {
 		var err error
 		if data, err = crypt.Encrypt(content, f.cryptKey); err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 	} else {
 		data = content
@@ -240,9 +227,9 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 		func() error {
 			var innerXErr fail.Error
 			source := bytes.NewBuffer(data)
-			sourceHash := md5.New()
-			_, _ = sourceHash.Write(source.Bytes())
-			srcHex := hex.EncodeToString(sourceHash.Sum(nil))
+			// sourceHash := md5.New()
+			// _, _ = sourceHash.Write(source.Bytes())
+			// srcHex := hex.EncodeToString(sourceHash.Sum(nil))
 			if _, innerXErr = f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
 				return innerXErr
 			}
@@ -256,11 +243,8 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 						return innerErr
 					}
 
-					remoteHash := md5.New()
-					_, _ = remoteHash.Write(target.Bytes())
-					rmtHex := hex.EncodeToString(remoteHash.Sum(nil))
-					if srcHex != rmtHex {
-						return fail.NewError("remote content is different from local reference (local=%s, remote=%s)", srcHex, rmtHex)
+					if !bytes.Equal(data, target.Bytes()) {
+						return fail.NewError("remote content is different from local reference")
 					}
 
 					return nil
@@ -272,7 +256,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 				func(t retry.Try, v verdict.Enum) {
 					switch v { //nolint
 					case verdict.Retry:
-						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying...", bucketName, absolutePath, t.Err.Error())
+						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
 					}
 				},
 			)
@@ -298,7 +282,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
+			xerr = fail.ConvertError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
 		}
 	}
 	return xerr
@@ -334,7 +318,7 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 		data := buffer.Bytes()
 		if f.crypt {
 			if data, err = crypt.Decrypt(data, f.cryptKey); err != nil {
-				return fail.ToError(err)
+				return fail.ConvertError(err)
 			}
 		}
 		if xerr = callback(data); xerr != nil {

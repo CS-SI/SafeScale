@@ -171,13 +171,13 @@ func (l *location) connect() fail.Error {
 	err := stow.Validate(kind, config)
 	if err != nil {
 		logrus.Debugf("invalid config: %v", err)
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	l.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
 		logrus.Debugf("failed dialing stowLocation (error type=%s): %v", reflect.TypeOf(err).String(), err)
 	}
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // ObjectStorageProtocol returns the type of ObjectStorage
@@ -209,7 +209,7 @@ func (l location) ListBuckets(prefix string) ([]string, fail.Error) {
 		},
 	)
 	if err != nil {
-		return []string{}, fail.ToError(err)
+		return []string{}, fail.ConvertError(err)
 	}
 	return list, nil
 }
@@ -242,7 +242,7 @@ func (l location) FindBucket(bucketName string) (bool, fail.Error) {
 	if found {
 		return true, nil
 	}
-	return false, fail.ToError(err)
+	return false, fail.ConvertError(err)
 }
 
 // InspectBucket ...
@@ -286,7 +286,7 @@ func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
 	b.stowContainer, err = l.stowLocation.Container(bucketName)
 	if err != nil {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
-		return bucket{}, fail.ToError(err)
+		return bucket{}, fail.ConvertError(err)
 	}
 
 	return b, nil
@@ -328,7 +328,7 @@ func (l location) DeleteBucket(bucketName string) fail.Error {
 
 	err := l.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	return nil
 }
@@ -352,14 +352,17 @@ func (l location) InspectObject(bucketName string, objectName string) (aosi abst
 	if err != nil {
 		return aosi, err
 	}
+
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return aosi, err
 	}
+
 	m, err := o.GetMetadata()
 	if err != nil {
 		return aosi, err
 	}
+
 	aosi = abstract.ObjectStorageItem{
 		BucketName: bucketName,
 		ItemName:   objectName,
@@ -461,13 +464,16 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 	if err != nil {
 		return err
 	}
+
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err
 	}
+
 	if err = o.Read(writer, from, to); err != nil {
 		return err
 	}
+
 	return nil
 }
 

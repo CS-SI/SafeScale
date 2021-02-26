@@ -21,6 +21,8 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -28,6 +30,8 @@ import (
 type Share interface {
 	Metadata
 	data.Identifiable
+	observer.Observable
+	cache.Cacheable
 
 	Browse(task concurrency.Task, callback func(hostName string, shareID string) fail.Error) fail.Error
 	Create(task concurrency.Task, shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host

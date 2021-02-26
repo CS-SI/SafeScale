@@ -22,6 +22,8 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -47,6 +49,8 @@ const (
 type SecurityGroup interface {
 	Metadata
 	data.Identifiable
+	observer.Observable
+	cache.Cacheable
 
 	AddRule(task concurrency.Task, _ abstract.SecurityGroupRule) fail.Error                                           // returns true if the host is member of a cluster
 	AddRules(task concurrency.Task, _ abstract.SecurityGroupRules) fail.Error                                         // returns true if the host is member of a cluster

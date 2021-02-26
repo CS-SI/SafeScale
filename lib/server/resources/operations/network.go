@@ -19,6 +19,7 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -30,6 +31,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/net"
@@ -39,6 +41,7 @@ import (
 )
 
 const (
+	networkKind = "network"
 	// networksFolderName is the technical name of the container used to store networks info
 	networksFolderName = "networks"
 )
@@ -58,7 +61,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 		return nullNetwork(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, "network", networksFolderName, &abstract.Network{})
+	coreInstance, xerr := newCore(svc, networkKind, networksFolderName, &abstract.Network{})
 	if xerr != nil {
 		return nullNetwork(), xerr
 	}
@@ -67,7 +70,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources.Network, fail.Error) {
+func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resources.Network, xerr fail.Error) {
 	if task == nil {
 		return nullNetwork(), fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -77,17 +80,32 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
-	if ref == "" {
+	if ref = strings.TrimSpace(ref); ref == "" {
 		return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rn, xerr := NewNetwork(svc)
+	networkCache, xerr := svc.GetCache(networkKind)
 	if xerr != nil {
-		return nullNetwork(), xerr
+		return nil, xerr
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rn.Read(task, ref); xerr != nil {
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rn, innerXErr := NewNetwork(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rn.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			return rn, nil
+		}),
+	}
+	cacheEntry, xerr := networkCache.Get(task, ref, options...)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -97,7 +115,18 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 		}
 	}
 
-	if xerr = upgradeNetworkPropertyIfNeeded(task, rn); xerr != nil {
+	if rn = cacheEntry.Content().(resources.Network); rn == nil {
+		return nullNetwork(), fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
+	}
+	_ = cacheEntry.LockContent()
+	defer func() {
+		if xerr != nil {
+			_ = cacheEntry.UnlockContent()
+		}
+	}()
+
+	// Deal with legacy
+	if xerr = rn.(*network).upgradeNetworkPropertyIfNeeded(task); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
 			// ignore
@@ -109,7 +138,7 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (resources
 }
 
 // upgradeNetworkPropertyIfNeeded upgrades properties to most recent version
-func upgradeNetworkPropertyIfNeeded(task concurrency.Task, rn resources.Network) fail.Error {
+func (rn *network) upgradeNetworkPropertyIfNeeded(task concurrency.Task) fail.Error {
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -146,7 +175,8 @@ func (rn *network) IsNull() bool {
 func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rn.IsNull() {
+	// Note: do not use .IsNull() here
+	if rn == nil {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -213,7 +243,6 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 			if derr := svc.DeleteNetwork(an.ID); xerr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
-
 		}
 	}()
 
@@ -226,13 +255,40 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 	return rn.Carry(task, an)
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (rn *network) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	// Note: do not use .IsNull() there because Carry() should be called from null value (but not nil)
+	if rn == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := rn.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	networkCache, xerr := rn.GetService().GetCache(networkKind)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := networkCache.AddEntry(task, rn)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
+}
+
 // Browse walks through all the metadata objects in subnet
 func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rn.IsNull() {
-		return fail.InvalidInstanceError()
-	}
+	// Note: Browse is intended to be callable from null value of network, so do not validate rn
+	// if rn.IsNull() {
+	//     return fail.InvalidInstanceError()
+	// }
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -396,24 +452,17 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 	}
 
 	cidr = ""
-	xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rn.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		cidr = an.CIDR
 		return nil
 	})
 	return cidr, xerr
 }
-
-// VPL: not used
-//// CIDR returns the CIDR of the subnet
-//// Intended to be used when objn is notoriously not nil (because previously checked)
-//func (rn network) CIDR(task concurrency.Task) string {
-//	cidr, _ := rn.GetCIDR(task)
-//	return cidr
-//}
 
 // ToProtocol converts resources.Network to protocol.Network
 func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr fail.Error) {

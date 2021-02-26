@@ -276,7 +276,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 
 		box, err = rice.FindBox("../userdata/scripts")
 		if err != nil {
-			return nil, fail.ToError(err)
+			return nil, fail.ConvertError(err)
 		}
 		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
 		if err != nil {
@@ -292,7 +292,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	buf := bytes.NewBufferString("")
 	err = tmpl.Execute(buf, ud)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 	result = buf.Bytes()
 	for tagname, tagcontent := range ud.Tags[phase] {

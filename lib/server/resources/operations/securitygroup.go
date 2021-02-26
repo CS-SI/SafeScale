@@ -19,11 +19,6 @@ package operations
 import (
 	"reflect"
 	"strings"
-	"time"
-
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/sirupsen/logrus"
 
@@ -32,23 +27,33 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
+	securityGroupKind = "security-group"
 	// securityGroupsFolderName is the technical name of the container used to store networks info
 	securityGroupsFolderName = "security-groups"
 )
+
+//var (
+//	securityGroupCacheByID data.Cache
+//	securityGroupIDsByName map[string]string
+//)
 
 // securityGroup ...
 // follows interface resources.SecurityGroup
@@ -62,7 +67,7 @@ func NewSecurityGroup(svc iaas.Service) (resources.SecurityGroup, fail.Error) {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	coreInstance, xerr := newCore(svc, "security-group", securityGroupsFolderName, &abstract.SecurityGroup{})
+	coreInstance, xerr := newCore(svc, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -107,9 +112,8 @@ func lookupSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (b
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
-	// Do not log error from here; caller has the responsibility to log if needed
-	//defer fail.OnExitLogError(&xerr)
+func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
+	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -125,13 +129,28 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rsg, xerr := NewSecurityGroup(svc)
+	sgCache, xerr := svc.GetCache(securityGroupKind)
 	if xerr != nil {
-		return nullSecurityGroup(), xerr
+		return nullSecurityGroup(), fail.Wrap(xerr, "failed to get cache for Security Groups")
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rsg.Read(task, ref); xerr != nil {
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rsg, innerXErr := NewSecurityGroup(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rsg.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			return rsg, nil
+		}),
+	}
+	cacheEntry, xerr := sgCache.Get(task, ref, options...)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -140,6 +159,17 @@ func LoadSecurityGroup(task concurrency.Task, svc iaas.Service, ref string) (_ r
 			return nullSecurityGroup(), xerr
 		}
 	}
+
+	if rsg = cacheEntry.Content().(resources.SecurityGroup); rsg == nil {
+		return nullSecurityGroup(), fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
+	}
+	_ = cacheEntry.LockContent()
+	defer func() {
+		if xerr != nil {
+			_ = cacheEntry.UnlockContent()
+		}
+	}()
+
 	return rsg, nil
 }
 
@@ -148,13 +178,39 @@ func (sg *securityGroup) IsNull() bool {
 	return sg == nil || sg.core.IsNull()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (sg *securityGroup) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	if sg.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := sg.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	sgCache, xerr := sg.GetService().GetCache(securityGroupKind)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := sgCache.AddEntry(task, sg)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return nil
+}
+
 // Browse walks through securityGroup folder and executes a callback for each entries
 func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if sg.IsNull() {
-		return fail.InvalidInstanceError()
-	}
+	// Note: Browse is intended to be callable from null value, so do not validate sg
+	// if sg.IsNull() {
+	// 	return fail.InvalidInstanceError()
+	// }
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
@@ -183,43 +239,39 @@ func (sg securityGroup) Browse(task concurrency.Task, callback func(*abstract.Se
 	})
 }
 
-// Reload reloads securityGroup from metadata and current securityGroup state on provider state
-func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if sg.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// Read data from metadata storage
-	securityGroupID := sg.GetID()
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return sg.Read(task, securityGroupID)
-		},
-		10*time.Second,
-	)
-	if xerr != nil {
-		// If retry timed out, log it and return error ErrNotFound
-		if _, ok := xerr.(*retry.ErrTimeout); ok {
-			xerr = fail.NotFoundError("metadata of securityGroup '%s' not found; securityGroup deleted?", securityGroupID)
-		}
-		return xerr
-	}
-	//
-	//// Request securityGroup inspection from provider
-	//inspected, xerr := sg.GetService().InspectSecurityGroup(securityGroupID)
-	//if xerr != nil {
-	//    return xerr
-	//}
-	return nil
-}
+// // Reload reloads securityGroup from metadata and current securityGroup state on provider state
+// func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
+// 	defer fail.OnPanic(&xerr)
+//
+// 	if sg.IsNull() {
+// 		return fail.InvalidInstanceError()
+// 	}
+// 	if task == nil {
+// 		return fail.InvalidParameterError("task", "cannot be nil")
+// 	}
+//
+// 	if task.Aborted() {
+// 		return fail.AbortedError(nil, "aborted")
+// 	}
+//
+// 	// Read data from metadata storage
+// 	securityGroupID := sg.GetID()
+// 	xerr = retry.WhileUnsuccessfulDelay1Second(
+// 		func() error {
+// 			return sg.Read(task, securityGroupID)
+// 		},
+// 		10*time.Second,
+// 	)
+// 	if xerr != nil {
+// 		// If retry timed out, log it and return error ErrNotFound
+// 		if _, ok := xerr.(*retry.ErrTimeout); ok {
+// 			xerr = fail.NotFoundError("metadata of securityGroup '%s' not found; securityGroup deleted?", securityGroupID)
+// 		}
+// 		return xerr
+// 	}
+//
+// 	return nil
+// }
 
 // Create creates a new securityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
@@ -227,7 +279,8 @@ func (sg *securityGroup) Reload(task concurrency.Task) (xerr fail.Error) {
 func (sg *securityGroup) Create(task concurrency.Task, networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if sg.IsNull() {
+	// Note: do not use .IsNull() here
+	if sg == nil {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -296,9 +349,6 @@ func (sg *securityGroup) Create(task concurrency.Task, networkID, name, descript
 
 	defer func() {
 		if xerr != nil {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), name))
 			}
@@ -510,7 +560,7 @@ func (sg *securityGroup) delete(task concurrency.Task, force bool) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			xerr = fail.ToError(xerr.Cause())
+			xerr = fail.ConvertError(xerr.Cause())
 		}
 	}
 	if xerr != nil {

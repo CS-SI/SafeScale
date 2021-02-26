@@ -17,7 +17,6 @@
 package concurrency
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -210,7 +209,7 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 	if _, ok := tm.readLocks[tid]; ok {
 		traceR.trace("Cannot Lock, already RLocked")
 		taskID, _ := task.GetID()
-		return fail.ForbiddenError(fmt.Sprintf("cannot Lock task '%s': already RLocked", taskID))
+		return fail.ForbiddenError(callstack.DecorateWith("cannot Lock task ", taskID, "already RLocked", 0))
 	}
 	// registers mu for read for the task and actively mu the RWMutex
 	tm.writeLocks[tid] = 1
@@ -253,10 +252,10 @@ func (tm *taskedLock) Unlock(task Task) fail.Error {
 	// a TaskedLock can be Locked then RLocked without problem,
 	// but RUnlocks must have been done before Unlock.
 	if _, ok := tm.readLocks[tid]; ok {
-		return fail.ForbiddenError(fmt.Sprintf("cannot Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid]))
+		return fail.ForbiddenError("cannot Unlock task '%s': %d remaining RLock inside", tid, tm.readLocks[tid])
 	}
 	if _, ok := tm.writeLocks[tid]; !ok {
-		return fail.ForbiddenError(fmt.Sprintf("cannot Unlock task '%s': not Locked", tid))
+		return fail.ForbiddenError("cannot Unlock task '%s': not Locked", tid)
 	}
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {

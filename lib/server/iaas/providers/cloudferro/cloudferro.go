@@ -116,7 +116,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	})
 
 	if _, err := govalidator.ValidateStruct(authOptions); err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	providerName := "openstack"

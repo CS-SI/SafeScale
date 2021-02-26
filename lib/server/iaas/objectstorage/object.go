@@ -128,7 +128,7 @@ func (o *object) Reload() fail.Error {
 		case "not found":
 			return fail.NotFoundError("failed to reload '%s:%s' from Object Storage", o.bucket.name, o.name)
 		default:
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 	}
 	return o.reloadFromItem(item)
@@ -139,7 +139,7 @@ func (o *object) reloadFromItem(item stow.Item) fail.Error {
 	o.item = item
 	newMetadata, err := item.Metadata()
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	o.metadata = newMetadata
 	return nil
@@ -186,35 +186,45 @@ func (o *object) Read(target io.Writer, from, to int64) fail.Error {
 
 	source, serr := o.item.Open()
 	if serr != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	defer func() {
 		if clerr := source.Close(); clerr != nil {
-			logrus.Error("Error closing item")
+			logrus.Error("error closing item")
 		}
 	}()
 
 	if seekTo == 0 && length >= size {
-		_, err := io.CopyN(target, source, size)
+		r, err := io.CopyN(target, source, size)
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
+		}
+		if r != size {
+			return fail.InconsistentError("read %d bytes instead of expected %d", r, size)
 		}
 	} else {
 		buf := make([]byte, seekTo)
-		if _, err := io.ReadAtLeast(source, buf, int(seekTo)); err != nil {
-			logrus.Fatal(err)
+		r, err := io.ReadAtLeast(source, buf, int(seekTo))
+		if err != nil {
+			return fail.ConvertError(fail.Wrap(err, "failed to seek Object Storage item"))
+		}
+		if r != int(seekTo) {
+			return fail.InconsistentError("seeked %d bytes instead of expected %d", r, seekTo)
 		}
 
 		bufbis := make([]byte, length)
-		if _, err := io.ReadAtLeast(source, bufbis, int(length)); err != nil {
-			logrus.Println("error ")
-			logrus.Fatal(err)
+		r, err = io.ReadAtLeast(source, bufbis, int(length))
+		if err != nil {
+			return fail.ConvertError(fail.Wrap(err, "failed to read from Object Storage item"))
+		}
+		if r != int(length) {
+			return fail.InconsistentError("read %d bytes instead of expected %d", r, length)
 		}
 
 		readerbis := bytes.NewReader(bufbis)
-		_, err := io.CopyBuffer(target, readerbis, bufbis)
+		_, err = io.CopyBuffer(target, readerbis, bufbis)
 		if err != nil {
-			return fail.ToError(err)
+			return fail.ConvertError(err)
 		}
 	}
 	return nil
@@ -236,7 +246,7 @@ func (o *object) Write(source io.Reader, sourceSize int64) fail.Error {
 
 	item, err := o.bucket.stowContainer.Put(o.name, source, sourceSize, o.metadata)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	return o.reloadFromItem(item)
 }
@@ -292,7 +302,7 @@ func writeChunk(container stow.Container, objectName string, source io.Reader, n
 		return fail.Wrap(err, "failed to write in chunk of object '%s' in bucket '%s'", objectName, container.Name())
 	}
 	logrus.Debugf("written chunk #%d (%d bytes) of data in object '%s:%s'", nBytesRead, chunkIndex, container.Name(), objectName)
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }
 
 // Delete deletes the object from Object Storage
@@ -308,7 +318,7 @@ func (o *object) Delete() fail.Error {
 
 	err := o.bucket.stowContainer.RemoveItem(o.name)
 	if err != nil {
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 	o.item = nil
 	return nil
@@ -390,7 +400,7 @@ func (o object) GetSize() (int64, fail.Error) {
 	}
 	size, err := o.item.Size()
 	if err != nil {
-		return -1, fail.ToError(err)
+		return -1, fail.ConvertError(err)
 	}
 	return size, nil
 }
@@ -405,7 +415,7 @@ func (o object) GetETag() (string, fail.Error) {
 	}
 	etag, err := o.item.ETag()
 	if err != nil {
-		return "", fail.ToError(err)
+		return "", fail.ConvertError(err)
 	}
 	return etag, nil
 }

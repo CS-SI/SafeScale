@@ -38,6 +38,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -46,8 +49,9 @@ import (
 )
 
 const (
-	// volumesFolderName is the technical name of the container used to store volume info
-	volumesFolderName = "volumes"
+	volumeKind        = "volume"
+	volumesFolderName = "volumes" // is the name of the Object Storage folder used to store volume info
+
 )
 
 // Volume links Object Storage folder and getVolumes
@@ -67,7 +71,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, err := newCore(svc, "volume", volumesFolderName, &abstract.Volume{})
+	coreInstance, err := newCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
 	if err != nil {
 		return nullVolume(), err
 	}
@@ -75,7 +79,9 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if task == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -85,17 +91,36 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 	if svc == nil {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
-	if ref == "" {
-		return nullVolume(), fail.InvalidParameterError("ref", "cannot be empty string")
+	if ref = strings.TrimSpace(ref); ref == "" {
+		return nullVolume(), fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	rv, xerr := NewVolume(svc)
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s')", ref).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	volumeCache, xerr := svc.GetCache(volumeKind)
 	if xerr != nil {
-		return rv, xerr
+		return nullVolume(), xerr
 	}
 
-	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-	if xerr = rv.Read(task, ref); xerr != nil {
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
+			rv, innerXErr := NewVolume(svc)
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			if innerXErr = rv.Read(task, ref); innerXErr != nil {
+				return nil, innerXErr
+			}
+
+			return rv, nil
+		}),
+	}
+	cacheEntry, xerr := volumeCache.Get(task, ref, options...)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -104,6 +129,17 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (resources.
 			return nullVolume(), xerr
 		}
 	}
+
+	if rv = cacheEntry.Content().(resources.Volume); rv == nil {
+		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
+	}
+	_ = cacheEntry.LockContent()
+	defer func() {
+		if xerr != nil {
+			_ = cacheEntry.UnlockContent()
+		}
+	}()
+
 	return rv, nil
 }
 
@@ -112,8 +148,37 @@ func (rv *volume) IsNull() bool {
 	return rv == nil || rv.core.IsNull()
 }
 
+// Carry overloads rv.core.Carry() to add Volume to service cache
+func (rv *volume) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if rv.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := rv.core.Carry(task, clonable); xerr != nil {
+		return xerr
+	}
+
+	volumeCache, xerr := rv.GetService().GetCache(volumeKind)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := volumeCache.AddEntry(task, rv)
+	if xerr != nil {
+		return xerr
+	}
+
+	cacheEntry.LockContent()
+	return xerr
+}
+
 // GetSpeed ...
-func (rv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) {
+func (rv volume) GetSpeed(task concurrency.Task) (_ volumespeed.Enum, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -124,8 +189,12 @@ func (rv volume) GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error) 
 		return 0, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var speed volumespeed.Enum
-	xerr := rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rv.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -147,7 +216,9 @@ func (rv volume) getSpeed(task concurrency.Task) volumespeed.Enum {
 }
 
 // GetSize ...
-func (rv volume) GetSize(task concurrency.Task) (int, fail.Error) {
+func (rv volume) GetSize(task concurrency.Task) (_ int, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -158,8 +229,12 @@ func (rv volume) GetSize(task concurrency.Task) (int, fail.Error) {
 		return 0, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var size int
-	xerr := rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rv.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -181,7 +256,9 @@ func (rv volume) getSize(task concurrency.Task) int {
 }
 
 // GetAttachments returns where the Volume is attached
-func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error) {
+func (rv volume) GetAttachments(task concurrency.Task) (_ *propertiesv1.VolumeAttachments, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if rv.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -192,8 +269,12 @@ func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAtta
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	var vaV1 *propertiesv1.VolumeAttachments
-	xerr := rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
@@ -210,7 +291,10 @@ func (rv volume) GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAtta
 }
 
 // Browse walks through volume folder and executes a callback for each entry
-func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error {
+func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	// Note: Browse is intended to be callable from null value, so do not validate rv
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -223,6 +307,10 @@ func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) f
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return rv.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		av := abstract.NewVolume()
@@ -247,6 +335,10 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 	if task.Aborted() {
 		return fail.AbortedError(nil, "canceled")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	rv.SafeLock(task)
 	defer rv.SafeUnlock(task)
@@ -282,7 +374,7 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 		switch xerr.(type) { //nolint
 		case *retry.ErrTimeout:
 			if xerr.Cause() != nil {
-				xerr = fail.ToError(xerr.Cause())
+				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
 	}
@@ -301,8 +393,13 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 
 // Create a volume
 func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xerr fail.Error) {
-	if rv.IsNull() {
+	defer fail.OnPanic(&xerr)
+
+	if rv == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !rv.IsNull() {
+		return fail.InvalidInstanceContentError("sg", "must be null value of 'volume' to be able to create")
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
@@ -317,17 +414,21 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 		return fail.InvalidParameterError("req.Size", "must be an integer > 0")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	// Check if Volume exists and is managed by SafeScale
 	svc := rv.GetService()
-	if _, xerr = LoadVolume(task, svc, req.Name); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
+	if vol, xerr := LoadVolume(task, svc, req.Name); xerr == nil {
+		vol.Released(task)
+		return fail.DuplicateError("there is already a volume named '%s'", req.Name)
+	}
+	switch xerr.(type) {
+	case *fail.ErrNotFound:
 		// continue
-		default:
-			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
-		}
-	} else {
-		return fail.DuplicateError("'%s' already exists", req.Name)
+	default:
+		return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 	}
 
 	// Check if host exists but is not managed by SafeScale
@@ -382,6 +483,10 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 	if format == "" {
 		return fail.InvalidParameterError("format", "cannot be empty string")
 	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
@@ -741,7 +846,10 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	// const CANNOT = "cannot detach volume"
+	targetID := host.GetID()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var (
 		volumeID, volumeName string
@@ -749,7 +857,7 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 	)
 
 	// -- retrives volume data --
-	xerr = rv.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = rv.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		volume, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -764,11 +872,9 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 
 	// -- retrieve host data --
 	svc := rv.GetService()
-	targetID := host.GetID()
 	targetName := host.GetName()
 
 	// -- Update target attachments --
-
 	return host.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var (
 			attachment *propertiesv1.HostVolume
@@ -848,7 +954,7 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 				}
 
 				if strings.Index(v.Path, mount.Path) == 0 {
-					return fail.InvalidRequestError("cannot detach volume '%s' from '%s', '%s:%s' is shared", volumeName, targetName, mount.Path, targetName, v.Path)
+					return fail.InvalidRequestError("cannot detach volume '%s' from '%s': mounted in '%s' and shared", volumeName, targetName, mount.Path)
 				}
 			}
 			return nil
@@ -948,6 +1054,10 @@ func (rv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRespo
 		return nil, fail.AbortedError(nil, "canceled")
 	}
 
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	volumeID := rv.GetID()
 	volumeName := rv.GetName()
 	out := &protocol.VolumeInspectResponse{
@@ -969,6 +1079,10 @@ func (rv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRespo
 		if xerr != nil {
 			return nil, xerr
 		}
+		defer func(instance resources.Host) {
+			instance.Released(task)
+		}(rh)
+
 		vols := rh.(*host).getVolumes(task)
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {

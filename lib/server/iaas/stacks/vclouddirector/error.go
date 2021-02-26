@@ -24,5 +24,5 @@ func normalizeError(err error) fail.Error {
 	if err == nil {
 		return nil
 	}
-	return fail.ToError(err)
+	return fail.ConvertError(err)
 }

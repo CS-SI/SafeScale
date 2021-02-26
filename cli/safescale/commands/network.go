@@ -248,15 +248,16 @@ var networkCreate = &cli.Command{
 			Usage: "Name for the gateway. Default to 'gw-<network_name>'",
 		},
 		&cli.IntFlag{
-			Name:    "ssh-port",
+			Name:    "gwport",
 			Aliases: []string{"default-ssh-port"},
 			Value:   22,
 			Usage: `Define the port to use for SSH (default: 22) in default subnet;
-		Meaningful only if --empty is not used`,
+			Meaningful only if --empty is not used`,
 		},
 		&cli.BoolFlag{
-			Name:  "failover",
-			Usage: "creates 2 gateways for the network with a VIP used as internal default route",
+			Name: "failover",
+			Usage: `creates 2 gateways for the network with a VIP used as internal default route;
+			Meaningful only if --empty is not used`,
 		},
 		&cli.StringFlag{
 			Name:    "sizing",
@@ -280,7 +281,7 @@ var networkCreate = &cli.Command{
 						--sizing "cpu <= 4, ram <= 10, disk >= 100"
 						--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
 						--sizing "cpu <= 8, ram ~ 16"
-		`,
+			Meaningful only if --empty is not used`,
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -307,10 +308,10 @@ var networkCreate = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		defaultSSHPort := uint32(c.Int("ssh-port"))
+		gatewaySshPort := uint32(c.Int("gwport"))
 		network, err := clientSession.Network.Create(
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
-			c.String("gwname"), defaultSSHPort, c.String("os"), sizing,
+			c.String("gwname"), gatewaySshPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
 			temporal.GetExecutionTimeout(),
 		)

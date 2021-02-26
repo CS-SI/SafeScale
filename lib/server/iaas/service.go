@@ -67,6 +67,8 @@ type Service interface {
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
+	GetCache(string) (*ResourceCache, fail.Error)
+
 	// --- from interface iaas.Providers ---
 	providers.Provider
 
@@ -76,7 +78,7 @@ type Service interface {
 	objectstorage.Location
 }
 
-// GetService ...
+// service is the implementation struct of interface Service
 type service struct {
 	providers.Provider
 	objectstorage.Location
@@ -89,6 +91,8 @@ type service struct {
 	blacklistTemplateREs []*regexp.Regexp
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
+
+	cache serviceCache
 }
 
 const (
@@ -142,6 +146,29 @@ func (svc service) GetID() string {
 		return ""
 	}
 	return svc.Provider.GetName()
+}
+
+// GetCache returns the data.Cache instance corresponding to the name passed as parameter
+// If the cache does not exist, create it
+func (svc *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
+	if svc.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if name == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	if svc.cache.resources == nil {
+		svc.cache.resources = map[string]*ResourceCache{}
+	}
+	if _, ok := svc.cache.resources[name]; !ok {
+		rc, xerr := NewResourceCache(name)
+		if xerr != nil {
+			return rc, xerr
+		}
+		svc.cache.resources[name] = rc
+	}
+	return svc.cache.resources[name], nil
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
@@ -689,7 +716,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 	// Create temporary key pair
 	kpNameuuid, err := uuid.NewV4()
 	if err != nil {
-		return nil, nil, nil, fail.ToError(err)
+		return nil, nil, nil, fail.ConvertError(err)
 	}
 
 	kpName := kpNameuuid.String()

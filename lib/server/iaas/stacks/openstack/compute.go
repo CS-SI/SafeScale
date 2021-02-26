@@ -78,7 +78,7 @@ func (s Stack) ListRegions() (list []string, xerr fail.Error) {
 
 	allRegions, err := regions.ExtractRegions(allPages)
 	if err != nil {
-		return emptySlice, fail.ToError(err)
+		return emptySlice, fail.ConvertError(err)
 	}
 
 	var results []string
@@ -113,7 +113,7 @@ func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return emptyMap, fail.ToError(err)
+		return emptyMap, fail.ConvertError(err)
 	}
 
 	azList := map[string]bool{}
@@ -690,7 +690,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
-					innerXErr = fail.ToError(innerXErr.Cause())
+					innerXErr = fail.ConvertError(innerXErr.Cause())
 				case *fail.ErrInvalidRequest: // useless to retry on bad request...
 					return retry.StopRetryError(innerXErr)
 				case *fail.ErrDuplicate: // useless to retry on duplicate (no matter on what resource the duplicate is found)...
@@ -761,11 +761,11 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ToError(cerr)
+				xerr = fail.ConvertError(cerr)
 			}
 		case *retry.ErrStopRetry:
 			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ToError(cerr)
+				xerr = fail.ConvertError(cerr)
 			}
 		}
 		return nullAHF, nullUDC, xerr
@@ -1117,7 +1117,7 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		case *fail.ErrTimeout:
 			retryErr = fail.TimeoutError(retryErr.Cause(), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
 		case *fail.ErrAborted:
-			retryErr = fail.ToError(retryErr.Cause())
+			retryErr = fail.ConvertError(retryErr.Cause())
 		}
 	}
 	if retryErr != nil {
@@ -1324,7 +1324,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		switch xerr.(type) {
 		case *retry.ErrTimeout, *retry.ErrStopRetry:
 			// On timeout or abort, recover the error cause
-			xerr = fail.ToError(xerr.Cause())
+			xerr = fail.ConvertError(xerr.Cause())
 		}
 	}
 	if xerr != nil {
