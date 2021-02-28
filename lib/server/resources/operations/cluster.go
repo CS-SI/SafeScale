@@ -89,7 +89,7 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 		return nullCluster(), fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+		return nullCluster(), fail.AbortedError(nil, "aborted")
 	}
 	if svc == nil {
 		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
@@ -817,12 +817,18 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 		}
 	}
 
+	emptySizing := abstract.HostSizingRequirements{
+		MinGPU: -1,
+	}
+
 	gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
 	gatewaysDef.Image = imageID
 
-	if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
-		if !req.Force {
-			return nil, nil, nil, fail.NewError("requested gateway sizing less than recommended")
+	if !req.GatewaysDef.Equals(emptySizing) {
+		if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
+			if !req.Force {
+				return nil, nil, nil, fail.NewError("requested gateway sizing less than recommended")
+			}
 		}
 	}
 
@@ -849,9 +855,11 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
 	mastersDef.Image = imageID
 
-	if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
-		if !req.Force {
-			return nil, nil, nil, fail.NewError("requested master sizing less than recommended")
+	if !req.MastersDef.Equals(emptySizing) {
+		if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
+			if !req.Force {
+				return nil, nil, nil, fail.NewError("requested master sizing less than recommended")
+			}
 		}
 	}
 
@@ -881,9 +889,11 @@ func (c *cluster) determineSizingRequirements(task concurrency.Task, req abstrac
 	nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
 	nodesDef.Image = imageID
 
-	if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
-		if !req.Force {
-			return nil, nil, nil, fail.NewError("requested node sizing less than recommended")
+	if !req.NodesDef.Equals(emptySizing) {
+		if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
+			if !req.Force {
+				return nil, nil, nil, fail.NewError("requested node sizing less than recommended")
+			}
 		}
 	}
 
@@ -2194,6 +2204,10 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 
 	var subtasks []concurrency.Task
 	for i := uint(0); i < count; i++ {
+		if task.Aborted() {
+			return nil, fail.AbortedError(nil, "aborted")
+		}
+
 		subtask, xerr := task.StartInSubtask(c.taskCreateNode, taskCreateNodeParameters{
 			index:         i + 1,
 			nodeDef:       nodeDef,
@@ -3148,9 +3162,9 @@ func (c *cluster) deleteNode(task concurrency.Task, host resources.Host, master 
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(host='%s')", host.GetName()).Entering()
-	// defer tracer.Exiting()
-	// // defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+	defer tracer.Exiting()
+	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Identify the node to delete and remove it preventive from metadata
 	var node *propertiesv3.ClusterNode
@@ -3930,10 +3944,6 @@ func (c cluster) ToProtocol(task concurrency.Task) (_ *protocol.ClusterResponse,
 }
 
 func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.ClusterNode, xerr fail.Error) {
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	var emptySlice []*propertiesv3.ClusterNode
 	if c.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
