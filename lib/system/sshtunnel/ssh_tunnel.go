@@ -23,6 +23,7 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -46,7 +47,11 @@ type dumper interface { //nolint
 func OnPanic(err *error) func() {
 	return func() {
 		if x := recover(); x != nil {
-			*err = fmt.Errorf("runtime panic occurred: %v", x)
+			if anError, ok := x.(error); ok {
+				*err = fmt.Errorf("runtime panic occurred: %w", anError)
+			} else {
+				*err = fmt.Errorf("runtime panic occurred: %v", x)
+			}
 		}
 	}
 }
@@ -73,8 +78,9 @@ type SSHTunnel struct {
 	timeKeepAliveRead  time.Duration
 	timeKeepAliveWrite time.Duration
 
-	isOpen  bool
-	isReady bool
+	cleanupDelay time.Duration
+
+	isOpen bool
 
 	closer   chan interface{}
 	closerFw chan interface{}
@@ -83,6 +89,9 @@ type SSHTunnel struct {
 
 	inBuffer  []byte
 	outBuffer []byte
+
+	command string
+	mu      *sync.Mutex
 }
 
 func (tunnel *SSHTunnel) logf(sfmt string, args ...interface{}) {
@@ -102,15 +111,25 @@ func (tunnel *SSHTunnel) errorf(sfmt string, args ...interface{}) {
 }
 
 func (tunnel SSHTunnel) GetLocalEndpoint() Endpoint {
-	return *tunnel.local
+	tunnel.mu.Lock()
+	defer tunnel.mu.Unlock()
+	return *(tunnel.local)
 }
 
 func (tunnel SSHTunnel) GetRemoteEndpoint() Endpoint {
-	return *tunnel.remote
+	tunnel.mu.Lock()
+	defer tunnel.mu.Unlock()
+	return *(tunnel.remote)
 }
 
 func (tunnel SSHTunnel) GetServerEndpoint() Endpoint {
-	return *tunnel.server
+	tunnel.mu.Lock()
+	defer tunnel.mu.Unlock()
+	return *(tunnel.server)
+}
+
+func (tunnel *SSHTunnel) SetCommand(cmd string) {
+	tunnel.command = cmd
 }
 
 func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn) (err error) {
@@ -165,10 +184,8 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 		}
 	}
 
-	select { //nolint
-	case res := <-resChan:
-		return res.resLis, res.resErr
-	}
+	res := <-resChan
+	return res.resLis, res.resErr
 }
 
 func (tunnel *SSHTunnel) Ready() <-chan bool {
@@ -178,15 +195,18 @@ func (tunnel *SSHTunnel) Ready() <-chan bool {
 func (tunnel *SSHTunnel) Start() (err error) {
 	defer OnPanic(&err)
 
+	tunnel.mu.Lock()
 	if tunnel.isOpen {
+		defer tunnel.mu.Unlock()
 		return fmt.Errorf("error starting the ssh tunnel: already started")
 	}
 
 	listener, err := tunnel.netListenWithTimeout("tcp", tunnel.local.Address(), tunnel.dialTimeout)
 	if err != nil {
+		defer tunnel.mu.Unlock()
 		err = convertErrorToTunnelError(err)
 		tunnel.ready <- false
-		tunnel.isReady = false
+		close(tunnel.ready)
 		return fmt.Errorf("error starting the ssh tunnel: %w", err)
 	}
 
@@ -194,14 +214,16 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	if tunnel.local.Port() == 0 {
 		tunnel.local.port = listener.Addr().(*net.TCPAddr).Port
 	}
+	tunnel.mu.Unlock()
 
 	defer func() {
 		tunnel.closerFw <- struct{}{}
+		close(tunnel.closerFw)
 	}()
 
 	defer func(st time.Time) {
 		tunnel.timeTunnelRunning = time.Since(st)
-		tunnel.logf("ssh tunnel lifetime: %s", tunnel.timeTunnelRunning)
+		tunnel.logf("ssh tunnel lifetime (%s): %s", tunnel.command, tunnel.timeTunnelRunning)
 	}(time.Now())
 
 	var quittingErr error
@@ -224,9 +246,11 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		}()
 
 		tunnel.logf("listening for new ssh connections...")
-		if !tunnel.isReady {
+		select {
+		case <-tunnel.ready:
+		default:
 			tunnel.ready <- true
-			tunnel.isReady = true
+			close(tunnel.ready)
 		}
 
 		select {
@@ -239,7 +263,9 @@ func (tunnel *SSHTunnel) Start() (err error) {
 			tunnel.logf("close signal received through channel: closing tunnel...\n")
 			tunnel.isOpen = false
 		case conn := <-connCh:
+			tunnel.mu.Lock()
 			tunnel.conns = append(tunnel.conns, conn)
+			tunnel.mu.Unlock()
 			tunnel.logf("accepted connection")
 			go func() {
 				var fwErr error
@@ -322,11 +348,11 @@ func TunnelOptionWithKeepAlive(keepAlive time.Duration) Option {
 	}
 }
 
-func TunnelOptionWithDefaultKeepAlive(keepAlive time.Duration) Option {
+func TunnelOptionWithDefaultKeepAlive() Option {
 	return func(tunnel *SSHTunnel) error {
 		tunnel.withKeepAlive = true
 
-		kal := NewDefaultKeepAliveCfg()
+		kal := newDefaultKeepAliveCfg()
 		tunnel.timeKeepAliveRead = time.Duration(kal.tcpKeepaliveTime) * time.Second
 		tunnel.timeKeepAliveWrite = time.Duration(kal.tcpKeepaliveTime) * time.Second
 		return nil
@@ -378,10 +404,8 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 		}
 	}
 
-	select { //nolint
-	case res := <-resChan:
-		return res.resCli, res.resErr
-	}
+	res := <-resChan
+	return res.resCli, res.resErr
 }
 
 func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
@@ -434,11 +458,9 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 		}
 	}
 
-	select { //nolint
-	case res := <-resChan:
-		expired = true
-		return res.resConn, res.resErr
-	}
+	res := <-resChan
+	expired = true
+	return res.resConn, res.resErr
 }
 
 func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
@@ -456,8 +478,10 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 	tunnel.logf("[2/4] dialed %s in %s\n", tunnel.server.String(), time.Since(dialOp))
 	dialOp = time.Now()
 	tunnel.logf("[3/4] dialing %s with timeout of %s\n", tunnel.remote.String(), tunnel.dialTimeout)
+	tunnel.mu.Lock()
 	remoteConn, err := tunnel.dialSSHConnectionWithTimeout(serverConn, "tcp", tunnel.remote.Address(), tunnel.dialTimeout)
 	if err != nil {
+		defer tunnel.mu.Unlock()
 		err = convertErrorToTunnelError(err)
 		tunnel.errorf("remote dial error, unable to reach %s: %s", tunnel.remote.String(), litter.Sdump(err))
 		return fmt.Errorf("remote dial error, unable to reach %s: %w", tunnel.remote.String(), err)
@@ -466,7 +490,11 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 		remoteConn, _ = setConnectionDeadlines(remoteConn, tunnel.timeKeepAliveRead, tunnel.timeKeepAliveWrite)
 	}
 	tunnel.conns = append(tunnel.conns, remoteConn)
+	tunnel.mu.Unlock()
 	tunnel.logf("[4/4] dialed %s through %s in %s\n", tunnel.remote.String(), tunnel.local.String(), time.Since(dialOp))
+
+	stopUpdown := make(chan struct{})
+	updown := make(chan bool)
 	copyConn := func(copier string, writer, reader net.Conn, buff *[]byte) {
 		endCopy := make(chan bool)
 		go func() {
@@ -488,14 +516,32 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 					tunnel.logf("io.Copy [%s] ended with warnings", copier)
 				}
 				endCopy <- false
+				select {
+				case <-tunnel.closerFw:
+					return
+				case <-stopUpdown:
+					return
+				default:
+					updown <- true
+				}
 				return
 			}
 			tunnel.logf("io.Copy [%s] ended without error", copier)
 			endCopy <- true
+			select {
+			case <-tunnel.closerFw:
+				return
+			case <-stopUpdown:
+				return
+			default:
+				updown <- true
+			}
 			return //nolint
 		}()
 		select {
 		case <-endCopy:
+			return
+		case <-stopUpdown:
 			return
 		case <-tunnel.closerFw:
 			tunnel.logf("tunnel is closing, stopping copies")
@@ -503,15 +549,57 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 		}
 	}
 
+	// Both goroutines should end almost in the same second one after another, if not we can consider the tunnel dead...
+	go func() {
+		defer func() {
+			close(stopUpdown)
+			close(updown)
+		}()
+
+		minim := tunnel.cleanupDelay
+
+		if tunnel.withKeepAlive {
+			minim = tunnel.timeKeepAliveRead
+			if minim > tunnel.timeKeepAliveWrite {
+				minim = tunnel.timeKeepAliveWrite
+			}
+		}
+
+		if minim == 0 || minim > 60 { // zero ain't valid
+			minim = tunnel.cleanupDelay
+			if minim == 0 || minim > 60 {
+				minim = 15 * time.Second
+			}
+		}
+
+		<-updown // Indeed, if both goroutines die, this one dies too
+		tunnel.logf("first in, waiting for the second...")
+		select {
+		case <-updown:
+			tunnel.logf("second there...")
+			return
+		case <-time.After(minim):
+			select {
+			case <-tunnel.closerFw:
+				return
+			default:
+				tunnel.errorf("the tunnel is dead after %s (%s)...", minim, tunnel.command)
+				// tunnel.Close() // if so, we have a use of closed connection error
+				return
+			}
+		}
+	}()
+
 	go copyConn("upstream", localConn, remoteConn, &tunnel.inBuffer)
 	go copyConn("downstream", remoteConn, localConn, &tunnel.outBuffer)
 
-	return nil //nolint
+	return nil
 }
 
 func (tunnel *SSHTunnel) Close() {
 	if tunnel.isOpen {
 		tunnel.closer <- struct{}{}
+		close(tunnel.closer)
 	}
 	return //nolint
 }
@@ -560,7 +648,7 @@ func NewSSHTunnelWithLocalBinding(
 		return nil, fmt.Errorf("error creating remote endpoint: %w", err)
 	}
 
-	ttlCfg := NewDefaultKeepAliveCfg()
+	ttlCfg := newDefaultKeepAliveCfg()
 	tid, err := uuid.NewV4()
 	if err != nil {
 		err = convertErrorToTunnelError(err)
@@ -579,21 +667,25 @@ func NewSSHTunnelWithLocalBinding(
 		local:              localEndpoint,
 		server:             server,
 		remote:             remote,
-		dialTimeout:        40 * time.Second,
+		dialTimeout:        45 * time.Second,
 		timeKeepAliveRead:  time.Duration(ttlCfg.tcpKeepaliveTime) * time.Second,
 		timeKeepAliveWrite: time.Duration(ttlCfg.tcpKeepaliveTime) * time.Second,
+		cleanupDelay:       15 * time.Second,
 		closer:             make(chan interface{}),
 		closerFw:           make(chan interface{}),
 		ready:              make(chan bool),
 		inBuffer:           make([]byte, int(math.Pow(2, 14))),
 		outBuffer:          make([]byte, int(math.Pow(2, 14))),
 		tid:                tid,
+		mu:                 &sync.Mutex{},
 	}
 
 	for _, op := range options {
-		err = op(sshTunnel)
-		if err != nil {
-			return nil, err
+		if op != nil {
+			err = op(sshTunnel)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
