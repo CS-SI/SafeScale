@@ -31,16 +31,16 @@ type keepAliveCfg struct {
 	tcpKeepaliveProbes uint
 }
 
-func NewKeepAliveCfg(tcpKeepaliveTime uint, tcpKeepaliveIntvl uint, tcpKeepaliveProbes uint) *keepAliveCfg { //nolint
+func newKeepAliveCfg(tcpKeepaliveTime uint, tcpKeepaliveIntvl uint, tcpKeepaliveProbes uint) *keepAliveCfg {
 	return &keepAliveCfg{tcpKeepaliveTime: tcpKeepaliveTime, tcpKeepaliveIntvl: tcpKeepaliveIntvl, tcpKeepaliveProbes: tcpKeepaliveProbes}
 }
 
-func NewDefaultKeepAliveCfg() *keepAliveCfg { //nolint
-	return NewKeepAliveCfg(7200, 75, 9)
+func newDefaultKeepAliveCfg() *keepAliveCfg {
+	return newKeepAliveCfg(7200, 75, 9)
 }
 
-func NewKeepAliveCfgFromSystem() *keepAliveCfg { //nolint
-	ka := NewDefaultKeepAliveCfg()
+func newKeepAliveCfgFromSystem() *keepAliveCfg { //nolint
+	ka := newDefaultKeepAliveCfg()
 	ka.readFromCfg()
 	return ka
 }
