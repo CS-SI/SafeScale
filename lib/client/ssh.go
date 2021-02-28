@@ -66,13 +66,10 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		return -1, "", "", err
 	}
 
-	if executionTimeout < temporal.GetHostTimeout() {
-		executionTimeout = temporal.GetHostTimeout()
-	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
 	}
-	if connectionTimeout > executionTimeout {
+	if connectionTimeout > executionTimeout { // FIXME: Think about it
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 

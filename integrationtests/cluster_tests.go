@@ -5,8 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 )
 
 func ClusterK8S(t *testing.T, provider providers.Enum) {

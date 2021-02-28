@@ -126,7 +126,7 @@ func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
 	return list
 }
 
-// FIXME: include the cluster part of setImplicitParameters() from feature
+// ComplementFeatureParameters FIXME: include the cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
 func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
@@ -336,7 +336,7 @@ func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Featu
 		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+		return emptySlice, fail.AbortedError(nil, "aborted")
 	}
 
 	var list map[string]*propertiesv1.ClusterInstalledFeature
@@ -388,7 +388,7 @@ func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, 
 	return feat.Add(c, vars, settings)
 }
 
-// IsFeatureInstalled tells if a feature is installed on the cluster
+// CheckFeature tells if a feature is installed on the cluster
 func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if c.IsNull() {
 		return nil, fail.InvalidInstanceError()

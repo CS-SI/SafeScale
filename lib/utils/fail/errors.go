@@ -153,9 +153,6 @@ func (e *errorCore) ForceSetCause(err error) Error {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from null value", 0))
 		return ConvertError(err)
 	}
-	if e.cause != nil {
-		return e
-	}
 	e.cause = err
 	return e
 }

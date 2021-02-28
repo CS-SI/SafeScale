@@ -117,7 +117,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "ssh copy")

@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 
 	"github.com/asaskevich/govalidator"
@@ -39,7 +40,7 @@ import (
 // safescale volume inspect v1
 // safescale volume update v1 --speed="HDD" --size=1000
 
-// FIXME Think about this
+// FIXME: Think about this
 // //go:generate mockgen -destination=../mocks/mock_volumeserviceserver.go -package=mocks github.com/CS-SI/SafeScale/lib VolumeServiceServer
 
 // VolumeHandler ...
@@ -66,7 +67,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -118,7 +119,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "volume create")
@@ -275,7 +276,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "volume delete")
@@ -317,7 +318,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "volume inspect")

@@ -118,7 +118,7 @@ func (s *stack) InspectVolume(ref string) (*abstract.Volume, fail.Error) {
 		return nil, xerr
 	}
 
-	// FIXME Add data
+	// FIXME: Add data
 	dr, err := vdc.QueryDisk(ref)
 	if err == nil {
 		thed, err := vdc.FindDiskByHREF(dr.Disk.HREF)

@@ -17,9 +17,10 @@
 package propertiesv2
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"reflect"
 	"testing"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 
 	"github.com/stretchr/testify/assert"
 )

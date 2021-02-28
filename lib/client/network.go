@@ -47,9 +47,8 @@ func (n network) List(all bool, timeout time.Duration) (*protocol.NetworkList, e
 	})
 }
 
-// TODO concurent access if deleting multiple networks
 // Delete deletes several networks at the same time in goroutines
-func (n network) Delete(names []string, timeout time.Duration) error {
+func (n network) Delete(names []string, timeout time.Duration) error { // TODO: concurrent access if deleting multiple networks
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)

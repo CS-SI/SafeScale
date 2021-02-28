@@ -17,8 +17,9 @@
 package propertiesv1
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"

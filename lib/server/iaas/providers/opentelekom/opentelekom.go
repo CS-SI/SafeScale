@@ -18,8 +18,9 @@ package opentelekom
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -256,11 +257,8 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU = []string{
-			// "g.*-.*",
-			// "t.*-.*",
-		}
-		out []*regexp.Regexp
+		templatesWithGPU []string
+		out              []*regexp.Regexp
 	)
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)

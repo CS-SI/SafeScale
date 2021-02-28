@@ -1,9 +1,10 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/CS-SI/SafeScale/integrationtests"
 	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
-	"testing"
 )
 
 func Test_ApacheIgnite(t *testing.T) {

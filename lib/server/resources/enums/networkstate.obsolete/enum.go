@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// Package networkstate_obsolete
 package networkstate_obsolete //nolint
 
 //go:generate stringer -type=Enum
@@ -21,14 +22,14 @@ package networkstate_obsolete //nolint
 // Enum represents the state of a network
 type Enum int
 
+//goland:noinspection GoSnakeCaseUsage,GoSnakeCaseUsage
 const (
-	// UNKNOWNSTATE
 	UNKNOWNSTATE Enum = iota
 
 	// GATEWAY_CREATION when gateway(s) is(are) created
 	GATEWAY_CREATION //nolint
 
-	// PHASE2 when gateway(s) is(are) configured
+	// GATEWAY_CONFIGURATION when gateway(s) is(are) configured
 	GATEWAY_CONFIGURATION //nolint
 
 	// READY when ready

@@ -11,7 +11,6 @@ require (
 	github.com/antihax/optional v1.0.0
 	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496
 	github.com/aws/aws-sdk-go v1.28.2
-	github.com/coreos/etcd v3.3.10+incompatible
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/daaku/go.zipexe v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1
@@ -21,9 +20,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.4.1
-	github.com/google/martian v2.1.0+incompatible
 	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
 	github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00 // indirect
 	github.com/gregoryv/gocyclo v0.1.0
@@ -58,7 +55,7 @@ require (
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.5.1
 	github.com/urfave/cli/v2 v2.1.1
-	github.com/vmware/go-vcloud-director v2.0.0+incompatible
+	github.com/vmware/go-vcloud-director v2.0.0+incompatible // indirect
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
@@ -70,7 +67,7 @@ require (
 	google.golang.org/api v0.15.0
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.27.0
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

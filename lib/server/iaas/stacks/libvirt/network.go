@@ -153,11 +153,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	dns := req.DNSServers
 
 	if ipVersion != ipversion.IPv4 {
-		// TODO implement IPV6 networks
+		// TODO: implement IPV6 networks
 		return nil, fail.NotImplementedError("only ipv4 networks are implemented")
 	}
 	if len(dns) != 0 {
-		// TODO implement DNS for networks
+		// TODO: implement DNS for networks
 		return nil, fail.NotImplementedError("DNS not implemented yet in networks creation")
 	}
 

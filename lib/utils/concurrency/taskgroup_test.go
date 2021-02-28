@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// FIXME The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
+// FIXME: The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
 
 func TestChildrenWaitingGame(t *testing.T) {
 	overlord, err := NewTaskGroup(nil)
@@ -349,7 +349,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 	fmt.Println("Here we are")
 
-	if end >= (time.Millisecond * 370) {
+	if end >= (time.Millisecond * 400) {
 		t.Errorf("It should have finished near 350 ms but it didn't, it was %v !!", end)
 	}
 }

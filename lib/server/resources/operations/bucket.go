@@ -244,7 +244,8 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 			return xerr
 		}
 	}
-	if !ab.IsNull() {
+	if //goland:noinspection GoNilness
+	!ab.IsNull() {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 	if ab, xerr = b.GetService().CreateBucket(name); xerr != nil {
@@ -358,13 +359,13 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 		return xerr
 	}
 
-	data := struct {
+	dataBu := struct {
 		Bucket string
 	}{
 		Bucket: b.GetName(),
 	}
 
-	err := b.exec(task, rh, "umount_object_storage.sh", data)
+	err := b.exec(task, rh, "umount_object_storage.sh", dataBu)
 	return fail.ConvertError(err)
 }
 

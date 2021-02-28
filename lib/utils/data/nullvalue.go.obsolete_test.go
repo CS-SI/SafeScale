@@ -38,5 +38,6 @@ func TestIsNull(t *testing.T) {
 	require.False(t, v.IsNull())
 
 	v = nil
+	//goland:noinspection GoNilness
 	require.True(t, v.IsNull())
 }

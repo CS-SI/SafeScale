@@ -913,6 +913,10 @@ func (objs *share) Delete(task concurrency.Task) (xerr fail.Error) {
 		hostShare          *propertiesv1.HostShare
 	)
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	objs.SafeLock(task)
 	defer objs.SafeUnlock(task)
 

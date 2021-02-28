@@ -205,14 +205,14 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	// // bufio.Scanner.Scan() may panic...
-	// var panicErr error
-	// defer func() {
-	// 	if panicErr != nil {
-	// 		xerr = fail.ConvertError(panicErr)
-	// 	}
-	// }()
-	// defer fail.OnPanic(&panicErr)
+	// bufio.Scanner.Scan() may panic...
+	var panicErr error
+	defer func() {
+		if panicErr != nil {
+			xerr = fail.ConvertError(panicErr)
+		}
+	}()
+	defer fail.OnPanic(&panicErr)
 
 	scanner := bufio.NewScanner(params.bridge.Reader())
 	scanner.Split(bufio.ScanLines)

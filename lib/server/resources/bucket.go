@@ -8,7 +8,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// GetBucket defines the interface to manipulate Object Storage buckets
+// Bucket GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {
 	Metadata
 	data.Identifiable

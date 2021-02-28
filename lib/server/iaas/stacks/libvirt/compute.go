@@ -547,7 +547,7 @@ func getSizingV1FromDomain(domain *libvirt.Domain, libvirtService *libvirt.Conne
 	hostSizing.AllocatedSize.RAMSize = float32(info.MaxMem) / 1024 / 1024
 	hostSizing.AllocatedSize.Cores = int(info.NrVirtCpu)
 	hostSizing.AllocatedSize.DiskSize = diskSize
-	// TODO GPU not implemented
+	// TODO: GPU not implemented
 	hostSizing.AllocatedSize.GPUNumber = 0
 	hostSizing.AllocatedSize.GPUType = ""
 
@@ -880,8 +880,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	var commands []string
-	// TODO gpu is ignored
-	// TODO use libvirt-go functions not bash commands
+	// TODO: gpu is ignored
+	// TODO: use libvirt-go functions not bash commands
 	commandSetup := fmt.Sprintf("IMAGE_PATH=\"%s\" && IMAGE=\"`echo $IMAGE_PATH | rev | cut -d/ -f1 | rev`\" && EXT=\"`echo $IMAGE | grep -o '[^.]*$'`\" && LIBVIRT_STORAGE=\"%s\" && HOST_NAME=\"%s\" && VM_IMAGE=\"$LIBVIRT_STORAGE/$HOST_NAME.$EXT\"", imagePath, s.LibvirtConfig.LibvirtStorage, resourceName)
 
 	commandResize := fmt.Sprintf("cd $LIBVIRT_STORAGE && chmod 666 $IMAGE_PATH && truncate $VM_IMAGE -s %dG && virt-resize --expand %s $IMAGE_PATH $VM_IMAGE", template.DiskSize, imageDisk)
@@ -945,7 +945,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	hostNetwork.DefaultNetworkID = request.Networks[0].ID
 	hostNetwork.IsGateway = request.IsGateway
 
-	// FIXME Get gateway info
+	// FIXME: Get gateway info
 
 	host = abstract.NewHostFull()
 	host.Core = hostCore

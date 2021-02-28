@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 
 	"github.com/asaskevich/govalidator"
@@ -131,7 +132,7 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "share delete")

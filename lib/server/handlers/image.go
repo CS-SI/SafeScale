@@ -26,7 +26,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ImageHandler
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // ImageHandler defines API to manipulate images
 type ImageHandler interface {
@@ -35,7 +35,7 @@ type ImageHandler interface {
 	Filter(osfilter string) ([]abstract.Image, fail.Error)
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
+// FIXME: ROBUSTNESS All functions MUST propagate context
 
 // imageHandler image service
 type imageHandler struct {

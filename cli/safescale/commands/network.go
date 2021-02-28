@@ -19,12 +19,14 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"

@@ -146,7 +146,7 @@ func TestNilNormalUsage(t *testing.T) {
 // this test breaks no matter what, the first line of CauseFormatter being 'if e.IsNull()' of 'if e == nil' makes no difference
 func TestNilNormalUsageSkippingNilCheck(t *testing.T) {
 	defer func() {
-		if x := recover(); x != nil {
+		if x := recover(); x == nil {
 			t.Fail()
 		}
 	}()

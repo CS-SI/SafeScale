@@ -141,6 +141,19 @@ func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 
 // lookupSubnet tells if a Subnet exists
 func lookupSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (_ bool, xerr fail.Error) {
+	if task == nil {
+		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	}
+	if task.Aborted() {
+		return false, fail.AbortedError(nil, "aborted")
+	}
+	if svc == nil {
+		return false, fail.InvalidParameterError("svc", "cannot be null value")
+	}
+	if subnetRef == "" {
+		return false, fail.InvalidParameterError("subnetRef", "cannot be empty string")
+	}
+
 	var subnetID string
 	if networkRef != "" {
 		// If networkRef is not empty, make sure the subnetRef is inside the network
@@ -533,7 +546,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		as.State = subnetstate.GATEWAY_CREATION
+		as.State = subnetstate.GATEWAY_CREATION //nolint
 		as.GWSecurityGroupID = subnetGWSG.GetID()
 		as.InternalSecurityGroupID = subnetInternalSG.GetID()
 		as.PublicIPSecurityGroupID = subnetPublicIPSG.GetID()
@@ -1847,12 +1860,14 @@ func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.
 			item.Released(task)
 		}(rsg)
 
-		if xerr = rsg.UnbindFromSubnet(task, rs); xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// consider a Security Group not found as a successful unbind
-			default:
-				return xerr
+		if rsg != nil {
+			if xerr = rsg.UnbindFromSubnet(task, rs); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// consider a Security Group not found as a successful unbind
+				default:
+					return xerr
+				}
 			}
 		}
 

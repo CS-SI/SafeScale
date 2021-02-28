@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/integrationtests/enums/providers"
 )
 
 func Docker(t *testing.T, provider providers.Enum) {
@@ -179,7 +180,7 @@ func RemoteDesktop(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 	_ = out
 
-	// TODO : try to connect to the host through guacamole?
+	// TODO: try to connect to the host through guacamole?
 	out, err = GetOutput("wget " + host.PublicIP + ":9080/guacamole")
 	fmt.Print(out)
 	require.Nil(t, err)
@@ -245,37 +246,37 @@ func ReverseProxy(t *testing.T, provider providers.Enum) {
 }
 
 func Metricbeat(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Filebeat(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func NvidiaDocker(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func ProxyCacheClient(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func ProxyCacheServer(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func ApacheIgnite(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Helm(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Kubernetes(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }
 
 func Spark(t *testing.T, provider providers.Enum) {
-	// TODO Implement integration test
+	// TODO: Implement integration test
 }

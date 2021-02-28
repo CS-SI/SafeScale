@@ -50,9 +50,9 @@ type VolumeHandler interface {
 	Detach(volume string, host string) fail.Error
 }
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
-// FIXME ROBUSTNESS All functions MUST propagate context
+// FIXME: ROBUSTNESS All functions MUST propagate context
 
 // volumeHandler volume service
 type volumeHandler struct {
@@ -499,7 +499,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// return nil
 }
 
-// func (handler *volumeHandler) listAttachedDevices(host resources.IPAddress) (set mapset.Set, xerr fail.Error) { // FIXME Make sure ctx is propagated
+// func (handler *volumeHandler) listAttachedDevices(host resources.IPAddress) (set mapset.Set, xerr fail.Error) { // FIXME: Make sure ctx is propagated
 // 	if handler == nil {
 // 		return nil, fail.InvalidInstanceError()
 // 	}

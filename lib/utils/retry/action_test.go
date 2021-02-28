@@ -422,6 +422,8 @@ func TestRefactorSwitch(t *testing.T) {
 	switch toe.(type) {
 	case ErrTimeout:
 		fmt.Println("This requires looking for all the (type) out there...")
+	case *ErrTimeout:
+		fmt.Println("Good enough")
 	default:
 		t.Error("Unexpected problem")
 	}

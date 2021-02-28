@@ -41,7 +41,7 @@ type Stopwatch interface {
 	String() string
 	// OnExitLogWithLevel returns a function that will log start and end of Stopwatch, intended tto be used with defer
 	OnExitLogWithLevel(in, out string, level logrus.Level) func()
-	// OnExitLogInfo
+
 	OnExitLogInfo(in, out string) func()
 }
 

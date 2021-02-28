@@ -39,11 +39,11 @@ const (
 	Bash
 	// Ansible is supported by target
 	Ansible
-	// DCOS packager is supported by cluster target
+	// DCOS_deprecated packager is supported by cluster target
 	DCOS_deprecated //nolint
 	// Helm is supported by cluster target
 	Helm
-	// Nonedoes nothing; check always fail, add and remove always succeed
+	// None does nothing; check always fail, add and remove always succeed
 	None
 
 	// NextEnum marks the next value (or the max, depending the use)

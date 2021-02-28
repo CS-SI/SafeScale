@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// getServer structure
+// Server getServer structure
 type Server struct {
 	SSHConfig *system.SSHConfig
 }

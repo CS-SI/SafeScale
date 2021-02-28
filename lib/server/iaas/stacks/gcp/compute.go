@@ -150,7 +150,7 @@ func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Er
 
 // -------------SSH KEYS-------------------------------------------------------------------------------------------------
 
-// FIXME: change code to really create a keypair on provider side
+// CreateKeyPair FIXME: change code to really create a keypair on provider side
 // CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error) {
 	if s.IsNull() {

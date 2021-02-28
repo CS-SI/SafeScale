@@ -50,7 +50,7 @@ func GetNames(coreString string, nbBukets int, nbVolumes int, nbShares int, nbHo
 }
 
 func (names *Names) TearDown() {
-	// TODO is it possible to suppress a non empty bucket?
+	// TODO: is it possible to suppress a non empty bucket?
 	for _, bucketName := range names.Buckets {
 		_, _ = GetTaggedOutput(fmt.Sprintf("safescale bucket delete %s", bucketName), "Teardown: ")
 	}

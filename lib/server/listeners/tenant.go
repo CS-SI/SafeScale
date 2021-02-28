@@ -81,7 +81,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -181,7 +181,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 

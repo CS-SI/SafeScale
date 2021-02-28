@@ -14,6 +14,7 @@ func Test_host_IsNull_Empty(t *testing.T) {
 
 func Test_host_IsNull_Nil(t *testing.T) {
 	var rh *host
+	//goland:noinspection GoNilness
 	itis := rh.IsNull()
 	require.True(t, itis)
 }

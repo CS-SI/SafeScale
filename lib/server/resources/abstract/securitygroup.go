@@ -355,13 +355,6 @@ func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	// var panicErr error
-	// defer func() {
-	// 	if panicErr != nil {
-	// 		xerr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
-	// 	}
-	// }()
-
 	if jserr := json.Unmarshal(buf, sg); jserr != nil {
 		switch jserr.(type) {
 		case *json.SyntaxError:

@@ -18,13 +18,13 @@ package listeners
 
 import (
 	"context"
+	"reflect"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-
-	"reflect"
-	"strings"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -186,7 +186,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host reboot")

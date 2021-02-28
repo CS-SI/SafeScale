@@ -98,7 +98,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -140,7 +140,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -181,7 +181,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -228,7 +228,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -270,7 +270,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 

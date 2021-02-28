@@ -20,10 +20,9 @@ package cache
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-
-	"sync/atomic"
 )
 
 // Entry is a struct containing information about a cache entry

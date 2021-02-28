@@ -19,13 +19,12 @@ package gcp
 import (
 	"fmt"
 	"net/url"
+	"reflect"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-
-	"reflect"
 
 	"google.golang.org/api/googleapi"
 )

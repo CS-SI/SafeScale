@@ -544,7 +544,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 		return nullAhf, userData, fail.Wrap(retryErr, "error getting machine ip")
 	}
 
-	// FIXME Populate this
+	// FIXME: Populate this
 	hostFull = abstract.NewHostFull()
 	hostFull.Core = &abstract.HostCore{
 		ID:         vapp.VApp.ID,

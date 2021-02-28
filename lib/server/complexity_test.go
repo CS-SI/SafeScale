@@ -25,12 +25,12 @@ func complexityTester(maximum int, subdir string, t *testing.T) {
 }
 
 func TestComplexity(t *testing.T) {
-	// FIXME In time, not a single subpackage complexity should be greater than 25
+	// FIXME: In time, not a single subpackage complexity should be greater than 25
 
 	complexityTester(20, "cluster", t)
-	complexityTester(110, "handlers", t) // FIXME Reduce complexity
-	complexityTester(48, "iaas", t)      // FIXME Reduce complexity
-	complexityTester(51, "install", t)   // FIXME Reduce complexity
+	complexityTester(110, "handlers", t) // FIXME: Reduce complexity
+	complexityTester(48, "iaas", t)      // FIXME: Reduce complexity
+	complexityTester(51, "install", t)   // FIXME: Reduce complexity
 	complexityTester(20, "listeners", t)
 	complexityTester(20, "metadata", t)
 	complexityTester(20, "utils", t)

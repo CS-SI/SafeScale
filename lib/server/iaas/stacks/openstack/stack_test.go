@@ -27,34 +27,33 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/tests"
 )
 
-var tester *tests.ServiceTester
-var service iaas.Service
-
 func getTester() (*tests.ServiceTester, error) {
-	if tester == nil {
-		theService, err := getService()
-		if err != nil {
-			return nil, err
-		}
-		tester = &tests.ServiceTester{
-			Service: theService,
-		}
+	theService, err := getService()
+	if err != nil {
+		return nil, err
 	}
+	tester := &tests.ServiceTester{
+		Service: theService,
+	}
+
 	return tester, nil
 }
 
 func getService() (iaas.Service, error) {
-	if service == nil {
-		tenantName := "TestOpenstack"
-		if tenantOverride := os.Getenv("TEST_OPENSTACK"); tenantOverride != "" {
-			tenantName = tenantOverride
-		}
-		var err error
-		service, err = iaas.UseService(tenantName)
-		if err != nil {
-			return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
-		}
+	tenantName := ""
+	if tenantOverride := os.Getenv("TEST_OPENSTACK"); tenantOverride != "" {
+		tenantName = tenantOverride
 	}
+
+	if tenantName == "" {
+		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
+	}
+
+	service, err := iaas.UseService(tenantName)
+	if err != nil || service == nil {
+		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
+	}
+
 	return service, nil
 }
 
