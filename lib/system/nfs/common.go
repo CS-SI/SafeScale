@@ -122,11 +122,6 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	hidesOutput := strings.Contains(content, "set +x\n")
 	if hidesOutput {
 		content = strings.Replace(content, "set +x\n", "\n", 1)
-		/*
-			if strings.Contains(content, "exec 2>&1\n") {
-				content = strings.Replace(content, "exec 2>&1\n", "exec 2>&7\n", 1)
-			}
-		*/
 	}
 
 	// Copy script to remote host with retries if needed

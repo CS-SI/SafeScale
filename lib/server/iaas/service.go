@@ -51,7 +51,7 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
-	// --- from service ---
+	// CreateHostWithKeyPair --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
@@ -69,12 +69,12 @@ type Service interface {
 
 	GetCache(string) (*ResourceCache, fail.Error)
 
-	// --- from interface iaas.Providers ---
+	// Provider --- from interface iaas.Providers ---
 	providers.Provider
 
 	LookupRuleInSecurityGroup(*abstract.SecurityGroup, abstract.SecurityGroupRule) (bool, fail.Error)
 
-	// --- from interface objectstorage.Location ---
+	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
 }
 

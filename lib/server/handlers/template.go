@@ -26,7 +26,7 @@ import (
 
 //go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateHandler
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // TemplateHandler defines API to manipulate hosts
 type TemplateHandler interface {

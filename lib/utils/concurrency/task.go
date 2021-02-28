@@ -78,7 +78,6 @@ type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	// IgnoreAbortSignal(bool)
 	DisarmAbortSignal() func()
 	SetID(string) fail.Error
 	GetID() (string, fail.Error)
@@ -672,7 +671,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 	if duration > 0 {
 		select {
 		case <-time.After(duration):
-			toErr := fail.TimeoutError(fmt.Errorf("timeout waiting for task '%s'", tid), duration, nil)
+			toErr := fail.TimeoutError(fmt.Errorf("timeout of %s waiting for task '%s'", duration, tid), duration, nil)
 			abErr := t.Abort()
 			if abErr != nil {
 				_ = toErr.AddConsequence(abErr)

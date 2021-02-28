@@ -599,7 +599,7 @@ func (s *stack) CreateNetwork(req abstract.NetworkRequest) (network *abstract.Ne
 
 	network = abstract.NewNetwork()
 
-	// FIXME Remove this, get info from recently created network
+	// FIXME: Remove this, get info from recently created network
 	network.ID = createdNetwork.OrgVDCNetwork.ID
 	network.Name = req.Name
 	network.CIDR = req.CIDR

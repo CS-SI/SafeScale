@@ -241,7 +241,7 @@ func (h host) ListFeatures(hostRef string, all bool, duration time.Duration) (*p
 	return result, nil
 }
 
-// CheckFeatures ...
+// CheckFeature ...
 func (h host) CheckFeature(hostRef, featureName string, params map[string]string, settings *protocol.FeatureSettings, duration time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()

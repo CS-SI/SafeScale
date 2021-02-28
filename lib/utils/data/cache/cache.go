@@ -69,12 +69,12 @@ func (c *cache) IsNull() bool {
 	return c == nil || c.name == "" || c.cache == nil
 }
 
-// satisfies interface data.Identifiable
+// GetID satisfies interface data.Identifiable
 func (c cache) GetID() string {
 	return c.name
 }
 
-// satisfies interface data.Identifiable
+// GetName satisfies interface data.Identifiable
 func (c cache) GetName() string {
 	return c.name
 }

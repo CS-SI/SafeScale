@@ -16,7 +16,7 @@
 
 package tests
 
-// TODO NOTICE Side-effects imports here
+// TODO: NOTICE Side-effects imports here
 import (
 	"fmt"
 	"testing"
@@ -817,4 +817,4 @@ func (tester *ServiceTester) Buckets(t *testing.T) {
 // 	assert.Nil(t, err)
 // }
 
-// TODO: Implement missing methods here (Look at TODO Implement Test)
+// TODO: Implement missing methods here (Look at TODO: Implement Test)

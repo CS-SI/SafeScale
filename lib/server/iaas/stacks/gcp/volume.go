@@ -18,9 +18,10 @@ package gcp
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"strconv"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 
 	"google.golang.org/api/compute/v1"
 

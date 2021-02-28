@@ -17,10 +17,11 @@
 package client
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
@@ -50,9 +51,9 @@ func (s subnet) List(networkRef string, all bool, timeout time.Duration) (*proto
 	})
 }
 
-// TODO: concurent access if deleting multiple networks
+// Delete TODO: concurent access if deleting multiple networks
 // FIXME: use concurrency.Task ?
-// Delete deletes several networks at the same time in goroutines
+// deletes several networks at the same time in goroutines
 func (s subnet) Delete(networkRef string, names []string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()

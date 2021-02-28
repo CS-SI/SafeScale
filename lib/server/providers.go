@@ -16,7 +16,7 @@
 
 package server
 
-// TODO NOTICE Side-effects imports here
+// TODO: NOTICE Side-effects imports here
 
 // This file is used to automatically register all providers
 import (

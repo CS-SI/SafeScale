@@ -230,11 +230,8 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU = []string{
-			// "g.*-.*",
-			// "t.*-.*",
-		}
-		out []*regexp.Regexp
+		templatesWithGPU []string
+		out              []*regexp.Regexp
 	)
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)

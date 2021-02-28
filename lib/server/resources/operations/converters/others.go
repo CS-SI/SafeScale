@@ -78,7 +78,7 @@ func NFSExportOptionsFromStringToProtocol(in string) *protocol.NFSExportOptions 
 	return out
 }
 
-// HostSizingFromStringToAbstract converts host sizing requirements from string to *abstract.HostSizingRequirements
+// HostSizingRequirementsFromStringToAbstract HostSizingFromStringToAbstract converts host sizing requirements from string to *abstract.HostSizingRequirements
 func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizingRequirements, int, fail.Error) {
 	tokens, rerr := parseSizingString(in)
 	if rerr != nil {
@@ -436,10 +436,7 @@ func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 			}
 
 		case "-": // Manages negative number (can be used for gpu)
-			for tok = s.Scan(); tok != scanner.EOF; tok = s.Scan() { // FIXME: OPP Unreachable code ?
-				t += s.TokenText()
-				break
-			}
+			t += s.TokenText()
 		}
 
 		if mytoken == nil {

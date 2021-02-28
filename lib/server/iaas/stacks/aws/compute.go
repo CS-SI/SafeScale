@@ -522,6 +522,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or attached network")
 		}
 		// FIXME: fallback to net-safescale ?
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without default subnet")
 	}
 
 	// --- prepares data structures for Provider usage ---

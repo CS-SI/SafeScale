@@ -392,10 +392,6 @@ func (rh *host) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.
 func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate rh
-	// if rh.IsNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -485,21 +481,6 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 		}
 		return xerr
 	}
-	// // Read data from metadata storage
-	// hostID := rh.GetID()
-	// xerr = retry.WhileUnsuccessfulDelay1Second(
-	// 	func() error {
-	// 		return rh.Read(task, hostID)
-	// 	},
-	// 	10*time.Second,
-	// )
-	// if xerr != nil {
-	// 	// If retry timed out, log it and return error ErrNotFound
-	// 	if _, ok := xerr.(*retry.ErrTimeout); ok {
-	// 		xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostID)
-	// 	}
-	// 	return xerr
-	// }
 
 	// Request host inspection from provider
 	ahf, xerr := rh.GetService().InspectHost(rh.GetID())
@@ -1960,15 +1941,8 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 		return 0, "", "", xerr
 	}
 
-	if executionTimeout < temporal.GetHostTimeout() {
-		executionTimeout = temporal.GetHostTimeout()
-	}
 	if connectionTimeout < temporal.GetConnectSSHTimeout() {
 		connectionTimeout = temporal.GetConnectSSHTimeout()
-	}
-	// FIXME: Whaaaaat ?
-	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
 	hostName := rh.GetName()

@@ -229,13 +229,6 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	// nHosts := uint(len(hosts))
-	// defer temporal.NewStopwatch().OnExitLogWithLevel(
-	// 	fmt.Sprintf("Starting step '%s' on %d host%s...", is.Name, nHosts, strprocess.Plural(nHosts)),
-	// 	fmt.Sprintf("Ending step '%s' on %d host%s", is.Name, len(hosts), strprocess.Plural(nHosts)),
-	// 	logrus.DebugLevel,
-	// )()
-
 	if is.Serial || s.Serialize {
 
 		for _, h := range hosts {

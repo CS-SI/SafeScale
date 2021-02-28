@@ -1,11 +1,12 @@
 package fail
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/sirupsen/logrus"
 )

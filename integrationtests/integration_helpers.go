@@ -41,7 +41,7 @@ func CanBeRun(command string) (bool, error) {
 	return strings.Contains(string(out), command), nil
 }
 
-// GetOutput ...
+// GetTaggedOutput ...
 func GetTaggedOutput(command string, tag string) (string, error) {
 	fmt.Printf("%sRunning [%s]\n", tag, command)
 	out, err := exec.Command("bash", "-c", command).CombinedOutput()

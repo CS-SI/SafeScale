@@ -1,6 +1,6 @@
 package stacks
 
-// AWS cloud platform configuration
+// AWSConfiguration AWS cloud platform configuration
 type AWSConfiguration struct {
 	S3Endpoint  string `json:"-"`
 	Ec2Endpoint string `json:"-"`

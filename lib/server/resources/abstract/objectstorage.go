@@ -95,7 +95,7 @@ func (osb *ObjectStorageBucket) Deserialize(buf []byte) (xerr fail.Error) {
 	return nil
 }
 
-// name returns the name of the host
+// GetName name returns the name of the host
 // Satisfies interface data.Identifiable
 func (osb ObjectStorageBucket) GetName() string {
 	if osb.IsNull() {

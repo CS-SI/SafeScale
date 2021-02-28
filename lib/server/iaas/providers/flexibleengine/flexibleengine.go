@@ -18,9 +18,10 @@ package flexibleengine
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"regexp"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"

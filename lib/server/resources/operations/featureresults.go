@@ -120,7 +120,7 @@ func (urs unitResults) Keys() []string {
 	return keys
 }
 
-// ResultFromKey returns the result corresponding to the unit passed as parameter
+// ResultOfKey returns the result corresponding to the unit passed as parameter
 func (urs unitResults) ResultOfKey(key string) resources.UnitResult {
 	if r, ok := urs[key]; ok {
 		return r

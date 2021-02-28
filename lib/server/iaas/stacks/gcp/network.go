@@ -80,14 +80,14 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		return nullAN, xerr
 	}
 
-	net := abstract.NewNetwork()
-	net.ID = strconv.FormatUint(resp.Id, 10)
-	net.Name = req.Name
-	net.CIDR = req.CIDR // Not enforced by GCP, but needed by SafeScale
+	anet := abstract.NewNetwork()
+	anet.ID = strconv.FormatUint(resp.Id, 10)
+	anet.Name = req.Name
+	anet.CIDR = req.CIDR // Not enforced by GCP, but needed by SafeScale
 
 	// _ = net.OK()
 
-	return net, nil
+	return anet, nil
 }
 
 // InspectNetwork returns the network identified by id (actually for gcp, id here is name)

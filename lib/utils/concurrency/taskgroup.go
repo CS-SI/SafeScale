@@ -421,7 +421,7 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 	if duration > 0 {
 		select {
 		case <-time.After(duration):
-			tout := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout waiting for task group '%s'", tid))
+			tout := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout of %s waiting for task group '%s'", duration, tid))
 			abErr := tg.Abort()
 			if abErr != nil {
 				_ = tout.AddConsequence(abErr)

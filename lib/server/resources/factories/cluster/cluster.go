@@ -27,7 +27,7 @@ import (
 
 // List returns a list of available hosts
 func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
-	nullList := []abstract.ClusterIdentity{}
+	var nullList []abstract.ClusterIdentity
 
 	if task == nil {
 		return nullList, fail.InvalidParameterCannotBeNilError("task")

@@ -18,8 +18,9 @@ package listeners
 
 import (
 	"context"
-	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	"strings"
+
+	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -304,7 +305,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -360,7 +361,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 
@@ -473,7 +474,7 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 		}
 	}
 

@@ -19,12 +19,14 @@ package huaweicloud
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"net"
+
 	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
-	"net"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 
 	"github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"

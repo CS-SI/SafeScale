@@ -17,9 +17,10 @@
 package aws
 
 import (
-	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"net"
 	"reflect"
+
+	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -169,16 +170,16 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 		}
 	}()
 
-	net := abstract.NewNetwork()
-	net.ID = aws.StringValue(theVpc.VpcId)
-	net.Name = req.Name
-	net.CIDR = req.CIDR
-	net.DNSServers = req.DNSServers
+	anet := abstract.NewNetwork()
+	anet.ID = aws.StringValue(theVpc.VpcId)
+	anet.Name = req.Name
+	anet.CIDR = req.CIDR
+	anet.DNSServers = req.DNSServers
 
 	// Make sure we log warnings
-	_ = net.OK()
+	_ = anet.OK()
 
-	return net, nil
+	return anet, nil
 }
 
 // InspectNetwork returns information about Network/VPC from AWS
@@ -199,15 +200,12 @@ func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) 
 		return nullAN, xerr
 	}
 
-	net, xerr := toAbstractNetwork(resp)
+	anet, xerr := toAbstractNetwork(resp)
 	if xerr != nil {
 		return nullAN, xerr
 	}
-	//net.Subnets, xerr = s.listSubnetIDs(net.ID)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	return net, nil
+
+	return anet, nil
 }
 
 // toAbstractNetwork converts an ec2.Vpc to abstract.Network
@@ -247,16 +245,12 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 		return nullAN, xerr
 	}
 
-	net, xerr := toAbstractNetwork(resp)
+	anet, xerr := toAbstractNetwork(resp)
 	if xerr != nil {
 		return nullAN, xerr
 	}
 
-	//net.Subnets, xerr = s.listSubnetIDs(net.ID)
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	return net, nil
+	return anet, nil
 }
 
 // ListNetworks ...

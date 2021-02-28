@@ -19,9 +19,10 @@ package converters
 // Contains functions that are used to convert from Protocol
 
 import (
+	"strings"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"

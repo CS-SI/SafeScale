@@ -17,11 +17,10 @@
 package aws
 
 import (
+	"fmt"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
-	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -193,7 +192,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername: operatorUsername,
 		UseNATService:    false,
 		ProviderName:     providerName,
-		// BuildSubnets:     false, // FIXME AWS by default don't build subnetworks
+		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
 		DefaultSecurityGroupName: "default",
 	}
 
@@ -282,11 +281,8 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU = []string{
-			// "g.*-.*",
-			// "t.*-.*",
-		}
-		out []*regexp.Regexp
+		templatesWithGPU []string
+		out              []*regexp.Regexp
 	)
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)

@@ -122,7 +122,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdNetSpeed,
 )
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // ScannerHandler defines API to manipulate images
 type ScannerHandler interface {
@@ -322,7 +322,7 @@ func (handler *scannerHandler) analyze() (xerr fail.Error) {
 		// 	logrus.Warnf("template [%s]: Problem creating ssh command: %v", template.GetName, err)
 		// 	return err
 		// }
-		// _, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME Hardcoded timeout
+		// _, cout, _, err := c.RunWithTimeout(nil, outputs.COLLECT, 8*time.Minute) // FIXME: Hardcoded timeout
 		// if err != nil {
 		// 	logrus.Warnf("template [%s]: Problem running ssh command: %v", template.GetName, err)
 		// 	return err

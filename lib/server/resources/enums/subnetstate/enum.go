@@ -21,14 +21,14 @@ package subnetstate
 // Enum represents the state of a network
 type Enum int
 
+//goland:noinspection ALL
 const (
-	// UNKNOWN
 	UNKNOWN Enum = iota
 
 	// GATEWAY_CREATION when gateway(s) is(are) created
 	GATEWAY_CREATION //nolint
 
-	// PHASE2 when gateway(s) is(are) configured
+	// GATEWAY_CONFIGURATION when gateway(s) is(are) configured
 	GATEWAY_CONFIGURATION //nolint
 
 	// READY when ready

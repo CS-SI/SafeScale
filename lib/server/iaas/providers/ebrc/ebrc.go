@@ -1,4 +1,5 @@
 // +build ignore
+
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
@@ -18,10 +19,11 @@
 package ebrc
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"regexp"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 

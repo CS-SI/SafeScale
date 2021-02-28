@@ -6,11 +6,9 @@ import (
 )
 
 func TestGetBigDelay(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -22,11 +20,9 @@ func TestGetBigDelay(t *testing.T) {
 }
 
 func TestGetConnectSSHTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -38,11 +34,9 @@ func TestGetConnectSSHTimeout(t *testing.T) {
 }
 
 func TestGetConnectionTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,11 +48,9 @@ func TestGetConnectionTimeout(t *testing.T) {
 }
 
 func TestGetContextTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,11 +62,9 @@ func TestGetContextTimeout(t *testing.T) {
 }
 
 func TestGetDefaultDelay(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -86,11 +76,9 @@ func TestGetDefaultDelay(t *testing.T) {
 }
 
 func TestGetExecutionTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -102,11 +90,9 @@ func TestGetExecutionTimeout(t *testing.T) {
 }
 
 func TestGetHostCleanupTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -118,11 +104,9 @@ func TestGetHostCleanupTimeout(t *testing.T) {
 }
 
 func TestGetHostCreationTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,11 +118,9 @@ func TestGetHostCreationTimeout(t *testing.T) {
 }
 
 func TestGetHostTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -150,11 +132,9 @@ func TestGetHostTimeout(t *testing.T) {
 }
 
 func TestGetLongOperationTimeout(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -166,11 +146,9 @@ func TestGetLongOperationTimeout(t *testing.T) {
 }
 
 func TestGetMinDelay(t *testing.T) {
-	tests := []struct {
+	var tests []struct {
 		name string
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -186,12 +164,10 @@ func TestGetTimeoutFromEnv(t *testing.T) {
 		key      string
 		duration time.Duration
 	}
-	tests := []struct {
+	var tests []struct {
 		name string
 		args args
 		want time.Duration
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

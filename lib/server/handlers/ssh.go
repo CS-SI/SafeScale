@@ -18,12 +18,13 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 
 	"github.com/sirupsen/logrus"
 
@@ -48,17 +49,16 @@ const protocolSeparator = ":"
 
 //go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers SSHHandler
 
-// TODO At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
 // SSHHandler defines ssh management API
 type SSHHandler interface {
-	// Connect(name string) error
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
 	GetConfig(stacks.HostParameter) (*system.SSHConfig, fail.Error)
 }
 
-// FIXME ROBUSTNESS All functions MUST propagate context
+// FIXME: ROBUSTNESS All functions MUST propagate context
 
 // sshHandler SSH service
 type sshHandler struct {

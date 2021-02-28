@@ -288,8 +288,8 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	return flvList, nil
 }
 
-// TODO: replace with code to create KeyPair on provider side if it exists
-// CreateKeyPair creates and import a key pair
+// CreateKeyPair TODO: replace with code to create KeyPair on provider side if it exists
+// creates and import a key pair
 func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
 	if s.IsNull() {
@@ -305,8 +305,8 @@ func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	return abstract.NewKeyPair(name)
 }
 
-// TODO: replace with openstack code to get keypair (if it exits)
-// GetKeyPair returns the key pair identified by id
+// InspectKeyPair TODO: replace with openstack code to get keypair (if it exits)
+// returns the key pair identified by id
 func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
 	if s.IsNull() {
@@ -334,7 +334,7 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
 func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
-	emptySlice := []abstract.KeyPair{}
+	var emptySlice []abstract.KeyPair
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}

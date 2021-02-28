@@ -22,7 +22,7 @@ package clusternodetype
 type Enum int
 
 const (
-	// getGateway to represent a gateway node
+	// Gateway to represent a gateway node
 	Gateway Enum = iota
 	// Master to represent a master node
 	Master

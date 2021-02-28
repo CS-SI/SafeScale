@@ -106,7 +106,7 @@ type stack struct {
 	//SecurityGroup     *secgroups.SecGroup
 }
 
-// NullStacks returns a null value of the stack
+// NullStack returns a null value of the stack
 func NullStack() *stack { //nolint
 	return &stack{}
 }

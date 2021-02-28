@@ -192,12 +192,17 @@ func TestSingleTaskTryWaitUsingSubtasks(t *testing.T) {
 
 	begin := time.Now()
 	res, err := single.Wait()
+	if err == nil {
+		t.FailNow()
+	}
 	end := time.Since(begin)
 
-	_ = end
-
 	require.Nil(t, res)
-	require.NotNil(t, err)
+	// require.NotNil(t, err)
+
+	if end > time.Duration(2800)*time.Millisecond {
+		t.FailNow()
+	}
 }
 
 func TestSingleTaskTryWaitOK(t *testing.T) {
@@ -333,7 +338,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	}
 	funk(30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
 	funk(30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)
-	funk(60*time.Millisecond, 30*time.Millisecond, 10*time.Millisecond, true)
+	funk(80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
 	funk(40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)
 	funk(40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)
 	funk(140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)

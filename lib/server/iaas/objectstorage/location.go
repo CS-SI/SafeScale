@@ -89,8 +89,6 @@ type Location interface {
 	WriteMultiPartObject(string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
 	// WriteObject ...
 	WriteObject(string, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
-	// // CopyObject copies an object
-	// CopyObject(string, string, string) fail.Error
 	// DeleteObject delete an object from a stowContainer
 	DeleteObject(string, string) fail.Error
 	// FilterItemsByMetadata(ContainerName string, key string, pattern string) (map[string][]string, fail.Error)

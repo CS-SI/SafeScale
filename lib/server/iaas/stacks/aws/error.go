@@ -18,11 +18,13 @@ package aws
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"reflect"
+
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/sirupsen/logrus"
-	"reflect"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // normalizeError translates AWS error to SafeScale one

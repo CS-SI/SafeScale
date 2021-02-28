@@ -44,6 +44,5 @@ type Results interface {
 	ErrorMessagesOfUnit(name string) string
 	ErrorMessagesOfKey(name string) string
 	ResultsOfKey(key string) UnitResults
-	// ResultsOfUnit(unitKey string) UnitResults
 	Keys() []string
 }

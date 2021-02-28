@@ -60,13 +60,13 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	uuid, err := uuid.NewV4()
+	auuid, err := uuid.NewV4()
 	if err != nil {
 		return nullASG, fail.Wrap(err, "failed to generate unique id for Security Group")
 	}
 
 	asg := abstract.NewSecurityGroup()
-	asg.ID = fmt.Sprintf("sfsg-%s", uuid)
+	asg.ID = fmt.Sprintf("sfsg-%s", auuid)
 	asg.Name = name
 	asg.Description = description + " (" + asg.ID + ")"
 	asg.Network = networkRef
