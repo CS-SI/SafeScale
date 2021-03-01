@@ -125,6 +125,7 @@ func (c core) GetName() string {
 	if c.IsNull() {
 		return "<NullCore>"
 	}
+
 	if name, ok := c.name.Load().(string); ok {
 		return name
 	}
@@ -141,14 +142,15 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 	if c.properties == nil {
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
@@ -544,9 +546,6 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
-
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
 
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
