@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	scribble "github.com/nanobox-io/golang-scribble"
@@ -92,7 +93,8 @@ type service struct {
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
 
-	cache serviceCache
+	cache     serviceCache
+	cacheLock *sync.Mutex
 }
 
 const (
@@ -158,14 +160,18 @@ func (svc *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	if svc.cache.resources == nil {
-		svc.cache.resources = map[string]*ResourceCache{}
-	}
+	// if svc.cache.resources == nil {
+	// 	svc.cache.resources = map[string]*ResourceCache{}
+	// }
+	svc.cacheLock.Lock()
+	defer svc.cacheLock.Unlock()
+
 	if _, ok := svc.cache.resources[name]; !ok {
 		rc, xerr := NewResourceCache(name)
 		if xerr != nil {
 			return rc, xerr
 		}
+
 		svc.cache.resources[name] = rc
 	}
 	return svc.cache.resources[name], nil
