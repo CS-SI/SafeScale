@@ -155,7 +155,7 @@ generate: sdk
 
 test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	$(GO) test -v github.com/CS-SI/SafeScale/integrationtests/... github.com/CS-SI/SafeScale/lib/... 2>&1 > test_results.log || true
+	@$(GO) test -v github.com/CS-SI/SafeScale/integrationtests/... github.com/CS-SI/SafeScale/lib/... 2>&1 > test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
