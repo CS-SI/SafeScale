@@ -26,6 +26,7 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -88,9 +89,9 @@ type TaskCore interface {
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, fail.Error)
-	Start(TaskAction, TaskParameters) (Task, fail.Error)
-	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, fail.Error)
-	StartInSubtask(TaskAction, TaskParameters) (Task, fail.Error)
+	Start(TaskAction, TaskParameters, ...data.ImmutableKeyValue) (Task, fail.Error)
+	StartWithTimeout(TaskAction, TaskParameters, time.Duration, ...data.ImmutableKeyValue) (Task, fail.Error)
+	StartInSubtask(TaskAction, TaskParameters, ...data.ImmutableKeyValue) (Task, fail.Error)
 }
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
@@ -117,7 +118,7 @@ type task struct {
 	result TaskResult
 
 	abortDisengaged bool
-	subtasks        map[string]Task // list of subtasks created from this task
+	//	subtasks        map[string]Task // list of subtasks created from this task
 }
 
 var globalTask atomic.Value
@@ -203,7 +204,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 		abortCh:  make(chan bool, 1),
 		doneCh:   make(chan bool, 1),
 		finishCh: make(chan struct{}, 1),
-		subtasks: make(map[string]Task),
+		//		subtasks: make(map[string]Task),
 	}
 
 	u, err := uuid.NewV4()
@@ -221,6 +222,7 @@ func (t *task) IsNull() bool {
 	return t == nil || t.id == ""
 }
 
+// GetLastError returns the last error of the Task
 func (t *task) GetLastError() (error, fail.Error) { //nolint
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -332,7 +334,7 @@ func (t *task) SetID(id string) fail.Error {
 }
 
 // Start runs in goroutine the function with parameters
-func (t *task) Start(action TaskAction, params TaskParameters) (Task, fail.Error) {
+func (t *task) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -342,7 +344,7 @@ func (t *task) Start(action TaskAction, params TaskParameters) (Task, fail.Error
 // StartWithTimeout runs in goroutine the TasAction with TaskParameters, and stops after timeout (if > 0)
 // If timeout happens, error returned will be ErrTimeout
 // This function is useful when you know at the time you use it there will be a timeout to apply.
-func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, fail.Error) {
+func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -373,7 +375,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 }
 
 // StartInSubtask runs in a subtask goroutine the function with parameters
-func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, fail.Error) {
+func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -386,8 +388,8 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, f
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	subtaskID, _ := st.GetID()
-	t.subtasks[subtaskID] = st
+	// subtaskID, _ := st.GetID()
+	// t.subtasks[subtaskID] = st
 
 	return st.Start(action, params)
 }
