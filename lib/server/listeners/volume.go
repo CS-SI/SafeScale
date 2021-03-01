@@ -40,9 +40,6 @@ import (
 // safescale volume inspect v1
 // safescale volume update v1 --speed="HDD" --size=1000
 
-// FIXME: Think about this
-// //go:generate mockgen -destination=../mocks/mock_volumeserviceserver.go -package=mocks github.com/CS-SI/SafeScale/lib VolumeServiceServer
-
 // VolumeHandler ...
 var VolumeHandler = handlers.NewVolumeHandler
 

@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_templateapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers TemplateHandler
+//go:generate minimock -o ../mocks/mock_templateapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.TemplateHandler
 
 // TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 

@@ -13,6 +13,9 @@ generate:
 vet:
 	@$(GO) vet ./...
 
+test:
+	@$(GO) test ./...
+
 clean:
 	@(cd enums && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))

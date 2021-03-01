@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_cache.go -package=mocks github.com/CS-SI/SafeScale/lib/utils Cache
+//go:generate minimock -o ../mocks/mock_cache.go -i github.com/CS-SI/SafeScale/lib/utils.Cache
 
 // Cache is an interface for caching elements
 type Cache interface {

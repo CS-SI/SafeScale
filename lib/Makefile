@@ -24,6 +24,9 @@ all:	lib/protocol lib/system lib/utils lib/server lib/client sdk
 vet:
 	@$(GO) vet ./...
 
+test:
+	@$(GO) test -v ./...
+
 gensrc:
 	@(cd server/iaas/userdata && $(MAKE) $(@))
 	@(cd system && $(MAKE) $(@))

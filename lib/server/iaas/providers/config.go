@@ -16,7 +16,7 @@
 
 package providers
 
-//go:generate mockgen -destination=../mocks/mock_config.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/providers Config
+//go:generate minimock -o ../mocks/mock_config.go -i github.com/CS-SI/SafeScale/lib/server/iaas/providers.Config
 
 // Config represents key/value configuration.
 type Config interface {

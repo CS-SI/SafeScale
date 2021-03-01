@@ -16,7 +16,7 @@
 
 package cache
 
-//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Cacheable
+//go:generate minimock -o ../mocks/mock_cacheable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cacheable
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
