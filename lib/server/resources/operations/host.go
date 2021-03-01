@@ -465,6 +465,7 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -474,12 +475,12 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 
 	if xerr = rh.core.Reload(task); xerr != nil {
-		// If retry timed out, log it and return error ErrNotFound
 		switch xerr.(type) { //nolint
-		case *retry.ErrTimeout:
+		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
 			xerr = fail.NotFoundError("metadata of host '%s' not found; host deleted?", hostName)
+		default:
+			return xerr
 		}
-		return xerr
 	}
 
 	// Request host inspection from provider
