@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -235,6 +236,8 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 			Location:       objectStorageLocation,
 			metadataBucket: metadataBucket,
 			metadataKey:    metadataCryptKey,
+			cache:          serviceCache{map[string]*ResourceCache{}},
+			cacheLock:      &sync.Mutex{},
 		}
 		return newS, validateRegexps(newS /*tenantClient*/, tenant)
 	}

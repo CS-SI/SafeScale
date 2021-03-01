@@ -23,14 +23,30 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestClusterInstalledFeature_Clone(t *testing.T) {
+	ct := NewClusterInstalledFeature()
+	ct.Requires["something"] = struct{}{}
+
+	clonedCt, ok := ct.Clone().(*ClusterInstalledFeature)
+	if !ok {
+		t.Fail()
+	}
+
+	assert.Equal(t, ct, clonedCt)
+
+	clonedCt.RequiredBy["other"] = struct{}{}
+
+	areEqual := reflect.DeepEqual(ct, clonedCt)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+}
+
 func TestFeatures_Clone(t *testing.T) {
 	ct := newClusterFeatures()
-
-	ct.Installed["fair"] = &ClusterInstalledFeature{
-		Requires: map[string]struct{}{
-			"something": struct{}{},
-		},
-	}
+	ct.Installed["fair"] = NewClusterInstalledFeature()
+	ct.Installed["fair"].Requires["something"] = struct{}{}
 	ct.Disabled["kind"] = struct{}{}
 
 	clonedCt, ok := ct.Clone().(*ClusterFeatures)
@@ -39,11 +55,7 @@ func TestFeatures_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
-	clonedCt.Installed["fair"] = &ClusterInstalledFeature{
-		Requires: map[string]struct{}{
-			"commitment": struct{}{},
-		},
-	}
+	clonedCt.Installed["fair"].Requires = map[string]struct{}{"commitment": {}}
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {

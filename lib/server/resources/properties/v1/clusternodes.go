@@ -63,21 +63,22 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 	src := p.(*ClusterNodes)
 	*n = *src
 	n.Masters = make([]*ClusterNode, len(src.Masters))
-	// for k, v := range src.Masters {
-	// 	n.Masters[k] = v
-	// }
-	copy(n.Masters, src.Masters)
+	for k, v := range src.Masters {
+		newNode := *v
+		n.Masters[k] = &newNode
+	}
 
 	n.PublicNodes = make([]*ClusterNode, len(src.PublicNodes))
-	// for k, v := range src.PublicNodes {
-	// 	n.PublicNodes[k] = v
-	// }
-	copy(n.PublicNodes, src.PublicNodes)
+	for k, v := range src.PublicNodes {
+		newNode := *v
+		n.PublicNodes[k] = &newNode
+	}
+
 	n.PrivateNodes = make([]*ClusterNode, len(src.PrivateNodes))
-	// for k, v := range src.PrivateNodes {
-	// 	n.PrivateNodes[k] = v
-	// }
-	copy(n.PrivateNodes, src.PrivateNodes)
+	for k, v := range src.PrivateNodes {
+		newNode := *v
+		n.PrivateNodes[k] = &newNode
+	}
 	return n
 }
 
