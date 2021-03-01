@@ -42,6 +42,11 @@ const (
 
 // core contains the core functions of a persistent object
 type core struct {
+	// Note: these 2 fields MUST appear at the beginning of the struct, to be sure to have them 64-bit aligned, a necessary condition
+	//       to use of native atomic instructions
+	name atomic.Value
+	id   atomic.Value
+
 	concurrency.TaskedLock `json:"-"`
 
 	kind       string
@@ -50,8 +55,6 @@ type core struct {
 	folder     folder
 	loaded     bool
 	committed  bool
-	name       atomic.Value
-	id         atomic.Value
 	observers  map[string]observer.Observer
 }
 
