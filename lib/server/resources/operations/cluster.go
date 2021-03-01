@@ -3333,7 +3333,24 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	// Note: we are not using a TaskGroup here because we need to filter ErrNotFound for each Host (a missing Host is considered a successful deletion)
 	// TaskGroup, as currently designed, does not allow that
 	masterCount, nodeCount := len(masters), len(nodes)
-	subtasks := make([]concurrency.Task, 0, masterCount+nodeCount)
+	//	subtasks := make([]concurrency.Task, 0, masterCount+nodeCount)
+	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	if xerr != nil {
+		return xerr
+	}
+
+	options := []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue("normalizeError", func(err error) error {
+			if err != nil {
+				switch err.(type) {
+				case *fail.ErrNotFound:
+					return nil
+				}
+			}
+			return err
+		}),
+	}
+
 	if nodeCount > 0 {
 		for _, v := range nodes {
 			if task.Aborted() {
@@ -3341,12 +3358,12 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 			}
 
 			if n, ok := all[v]; ok {
-				subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: n})
-				if xerr != nil {
+				// subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: n})
+				if _, xerr := tg.Start(c.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...); xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
 				}
-				subtasks = append(subtasks, subtask)
+				// subtasks = append(subtasks, subtask)
 			}
 		}
 	}
@@ -3357,25 +3374,28 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 			}
 
 			if n, ok := all[v]; ok {
-				subtask, xerr := task.StartInSubtask(c.taskDeleteMaster, taskDeleteNodeParameters{node: n})
-				if xerr != nil {
+				// subtask, xerr := task.StartInSubtask(c.taskDeleteMaster, taskDeleteNodeParameters{node: n})
+				if _, xerr := tg.Start(c.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...); xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
 				}
-				subtasks = append(subtasks, subtask)
+				// subtasks = append(subtasks, subtask)
 			}
 		}
 	}
-	for _, s := range subtasks {
-		if _, innerXErr := s.Wait(); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// node not found, consider as a successful deletion and continue
-			default:
-				cleaningErrors = append(cleaningErrors, innerXErr)
-			}
-		}
+	if _, xerr = tg.WaitGroup(); xerr != nil {
+		cleaningErrors = append(cleaningErrors, xerr)
 	}
+	// for _, s := range subtasks {
+	// 	if _, innerXErr := s.Wait(); innerXErr != nil {
+	// 		switch innerXErr.(type) {
+	// 		case *fail.ErrNotFound:
+	// 			// node not found, consider as a successful deletion and continue
+	// 		default:
+	// 			cleaningErrors = append(cleaningErrors, innerXErr)
+	// 		}
+	// 	}
+	// }
 
 	if len(cleaningErrors) > 0 {
 		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
@@ -3397,30 +3417,39 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 
 	allCount := len(all)
+	tg, xerr = concurrency.NewTaskGroupWithParent(task)
+	if xerr != nil {
+		return xerr
+	}
+
 	if allCount > 0 {
-		subtasks = make([]concurrency.Task, 0, allCount)
+		// subtasks = make([]concurrency.Task, 0, allCount)
 		for _, v := range all {
 			if task.Aborted() {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v})
+			// subtask, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v})
+			_, xerr := task.StartInSubtask(c.taskDeleteNode, taskDeleteNodeParameters{node: v})
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
 				break
 			}
-			subtasks = append(subtasks, subtask)
+			// subtasks = append(subtasks, subtask)
 		}
 	}
-	for _, s := range subtasks {
-		if _, innerXErr := s.Wait(); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// node not found, consider as a successful deletion and continue
-			default:
-				cleaningErrors = append(cleaningErrors, innerXErr)
-			}
-		}
+	// for _, s := range subtasks {
+	// 	if _, innerXErr := s.Wait(); innerXErr != nil {
+	// 		switch innerXErr.(type) {
+	// 		case *fail.ErrNotFound:
+	// 			// node not found, consider as a successful deletion and continue
+	// 		default:
+	// 			cleaningErrors = append(cleaningErrors, innerXErr)
+	// 		}
+	// 	}
+	// }
+	if _, xerr = tg.WaitGroup(); xerr != nil {
+		cleaningErrors = append(cleaningErrors, xerr)
 	}
 	if len(cleaningErrors) > 0 {
 		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
