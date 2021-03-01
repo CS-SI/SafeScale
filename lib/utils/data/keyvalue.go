@@ -22,8 +22,10 @@ import (
 
 // keyValue describes the content of a key/value pair
 type keyValue struct {
-	name  string
+	// Note: value MUST be the first field in the struct to ensure it is 64-bit aligned, condition to make the use
+	//       of native atomic instructions of the processor
 	value atomic.Value
+	name  string
 }
 
 // Key returns the key of the key/value
