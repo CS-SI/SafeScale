@@ -162,7 +162,7 @@ service ImageService{
 message NetworkCreateRequest{
 	string name = 2;
 	string cidr = 3;
-	GatewayDefinition gateway = 4;  // Deprecated: moved to SubnetDefinition
+	GatewayDefinition gateway = 4;  // used only if no_subnet is true
 	bool fail_over = 5;             // Deprecated: moved to SubnetDefinition
 	string domain = 6;              // Deprecated: moved to SubnetDefinition
 	bool keep_on_failure = 7;
