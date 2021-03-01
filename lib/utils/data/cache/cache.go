@@ -219,15 +219,6 @@ func (c *cache) AddEntry(task concurrency.Task, content Cacheable) (*Entry, fail
 		return nil, xerr
 	}
 	return cacheEntry, nil
-	//
-	// if _, ok := c.cache[id]; ok {
-	// 	return nil, fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry in the cache with id %s", id), 0))
-	// }
-	//
-	// ce := newEntry(content)
-	// c.cache[id] = &ce
-	//
-	// return &ce, fail.ConvertError(content.AddObserver(task, c))
 }
 
 // SignalChange tells the cache entry something has been changed in the content
@@ -240,7 +231,10 @@ func (c cache) SignalChange(task concurrency.Task, key string) {
 	defer c.SafeRUnlock(task)
 
 	if ce, ok := c.cache[key]; ok {
-		ce.lastUpdated.Store(time.Now())
+		ce.lock()
+		defer ce.unlock()
+
+		ce.lastUpdated = time.Now()
 	}
 }
 
