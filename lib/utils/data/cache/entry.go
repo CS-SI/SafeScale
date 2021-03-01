@@ -16,8 +16,6 @@
 
 package cache
 
-//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Cacheable
-
 import (
 	"sync"
 	"sync/atomic"

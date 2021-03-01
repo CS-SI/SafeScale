@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_bucket.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage Bucket
+//go:generate minimock -o ../mocks/mock_bucket.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Bucket
 
 const (
 	// RootPath defines the path corresponding of the root of a Bucket

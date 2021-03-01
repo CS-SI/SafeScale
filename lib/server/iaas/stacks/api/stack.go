@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_stack.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api Stack
+//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api.Stack
 
 // Stack is the interface to cloud stack
 type Stack interface {

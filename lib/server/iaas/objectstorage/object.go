@@ -38,7 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_object.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage Object
+//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Object
 
 // Object interface
 type Object interface {

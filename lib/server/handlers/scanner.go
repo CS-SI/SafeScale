@@ -41,7 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-//go:generate mockgen -destination=../mocks/mock_imageapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers ScannerHandler
+//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ScannerHandler
 
 // PriceInfo stores price information
 type PriceInfo struct {

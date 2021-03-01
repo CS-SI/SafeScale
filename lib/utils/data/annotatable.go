@@ -16,7 +16,7 @@
 
 package data
 
-//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Clonable
+//go:generate minimock -o ../mocks/mock_annotatable.go -i github.com/CS-SI/SafeScale/lib/utils/data.Annotatable
 
 // Annotation ...
 type Annotation interface{}

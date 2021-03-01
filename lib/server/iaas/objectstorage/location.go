@@ -37,7 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_location.go -package=mocks github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage Location
+//go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
 

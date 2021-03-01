@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//go:generate mockgen -destination=../mocks/mock_taskedlock.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/concurrency TaskedLock
+//go:generate minimock -o ../mocks/mock_taskedlock.go -i github.com/CS-SI/SafeScale/lib/utils/concurrency.TaskedLock
 
 // TaskedLockHelpers ...
 type TaskedLockHelpers interface {

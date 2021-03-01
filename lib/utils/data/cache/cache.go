@@ -16,7 +16,7 @@
 
 package cache
 
-//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data/cache Cache
+//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cache
 
 import (
 	"fmt"
@@ -33,7 +33,6 @@ import (
 // Cache interface describing what a struct must implement to be considered as a Cache
 type Cache interface {
 	concurrency.TaskedLock
-	data.Identifiable
 	observer.Observer
 
 	GetEntry(task concurrency.Task, key string) (*Entry, fail.Error)                       // returns a cache entry from its key
@@ -41,7 +40,6 @@ type Cache interface {
 	CommitEntry(task concurrency.Task, key string, content Cacheable) (*Entry, fail.Error) // fills a previously reserved entry with content
 	FreeEntry(task concurrency.Task, key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
 	AddEntry(task concurrency.Task, content Cacheable) (*Entry, fail.Error)                // AddEntry adds a content in cache
-
 }
 
 type cache struct {

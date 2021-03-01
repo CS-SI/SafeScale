@@ -16,7 +16,7 @@
 
 package data
 
-//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data Clonable
+//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/lib/utils/data.Clonable
 
 // Clonable is the interface a struct must satisfy to be able to be cloned
 type Clonable interface {

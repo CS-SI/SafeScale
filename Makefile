@@ -15,9 +15,9 @@ PKG_FILES := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v 
 # List of packages
 PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/)
 # List of packages alt
-PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks | grep -v vclouddirector | grep -v ebrc |  xargs -I {} dirname {} | uniq )
+PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks | grep -v vclouddirector | grep -v ebrc | grep -v cli | xargs -I {} dirname {} | uniq )
 # List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/ | grep -v sandbox)
+TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /cli)
 
 # DEPENDENCIES MANAGEMENT
 STRINGER := golang.org/x/tools/cmd/stringer
@@ -27,7 +27,7 @@ PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
 # Build tools
 CONVEY := github.com/smartystreets/goconvey
-MOCKGEN := github.com/golang/mock/gomock github.com/golang/mock/mockgen
+MINIMOCK := github.com/gojuno/minimock/v3/cmd/minimock
 COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
 ERRCHECK := github.com/kisielk/errcheck
@@ -79,8 +79,8 @@ getdevdeps: begin ground
 	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
 	fi
-	@which mockgen > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading mockgen...\n" && $(GO) get -u  $(MOCKGEN) &>/dev/null || true; \
+	@which minimock > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) install $(MINIMOCK) &>/dev/null || true; \
 	fi
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) &>/dev/null || true; \
@@ -153,9 +153,9 @@ generate: sdk
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
 
-test: begin generate mockgen # Run unit tests
+test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test -v ${PKG_LIST_ALT} 2>&1 > test_results.log || true
+	$(GO) test -v github.com/CS-SI/SafeScale/integrationtests/... github.com/CS-SI/SafeScale/lib/... 2>&1 > test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
@@ -177,8 +177,11 @@ vet: begin generate
 	@$(GO) vet ${PKG_LIST_ALT} 2>&1 | tee vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
-mockgen:
-	@$(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log
+minimock:
+	@$(GO) generate -run minimock ./... 2>&1 | tee -a generation_results.log
+
+silentminimock:
+	@$(GO) generate -run minimock ./... 2>&1 >> generation_results.log
 
 lint: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running lint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

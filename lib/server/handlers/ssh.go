@@ -47,7 +47,7 @@ import (
 
 const protocolSeparator = ":"
 
-//go:generate mockgen -destination=../mocks/mock_sshapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers SSHHandler
+//go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.SSHHandler
 
 // TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
 
