@@ -219,7 +219,7 @@ func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 	rh.SafeLock(task)
 	defer rh.SafeUnlock(task)
 
-	return rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return rh.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var primaryGatewayConfig, secondaryGatewayConfig *system.SSHConfig
 
 		ahc, ok := clonable.(*abstract.HostCore)
