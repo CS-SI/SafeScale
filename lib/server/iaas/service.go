@@ -160,9 +160,6 @@ func (svc *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	// if svc.cache.resources == nil {
-	// 	svc.cache.resources = map[string]*ResourceCache{}
-	// }
 	svc.cacheLock.Lock()
 	defer svc.cacheLock.Unlock()
 

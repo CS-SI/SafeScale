@@ -18,18 +18,16 @@ package cache
 
 import (
 	"sync"
-	"sync/atomic"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
 // Entry is a struct containing information about a cache entry
 type Entry struct {
-	// key         atomic.Value
-	// content     data.Cacheable
 	content     data.ImmutableKeyValue
-	use         atomic.Value
-	lastUpdated atomic.Value
+	use         uint
+	lastUpdated time.Time
 	mu          *sync.Mutex
 }
 
@@ -39,12 +37,12 @@ func newEntry(content Cacheable) Entry {
 		content: data.NewImmutableKeyValue(content.GetID(), content),
 		mu:      &sync.Mutex{},
 	}
-	ce.use.Store(uint(0))
+	ce.use = 0
 	return ce
 }
 
 // GetKey returns the key of the cache entry
-func (ce Entry) GetKey() string {
+func (ce *Entry) GetKey() string {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
@@ -52,7 +50,7 @@ func (ce Entry) GetKey() string {
 }
 
 // Content returns the content of the cache
-func (ce Entry) Content() interface{} {
+func (ce *Entry) Content() interface{} {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
@@ -64,8 +62,8 @@ func (ce *Entry) LockContent() uint {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
-	ce.use.Store(ce.use.Load().(uint) + 1)
-	return ce.use.Load().(uint)
+	ce.use++
+	return ce.use
 }
 
 // UnlockContent decrements the counter of use of cache entry
@@ -73,16 +71,16 @@ func (ce *Entry) UnlockContent() uint {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
-	ce.use.Store(ce.use.Load().(uint) - 1)
-	return ce.use.Load().(uint)
+	ce.use--
+	return ce.use
 }
 
 // LockCount returns the current count of locks of the content
-func (ce Entry) LockCount() uint {
+func (ce *Entry) LockCount() uint {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
-	return ce.use.Load().(uint)
+	return ce.use
 }
 
 func (ce *Entry) lock() {
